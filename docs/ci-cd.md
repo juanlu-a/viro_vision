@@ -20,13 +20,32 @@ and are skipped (not failed) until EAS is set up — so nothing blocks merging b
 - Require the **CI** status checks to pass: _Lint · Typecheck · Test_ and _Bundle (build check)_.
 - (Optional) require branches to be up to date before merging.
 
-## Enabling the EAS workflows (done in the EAS pillar / item 2)
+## Enabling the EAS workflows
 
-1. `cd app && eas init` — creates the EAS project and adds `projectId` to `app.json`.
-2. Add `eas.json` with `development` / `preview` / `production` profiles (incl. an `ios` profile).
-3. Create an Expo access token and add it as the repo **secret** `EXPO_TOKEN`.
-4. Set the repo **variable** `EAS_ENABLED` to `true`.
-5. For iOS builds: connect the Apple Developer account so EAS can manage signing.
+`app/eas.json` is already committed with three build profiles, each bound to an EAS Update channel:
+
+| Profile | Channel | Distribution | iOS |
+|---------|---------|--------------|-----|
+| `development` | `development` | internal | simulator + dev client |
+| `preview` | `preview` | internal | **simulator** (no Apple account needed) |
+| `production` | `production` | store | device (needs Apple Developer account) |
+
+Channels map to update branches, so `eas update --branch preview` (the deploy workflow) is served to
+`preview`-channel builds.
+
+Interactive one-time setup (run locally — these need your Expo login; in this session you can run
+them via `! eas login` etc.):
+
+1. `cd app && eas login`
+2. `eas init` — creates the EAS project and writes `extra.eas.projectId` into `app.json`.
+3. `eas update:configure` — installs `expo-updates` and sets `updates.url` + a `runtimeVersion`
+   policy (fingerprint) so OTA updates resolve correctly.
+4. Create an Expo access token (expo.dev → account → access tokens) and add it as the repo **secret**
+   `EXPO_TOKEN`.
+5. Set the repo **variable** `EAS_ENABLED` to `true`.
+6. For **production/device iOS** builds only: connect the Apple Developer account so EAS can manage
+   signing. The **preview** profile builds an iOS **simulator** app and needs no Apple account, so it
+   can validate the native build before the account exists.
 
 Then: pushes to `main` publish a preview update, and _Actions → EAS Build (iOS) → Run workflow_
 starts an iOS build.
