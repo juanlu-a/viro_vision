@@ -1,0 +1,61 @@
+name: CI
+
+# Quality gates for every pull request into main and every push to a feature branch.
+# Pushes to main are handled by the EAS deploy workflow instead (this repo merges via PR).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches-ignore: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: ./app
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies (install check)
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test -- --ci
+
+  build:
+    name: Bundle (build check)
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      # Bundles the JS for both native targets — validates the app compiles end to end
+      # (imports resolve, config plugins apply) without needing native toolchains.
+      - name: Export bundle (iOS + Android)
+        run: npx expo export --platform ios --platform android --output-dir dist
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-export
+          path: app/dist
+          retention-days: 7
