@@ -1,0 +1,38 @@
+# Root .gitignore for the ViroVision monorepo.
+# The React Native app (app/) has its own .gitignore for JS/Expo/native artifacts.
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Editors ---
+.idea/
+*.swp
+
+# --- Node (safety net; app/ also ignores these) ---
+node_modules/
+
+# --- Python (hardware/ and ml/) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.ipynb_checkpoints/
+
+# --- ML: datasets, weights and runs (keep out of git; store via DVC / external storage) ---
+ml/datasets/
+ml/runs/
+ml/**/*.pt
+ml/**/*.onnx
+ml/**/*.tflite
+ml/**/*.weights
+
+# --- Secrets / local env ---
+.env
+.env.local
+*.local
+
+# --- Logs ---
+*.log
