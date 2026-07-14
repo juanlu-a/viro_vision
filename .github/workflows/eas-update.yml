@@ -1,0 +1,41 @@
+name: EAS Update (preview)
+
+# Publishes an over-the-air EAS Update to the "preview" branch/channel so the latest main
+# can be previewed in a dev/preview client as an update group.
+#
+# Requires (see docs/ci-cd.md): repository variable EAS_ENABLED=true, secret EXPO_TOKEN, an
+# initialized EAS project (eas.json + projectId) — added when the EAS pillar is configured.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: eas-update-preview
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: ./app
+
+jobs:
+  publish-preview:
+    name: Publish preview update
+    # Skipped until EAS is configured, so it never blocks the pipeline prematurely.
+    if: ${{ vars.EAS_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Publish EAS Update (preview)
+        run: eas update --branch preview --message "${{ github.event.head_commit.message || github.sha }}" --non-interactive

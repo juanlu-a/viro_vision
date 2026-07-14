@@ -2,16 +2,18 @@
  * Supabase client for ViroVision's online account layer (auth, profile, sync, model-file hosting).
  * See ADR 0002 (docs/architecture/adr/0002-backend-and-auth-supabase.md).
  *
- * STATUS: interface + honest stub. The real implementation wraps `@supabase/supabase-js`, configured
- * with `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` (see app/.env.example) and a
- * secure-storage session adapter (e.g. expo-secure-store) with `persistSession: true` and
- * `autoRefreshToken: true`. It is intentionally NOT wired yet, so the app builds and runs with no
- * backend and no network dependency.
+ * This module exposes the interface, the offline-safe stub, and the selector `getSupabaseAuthClient()`
+ * which returns the real `@supabase/supabase-js`-backed client (authClient.ts + supabase.ts) when the
+ * project is configured via `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+ * (see app/.env.example), and the stub otherwise — so the app always builds and runs with no backend.
  *
  * BOUNDARY RULE (ADR 0001 + 0002): this client must never be called from the camera → detection/OCR
  * → announcement path. It serves the account layer only, and must degrade gracefully offline.
  */
 import type { AuthSession } from '@/features/auth/types';
+
+import { createSupabaseAuthClient } from './authClient';
+import { getSupabaseClient } from './supabase';
 
 export interface SupabaseAuthClient {
   /** Restore a persisted session on startup (no network needed if a valid session is cached). */
@@ -49,9 +51,11 @@ const stubClient: SupabaseAuthClient = {
 };
 
 /**
- * Returns the app's Supabase auth client. Swap `stubClient` for the real
- * `@supabase/supabase-js`-backed implementation once the project + env vars exist.
+ * Returns the app's Supabase auth client: the real `@supabase/supabase-js`-backed client when the
+ * project is configured (EXPO_PUBLIC_SUPABASE_* env vars present), otherwise the offline-safe stub.
+ * This keeps the app runnable with no backend while enabling real Google sign-in once configured.
  */
 export function getSupabaseAuthClient(): SupabaseAuthClient {
-  return stubClient;
+  const supabase = getSupabaseClient();
+  return supabase ? createSupabaseAuthClient(supabase) : stubClient;
 }

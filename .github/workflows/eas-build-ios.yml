@@ -1,0 +1,45 @@
+name: EAS Build (iOS)
+
+# Triggers a native iOS build on EAS Build (cloud). Manual by design: iOS builds consume EAS
+# build credits and require Apple Developer credentials, so they are not run on every push.
+#
+# Requires (see docs/ci-cd.md): repository variable EAS_ENABLED=true, secret EXPO_TOKEN, an
+# initialized EAS project with an "ios" build profile in eas.json, and a connected Apple
+# Developer account (for signing) — configured when the EAS/iOS pillar is set up.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        default: preview
+        type: choice
+        options: [preview, production]
+
+concurrency:
+  group: eas-build-ios
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: ./app
+
+jobs:
+  build-ios:
+    name: Build iOS (${{ inputs.profile }})
+    if: ${{ vars.EAS_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Start iOS build on EAS
+        run: eas build --platform ios --profile ${{ inputs.profile }} --non-interactive --no-wait
