@@ -8,30 +8,14 @@ raw chat transcript.
 
 ---
 
-## ⚠️ Read this first — `main` is missing merged work
+## Current state — everything is in `main` ✅
 
-PRs #2, #3, #4 show **MERGED**, but they were **stacked** (each based on the previous feature branch),
-so they merged into their intermediate branches — **not into `main`**. As of now:
+All setup work (scaffold, CI/CD, EAS config, Supabase auth) is merged into `main` and CI is green.
+The stale feature branches have been deleted; branch from an up-to-date `main` for new work.
 
-- **`main` contains only the scaffold (#1):** monorepo + knowledge skill + ADRs + RN app.
-- **CI/CD, EAS config, and Supabase auth are NOT in `main`.** They are complete, green, and live on
-  the branches — the full, linear stack is on **`feat/supabase-auth`** (tip contains everything).
-
-### How to fix (get everything into `main`)
-Open one PR from the top-of-stack branch into main and merge it (the scaffold is already in main, so
-the diff is just CI + EAS + Supabase):
-
-```bash
-gh pr create --base main --head feat/supabase-auth \
-  --title "Consolidate CI/CD, EAS config, and Supabase auth into main"
-# review, then merge
-```
-
-After merging, delete the stale feature branches (`feat/ci-cd`, `feat/eas-setup`,
-`feat/scaffold-monorepo-and-app`, `feat/supabase-auth`).
-
-> Lesson for next time: don't stack PRs unless each base is retargeted to `main` as it merges. Prefer
-> branching each change from an up-to-date `main`.
+> History note: PRs #1–#4 were **stacked**, so #2–#4 initially merged into intermediate branches
+> rather than `main`; they were then consolidated into `main` via PR #5. Lesson: don't stack PRs
+> unless each base is retargeted to `main` as it merges — prefer branching each change from `main`.
 
 ---
 
