@@ -73,11 +73,11 @@ default, using each platform's session/routing APIs (`AVAudioSession` on iOS,
 it as a typed stub.
 
 ## Auth / backend (online account layer)
-Google login via **Supabase OAuth (web redirect)** is wired in `src/services/supabase/` and
-env-gated: with no `EXPO_PUBLIC_SUPABASE_*` vars it falls back to an offline-safe stub; with them set
-it does real sign-in (browser → exchange code → AsyncStorage-persisted session that survives offline).
-Setup + dashboard config: `docs/supabase.md`. Strictly separated from the offline recognition path
-(ADR 0001/0002).
+Login via **Supabase email + password** (native auth — no Google/OAuth) is wired in
+`src/services/supabase/` and env-gated: with no `EXPO_PUBLIC_SUPABASE_*` vars it falls back to an
+offline-safe stub; with them set it does real `signInWithPassword` / `signUp` (AsyncStorage-persisted
+session that survives offline). Setup: `docs/supabase.md`. Strictly separated from the offline
+recognition path (ADR 0001/0002).
 
 ## Scaffold status
 Structure + one accessible starting screen only. BLE and audio are typed stubs/interfaces this

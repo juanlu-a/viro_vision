@@ -43,31 +43,31 @@ docs/       thesis deliverables, ADRs, this file
 - **ADR 0001 — Offline-first:** essential recognition (detection, OCR, audio) MUST work with no
   internet; the model runs **locally** (on device or bundled on the phone), never a cloud inference
   API. Internet only for non-essential features.
-- **ADR 0002 — Backend & auth:** **Supabase** is the online account layer (Google login, profile,
+- **ADR 0002 — Backend & auth:** **Supabase** is the online account layer (email login, profile,
   sync, model-file hosting), strictly separated from the offline core. A signed-in user stays signed
   in offline.
-- Google login method chosen: **Supabase OAuth web redirect** (`signInWithOAuth`).
+- Login method: **Supabase email + password** (`signInWithPassword` / `signUp`) — no Google/OAuth.
 - **Git convention:** no AI co-author trailers on commits/PRs (also in the skill).
 
 ## App tech stack
 
 Expo SDK 57 · React Native 0.86 · React 19.2 · TypeScript 6 · New Architecture (JSI) · Expo Router.
 Key deps: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supabase/supabase-js`,
-`@react-native-async-storage/async-storage`, `expo-auth-session`, `react-native-url-polyfill`;
+`@react-native-async-storage/async-storage`, `react-native-url-polyfill`;
 tests via `jest-expo`.
 
 ## What's done per pillar
 
 **App** (structure + honest stubs):
 - Screens: `index` (Home — navigation + **working TTS** "Probar audio"), `connect` (BLE, live-region
-  status), `settings` (account / Google sign-in).
+  status), `settings` (account / email sign-in + sign-up form).
 - Domain layers under `app/src/`: `features/{recognition,device,audio,auth}`,
   `services/{ble,audio,supabase,storage}`, `i18n` (Spanish strings), `types`.
 - **BLE** = typed stub (`services/ble/bleClient.ts`) — GATT profile placeholders in
   `features/device/gatt.ts`. Not wired (needs a dev-client build + real device).
 - **Audio routing** to the device earphone = documented TODO in `services/audio/tts.ts`.
 - **Supabase auth** = wired + env-gated: no `EXPO_PUBLIC_SUPABASE_*` → offline-safe stub; configured →
-  real Google OAuth (browser → exchange code → AsyncStorage-persisted session).
+  real email sign-in (`signInWithPassword` / `signUp` → AsyncStorage-persisted session).
 - Tests: `app/src/features/recognition/format.test.ts` (5 passing).
 
 **CI/CD** (`.github/workflows/`, gated EAS jobs):
@@ -88,8 +88,8 @@ preview builds an iOS **simulator** app (no Apple account needed).
 1. **EAS** (run locally; in a Claude session use `! ` prefix):
    `cd app && eas login && eas init && eas update:configure`, then add repo **secret** `EXPO_TOKEN`
    and **variable** `EAS_ENABLED=true`. `eas init`/`update:configure` edit `app.json` — fold those in.
-2. **Supabase** (see `docs/supabase.md`): create project → enable Google provider → allow-list
-   `virovision://auth/callback` (+ dev redirect) → Google Cloud OAuth web client → fill `app/.env`.
+2. **Supabase** (see `docs/supabase.md`): create project → enable **Email** auth → (optional) turn off
+   email confirmation for testing → fill `app/.env`. No Google Cloud / OAuth needed.
 3. **iOS Developer account** — enroll in the Apple Developer Program ($99/yr); then EAS handles signing.
 
 ## What's next — options (was mid-discussion)
