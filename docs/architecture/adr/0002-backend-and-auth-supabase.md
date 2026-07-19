@@ -6,9 +6,13 @@
 - **Tags:** app, backend, auth, requirement
 - **Relates to:** [ADR 0001 — Offline-first](0001-offline-first-on-device-inference.md)
 
+> **Update (2026-07-18):** the login method is **email + password** (Supabase native auth) — the
+> earlier draft of this ADR specified Google OAuth (web redirect); that has been dropped. Everything
+> else (Supabase as the online account layer, strictly separated from the offline core) stands.
+
 ## Context
 
-ViroVision needs user accounts: **login (Google)**, a user profile, synced settings, saved history,
+ViroVision needs user accounts: **login (email + password)**, a user profile, synced settings, saved history,
 and a way to distribute **model-file updates**. All of these require the internet.
 
 At the same time, ADR 0001 makes offline recognition a hard requirement. So we need a backend for the
@@ -28,7 +32,7 @@ explicitly rejected by ADR 0001 — inference runs locally. The backend may host
    - **Boundary rule:** *nothing on the camera → detection/OCR → announcement path may `await` a
      network call.* Auth/sync live in their own modules and always degrade gracefully.
 
-2. **Supabase provides** Auth (Google OAuth), Postgres (with Row Level Security per user), and
+2. **Supabase provides** Auth (email + password — no Google/OAuth), Postgres (with Row Level Security per user), and
    Storage (model files / assets). Realtime and Edge Functions are available but not required.
 
 3. **Session persistence / offline login.** The Supabase session is persisted in device secure
@@ -54,7 +58,7 @@ explicitly rejected by ADR 0001 — inference runs locally. The backend may host
 ## Consequences
 
 **Positive**
-- Google login, per-user data (RLS), and asset hosting with minimal backend work; generous free tier.
+- Email login, per-user data (RLS), and asset hosting with minimal backend work; generous free tier.
 - Open-source / self-hostable → mitigates vendor lock-in.
 - Clean separation keeps the offline guarantee (ADR 0001) intact.
 
@@ -63,8 +67,8 @@ explicitly rejected by ADR 0001 — inference runs locally. The backend may host
   since account data is non-essential; if offline edits that sync are needed later, add a local-first
   layer (SQLite / WatermelonDB / Legend-State / PowerSync).
 - Requires care so no essential code path awaits Supabase (enforced by the boundary rule above).
-- Google OAuth in Expo needs setup: redirect/deep-link config and either Supabase `signInWithOAuth`
-  or native Google sign-in.
+- Email auth keeps setup minimal: no Google Cloud OAuth client, no redirect/deep-link config — just
+  enable Email auth in Supabase (and decide whether email confirmation is required).
 - Config via env: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (see `app/.env.example`).
 
 ## Implications for the current code

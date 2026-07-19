@@ -18,8 +18,13 @@ import { getSupabaseClient } from './supabase';
 export interface SupabaseAuthClient {
   /** Restore a persisted session on startup (no network needed if a valid session is cached). */
   getSession(): Promise<AuthSession | null>;
-  /** Start Google OAuth (requires internet). Resolves once a session is established. */
-  signInWithGoogle(): Promise<AuthSession>;
+  /** Sign in with email + password (requires internet). Resolves with the established session. */
+  signInWithEmail(email: string, password: string): Promise<AuthSession>;
+  /**
+   * Create an account with email + password. Resolves with the session if one was created, or `null`
+   * when email confirmation is required first (no session until the user confirms).
+   */
+  signUpWithEmail(email: string, password: string): Promise<AuthSession | null>;
   /** Explicit sign-out. Clears the persisted session. */
   signOut(): Promise<void>;
   /** Subscribe to session changes (sign-in, sign-out, silent refresh). Returns an unsubscribe fn. */
@@ -39,7 +44,10 @@ const stubClient: SupabaseAuthClient = {
     // No backend yet: behave as a signed-out, offline-safe app.
     return null;
   },
-  async signInWithGoogle() {
+  async signInWithEmail() {
+    throw new SupabaseNotConfiguredError();
+  },
+  async signUpWithEmail() {
     throw new SupabaseNotConfiguredError();
   },
   async signOut() {
@@ -53,7 +61,7 @@ const stubClient: SupabaseAuthClient = {
 /**
  * Returns the app's Supabase auth client: the real `@supabase/supabase-js`-backed client when the
  * project is configured (EXPO_PUBLIC_SUPABASE_* env vars present), otherwise the offline-safe stub.
- * This keeps the app runnable with no backend while enabling real Google sign-in once configured.
+ * This keeps the app runnable with no backend while enabling real email sign-in once configured.
  */
 export function getSupabaseAuthClient(): SupabaseAuthClient {
   const supabase = getSupabaseClient();

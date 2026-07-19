@@ -1,10 +1,10 @@
 /**
  * Hook that owns the auth session state for the online account layer (ADR 0002).
  *
- * Offline behavior: on startup it restores a persisted session (no network needed); a signed-in user
- * stays signed in while offline. `signInWithGoogle` requires internet and, until Supabase is
- * configured, surfaces an honest "not configured yet" message instead of faking success. When the
- * real client lands, only services/supabase/client.ts changes — this hook and the UI stay the same.
+ * Auth is Supabase email + password (no OAuth). Offline behavior: on startup it restores a persisted
+ * session (no network needed); a signed-in user stays signed in while offline. Until Supabase is
+ * configured, sign-in surfaces an honest "not configured yet" message instead of faking success. When
+ * the backend is configured, only services/supabase changes — this hook and the UI stay the same.
  */
 import { useCallback, useEffect, useState } from 'react';
 
@@ -21,10 +21,22 @@ const loadingState: AuthState = {
   message: strings.auth.loading,
 };
 
+const signingInState: AuthState = {
+  status: 'loading',
+  user: null,
+  message: strings.auth.signingIn,
+};
+
 function toState(session: AuthSession | null): AuthState {
   return session
     ? { status: 'signedIn', user: session.user, message: strings.auth.signedIn }
     : { status: 'signedOut', user: null, message: strings.auth.signedOut };
+}
+
+function errorState(err: unknown): AuthState {
+  const message =
+    err instanceof SupabaseNotConfiguredError ? strings.auth.notConfigured : strings.auth.error;
+  return { status: 'error', user: null, message };
 }
 
 export function useAuth() {
@@ -48,16 +60,28 @@ export function useAuth() {
     };
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
+  const signIn = useCallback(async (email: string, password: string) => {
+    setState(signingInState);
     try {
-      const session = await getSupabaseAuthClient().signInWithGoogle();
+      const session = await getSupabaseAuthClient().signInWithEmail(email, password);
       setState(toState(session));
     } catch (err) {
-      const message =
-        err instanceof SupabaseNotConfiguredError
-          ? strings.auth.notConfigured
-          : strings.auth.error;
-      setState({ status: 'error', user: null, message });
+      setState(errorState(err));
+    }
+  }, []);
+
+  const signUp = useCallback(async (email: string, password: string) => {
+    setState(signingInState);
+    try {
+      const session = await getSupabaseAuthClient().signUpWithEmail(email, password);
+      // No session means email confirmation is required before the account is usable.
+      setState(
+        session
+          ? toState(session)
+          : { status: 'signedOut', user: null, message: strings.auth.confirmEmail },
+      );
+    } catch (err) {
+      setState(errorState(err));
     }
   }, []);
 
@@ -66,5 +90,5 @@ export function useAuth() {
     setState(toState(null));
   }, []);
 
-  return { state, signInWithGoogle, signOut };
+  return { state, signIn, signUp, signOut };
 }
