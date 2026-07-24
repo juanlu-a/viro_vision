@@ -10,6 +10,14 @@
 > earlier draft of this ADR specified Google OAuth (web redirect); that has been dropped. Everything
 > else (Supabase as the online account layer, strictly separated from the offline core) stands.
 
+> **Update (2026-07-20) — app ships WITHOUT login.** After discussion with the team + tutor: the core
+> is offline-first (on-device model + BLE), so accounts add no value and only friction (App Store
+> obligations; an accessibility barrier). Apple does not require a login (Guideline 5.1.1 discourages
+> forcing registration when it isn't core). The app now **opens directly to the tabs — no gate, no
+> login screen.** This account layer (Supabase email auth + `AuthProvider`) is **archived, not
+> deleted** — kept for a possible future *optional* sync, not wired into navigation. If login ever
+> returns it stays email + password (never Google/OAuth).
+
 ## Context
 
 ViroVision needs user accounts: **login (email + password)**, a user profile, synced settings, saved history,

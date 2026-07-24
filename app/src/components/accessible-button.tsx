@@ -1,22 +1,24 @@
 /**
- * A large, high-contrast, screen-reader-friendly button built from the standard RN `Pressable`.
+ * Large, high-contrast, screen-reader-friendly button built from the standard RN `Pressable`.
  *
- * Uses a standard native component (per the Mascetti et al. 2020 strategy: standard components
- * inherit correct VoiceOver/TalkBack behavior) and always sets an explicit accessibility role,
- * label and (optional) hint. Enforces the minimum touch-target size for low-vision users.
+ * Standard native component (Mascetti et al. strategy) with an explicit accessibility role, label and
+ * hint, a ≥48dp target, theme-aware colors, and subtle haptic feedback (useful non-visual signal).
  */
-import { Pressable, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 
-import { A11y, Brand, Spacing } from '@/constants/theme';
-import { ThemedText } from '@/components/themed-text';
+import { Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 export type AccessibleButtonProps = {
   label: string;
   onPress: () => void;
-  /** Extra context announced by the screen reader about what happens on activation. */
   hint?: string;
-  variant?: 'primary' | 'secondary';
+  variant?: ButtonVariant;
   disabled?: boolean;
+  loading?: boolean;
 };
 
 export function AccessibleButton({
@@ -25,61 +27,74 @@ export function AccessibleButton({
   hint,
   variant = 'primary',
   disabled = false,
+  loading = false,
 }: AccessibleButtonProps) {
-  const isPrimary = variant === 'primary';
+  const theme = useTheme();
+  const isDisabled = disabled || loading;
+
+  const bg =
+    variant === 'primary' ? theme.primary : variant === 'danger' ? theme.danger : 'transparent';
+  const borderColor = variant === 'secondary' ? theme.border : 'transparent';
+  const labelColor =
+    variant === 'primary' || variant === 'danger'
+      ? theme.onPrimary
+      : variant === 'ghost'
+        ? theme.primary
+        : theme.text;
+
+  const handlePress = () => {
+    Haptics.selectionAsync().catch(() => {});
+    onPress();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
-      disabled={disabled}
+      onPress={handlePress}
+      disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       style={({ pressed }) => [
         styles.base,
-        isPrimary ? styles.primary : styles.secondary,
+        { backgroundColor: bg, borderColor, borderWidth: variant === 'secondary' ? 1.5 : 0 },
         pressed && styles.pressed,
-        disabled && styles.disabled,
+        isDisabled && styles.disabled,
       ]}>
-      <ThemedText
-        type="default"
-        style={[styles.label, isPrimary && styles.labelPrimary]}
-        // The Pressable is the accessible element; hide the inner text from the reader.
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants">
-        {label}
-      </ThemedText>
+      {loading ? (
+        <ActivityIndicator color={labelColor} />
+      ) : (
+        <Text
+          style={[styles.label, { color: labelColor }]}
+          numberOfLines={1}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants">
+          {label}
+        </Text>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: A11y.minTouchTarget,
+    minHeight: 52,
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.four,
-    borderRadius: 12,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primary: {
-    backgroundColor: Brand.primary,
-  },
-  secondary: {
-    borderWidth: 2,
-    borderColor: Brand.primary,
-  },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.75,
   },
   disabled: {
     opacity: 0.4,
   },
   label: {
+    fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
-  },
-  labelPrimary: {
-    color: Brand.onPrimary,
+    letterSpacing: 0.2,
   },
 });

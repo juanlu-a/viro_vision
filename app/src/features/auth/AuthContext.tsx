@@ -1,12 +1,12 @@
 /**
- * Hook that owns the auth session state for the online account layer (ADR 0002).
+ * Shared auth state for the online account layer (ADR 0002), exposed via context so the auth gate
+ * (navigation) and screens read one session — not independent copies.
  *
- * Auth is Supabase email + password (no OAuth). Offline behavior: on startup it restores a persisted
- * session (no network needed); a signed-in user stays signed in while offline. Until Supabase is
- * configured, sign-in surfaces an honest "not configured yet" message instead of faking success. When
- * the backend is configured, only services/supabase changes — this hook and the UI stay the same.
+ * Auth is Supabase email + password (no OAuth). On startup it restores a persisted session (no network
+ * needed); a signed-in user stays signed in offline. Until Supabase is configured, sign-in surfaces an
+ * honest "not configured yet" message instead of faking success.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { strings } from '@/i18n';
 import {
@@ -15,17 +15,15 @@ import {
 } from '@/services/supabase/client';
 import type { AuthSession, AuthState } from './types';
 
-const loadingState: AuthState = {
-  status: 'loading',
-  user: null,
-  message: strings.auth.loading,
+type AuthContextValue = {
+  state: AuthState;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
-const signingInState: AuthState = {
-  status: 'loading',
-  user: null,
-  message: strings.auth.signingIn,
-};
+const loadingState: AuthState = { status: 'loading', user: null, message: strings.auth.loading };
+const signingInState: AuthState = { status: 'loading', user: null, message: strings.auth.signingIn };
 
 function toState(session: AuthSession | null): AuthState {
   return session
@@ -39,21 +37,20 @@ function errorState(err: unknown): AuthState {
   return { status: 'error', user: null, message };
 }
 
-export function useAuth() {
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(loadingState);
 
   useEffect(() => {
     const client = getSupabaseAuthClient();
     let active = true;
-
     client.getSession().then((session) => {
       if (active) setState(toState(session));
     });
-
     const unsubscribe = client.onAuthStateChange((session) => {
       if (active) setState(toState(session));
     });
-
     return () => {
       active = false;
       unsubscribe();
@@ -63,8 +60,7 @@ export function useAuth() {
   const signIn = useCallback(async (email: string, password: string) => {
     setState(signingInState);
     try {
-      const session = await getSupabaseAuthClient().signInWithEmail(email, password);
-      setState(toState(session));
+      setState(toState(await getSupabaseAuthClient().signInWithEmail(email, password)));
     } catch (err) {
       setState(errorState(err));
     }
@@ -74,7 +70,6 @@ export function useAuth() {
     setState(signingInState);
     try {
       const session = await getSupabaseAuthClient().signUpWithEmail(email, password);
-      // No session means email confirmation is required before the account is usable.
       setState(
         session
           ? toState(session)
@@ -90,5 +85,13 @@ export function useAuth() {
     setState(toState(null));
   }, []);
 
-  return { state, signIn, signUp, signOut };
+  const value = useMemo(() => ({ state, signIn, signUp, signOut }), [state, signIn, signUp, signOut]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 }

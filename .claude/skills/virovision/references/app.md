@@ -72,12 +72,13 @@ default, using each platform's session/routing APIs (`AVAudioSession` on iOS,
 (e.g. `expo-audio` / `react-native-track-player`). Full routing is a later task; the scaffold keeps
 it as a typed stub.
 
-## Auth / backend (online account layer)
-Login via **Supabase email + password** (native auth — no Google/OAuth) is wired in
-`src/services/supabase/` and env-gated: with no `EXPO_PUBLIC_SUPABASE_*` vars it falls back to an
-offline-safe stub; with them set it does real `signInWithPassword` / `signUp` (AsyncStorage-persisted
-session that survives offline). Setup: `docs/supabase.md`. Strictly separated from the offline
-recognition path (ADR 0001/0002).
+## Auth / backend (online account layer) — ARCHIVED, app has NO login
+Decision (2026-07-20, team + tutor): **the app ships without a login** — it opens directly to the tabs.
+The core is offline-first (on-device model + BLE), so accounts add no value; Apple doesn't require a
+login. The Supabase email-auth code (`features/auth/AuthContext.tsx`, `src/services/supabase/*`) is
+**archived, not deleted** — present in the repo but **not wired into navigation** — kept for a possible
+future *optional* sync. If login ever returns it's Supabase **email + password** (never Google/OAuth).
+See ADR 0002.
 
 ## Scaffold status
 Structure + one accessible starting screen only. BLE and audio are typed stubs/interfaces this
