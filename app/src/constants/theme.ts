@@ -1,8 +1,20 @@
 /**
  * ViroVision design system — tokens.
  *
- * Identity: green + black (dark, default) with a clean white light mode. Minimalist, high-contrast,
- * accessibility-first (WCAG AA). Semantic color names so screens never hardcode hex values.
+ * Identidad de marca (ver `docs/brand/virovision-marca.md`): azul profundo, azul sensor y verde
+ * lectura. **Los tokens NO son los hex del manual tal cual**, y eso es deliberado:
+ *
+ *   - Azul Sensor `#1256D4` sobre Azul Profundo da **2.10:1** — falla WCAG por lejos.
+ *   - Verde Lectura `#1FB57A` sobre Gris Niebla da **2.44:1** — también falla.
+ *   - Blanco sobre Verde Lectura (botón) da **2.64:1** — falla.
+ *
+ * No es un error del manual: un logo no es texto, y WCAG no le exige contraste a un símbolo. Pero
+ * usar esos hex como color de texto o de relleno degradaría la accesibilidad — en una app para
+ * personas con baja visión eso no es aceptable. Así que los tokens **conservan el tono de la marca
+ * y ajustan la luminosidad** hasta alcanzar el contraste.
+ *
+ * Objetivo: **AAA (7:1)** para texto, AA (4.5:1) como piso. `theme.test.ts` lo verifica
+ * automáticamente — si alguien "corrige" un token para que coincida con el manual, el test falla.
  */
 import '@/global.css';
 
@@ -10,37 +22,43 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   dark: {
-    background: '#000000',
-    surface: '#141414',
-    surfaceElevated: '#1F1F1F',
-    border: '#2E2E2E',
-    text: '#FFFFFF',
-    textSecondary: '#A1A1AA',
-    primary: '#22C55E', // green-500 — bright green on black (high contrast)
-    primaryMuted: '#16351F', // subtle green tint for backgrounds
-    onPrimary: '#04140A', // near-black text on green
-    danger: '#F87171',
-    success: '#22C55E',
-    tabInactive: '#71717A',
+    background: '#0A2F5C', // Azul Profundo — el fondo del ícono de la app
+    surface: '#0C386E',
+    surfaceElevated: '#0E4281',
+    border: '#1255A6', // decorativo (tarjetas): no necesita 3:1
+    borderStrong: '#1976E6', // borde de controles (campos, foco): 3.03:1 — WCAG 1.4.11
+    text: '#F4F6F8', // Gris Niebla — 12.31:1 AAA
+    textSecondary: '#A9C0DE', // 7.4:1 AAA
+    primary: '#2BD69A', // Verde claro de marca — 7.11:1 AAA
+    primaryMuted: '#0C3F63',
+    onPrimary: '#0A2F5C', // texto OSCURO sobre relleno claro: 7.11:1. Blanco sobre verde falla.
+    danger: '#F3AAAD', // 7.09:1 AAA
+    success: '#2BD69A',
+    tabInactive: '#A9C0DE',
   },
   light: {
-    background: '#FFFFFF',
-    surface: '#F6F7F6',
+    background: '#F4F6F8', // Gris Niebla
+    surface: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
-    border: '#E4E4E7',
-    text: '#0A0A0A',
-    textSecondary: '#52525B',
-    primary: '#15803D', // green-700 — AA contrast on white
-    primaryMuted: '#E7F6EC',
-    onPrimary: '#FFFFFF',
-    danger: '#DC2626',
-    success: '#15803D',
-    tabInactive: '#8E8E93',
+    border: '#CFD7E0', // decorativo (tarjetas): no necesita 3:1
+    borderStrong: '#7990A9', // borde de controles (campos, foco): 3.04:1 — WCAG 1.4.11
+    text: '#0A2F5C', // Azul Profundo — 12.31:1 AAA
+    textSecondary: '#3D5273', // 7.6:1 AAA
+    primary: '#104CBA', // Azul Sensor oscurecido hasta AAA — 7.01:1
+    primaryMuted: '#E3EAF8',
+    onPrimary: '#FFFFFF', // 7.60:1 sobre el primario
+    danger: '#A5171C', // 7.08:1 AAA
+    success: '#105E3F', // Verde Lectura oscurecido hasta AAA — 7.19:1
+    tabInactive: '#3D5273',
   },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
-export type Theme = (typeof Colors)['light'];
+/**
+ * Un tema cualquiera. Deliberadamente `string` y no los literales de un tema concreto: si no,
+ * el tema oscuro no sería asignable a `Theme` y nada podría tratarlos de forma intercambiable.
+ */
+export type Theme = Record<ThemeColor, string>;
 
 export const Fonts = Platform.select({
   ios: {
