@@ -48,15 +48,18 @@ con el manual, el test falla.
 
 **Antes de tocar cualquier color, corré `npm test -- theme`.**
 
-### El acento sigue al manual: azul en ambos temas
+### Desviación deliberada: el acento es VERDE, no el Azul Sensor
 
-El manual asigna al **Azul Sensor** el rol de *acción primaria* y fija un valor por modo. La app
-los usa tal cual: `#1256D4` en claro (5.86:1 sobre fondo) y `#4D9BFF` en oscuro (5.98:1). Son
-**AA, no AAA** — se eligió respetar el manual antes que derivar un azul propio, y `theme.test.ts`
-exige AA para el acento y AAA para el texto, con el porqué escrito al lado del umbral.
+El manual asigna al **Azul Sensor** el rol de *acción primaria*. La app no lo sigue, y la decisión
+se tomó mirando el resultado en pantalla: sobre un fondo Azul Profundo, un acento azul se confunde
+con el fondo y la identidad se pierde — el verde es el color distintivo y casi no aparecía.
 
-Ojo con el texto encima del relleno: en oscuro **blanco sobre el azul da 2.82:1 y falla**, así que
-`onPrimary` es el azul profundo (5.98:1). En claro sí va blanco (6.35:1).
+Acento: `#2BD69A` en oscuro (8.99:1 AAA, la variante del manual) y `#105E3F` en claro (7.19:1 AAA,
+Verde Lectura oscurecido; el crudo `#1FB57A` da 2.44:1 y es ilegible). El azul sigue presente donde
+el manual lo pone de verdad: el arco izquierdo del símbolo.
+
+Ojo con el texto encima del relleno: **blanco sobre el verde da 1.88:1 y falla**, así que en oscuro
+`onPrimary` es el azul profundo (8.99:1). En claro sí va blanco (7.79:1).
 
 ### La única desviación que queda: el verde en fondo claro
 
@@ -92,11 +95,21 @@ Dos, ambas por cómo renderiza cada sistema operativo (ver `docs/brand/README.md
 
 ## Regenerar los assets
 
-Los PNG de `app/assets/images/` se generan desde los SVG de `docs/brand/`, no al revés. Sin
-dependencias extra — `qlmanage` viene con macOS:
+Los PNG de `app/assets/images/` se generan desde los SVG de `docs/brand/`, no al revés.
+
+⚠️ **`qlmanage` compone la transparencia sobre blanco.** Un símbolo sobre fondo transparente sale
+con un rectángulo blanco, y la pupila —que es blanca en modo oscuro— desaparece dentro de él. Para
+los assets que necesitan alfa (`splash-icon`, `android-icon-foreground`, `android-icon-monochrome`)
+usá el rasterizador del repo, que deriva el alfa de una máscara y conserva el antialiasing:
 
 ```sh
 cd docs/brand
+python3 rasterize.py splash-icon.svg 512 ../../app/assets/images/splash-icon.png
+```
+
+Para los que llevan fondo sólido (`icon`, `android-icon-background`, `favicon`) alcanza `qlmanage`:
+
+```sh
 qlmanage -t -s 1024 -o . icon.svg && mv icon.svg.png icon.png
 ```
 

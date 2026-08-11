@@ -24,9 +24,8 @@ function FeatureRow({
   const theme = useTheme();
   return (
     <View style={styles.row} accessible accessibilityRole="text" accessibilityLabel={`${title}. ${desc}`}>
-      {/* Verde: en el manual es "estado confirmado", y esto es lo que la app ya sabe reconocer. */}
-      <View style={[styles.iconWrap, { backgroundColor: theme.successMuted }]}>
-        <Ionicons name={icon} size={22} color={theme.success} />
+      <View style={[styles.iconWrap, { backgroundColor: theme.primaryMuted }]}>
+        <Ionicons name={icon} size={22} color={theme.primary} />
       </View>
       <View style={styles.rowText}>
         <ThemedText type="default" style={styles.rowTitle}>

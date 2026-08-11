@@ -31,11 +31,13 @@ export const Colors = {
     borderStrong: '#1C6AC4', // borde de controles (campos, foco): 3:1 — WCAG 1.4.11
     text: '#E8EFF7', // del manual — 14.56:1 sobre fondo, 12.27:1 sobre superficie (AAA)
     textSecondary: '#9FB8D4', // del manual — 8.26:1 sobre fondo (AAA)
-    // Azul del manual para modo oscuro: es el rol de "acción primaria" que define la marca.
-    // 5.98:1 sobre el fondo y 5.04:1 sobre la superficie — AA, no AAA (ver theme.test.ts).
-    primary: '#4D9BFF',
-    primaryMuted: '#0B3350',
-    // Texto OSCURO sobre el relleno azul: 5.36:1. Blanco encima daría 2.82:1 y fallaría.
+    // Verde: es el color distintivo de la marca y el que la app tiene que mostrar. El manual le
+    // asigna al azul el rol de "acción primaria", pero en pantalla el azul se confunde con el
+    // fondo azul profundo y la identidad se pierde. Decisión tomada mirando el resultado real.
+    // Verde Lectura del manual, variante para oscuro: 8.99:1 sobre el fondo (AAA).
+    primary: '#2BD69A',
+    primaryMuted: '#0B3A33',
+    // Texto OSCURO sobre el relleno verde: 8.99:1. Blanco encima daría 1.88:1 y fallaría.
     onPrimary: '#061D3A',
     danger: '#F3AAAD', // 7.09:1 AAA
     success: '#2BD69A', // Verde Lectura del manual — 8.99:1 AAA
@@ -50,10 +52,11 @@ export const Colors = {
     borderStrong: '#7990A9', // borde de controles (campos, foco): 3.04:1 — WCAG 1.4.11
     text: '#061D3A', // del manual — 15.57:1 AAA
     textSecondary: '#33475E', // del manual — 8.80:1 AAA
-    // Azul Sensor del manual: el rol de "acción primaria". 5.86:1 sobre el fondo — AA, no AAA.
-    primary: '#1256D4',
-    primaryMuted: '#E3EAF8',
-    onPrimary: '#FFFFFF', // 6.35:1 sobre el primario
+    // Verde, para que el acento sea el mismo en los dos temas. Verde Lectura oscurecido hasta
+    // AAA: 7.19:1 sobre el fondo. El crudo del manual (#1FB57A) da 2.44:1 y es ilegible.
+    primary: '#105E3F',
+    primaryMuted: '#E3F3EC',
+    onPrimary: '#FFFFFF', // 7.79:1 sobre el primario
     danger: '#A5171C', // 7.08:1 AAA
     success: '#105E3F', // Verde Lectura oscurecido hasta AAA — 7.19:1 (el crudo da 2.44:1)
     successMuted: '#E3F3EC',
