@@ -1,0 +1,105 @@
+# ADR 0004 — Runtime de inferencia on-device (Gemma vía LiteRT-LM)
+
+- **Status:** Proposed — a discutir con el tutor
+- **Date:** 2026-08-11
+- **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
+- **Tags:** ml, app, hardware, requirement
+
+## Contexto
+
+ADR 0001 exige que el reconocimiento funcione sin internet, con inferencia local. Falta decidir
+**con qué runtime** y **qué modelo**. La reunión con el tutor del 2026-08-10
+([`REUNIONES-TUTOR.md`](../../REUNIONES-TUTOR.md)) dejó cuatro caminos abiertos; este ADR los cierra.
+
+Dos hechos nuevos, posteriores a esa reunión:
+
+1. **Gemma probado a mano en el iPhone del equipo anda bien.** Es evidencia directa de viabilidad
+   sobre el hardware objetivo, no una estimación. Valida el "Camino A" antes de invertir en él.
+2. **MediaPipe LLM Inference quedó en modo mantenimiento.** Google recomienda migrar a
+   **LiteRT-LM**, que tiene API Swift nativa con aceleración GPU por Metal
+   ([LiteRT-LM Overview](https://ai.google.dev/edge/litert-lm/overview),
+   [aviso de mantenimiento](https://ai.google.dev/edge/mediapipe/solutions/genai/llm_inference)).
+   Coincide con lo que el tutor ya había dicho ("LiteRT, sucesor de TensorFlow Lite").
+
+## Restricción encontrada: el sandbox de iOS
+
+**No se puede usar el Gemma que corre dentro de otra app.** iOS aísla cada app en su sandbox: ni el
+proceso ni el archivo del modelo son accesibles desde ViroVision. Tener Gemma andando en Edge
+Gallery no acerca nada al producto — sólo prueba que el hardware da.
+
+Los dos caminos reales:
+
+- **(a) Servidor local.** Si la app que hospeda a Gemma expone un HTTP en `localhost`, ViroVision
+  puede pegarle. `services/vision/sse.ts`, las métricas y el schema ya son agnósticos del proveedor,
+  así que sería un adapter y nada más. Sirve para **medir**, no para producto: depende de una app de
+  terceros instalada.
+- **(b) Embeber Gemma en ViroVision** con LiteRT-LM. Es el producto.
+
+## Decisión propuesta
+
+**Embeber Gemma vía LiteRT-LM, arrancando por la variante más chica (E2B), con la cámara del
+teléfono como fuente de imagen.**
+
+1. **Runtime: LiteRT-LM**, no MediaPipe LLM Inference (mantenimiento) ni Core ML + Apple Vision
+   (cierra la plataforma a iOS, y el equipo aún no validó el perfil iOS vs. Android).
+2. **Modelo: la variante más chica primero.** La tarea es extremadamente acotada — leer número y
+   nombre de un cartel. Empezar por el modelo grande sería pagar latencia, RAM y batería sin
+   evidencia de que haga falta. Se sube sólo si la precisión medida no alcanza.
+3. **Cámara: React Native Vision Camera** (AVFoundation en iOS, CameraX en Android). Mantiene el
+   camino cross-platform abierto, que es el "Camino C" del tutor.
+4. **Antes del módulo nativo, evaluar
+   [`react-native-litert-lm`](https://github.com/hung-yueh/react-native-litert-lm).** Si es
+   compatible con Expo 57 / RN 0.86 y está mantenido, el esfuerzo baja de "escribir un módulo Swift"
+   a "instalar y probar". Si no, se escribe el módulo.
+
+## La pregunta abierta que este ADR NO cierra
+
+**Si Gemma es multimodal y lee el cartel directamente, el pipeline YOLO + OCR deja de ser necesario
+en el camino del teléfono.**
+
+Eso no es una optimización: borraría buena parte de la tarea **B1** del roadmap (entrenar YOLO11,
+definir el enfoque de OCR), que el documento principal de la tesis describe como *el* método.
+
+**Hay que decidirlo explícitamente con el tutor, no dejar que se filtre por omisión.** Opciones:
+
+- **Reemplazar:** Gemma multimodal hace detección + lectura en un paso. Más simple, menos control,
+  y obliga a reescribir la sección de método de la tesis.
+- **Conservar como comparación:** implementar los dos y medirlos uno contra otro. Más trabajo, pero
+  es una contribución mucho más fuerte para una tesis que elegir uno sin evidencia.
+- **Híbrido:** YOLO + OCR en el dispositivo de las gafas (donde no entra un LLM), Gemma en el
+  teléfono. Justifica las dos arquitecturas que el proyecto ya venía comparando.
+
+Recomendación: **conservar como comparación**. El benchmark ya construido mide latencia con la misma
+vara para cualquier backend, así que el costo marginal de comparar es bajo y el valor para la tesis
+es alto.
+
+## Consecuencias
+
+**Positivas**
+- Cumple ADR 0001 sin depender de la nube.
+- Viabilidad ya demostrada sobre el hardware objetivo.
+- Salida JSON gobernada por prompt: agregar funcionalidades no exige reentrenar.
+
+**Costos y riesgos**
+- **Descarga del modelo:** de 1 a 3 GB la primera vez. No va en el bundle. Hay que definir dónde
+  vive, qué pasa si se corta la descarga, y qué escucha el usuario mientras espera.
+- **Memoria:** la variante chica pide ~1,1 GB *antes* del contexto y el overhead, en un teléfono que
+  además corre la cámara. iOS mata apps que se exceden, sin aviso. Es el riesgo técnico principal.
+- **Tiempo de carga del modelo:** cargar varios GB son segundos, y para un usuario ciego apuntando a
+  un ómnibus que se aproxima eso cuenta igual que el time-to-first-token. **Es una métrica aparte
+  que todavía nadie midió** y hay que agregar al benchmark.
+- **Batería y temperatura** con cámara + GPU sostenidas. Sin medir.
+- **El pilar de hardware no se beneficia:** la RPi Zero 2 W (~0,5 GB) no corre Gemma. LiteRT-LM sí
+  corre en Raspberry Pi, así que una Pi más grande sería opción sin cambiar el stack de software.
+
+## Próximos pasos
+
+1. Averiguar qué app hospeda a Gemma en el iPhone y si expone servidor local → habilitaría medir
+   local vs. nube esta semana, sin módulo nativo.
+2. Evaluar `react-native-litert-lm` contra Expo 57 / RN 0.86.
+3. Agregar **tiempo de carga del modelo** como métrica del benchmark.
+4. Llevarle al tutor la pregunta de YOLO + OCR. Es decisión de alcance de tesis, no técnica.
+
+Ver también: [ADR 0001](0001-offline-first-on-device-inference.md) (y su nota del 2026-08-10 sobre la
+nube como acelerador opcional), [`REUNIONES-TUTOR.md`](../../REUNIONES-TUTOR.md), y
+`.claude/skills/virovision/references/ml.md`.
