@@ -23,14 +23,16 @@ import { Platform } from 'react-native';
 export const Colors = {
   dark: {
     background: '#0A2F5C', // Azul Profundo — el fondo del ícono de la app
-    surface: '#0C386E',
-    surfaceElevated: '#0E4281',
-    border: '#1255A6', // decorativo (tarjetas): no necesita 3:1
+    // Superficies apenas despegadas del fondo: casi todo el contenido vive en tarjetas, así que
+    // si son muy claras el azul que domina la pantalla deja de ser el Azul Profundo de la marca.
+    surface: '#0D3466',
+    surfaceElevated: '#103A70',
+    border: '#17457F', // decorativo (tarjetas): no necesita 3:1
     borderStrong: '#1976E6', // borde de controles (campos, foco): 3.03:1 — WCAG 1.4.11
     text: '#F4F6F8', // Gris Niebla — 12.31:1 AAA
     textSecondary: '#A9C0DE', // 7.4:1 AAA
     primary: '#2BD69A', // Verde claro de marca — 7.11:1 AAA
-    primaryMuted: '#0C3F63',
+    primaryMuted: '#12405F',
     onPrimary: '#0A2F5C', // texto OSCURO sobre relleno claro: 7.11:1. Blanco sobre verde falla.
     danger: '#F3AAAD', // 7.09:1 AAA
     success: '#2BD69A',
