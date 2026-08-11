@@ -9,18 +9,17 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.virovision.app",
-      "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
         "NSBluetoothPeripheralUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
-        "NSPhotoLibraryUsageDescription": "ViroVision accede a tus fotos para medir cuánto tarda el reconocimiento de ómnibus en la nube. Es una herramienta de desarrollo."
+        "NSPhotoLibraryUsageDescription": "ViroVision accede a tus fotos para medir cu\u00e1nto tarda el reconocimiento de \u00f3mnibus en la nube. Es una herramienta de desarrollo."
       }
     },
     "android": {
       "package": "com.virovision.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0A2F5C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -41,16 +40,18 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0A2F5C",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 160
         }
       ],
       [
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": false,
-          "modes": ["central"],
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento."
         }
       ],
@@ -58,7 +59,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "ViroVision accede a tus fotos para medir cuánto tarda el reconocimiento de ómnibus en la nube. Es una herramienta de desarrollo.",
+          "photosPermission": "ViroVision accede a tus fotos para medir cu\u00e1nto tarda el reconocimiento de \u00f3mnibus en la nube. Es una herramienta de desarrollo.",
           "microphonePermission": false
         }
       ],

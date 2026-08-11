@@ -1,0 +1,7 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ViroVision">
+  <g fill="none" stroke-linecap="round" stroke-width="18">
+    <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+    <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+  </g>
+  <circle cx="100" cy="92" r="17" fill="#0A2F5C"></circle>
+</svg>
