@@ -46,9 +46,13 @@ export const Colors = {
     borderStrong: '#7990A9', // borde de controles (campos, foco): 3.04:1 — WCAG 1.4.11
     text: '#061D3A', // Azul Profundo — 15.57:1 AAA
     textSecondary: '#3D5273', // 7.6:1 AAA
-    primary: '#104CBA', // Azul Sensor oscurecido hasta AAA — 7.01:1
-    primaryMuted: '#E3EAF8',
-    onPrimary: '#FFFFFF', // 7.60:1 sobre el primario
+    // Verde, igual que en el tema oscuro. El manual pone al Azul Sensor como "acción primaria",
+    // pero ese azul falla contraste sobre fondo oscuro, así que ahí el acento tiene que ser verde
+    // — y un acento que cambia de color entre temas es peor que apartarse del rol del manual.
+    // Verde Lectura oscurecido hasta AAA: 7.19:1 sobre el fondo.
+    primary: '#105E3F',
+    primaryMuted: '#E3F3EC',
+    onPrimary: '#FFFFFF', // 7.79:1 sobre el primario
     danger: '#A5171C', // 7.08:1 AAA
     success: '#105E3F', // Verde Lectura oscurecido hasta AAA — 7.19:1
     tabInactive: '#3D5273',

@@ -48,6 +48,14 @@ con el manual, el test falla.
 
 **Antes de tocar cualquier color, corré `npm test -- theme`.**
 
+### Desviación deliberada: el acento es VERDE en los dos temas
+
+El manual asigna al **Azul Sensor** el rol de *acción primaria*. La app no lo respeta, a propósito:
+ese azul falla contraste sobre fondo oscuro, así que en el tema oscuro el acento tiene que ser
+verde igual. Un acento que **cambia de color entre temas** es peor que apartarse del rol nominal
+del manual, así que ambos usan Verde Lectura ajustado en luminosidad — `#2BD69A` en oscuro
+(8.99:1) y `#105E3F` en claro (7.19:1). El azul queda como color de marca en el símbolo.
+
 ## Tipografía
 
 - Títulos: **Space Grotesk Bold**, tracking −2 %
