@@ -60,7 +60,8 @@
         {
           "photosPermission": "ViroVision accede a tus fotos para medir cuánto tarda el reconocimiento de ómnibus en la nube. Es una herramienta de desarrollo."
         }
-      ]
+      ],
+      "./plugins/withoutUserScriptSandboxing"
     ],
     "experiments": {
       "typedRoutes": true,
