@@ -59,9 +59,11 @@ const stubClient: SupabaseAuthClient = {
 };
 
 /**
- * Returns the app's Supabase auth client: the real `@supabase/supabase-js`-backed client when the
- * project is configured (EXPO_PUBLIC_SUPABASE_* env vars present), otherwise the offline-safe stub.
- * This keeps the app runnable with no backend while enabling real email sign-in once configured.
+ * Returns the app's auth client: the real `@supabase/supabase-js`-backed client when the project is
+ * configured (EXPO_PUBLIC_SUPABASE_*), otherwise the offline-safe stub.
+ *
+ * NOTE (2026-07): the app ships WITHOUT a login — this account layer is archived (kept for a possible
+ * future optional sync), not wired into navigation. See docs/architecture/adr/0002.
  */
 export function getSupabaseAuthClient(): SupabaseAuthClient {
   const supabase = getSupabaseClient();

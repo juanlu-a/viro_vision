@@ -34,9 +34,9 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
   + a rationale-first onboarding route. Update `app.json`: Bluetooth (present) + WiFi/local-network
   (iOS `NSLocalNetworkUsageDescription`/`NSBonjourServices`; Android WiFi + `NEARBY_WIFI_DEVICES`) +
   camera (via `expo-camera` when A5 nears). Also set a deliberate iOS `bundleIdentifier`.
-- **A3 · Navigation, login gate, core screens** — auth-gated `_layout.tsx` (via `useAuth`): loading →
-  splash, signed-out → `login`, signed-in → app. Add `login.tsx`. Rebuild Home/Connect/Settings on the
-  design system; real Settings model backed by `services/storage`.
+- **A3 · Navigation + core screens** ✅ *(done — no login)* — iOS bottom tabs (Inicio / Dispositivo /
+  Ajustes), app opens directly (no login gate — see ADR 0002 update). Home / Dispositivo / Ajustes
+  rebuilt on the design system. (Real Settings model backed by `services/storage` still pending.)
 - **A4 · Connectivity — data + image + audio** *(as Track B hardware firms up)* — real
   `react-native-ble-plx` client vs the stub (against `features/device/gatt.ts`); image transport
   (WiFi/local-network) in `services/transport/`; audio routing so TTS plays on the device earphone.

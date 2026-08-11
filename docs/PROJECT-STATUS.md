@@ -43,10 +43,10 @@ docs/       thesis deliverables, ADRs, this file
 - **ADR 0001 — Offline-first:** essential recognition (detection, OCR, audio) MUST work with no
   internet; the model runs **locally** (on device or bundled on the phone), never a cloud inference
   API. Internet only for non-essential features.
-- **ADR 0002 — Backend & auth:** **Supabase** is the online account layer (email login, profile,
-  sync, model-file hosting), strictly separated from the offline core. A signed-in user stays signed
-  in offline.
-- Login method: **Supabase email + password** (`signInWithPassword` / `signUp`) — no Google/OAuth.
+- **ADR 0002 — Backend & auth:** Supabase was the online account layer, but **the app now ships
+  WITHOUT login** (opens directly to the tabs; offline-first, Apple doesn't require login). The
+  Supabase email-auth code is **archived** — present but not wired into navigation — kept for a
+  possible future *optional* sync. If login ever returns → email + password, never Google/OAuth.
 - **Git convention:** no AI co-author trailers on commits/PRs (also in the skill).
 
 ## App tech stack
@@ -59,15 +59,15 @@ tests via `jest-expo`.
 ## What's done per pillar
 
 **App** (structure + honest stubs):
-- Screens: `index` (Home — navigation + **working TTS** "Probar audio"), `connect` (BLE, live-region
-  status), `settings` (account / email sign-in + sign-up form).
+- Screens: **iOS bottom tabs, no login** — `index` (Home + **working TTS** "Probar audio"), `connect`
+  (Dispositivo / BLE status), `settings` (appearance + about). Green/black design system + light mode.
 - Domain layers under `app/src/`: `features/{recognition,device,audio,auth}`,
   `services/{ble,audio,supabase,storage}`, `i18n` (Spanish strings), `types`.
 - **BLE** = typed stub (`services/ble/bleClient.ts`) — GATT profile placeholders in
   `features/device/gatt.ts`. Not wired (needs a dev-client build + real device).
 - **Audio routing** to the device earphone = documented TODO in `services/audio/tts.ts`.
-- **Supabase auth** = wired + env-gated: no `EXPO_PUBLIC_SUPABASE_*` → offline-safe stub; configured →
-  real email sign-in (`signInWithPassword` / `signUp` → AsyncStorage-persisted session).
+- **Supabase auth** = **archived** (app has no login). The env-gated client (real/stub) + `AuthProvider`
+  remain in the repo but are not wired into navigation — available if optional sync is added later.
 - Tests: `app/src/features/recognition/format.test.ts` (5 passing).
 
 **CI/CD** (`.github/workflows/`, gated EAS jobs):
