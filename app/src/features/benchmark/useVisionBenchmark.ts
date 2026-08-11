@@ -14,10 +14,10 @@ import { useCallback, useRef, useState } from 'react';
 
 import { strings } from '@/i18n';
 import {
-  AnthropicNotConfiguredError,
-  DEFAULT_MODEL_PROFILE,
-  MODEL_PROFILES,
+  VisionNotConfiguredError,
+  availableModels,
   benchmarkBusVision,
+  defaultModel,
 } from '@/services/vision';
 import type { BenchmarkResult, ThinkingMode } from '@/services/vision';
 import type { BenchmarkState, SelectedPhoto } from './types';
@@ -29,7 +29,7 @@ const initialState: BenchmarkState = {
   runs: [],
   message: strings.benchmark.noResults,
   photo: null,
-  model: DEFAULT_MODEL_PROFILE,
+  model: defaultModel(),
   thinking: 'off',
 };
 
@@ -89,8 +89,10 @@ export function useVisionBenchmark() {
 
   /** Rota al siguiente modelo del registro. Cambiar de modelo invalida las corridas anteriores. */
   const setModel = useCallback(() => {
-    const current = MODEL_PROFILES.findIndex((p) => p.id === stateRef.current.model.id);
-    const next = MODEL_PROFILES[(current + 1) % MODEL_PROFILES.length];
+    const models = availableModels();
+    if (models.length < 2) return;
+    const current = models.findIndex((p) => p.id === stateRef.current.model.id);
+    const next = models[(current + 1) % models.length];
     update({ model: next, runs: [], status: 'idle', currentRun: 0, totalRuns: 0 });
   }, [update]);
 
@@ -156,7 +158,7 @@ export function useVisionBenchmark() {
 }
 
 function describeError(err: unknown): string {
-  if (err instanceof AnthropicNotConfiguredError) return strings.benchmark.notConfigured;
+  if (err instanceof VisionNotConfiguredError) return strings.benchmark.notConfigured;
   if (err instanceof Error) return `${strings.benchmark.errorTitle}: ${err.message}`;
   return strings.benchmark.errorTitle;
 }

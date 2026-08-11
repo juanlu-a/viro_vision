@@ -17,7 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useVisionBenchmark } from '@/features/benchmark/useVisionBenchmark';
 import { strings } from '@/i18n';
-import { formatBytes, formatMs, isAnthropicConfigured, summarize } from '@/services/vision';
+import { availableModels, formatBytes, formatMs, isVisionConfigured, summarize } from '@/services/vision';
 import type { LatencyMetric } from '@/services/vision';
 
 const METRICS: { key: LatencyMetric; label: string }[] = [
@@ -44,7 +44,7 @@ export default function VisionBenchScreen() {
       <Screen scroll edges={[]}>
         <ScreenHeader title={t.title} subtitle={t.intro} />
 
-        {!isAnthropicConfigured && (
+        {!isVisionConfigured && (
           <Card>
             <ThemedText type="default" themeColor="danger">
               {t.notConfigured}
@@ -91,7 +91,7 @@ export default function VisionBenchScreen() {
             label={state.model.label}
             hint={t.modelHint}
             variant="ghost"
-            disabled={isBusy}
+            disabled={isBusy || availableModels().length < 2}
             onPress={setModel}
           />
           {state.model.supportsAdaptiveThinking ? (
@@ -130,7 +130,7 @@ export default function VisionBenchScreen() {
           <AccessibleButton
             label={`${t.runButton} (${RUN_COUNT})`}
             hint={t.runHint}
-            disabled={!state.photo || !isAnthropicConfigured}
+            disabled={!state.photo || !isVisionConfigured}
             onPress={() => run(RUN_COUNT)}
           />
         )}

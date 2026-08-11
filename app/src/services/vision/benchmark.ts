@@ -1,0 +1,191 @@
+/**
+ * Motor del benchmark de latencia contra un modelo de visión en la nube.
+ *
+ * Mide, sobre una foto de ómnibus real: tiempo hasta headers, hasta el primer byte, hasta el
+ * primer evento, hasta el primer token de la respuesta (TTFT — la métrica que pidió el tutor)
+ * y total. Habla HTTP crudo con streaming SSE sobre `expo/fetch`; ver sse.ts para el porqué.
+ *
+ * Es agnóstico del proveedor: los timestamps se toman acá y sólo acá, así que los números de
+ * Gemini y de Anthropic son comparables por construcción.
+ *
+ * REGLA DE FRONTERA (ADR 0001, nota 2026-08-10): esto es instrumentación de desarrollo. La nube
+ * es un acelerador opcional y lo local es el fallback garantizado — este módulo NUNCA debe
+ * llamarse desde el camino cámara → detección/OCR → anuncio, que tiene que funcionar sin internet.
+ */
+import { fetch } from 'expo/fetch';
+
+import { apiKeyFor, defaultModel, findModelProfile, isProviderConfigured } from './config';
+import { getProvider } from './providers';
+import { parseBusReading } from './schema';
+import { readSseStream } from './sse';
+import type {
+  BenchmarkOptions,
+  BenchmarkResult,
+  EffortLevel,
+  LatencyMarks,
+  LatencyMs,
+  ThinkingMode,
+  TokenUsage,
+} from './types';
+
+/** Se lanza cuando el proveedor del modelo elegido no tiene clave (ver app/.env.example). */
+export class VisionNotConfiguredError extends Error {
+  constructor() {
+    super('VISION_NOT_CONFIGURED');
+    this.name = 'VisionNotConfiguredError';
+  }
+}
+
+/** Se lanza ante una respuesta HTTP no-2xx. `body` trae el detalle de la API. */
+export class VisionHttpError extends Error {
+  readonly status: number;
+  readonly body: string;
+
+  constructor(status: number, body: string) {
+    super(`VISION_HTTP_${status}`);
+    this.name = 'VisionHttpError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+/** Se lanza ante un evento de error a mitad de stream (llega con HTTP 200). */
+export class VisionStreamError extends Error {
+  readonly detail: string;
+
+  constructor(detail: string) {
+    super('VISION_STREAM_ERROR');
+    this.name = 'VisionStreamError';
+    this.detail = detail;
+  }
+}
+
+/**
+ * Corre una medición. Lanza si falta la clave, si la API responde error, o si el stream falla.
+ *
+ * Higiene: la primera llamada del día paga handshake TLS y, en algunos proveedores, compilación
+ * del schema. Descartá siempre una corrida de calentamiento (lo hace el hook).
+ */
+export async function benchmarkBusVision(options: BenchmarkOptions): Promise<BenchmarkResult> {
+  const model = options.model ? findModelProfile(options.model) : defaultModel();
+  if (!isProviderConfigured(model.provider)) throw new VisionNotConfiguredError();
+
+  const provider = getProvider(model.provider);
+  // Un modelo que no soporta thinking adaptativo se fuerza a 'off': pedirlo daría 400.
+  const requested: ThinkingMode = options.thinking ?? 'off';
+  const thinking: ThinkingMode = model.supportsAdaptiveThinking ? requested : 'off';
+  const effort: EffortLevel = options.effort ?? 'low';
+  const maxTokens = options.maxTokens ?? (thinking === 'adaptive' ? 4096 : model.maxTokens);
+
+  const request = provider.buildRequest({
+    model,
+    apiKey: apiKeyFor(model.provider),
+    maxTokens,
+    thinking,
+    effort,
+    imageBase64: options.imageBase64,
+    mediaType: options.mediaType,
+  });
+
+  const startedAtEpoch = Date.now();
+  const marks: LatencyMarks = { requestSentAt: performance.now() };
+  const eventCounts: Record<string, number> = {};
+
+  let textBuffer = '';
+  let usage: TokenUsage | null = null;
+  let stopReason: string | null = null;
+  let streamError: string | null = null;
+
+  const response = await fetch(request.url, {
+    method: 'POST',
+    headers: request.headers,
+    body: JSON.stringify(request.body),
+    signal: options.signal,
+  });
+  marks.headersAt = performance.now();
+
+  if (!response.ok) {
+    throw new VisionHttpError(response.status, await response.text());
+  }
+  if (!response.body) {
+    throw new VisionStreamError('La respuesta no trae body legible (¿streaming no soportado?).');
+  }
+
+  await readSseStream(
+    response.body,
+    (frame, receivedAt) => {
+      let payload: Record<string, unknown>;
+      try {
+        payload = JSON.parse(frame.data) as Record<string, unknown>;
+      } catch {
+        // Frames no-JSON: keep-alives y el `data: [DONE]` con que cierra Gemini.
+        return;
+      }
+
+      const event = provider.readEvent(payload);
+      const label = typeof payload.type === 'string' ? payload.type : (frame.event ?? 'unknown');
+      eventCounts[label] = (eventCounts[label] ?? 0) + 1;
+      // Cualquier evento reconocido sirve para marcar "el servidor empezó a responder".
+      if (event) marks.firstEventAt ??= receivedAt;
+      if (!event) return;
+
+      switch (event.kind) {
+        case 'text-start':
+          marks.firstTextBlockAt ??= receivedAt;
+          break;
+        case 'text':
+          marks.firstTextDeltaAt ??= receivedAt;
+          marks.firstTextBlockAt ??= receivedAt;
+          textBuffer += event.text;
+          options.onTextDelta?.(event.text);
+          break;
+        case 'usage':
+          usage = event.usage;
+          break;
+        case 'stop':
+          if (event.stopReason) stopReason = event.stopReason;
+          marks.doneAt ??= receivedAt;
+          break;
+        case 'error':
+          streamError = event.message;
+          break;
+        case 'start':
+        default:
+          break;
+      }
+    },
+    { onFirstByte: (at) => (marks.firstByteAt = at) },
+  );
+
+  marks.doneAt ??= performance.now();
+
+  if (streamError) throw new VisionStreamError(streamError);
+
+  return {
+    marks,
+    ms: toDurations(marks),
+    eventCounts,
+    usage,
+    stopReason,
+    text: textBuffer,
+    parsed: parseBusReading(textBuffer),
+    imageBase64Bytes: options.imageBase64.length,
+    model: model.id,
+    provider: model.provider,
+    thinking,
+    effort,
+    startedAtEpoch,
+  };
+}
+
+function toDurations(marks: LatencyMarks): LatencyMs {
+  const since = (at: number | undefined) => (at == null ? NaN : at - marks.requestSentAt);
+  return {
+    toHeaders: since(marks.headersAt),
+    toFirstByte: since(marks.firstByteAt),
+    toFirstEvent: since(marks.firstEventAt),
+    toFirstTextBlock: since(marks.firstTextBlockAt),
+    toFirstTextDelta: since(marks.firstTextDeltaAt),
+    total: since(marks.doneAt),
+  };
+}

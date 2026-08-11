@@ -6,7 +6,7 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { strings } from '@/i18n';
-import { isAnthropicConfigured } from '@/services/vision';
+import { isVisionConfigured } from '@/services/vision';
 
 export default function SettingsScreen() {
   const t = strings.settings;
@@ -42,7 +42,7 @@ export default function SettingsScreen() {
         calle sin la laptop), pero desaparece solo en cualquier build que no lleve la clave —
         y la clave nunca debe viajar en un build distribuible (ver app/.env.example).
       */}
-      {(__DEV__ || isAnthropicConfigured) && (
+      {(__DEV__ || isVisionConfigured) && (
         <Card>
           <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
             {t.developer.toUpperCase()}

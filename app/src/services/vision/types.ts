@@ -83,6 +83,66 @@ export interface TokenUsage {
   output_tokens: number;
 }
 
+/**
+ * Evento neutro del benchmark. Cada proveedor traduce su propio formato SSE a esto, y el motor
+ * de medición no sabe con quién está hablando.
+ *
+ * Existe para que los timestamps se tomen en UN solo lugar: si cada proveedor midiera por su
+ * cuenta, los números dejarían de ser comparables entre sí sin que nadie lo note — que es
+ * exactamente el error que arruinaría el experimento.
+ */
+export type ProviderEvent =
+  | { kind: 'start' }
+  /** Arranca el bloque de texto visible (algunos proveedores lo señalan aparte). */
+  | { kind: 'text-start' }
+  | { kind: 'text'; text: string }
+  | { kind: 'usage'; usage: TokenUsage }
+  | { kind: 'stop'; stopReason?: string }
+  | { kind: 'error'; message: string };
+
+export interface ProviderRequest {
+  url: string;
+  headers: Record<string, string>;
+  body: Record<string, unknown>;
+}
+
+export interface BuildRequestInput {
+  model: ModelProfile;
+  apiKey: string;
+  maxTokens: number;
+  thinking: ThinkingMode;
+  effort: EffortLevel;
+  imageBase64: string;
+  mediaType: 'image/jpeg' | 'image/png';
+}
+
+/** Un proveedor de visión en la nube: cómo se le pide, y cómo se lee lo que devuelve. */
+export interface VisionProvider {
+  id: VisionProviderId;
+  label: string;
+  buildRequest(input: BuildRequestInput): ProviderRequest;
+  /**
+   * Traduce un payload SSE ya parseado a un evento neutro. Devuelve null para lo que no
+   * interesa (keep-alives, tipos desconocidos, eventos futuros).
+   */
+  readEvent(payload: Record<string, unknown>): ProviderEvent | null;
+}
+
+export type VisionProviderId = 'gemini' | 'anthropic';
+
+export interface ModelProfile {
+  provider: VisionProviderId;
+  id: string;
+  /** Etiqueta para la UI. */
+  label: string;
+  /** `output_config.effort` da 400 en algunos modelos (Haiku 4.5). Sólo aplica a Anthropic. */
+  supportsEffort: boolean;
+  /** Thinking adaptativo — existe desde la familia 4.6 de Anthropic. */
+  supportsAdaptiveThinking: boolean;
+  /** Techo de salida. La respuesta son dos campos cortos, así que alcanza muy poco. */
+  maxTokens: number;
+}
+
 export interface BenchmarkResult {
   marks: LatencyMarks;
   ms: LatencyMs;
@@ -97,6 +157,7 @@ export interface BenchmarkResult {
   /** Tamaño del base64 enviado, en bytes. El eje que suele dominar la latencia. */
   imageBase64Bytes: number;
   model: string;
+  provider: VisionProviderId;
   thinking: ThinkingMode;
   effort: EffortLevel;
   /** Date.now() — sólo como etiqueta legible del run, nunca para calcular duraciones. */
