@@ -114,7 +114,21 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
 - **Riesgo documentado:** `EXPO_PUBLIC_ANTHROPIC_API_KEY` se inlinea en el bundle JS. Es
   instrumentación de tesis, no puede viajar en un build distribuible; queda advertido en
   `.env.example`.
-- tsc / lint / 39 tests / bundle iOS + Android en verde. Nada del código nuevo es iOS-only.
+- **Modelo y respuesta, decididos priorizando velocidad:** por defecto **Haiku 4.5** (Opus 5 queda
+  disponible para contrastar), y la respuesta se reduce a **dos campos: `numero` y `nombre`** —
+  menos salida es menos latencia, y son los dos datos que el anuncio de voz necesita. Se le pide
+  explícitamente devolver `null` antes que adivinar: para un usuario ciego un número inventado es
+  peor que un "no pude leerlo".
+  Cambiar de modelo **no es cambiar un string**: la API responde 400 —no ignora— parámetros que el
+  modelo no admite, y Haiku 4.5 rechaza `output_config.effort` y no soporta thinking adaptativo. De
+  ahí el registro de perfiles en `config.ts` y el armado de request en `request.ts`, puro y testeado.
+- **Gemma local, restricción encontrada:** no se puede conectar a un modelo que corre dentro de otra
+  app — iOS aísla cada app en su sandbox. Los caminos reales son (a) que la app de Gemma exponga un
+  servidor HTTP local, y ahí el adapter es trivial porque `sse.ts` y las métricas son agnósticas del
+  proveedor, o (b) embeberlo con un módulo nativo sobre MediaPipe (el "Camino A" del tutor, proyecto
+  aparte). Pendiente de averiguar cuál app/versión se está usando. Dato valioso: Gemma probado a mano
+  en el iPhone **anda bien**, lo que valida el Camino A antes de invertir en él.
+- tsc / lint / 52 tests / bundle iOS + Android en verde. Nada del código nuevo es iOS-only.
 - **El incidente de TCC de macOS volvió a pasar** (ya había ocurrido el 18/07), esta vez a mitad de
   sesión: todo comando de npm dentro del repo moría con `EPERM: uv_cwd`, y `git` no podía leer el
   directorio. Los permisos Unix estaban intactos — era TCC bloqueando la carpeta Documentos. La
