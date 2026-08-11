@@ -2,13 +2,26 @@
  * Proveedor Gemini (Interactions API). Primario del benchmark: tier gratuito sin tarjeta, y de la
  * misma familia que Gemma, así que la comparación local vs. nube cambia una sola variable.
  *
- * Forma verificada contra los docs de la Gemini API (agosto 2026):
+ * Forma verificada CONTRA LA API REAL (agosto 2026), no sólo contra los docs:
  *   POST https://generativelanguage.googleapis.com/v1beta/interactions
  *   header  x-goog-api-key
  *   body    { model, input: [...], stream: true, response_format: {...} }
- *   SSE     eventos `step.delta` con { delta: { type: 'text', text } }, cierra con data: [DONE]
  *
- * Módulo puro: arma y traduce, no toca la red. Ver gemini.test.ts.
+ * El discriminador de los eventos es **`event_type`**, no `type` — los docs no lo muestran y
+ * leerlo mal descarta todos los eventos en silencio (cero texto, TTFT en NaN). La secuencia real:
+ *
+ *   interaction.created → interaction.status_update
+ *   step.start { step: { type: 'thought' } }          ← el modelo piensa primero
+ *   step.delta { delta: { type: 'thought_signature' } }
+ *   step.stop
+ *   step.start { step: { type: 'model_output' } }     ← acá arranca el texto visible
+ *   step.delta { delta: { type: 'text', text } }      ← TTFT
+ *   step.stop → interaction.completed
+ *
+ * Que haya un paso de "thought" antes del texto significa que el TTFT de Gemini lo incluye; por
+ * eso el benchmark mide por separado el arranque del bloque de texto y el primer token.
+ *
+ * Módulo puro: arma y traduce, no toca la red. Ver providers.test.ts.
  */
 import { GEMINI_INTERACTIONS_URL } from '../config';
 import { busReadingSchema } from '../schema';
@@ -41,33 +54,43 @@ function buildRequest(input: BuildRequestInput): ProviderRequest {
   };
 }
 
-function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
-  const type = typeof payload.type === 'string' ? payload.type : null;
-
-  if (type === 'step.delta') {
-    const delta = payload.delta as { type?: string; text?: string } | undefined;
-    if (delta?.type === 'text' && typeof delta.text === 'string') {
-      return { kind: 'text', text: delta.text };
-    }
-    return null;
-  }
-
-  if (type === 'error') {
-    const error = payload.error as { message?: string } | undefined;
-    return { kind: 'error', message: error?.message ?? 'error de stream' };
-  }
-
-  // El primer evento del stream, cualquiera sea, marca "hubo respuesta del servidor".
-  if (type?.startsWith('interaction.') || type === 'step.start') {
-    return { kind: 'start' };
-  }
-
-  if (type === 'interaction.completed' || type === 'done') {
-    const usage = readUsage(payload);
-    return usage ?? { kind: 'stop' };
-  }
-
+/** El discriminador real es `event_type`; se acepta `type` como respaldo por si vuelve a cambiar. */
+export function eventTypeOf(payload: Record<string, unknown>): string | null {
+  if (typeof payload.event_type === 'string') return payload.event_type;
+  if (typeof payload.type === 'string') return payload.type;
   return null;
+}
+
+function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
+  const type = eventTypeOf(payload);
+
+  switch (type) {
+    case 'step.start': {
+      // Sólo el paso de salida marca el arranque del texto visible; el de 'thought' no.
+      const step = payload.step as { type?: string } | undefined;
+      return step?.type === 'model_output' ? { kind: 'text-start' } : { kind: 'start' };
+    }
+    case 'step.delta': {
+      const delta = payload.delta as { type?: string; text?: string } | undefined;
+      // Los deltas del paso de pensamiento son 'thought_signature' y no cuentan como respuesta.
+      if (delta?.type === 'text' && typeof delta.text === 'string') {
+        return { kind: 'text', text: delta.text };
+      }
+      return null;
+    }
+    case 'interaction.completed':
+      return readUsage(payload) ?? { kind: 'stop' };
+    case 'interaction.failed':
+    case 'error': {
+      const error = payload.error as { message?: string } | undefined;
+      return { kind: 'error', message: error?.message ?? 'error de stream' };
+    }
+    case 'interaction.created':
+    case 'interaction.status_update':
+      return { kind: 'start' };
+    default:
+      return null; // step.stop y tipos futuros
+  }
 }
 
 /** El uso de tokens puede venir en el evento de cierre; su ubicación exacta varía por versión. */

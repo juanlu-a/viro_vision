@@ -123,7 +123,13 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
       }
 
       const event = provider.readEvent(payload);
-      const label = typeof payload.type === 'string' ? payload.type : (frame.event ?? 'unknown');
+      // El nombre del tipo vive en `type` (Anthropic) o `event_type` (Gemini); si no, la línea
+      // `event:` del propio SSE alcanza para el conteo.
+      const label =
+        (typeof payload.type === 'string' ? payload.type : null) ??
+        (typeof payload.event_type === 'string' ? payload.event_type : null) ??
+        frame.event ??
+        'unknown';
       eventCounts[label] = (eventCounts[label] ?? 0) + 1;
       // Cualquier evento reconocido sirve para marcar "el servidor empezó a responder".
       if (event) marks.firstEventAt ??= receivedAt;

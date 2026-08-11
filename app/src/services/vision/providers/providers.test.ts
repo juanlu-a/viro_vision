@@ -50,25 +50,75 @@ describe('geminiProvider.buildRequest', () => {
   });
 });
 
-describe('geminiProvider.readEvent', () => {
-  it('lee el texto incremental de un step.delta', () => {
-    const event = geminiProvider.readEvent({ type: 'step.delta', delta: { type: 'text', text: '11' } });
+/**
+ * Payloads capturados de una corrida real contra la API (agosto 2026). No están inventados a
+ * partir de los docs a propósito: los docs no muestran que el discriminador sea `event_type`,
+ * y leerlo mal descarta todos los eventos en silencio.
+ */
+const REAL_GEMINI_EVENTS = {
+  created: { interaction: { status: 'in_progress' }, event_type: 'interaction.created' },
+  statusUpdate: { status: 'in_progress', event_type: 'interaction.status_update' },
+  thoughtStart: { index: 0, step: { type: 'thought' }, event_type: 'step.start' },
+  thoughtDelta: {
+    index: 0,
+    delta: { signature: 'Et0ECtoEARFN', type: 'thought_signature' },
+    event_type: 'step.delta',
+  },
+  stepStop: { index: 0, event_type: 'step.stop' },
+  outputStart: { index: 1, step: { type: 'model_output' }, event_type: 'step.start' },
+  textDelta: {
+    index: 1,
+    delta: { text: '{\n  "numero": null,\n  "nombre": null\n}', type: 'text' },
+    event_type: 'step.delta',
+  },
+  completed: { event_type: 'interaction.completed' },
+};
 
-    expect(event).toEqual({ kind: 'text', text: '11' });
+describe('geminiProvider.readEvent', () => {
+  it('lee el discriminador de event_type, no de type', () => {
+    // Si leyera `type`, este evento se descartaría y el TTFT quedaría en NaN.
+    expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.textDelta)).toEqual({
+      kind: 'text',
+      text: '{\n  "numero": null,\n  "nombre": null\n}',
+    });
   });
 
-  it('ignora un step.delta que no sea de texto', () => {
-    expect(geminiProvider.readEvent({ type: 'step.delta', delta: { type: 'thought' } })).toBeNull();
+  it('marca el arranque del texto sólo en el paso de salida, no en el de pensamiento', () => {
+    expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.outputStart)).toEqual({ kind: 'text-start' });
+    expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.thoughtStart)).toEqual({ kind: 'start' });
+  });
+
+  it('no cuenta el delta de pensamiento como texto de respuesta', () => {
+    expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.thoughtDelta)).toBeNull();
+  });
+
+  it('cierra en interaction.completed', () => {
+    expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.completed)).toEqual({ kind: 'stop' });
+  });
+
+  it('ignora step.stop y tipos futuros en vez de romper', () => {
+    expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.stepStop)).toBeNull();
+    expect(geminiProvider.readEvent({ event_type: 'algo.nuevo.del.futuro' })).toBeNull();
   });
 
   it('reporta el error de stream', () => {
-    const event = geminiProvider.readEvent({ type: 'error', error: { message: 'cuota agotada' } });
+    const event = geminiProvider.readEvent({
+      event_type: 'error',
+      error: { message: 'cuota agotada' },
+    });
 
     expect(event).toEqual({ kind: 'error', message: 'cuota agotada' });
   });
 
-  it('ignora tipos desconocidos en vez de romper', () => {
-    expect(geminiProvider.readEvent({ type: 'algo.nuevo.del.futuro' })).toBeNull();
+  it('recorre la secuencia real completa y produce exactamente un texto y un cierre', () => {
+    const kinds = Object.values(REAL_GEMINI_EVENTS)
+      .map((payload) => geminiProvider.readEvent(payload))
+      .filter((event) => event !== null)
+      .map((event) => event.kind);
+
+    expect(kinds.filter((kind) => kind === 'text')).toHaveLength(1);
+    expect(kinds.filter((kind) => kind === 'text-start')).toHaveLength(1);
+    expect(kinds.filter((kind) => kind === 'stop')).toHaveLength(1);
   });
 });
 
