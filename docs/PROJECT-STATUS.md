@@ -1,6 +1,6 @@
 # ViroVision — Project status & session handoff
 
-_Living status/continuation doc. Last updated: 2026-07-10._
+_Living status/continuation doc. Last updated: 2026-08-11._
 
 This captures where the project stands so anyone (including a fresh Claude Code session, together with
 the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
@@ -42,11 +42,17 @@ docs/       thesis deliverables, ADRs, this file
 
 - **ADR 0001 — Offline-first:** essential recognition (detection, OCR, audio) MUST work with no
   internet; the model runs **locally** (on device or bundled on the phone), never a cloud inference
-  API. Internet only for non-essential features.
+  API. **Amended 2026-08-10:** the cloud is allowed as an **optional accelerator** on the
+  recognition path, with local inference as the guaranteed fallback; cloud-only recognition stays
+  forbidden.
 - **ADR 0002 — Backend & auth:** Supabase was the online account layer, but **the app now ships
   WITHOUT login** (opens directly to the tabs; offline-first, Apple doesn't require login). The
   Supabase email-auth code is **archived** — present but not wired into navigation — kept for a
   possible future *optional* sync. If login ever returns → email + password, never Google/OAuth.
+- **ADR 0004 — On-device inference runtime** *(Proposed)*: embed **Gemma via LiteRT-LM** (not
+  MediaPipe LLM Inference, which is in maintenance), smallest variant first, image from the phone
+  camera. Open question for the tutor: whether a multimodal Gemma replaces the YOLO + OCR pipeline
+  on the phone path — that would remove much of B1, which the thesis describes as *the* method.
 - **Git convention:** no AI co-author trailers on commits/PRs (also in the skill).
 
 ## App tech stack
@@ -68,7 +74,12 @@ tests via `jest-expo`.
 - **Audio routing** to the device earphone = documented TODO in `services/audio/tts.ts`.
 - **Supabase auth** = **archived** (app has no login). The env-gated client (real/stub) + `AuthProvider`
   remain in the repo but are not wired into navigation — available if optional sync is added later.
-- Tests: `app/src/features/recognition/format.test.ts` (5 passing).
+- **Cloud-latency benchmark** (thesis instrumentation, NOT the product path): `services/vision/`
+  (proveedores Gemini/Anthropic, lector SSE, schema JSON, estadística) + `features/benchmark/` + la
+  ruta `dev/vision-bench`, enlazada desde Ajustes cuando hay `__DEV__` o una clave cargada. Mide
+  headers / primer byte / primer evento / **primer token (TTFT)** / total, descarta una corrida de
+  calentamiento y reporta mediana y p90.
+- Tests: **65 en 5 suites** (`recognition/format`, `vision/{schema,sse,stats}`, `vision/providers`).
 
 **CI/CD** (`.github/workflows/`, gated EAS jobs):
 - `ci.yml` — on PRs to main / feature pushes: install → lint → typecheck → test → bundle (iOS+Android
@@ -90,7 +101,9 @@ preview builds an iOS **simulator** app (no Apple account needed).
    and **variable** `EAS_ENABLED=true`. `eas init`/`update:configure` edit `app.json` — fold those in.
 2. **Supabase** (see `docs/supabase.md`): create project → enable **Email** auth → (optional) turn off
    email confirmation for testing → fill `app/.env`. No Google Cloud / OAuth needed.
-3. **iOS Developer account** — enroll in the Apple Developer Program ($99/yr); then EAS handles signing.
+3. **iOS en dispositivo — ya funciona gratis**, firmando con un Apple ID personal; ver
+   [`dev-build-ios.md`](dev-build-ios.md). El Apple Developer Program ($99/año) sólo hace falta para
+   escapar de la caducidad de 7 días del provisioning gratuito.
 
 ## What's next — options (was mid-discussion)
 

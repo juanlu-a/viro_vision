@@ -61,10 +61,15 @@ final integration, bug-fixing and joint testing).
   against blind/low-vision usability and native screen readers (VoiceOver / TalkBack).
 - **Offline-first / self-contained (hard requirement).** The **essential features** — object
   detection, OCR and auditory feedback — MUST work **without internet**. The recognition model is
-  **bundled in the app / on the device and runs locally** (on-device inference), never via a cloud
-  API. This is a core differentiator vs. cloud-dependent tools (Seeing AI, Lookout, OrCam). The app
-  may still use the internet for **non-essential** features (e.g. updates, remote config, optional
-  data sync), but losing connectivity must never break recognition or the audio response. In the
+  **bundled in the app / on the device and runs locally** (on-device inference) — that local path is
+  the **guaranteed fallback**. Since the 2026-08-10 tutor meeting (ADR 0001, amended) the **cloud is
+  allowed as an optional accelerator** on the recognition path: a runtime *model gateway* may route
+  an inference to the cloud when there is coverage and it buys accuracy. **Cloud-only recognition,
+  with no local fallback, stays forbidden**, and latency-critical cases (bus lines) stay local by
+  default. Losing connectivity may cost accuracy or latency, never the recognition or the audio.
+  This is still a core differentiator vs. cloud-dependent tools (Seeing AI, Lookout, OrCam).
+  The concrete on-device runtime is decided in ADR 0004: **Gemma via LiteRT-LM** (MediaPipe LLM
+  Inference is in maintenance mode). In the
   "offload to phone" architecture the model runs **locally on the phone**, not on a server.
 - **Low cost, portable.** Hardware and processing choices balance accuracy against cost, size, power
   and feasibility. The device must be cheap and easy to carry.
