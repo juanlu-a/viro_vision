@@ -150,6 +150,8 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
           break;
         case 'stop':
           if (event.stopReason) stopReason = event.stopReason;
+          // El uso puede venir adjunto al cierre; no perderlo ni perder la marca.
+          if (event.usage) usage = event.usage;
           marks.doneAt ??= receivedAt;
           break;
         case 'error':

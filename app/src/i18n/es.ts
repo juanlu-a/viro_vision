@@ -41,14 +41,14 @@ export const es = {
     about: 'Acerca de',
     developer: 'Desarrollo',
     openBenchmark: 'Benchmark de latencia en la nube',
-    openBenchmarkHint: 'Abre la herramienta de medición de latencia. Solo en desarrollo.',
+    openBenchmarkHint: 'Abre la herramienta de medición de latencia contra el modelo en la nube.',
   },
   benchmark: {
     title: 'Benchmark en la nube',
     intro:
       'Mide cuánto tarda un modelo de visión en la nube en leer el cartel de un ómnibus. Herramienta de desarrollo: el reconocimiento real corre local y sin internet.',
     notConfigured:
-      'Falta la clave EXPO_PUBLIC_ANTHROPIC_API_KEY en app/.env. Sin ella el benchmark no puede correr.',
+      'Falta una clave de proveedor en app/.env (EXPO_PUBLIC_GEMINI_API_KEY, gratuita en aistudio.google.com). Sin ella el benchmark no puede correr.',
     photoSection: 'Foto',
     noPhoto: 'Sin foto seleccionada',
     pickPhoto: 'Elegir foto de ómnibus',
@@ -67,6 +67,7 @@ export const es = {
     cancelButton: 'Cancelar',
     cancelHint: 'Interrumpe la medición en curso.',
     warmingUp: 'Calentando (corrida descartada)…',
+    cancelled: 'Medición cancelada.',
     running: 'Midiendo corrida',
     resultsSection: 'Resultados',
     noResults: 'Todavía no hay mediciones.',

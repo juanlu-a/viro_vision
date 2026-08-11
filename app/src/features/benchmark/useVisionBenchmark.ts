@@ -98,8 +98,12 @@ export function useVisionBenchmark() {
 
   const run = useCallback(
     async (totalRuns: number) => {
-      const { photo, thinking, model } = stateRef.current;
+      const { photo, thinking, model, status } = stateRef.current;
       if (!photo) return;
+      // Guarda contra doble toque: el botón se deshabilita vía estado, que es asíncrono, así que
+      // dos taps rápidos podían lanzar dos series simultáneas. Requests en paralelo compiten por
+      // el uplink y los tiempos dejan de significar nada.
+      if (status === 'warmup' || status === 'running') return;
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -135,16 +139,28 @@ export function useVisionBenchmark() {
           collected.push(await benchmarkBusVision(options));
         }
 
-        update({
-          status: 'done',
-          currentRun: 0,
-          runs: collected,
-          message: `${collected.length} ${strings.benchmark.samplesLabel}`,
-        });
+        if (controller.signal.aborted) {
+          // Cancelación deliberada: volver a idle sin resultados parciales ni cartel de error.
+          update({ status: 'idle', currentRun: 0, runs: [], message: strings.benchmark.cancelled });
+        } else {
+          update({
+            status: 'done',
+            currentRun: 0,
+            runs: collected,
+            message: `${collected.length} ${strings.benchmark.samplesLabel}`,
+          });
+        }
       } catch (err) {
-        update({ status: 'error', currentRun: 0, message: describeError(err) });
+        // Un abort llega como excepción: es cancelación, no falla. No pintarlo como error.
+        if (controller.signal.aborted || isAbortError(err)) {
+          update({ status: 'idle', currentRun: 0, runs: [], message: strings.benchmark.cancelled });
+        } else {
+          update({ status: 'error', currentRun: 0, message: describeError(err) });
+        }
       } finally {
-        abortRef.current = null;
+        // Sólo limpiar si sigue siendo NUESTRO controller: si no, se anularía el de otra corrida
+        // y el botón Cancelar quedaría sin efecto.
+        if (abortRef.current === controller) abortRef.current = null;
       }
     },
     [update],
@@ -155,6 +171,10 @@ export function useVisionBenchmark() {
   }, []);
 
   return { state, pickPhoto, setModel, setThinking, run, cancel };
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message));
 }
 
 function describeError(err: unknown): string {

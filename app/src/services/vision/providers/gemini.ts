@@ -25,7 +25,13 @@
  */
 import { GEMINI_INTERACTIONS_URL } from '../config';
 import { busReadingSchema } from '../schema';
-import type { BuildRequestInput, ProviderEvent, ProviderRequest, VisionProvider } from '../types';
+import type {
+  BuildRequestInput,
+  ProviderEvent,
+  ProviderRequest,
+  TokenUsage,
+  VisionProvider,
+} from '../types';
 import { SYSTEM_PROMPT, USER_PROMPT } from './prompts';
 
 function buildRequest(input: BuildRequestInput): ProviderRequest {
@@ -79,7 +85,9 @@ function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
       return null;
     }
     case 'interaction.completed':
-      return readUsage(payload) ?? { kind: 'stop' };
+      // Siempre es un cierre, con o sin uso adjunto. Devolver sólo el uso perdería la marca de
+      // cierre y el total se mediría contra el fin del stream, inflado por transporte.
+      return { kind: 'stop', usage: readUsage(payload) };
     case 'interaction.failed':
     case 'error': {
       const error = payload.error as { message?: string } | undefined;
@@ -94,17 +102,17 @@ function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
 }
 
 /** El uso de tokens puede venir en el evento de cierre; su ubicación exacta varía por versión. */
-function readUsage(payload: Record<string, unknown>): ProviderEvent | null {
+function readUsage(payload: Record<string, unknown>): TokenUsage | undefined {
   const usage = (payload.usage ?? payload.usage_metadata) as
     | Record<string, number | undefined>
     | undefined;
-  if (!usage) return null;
+  if (!usage) return undefined;
 
   const input = usage.input_tokens ?? usage.prompt_token_count ?? usage.promptTokenCount;
   const output = usage.output_tokens ?? usage.candidates_token_count ?? usage.candidatesTokenCount;
-  if (input == null && output == null) return null;
+  if (input == null && output == null) return undefined;
 
-  return { kind: 'usage', usage: { input_tokens: input ?? 0, output_tokens: output ?? 0 } };
+  return { input_tokens: input ?? 0, output_tokens: output ?? 0 };
 }
 
 export const geminiProvider: VisionProvider = {

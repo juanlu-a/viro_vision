@@ -97,7 +97,12 @@ export type ProviderEvent =
   | { kind: 'text-start' }
   | { kind: 'text'; text: string }
   | { kind: 'usage'; usage: TokenUsage }
-  | { kind: 'stop'; stopReason?: string }
+  /**
+   * Cierre. Puede traer el uso de tokens: algunos proveedores lo mandan EN el evento de
+   * completado, y devolver sólo el uso perdería la marca de cierre — el total quedaría medido
+   * contra el fin del stream (que incluye latencia de transporte) en vez del evento real.
+   */
+  | { kind: 'stop'; stopReason?: string; usage?: TokenUsage }
   | { kind: 'error'; message: string };
 
 export interface ProviderRequest {

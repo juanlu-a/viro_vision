@@ -23,6 +23,23 @@ export interface ReadSseOptions {
   onFirstByte?: (at: number) => void;
   /** Reloj inyectable para poder testear. Por defecto `performance.now()`. */
   now?: () => number;
+  /** Techo del buffer sin separador. Por defecto {@link MAX_BUFFER_BYTES}. */
+  maxBufferBytes?: number;
+}
+
+/**
+ * Techo del buffer entre separadores de frame. Un servidor que responde 200 pero nunca manda la
+ * línea en blanco (bug, proxy roto) haría crecer el buffer sin límite hasta colgar la app. Un
+ * frame legítimo de estas APIs son unos pocos kB; 4 MB es holgadísimo y aun así acota el daño.
+ */
+export const MAX_BUFFER_BYTES = 4 * 1024 * 1024;
+
+/** Se lanza cuando el stream no respeta el formato SSE y el buffer se desborda. */
+export class SseOverflowError extends Error {
+  constructor(bytes: number) {
+    super(`SSE_BUFFER_OVERFLOW_${bytes}`);
+    this.name = 'SseOverflowError';
+  }
 }
 
 /**
@@ -36,6 +53,7 @@ export async function readSseStream(
   options: ReadSseOptions = {},
 ): Promise<void> {
   const now = options.now ?? (() => performance.now());
+  const maxBuffer = options.maxBufferBytes ?? MAX_BUFFER_BYTES;
   const reader = body.getReader();
   const decoder = new TextDecoder();
 
@@ -65,6 +83,9 @@ export async function readSseStream(
         if (frame) onFrame(frame, receivedAt);
         separator = findSeparator(buffer);
       }
+
+      // Si no quedó ningún separador y el buffer siguió creciendo, el stream no es SSE válido.
+      if (buffer.length > maxBuffer) throw new SseOverflowError(buffer.length);
     }
 
     // Cola sin línea en blanco final (algunos servidores cierran sin ella).

@@ -1,4 +1,4 @@
-import { parseFrame, readSseStream } from './sse';
+import { SseOverflowError, parseFrame, readSseStream } from './sse';
 import type { SseFrame } from './sse';
 
 /** Stream falso: entrega los chunks dados, uno por `read()`. Evita depender de la red. */
@@ -106,5 +106,28 @@ describe('readSseStream', () => {
 
     expect(frames).toEqual([]);
     expect(firstByteAt).toBeUndefined();
+  });
+});
+
+describe('protección contra stream malformado', () => {
+  it('corta con SseOverflowError si nunca llega un separador de frame', async () => {
+    // Un 200 que manda bytes para siempre sin la línea en blanco haría crecer el buffer sin fin.
+    const chunks = Array.from({ length: 5 }, () => 'x'.repeat(300));
+
+    await expect(
+      readSseStream(streamOf(chunks), () => {}, { maxBufferBytes: 1000, now: () => 0 }),
+    ).rejects.toThrow(SseOverflowError);
+  });
+
+  it('no corta un stream válido cuyos frames van cerrando', async () => {
+    const chunks = Array.from({ length: 5 }, () => `data: ${'x'.repeat(300)}\n\n`);
+    const frames: SseFrame[] = [];
+
+    await readSseStream(streamOf(chunks), (frame) => frames.push(frame), {
+      maxBufferBytes: 1000,
+      now: () => 0,
+    });
+
+    expect(frames).toHaveLength(5);
   });
 });
