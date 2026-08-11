@@ -2,7 +2,7 @@
  * Estado de la pantalla de benchmark. La lógica vive fuera del componente para que la pantalla
  * sea sólo presentación (y porque el proyecto todavía no tiene testing-library instalada).
  */
-import type { BenchmarkResult, ThinkingMode } from '@/services/vision';
+import type { BenchmarkResult, ModelProfile, ThinkingMode } from '@/services/vision';
 
 export interface SelectedPhoto {
   uri: string;
@@ -23,5 +23,6 @@ export interface BenchmarkState {
   /** Mensaje en español, listo para lector de pantalla. */
   message: string;
   photo: SelectedPhoto | null;
+  model: ModelProfile;
   thinking: ThinkingMode;
 }

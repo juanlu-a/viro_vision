@@ -14,11 +14,13 @@ import { fetch } from 'expo/fetch';
 import {
   ANTHROPIC_MESSAGES_URL,
   ANTHROPIC_VERSION,
-  VISION_MODEL,
+  DEFAULT_MODEL_PROFILE,
   anthropicApiKey,
+  findModelProfile,
   isAnthropicConfigured,
 } from './config';
-import { busReadingSchema, parseBusReading } from './schema';
+import { buildRequestBody } from './request';
+import { parseBusReading } from './schema';
 import { readSseStream } from './sse';
 import type {
   BenchmarkOptions,
@@ -62,14 +64,6 @@ export class AnthropicStreamError extends Error {
   }
 }
 
-const SYSTEM_PROMPT = [
-  'Sos un lector de carteles de ómnibus del transporte metropolitano de Montevideo.',
-  'Respondé solo con el objeto JSON pedido.',
-  'No incluyas etiquetas XML internas o del sistema en tu respuesta.',
-].join(' ');
-
-const USER_PROMPT = 'Leé el número de línea y el destino del cartel frontal de este ómnibus.';
-
 /**
  * Corre una medición. Lanza si la clave falta, si la API responde error, o si el stream falla.
  *
@@ -79,13 +73,16 @@ const USER_PROMPT = 'Leé el número de línea y el destino del cartel frontal d
 export async function benchmarkBusVision(options: BenchmarkOptions): Promise<BenchmarkResult> {
   if (!isAnthropicConfigured) throw new AnthropicNotConfiguredError();
 
-  const thinking: ThinkingMode = options.thinking ?? 'off';
+  const profile = options.model ? findModelProfile(options.model) : DEFAULT_MODEL_PROFILE;
+  // Un modelo que no soporta thinking adaptativo se fuerza a 'off': pedirlo daría 400.
+  const requested: ThinkingMode = options.thinking ?? 'off';
+  const thinking: ThinkingMode = profile.supportsAdaptiveThinking ? requested : 'off';
   const effort: EffortLevel = options.effort ?? 'low';
-  const model = options.model ?? VISION_MODEL;
-  const maxTokens = options.maxTokens ?? (thinking === 'off' ? 512 : 4096);
+  const model = profile.id;
+  const maxTokens = options.maxTokens ?? (thinking === 'adaptive' ? 4096 : profile.maxTokens);
 
   const body = buildRequestBody({
-    model,
+    profile,
     maxTokens,
     thinking,
     effort,
@@ -197,47 +194,6 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
     thinking,
     effort,
     startedAtEpoch,
-  };
-}
-
-interface RequestBodyInput {
-  model: string;
-  maxTokens: number;
-  thinking: ThinkingMode;
-  effort: EffortLevel;
-  imageBase64: string;
-  mediaType: 'image/jpeg' | 'image/png';
-}
-
-/**
- * Arma el cuerpo del POST. Exportada para poder inspeccionarla en tests sin tocar la red.
- *
- * El bloque de imagen va ANTES del de texto (recomendación de la API). `thinking: disabled`
- * sólo se acepta con effort <= high; por eso EffortLevel no incluye xhigh ni max.
- */
-export function buildRequestBody(input: RequestBodyInput): Record<string, unknown> {
-  return {
-    model: input.model,
-    max_tokens: input.maxTokens,
-    stream: true,
-    thinking: input.thinking === 'off' ? { type: 'disabled' } : { type: 'adaptive' },
-    output_config: {
-      effort: input.effort,
-      format: { type: 'json_schema', schema: busReadingSchema },
-    },
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: input.mediaType, data: input.imageBase64 },
-          },
-          { type: 'text', text: USER_PROMPT },
-        ],
-      },
-    ],
   };
 }
 

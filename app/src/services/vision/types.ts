@@ -1,25 +1,22 @@
 /**
  * Tipos del benchmark de latencia contra un modelo de visión en la nube.
  *
- * La forma de `BusReading` imita deliberadamente la salida JSON que devuelve Gemma
- * (línea + destino + confianza), para que los resultados nube vs. local sean comparables.
+ * `BusReading` son sólo los dos datos que el anuncio de voz necesita: número de línea y nombre.
+ * Deliberadamente mínimo — cada campo extra es salida que hay que generar, y la salida es tiempo.
+ * La misma forma se le pide a Gemma cuando corra local, para que los números sean comparables.
  */
 
 export interface BusReading {
-  /** Número de línea leído del cartel frontal, o null si no se pudo leer. */
-  line: string | null;
-  /** Destino leído del cartel, o null. */
-  destination: string | null;
-  /** Confianza declarada por el modelo, 0..1. */
-  confidence: number;
-  /** Todo el texto que el modelo distinguió en el cartel, en orden de lectura. */
-  raw_text: string[];
+  /** Número de línea del cartel frontal (ej. "116"), o null si no se pudo leer. */
+  numero: string | null;
+  /** Nombre / destino de la línea (ej. "Plaza Independencia"), o null. */
+  nombre: string | null;
 }
 
 /**
  * Modo de razonamiento del modelo.
- * - `off`: thinking deshabilitado — el brazo de latencia mínima.
- * - `adaptive`: el modelo decide cuánto pensar — el brazo de calidad por defecto.
+ * - `off`: sin thinking — el brazo de latencia mínima. Único disponible en Haiku 4.5.
+ * - `adaptive`: el modelo decide cuánto pensar. Requiere un modelo que lo soporte.
  */
 export type ThinkingMode = 'off' | 'adaptive';
 

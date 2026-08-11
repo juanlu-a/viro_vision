@@ -1,6 +1,9 @@
 /**
  * JSON Schema pedido al modelo (structured outputs) y su parser.
  *
+ * Sólo dos campos: número de línea y nombre. Cuanto más chica la respuesta, menos tokens de
+ * salida y menor latencia total — y son los dos datos que el anuncio de voz necesita.
+ *
  * Módulo puro: sin red, sin estado. Ver schema.test.ts.
  */
 import type { BusReading } from './types';
@@ -8,17 +11,17 @@ import type { BusReading } from './types';
 /**
  * Schema para `output_config.format`. Restricciones de la API a respetar:
  * `additionalProperties: false` y `required` completos son obligatorios; no se admiten
- * `minimum`/`maximum`/`minLength` (se validan del lado del cliente si hace falta).
+ * `minLength` ni restricciones numéricas (se validan del lado del cliente si hace falta).
+ *
+ * Ambos campos admiten null: un cartel ilegible tiene que poder decirlo, no inventar.
  */
 export const busReadingSchema = {
   type: 'object',
   properties: {
-    line: { type: ['string', 'null'] },
-    destination: { type: ['string', 'null'] },
-    confidence: { type: 'number' },
-    raw_text: { type: 'array', items: { type: 'string' } },
+    numero: { type: ['string', 'null'] },
+    nombre: { type: ['string', 'null'] },
   },
-  required: ['line', 'destination', 'confidence', 'raw_text'],
+  required: ['numero', 'nombre'],
   additionalProperties: false,
 } as const;
 
@@ -46,18 +49,10 @@ export function parseBusReading(text: string): BusReading | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const candidate = value as Record<string, unknown>;
 
-  if (!isStringOrNull(candidate.line)) return null;
-  if (!isStringOrNull(candidate.destination)) return null;
-  if (typeof candidate.confidence !== 'number' || Number.isNaN(candidate.confidence)) return null;
-  if (!Array.isArray(candidate.raw_text)) return null;
-  if (!candidate.raw_text.every((item) => typeof item === 'string')) return null;
+  if (!isStringOrNull(candidate.numero)) return null;
+  if (!isStringOrNull(candidate.nombre)) return null;
 
-  return {
-    line: candidate.line,
-    destination: candidate.destination,
-    confidence: candidate.confidence,
-    raw_text: candidate.raw_text as string[],
-  };
+  return { numero: candidate.numero, nombre: candidate.nombre };
 }
 
 function stripCodeFence(text: string): string {

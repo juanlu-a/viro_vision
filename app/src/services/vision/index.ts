@@ -9,9 +9,15 @@ export {
   AnthropicNotConfiguredError,
   AnthropicStreamError,
   benchmarkBusVision,
-  buildRequestBody,
 } from './anthropicVision';
-export { VISION_MODEL, isAnthropicConfigured } from './config';
+export {
+  DEFAULT_MODEL_PROFILE,
+  MODEL_PROFILES,
+  findModelProfile,
+  isAnthropicConfigured,
+} from './config';
+export type { ModelProfile } from './config';
+export { buildRequestBody } from './request';
 export { busReadingSchema, parseBusReading } from './schema';
 export { formatBytes, formatMs, median, percentile, summarize } from './stats';
 export type { LatencyMetric, MetricSummary } from './stats';

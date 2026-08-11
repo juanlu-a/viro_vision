@@ -13,7 +13,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useRef, useState } from 'react';
 
 import { strings } from '@/i18n';
-import { AnthropicNotConfiguredError, benchmarkBusVision } from '@/services/vision';
+import {
+  AnthropicNotConfiguredError,
+  DEFAULT_MODEL_PROFILE,
+  MODEL_PROFILES,
+  benchmarkBusVision,
+} from '@/services/vision';
 import type { BenchmarkResult, ThinkingMode } from '@/services/vision';
 import type { BenchmarkState, SelectedPhoto } from './types';
 
@@ -24,6 +29,7 @@ const initialState: BenchmarkState = {
   runs: [],
   message: strings.benchmark.noResults,
   photo: null,
+  model: DEFAULT_MODEL_PROFILE,
   thinking: 'off',
 };
 
@@ -81,9 +87,16 @@ export function useVisionBenchmark() {
     [update],
   );
 
+  /** Rota al siguiente modelo del registro. Cambiar de modelo invalida las corridas anteriores. */
+  const setModel = useCallback(() => {
+    const current = MODEL_PROFILES.findIndex((p) => p.id === stateRef.current.model.id);
+    const next = MODEL_PROFILES[(current + 1) % MODEL_PROFILES.length];
+    update({ model: next, runs: [], status: 'idle', currentRun: 0, totalRuns: 0 });
+  }, [update]);
+
   const run = useCallback(
     async (totalRuns: number) => {
-      const { photo, thinking } = stateRef.current;
+      const { photo, thinking, model } = stateRef.current;
       if (!photo) return;
 
       const controller = new AbortController();
@@ -100,6 +113,7 @@ export function useVisionBenchmark() {
       const options = {
         imageBase64: photo.base64,
         mediaType: photo.mediaType,
+        model: model.id,
         thinking,
         signal: controller.signal,
       };
@@ -138,7 +152,7 @@ export function useVisionBenchmark() {
     abortRef.current?.abort();
   }, []);
 
-  return { state, pickPhoto, setThinking, run, cancel };
+  return { state, pickPhoto, setModel, setThinking, run, cancel };
 }
 
 function describeError(err: unknown): string {

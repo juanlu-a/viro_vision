@@ -17,7 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useVisionBenchmark } from '@/features/benchmark/useVisionBenchmark';
 import { strings } from '@/i18n';
-import { VISION_MODEL, formatBytes, formatMs, isAnthropicConfigured, summarize } from '@/services/vision';
+import { formatBytes, formatMs, isAnthropicConfigured, summarize } from '@/services/vision';
 import type { LatencyMetric } from '@/services/vision';
 
 const METRICS: { key: LatencyMetric; label: string }[] = [
@@ -32,7 +32,7 @@ const RUN_COUNT = 6;
 
 export default function VisionBenchScreen() {
   const t = strings.benchmark;
-  const { state, pickPhoto, setThinking, run, cancel } = useVisionBenchmark();
+  const { state, pickPhoto, setModel, setThinking, run, cancel } = useVisionBenchmark();
 
   const isBusy = state.status === 'warmup' || state.status === 'running';
   const lastRun = state.runs[state.runs.length - 1];
@@ -87,16 +87,26 @@ export default function VisionBenchScreen() {
 
         <Card>
           <SectionLabel>{t.configSection}</SectionLabel>
-          <ThemedText type="small" themeColor="textSecondary">
-            {VISION_MODEL}
-          </ThemedText>
           <AccessibleButton
-            label={state.thinking === 'off' ? t.thinkingOff : t.thinkingAdaptive}
-            hint={t.thinkingLabel}
+            label={state.model.label}
+            hint={t.modelHint}
             variant="ghost"
             disabled={isBusy}
-            onPress={() => setThinking(state.thinking === 'off' ? 'adaptive' : 'off')}
+            onPress={setModel}
           />
+          {state.model.supportsAdaptiveThinking ? (
+            <AccessibleButton
+              label={state.thinking === 'off' ? t.thinkingOff : t.thinkingAdaptive}
+              hint={t.thinkingLabel}
+              variant="ghost"
+              disabled={isBusy}
+              onPress={() => setThinking(state.thinking === 'off' ? 'adaptive' : 'off')}
+            />
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t.thinkingUnsupported}
+            </ThemedText>
+          )}
         </Card>
 
         <View
@@ -159,13 +169,10 @@ export default function VisionBenchScreen() {
             {lastRun.parsed ? (
               <>
                 <ThemedText type="default">
-                  {t.readingLine}: {lastRun.parsed.line ?? '—'}
+                  {t.readingLine}: {lastRun.parsed.numero ?? '—'}
                 </ThemedText>
                 <ThemedText type="default">
-                  {t.readingDestination}: {lastRun.parsed.destination ?? '—'}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {t.readingConfidence}: {Math.round(lastRun.parsed.confidence * 100)} %
+                  {t.readingName}: {lastRun.parsed.nombre ?? '—'}
                 </ThemedText>
               </>
             ) : (
