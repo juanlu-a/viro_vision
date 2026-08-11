@@ -3,6 +3,9 @@
  * Keep every user-facing string here so screen-reader labels stay consistent and translatable.
  */
 export const es = {
+  common: {
+    back: 'Atrás',
+  },
   app: {
     name: 'ViroVision',
     tagline: 'Asistente de reconocimiento por voz',
@@ -82,6 +85,9 @@ export const es = {
     cancelHint: 'Interrumpe la medición en curso.',
     warmingUp: 'Calentando (corrida descartada)…',
     cancelled: 'Medición cancelada.',
+    quotaWait: 'Cuota del proveedor agotada. Esperando',
+    quotaExhausted:
+      'Cuota agotada. El tier gratuito de Gemini admite 20 llamadas por minuto y cada medición usa 7. Reintentá en',
     ofLabel: 'de',
     photoUnreadable: 'No se pudo leer la foto elegida. Probá con otra.',
     running: 'Midiendo corrida',

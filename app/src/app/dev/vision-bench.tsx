@@ -46,9 +46,14 @@ export default function VisionBenchScreen() {
 
   return (
     <>
-      {/* Sin título en el header nativo: `ScreenHeader` ya lo anuncia como encabezado, y
-          duplicarlo hace que VoiceOver lea el título dos veces. */}
-      <Stack.Screen options={{ headerShown: true, title: '' }} />
+      {/*
+        Sin título en el header nativo: `ScreenHeader` ya lo anuncia como encabezado y duplicarlo
+        hace que VoiceOver lo lea dos veces. `headerBackTitle` sí hace falta: sin él, iOS usa el
+        título de la ruta anterior, que es el nombre interno del grupo — "(tabs)".
+      */}
+      <Stack.Screen
+        options={{ headerShown: true, title: '', headerBackTitle: strings.common.back }}
+      />
       {/* El header nativo ya cubre el notch: sin `edges` el safe area se aplicaría dos veces. */}
       <Screen scroll edges={[]}>
         <ScreenHeader title={t.title} subtitle={t.intro} />

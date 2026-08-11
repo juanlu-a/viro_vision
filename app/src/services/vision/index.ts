@@ -10,6 +10,7 @@
 export {
   VisionHttpError,
   VisionNotConfiguredError,
+  VisionQuotaError,
   VisionStreamError,
   benchmarkBusVision,
 } from './benchmark';

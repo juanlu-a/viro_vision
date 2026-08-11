@@ -15,6 +15,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { strings } from '@/i18n';
 import {
   VisionNotConfiguredError,
+  VisionHttpError,
+  VisionQuotaError,
+  VisionStreamError,
   availableModels,
   benchmarkBusVision,
   defaultModel,
@@ -23,6 +26,24 @@ import {
 } from '@/services/vision';
 import type { BenchmarkResult, ThinkingMode } from '@/services/vision';
 import type { BenchmarkState, SelectedPhoto } from './types';
+
+/** Pausa entre corridas. Cada medición son 1+N requests y el tier gratuito admite 20 por minuto;
+ *  espaciarlas evita agotar la cuota a mitad de la serie. No afecta la medición: cada corrida se
+ *  cronometra por separado y empieza con la conexión ya fría de todos modos. */
+const PAUSA_ENTRE_CORRIDAS_MS = 1500;
+
+/** Cuántas veces se reintenta una corrida frenada por cuota antes de rendirse. */
+const MAX_REINTENTOS_CUOTA = 2;
+
+function esperar(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const id = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => {
+      clearTimeout(id);
+      resolve();
+    });
+  });
+}
 
 const initialState: BenchmarkState = {
   status: 'idle',
@@ -145,12 +166,34 @@ export function useVisionBenchmark() {
         const collected: BenchmarkResult[] = [];
         for (let index = 0; index < totalRuns; index += 1) {
           if (controller.signal.aborted) break;
+          if (index > 0) await esperar(PAUSA_ENTRE_CORRIDAS_MS, controller.signal);
+          if (controller.signal.aborted) break;
+
           update({
             status: 'running',
             currentRun: index + 1,
             message: `${strings.benchmark.running} ${index + 1} ${strings.benchmark.ofLabel} ${totalRuns}`,
           });
-          collected.push(await benchmarkBusVision(options));
+
+          // La cuota agotada no invalida la serie: se espera lo que el proveedor pide y se
+          // reintenta esa corrida. Tirar 5 muestras válidas por un límite de tasa sería absurdo.
+          let intentos = 0;
+          for (;;) {
+            try {
+              collected.push(await benchmarkBusVision(options));
+              break;
+            } catch (err) {
+              if (!(err instanceof VisionQuotaError) || intentos >= MAX_REINTENTOS_CUOTA) throw err;
+              intentos += 1;
+              update({
+                status: 'running',
+                currentRun: index + 1,
+                message: `${strings.benchmark.quotaWait} ${err.retryAfterSeconds} s…`,
+              });
+              await esperar((err.retryAfterSeconds + 1) * 1000, controller.signal);
+              if (controller.signal.aborted) break;
+            }
+          }
         }
 
         if (controller.signal.aborted) {
@@ -201,6 +244,14 @@ function isAbortError(err: unknown): boolean {
 
 function describeError(err: unknown): string {
   if (err instanceof VisionNotConfiguredError) return strings.benchmark.notConfigured;
+  // El detalle importa más que el nombre del error: sin él, "VISION_STREAM_ERROR" no dice nada.
+  if (err instanceof VisionQuotaError) {
+    return `${strings.benchmark.quotaExhausted} ${err.retryAfterSeconds} s.`;
+  }
+  if (err instanceof VisionStreamError) return `${strings.benchmark.errorTitle}: ${err.detail}`;
+  if (err instanceof VisionHttpError) {
+    return `${strings.benchmark.errorTitle} (HTTP ${err.status}): ${err.body.slice(0, 200)}`;
+  }
   if (err instanceof Error) return `${strings.benchmark.errorTitle}: ${err.message}`;
   return strings.benchmark.errorTitle;
 }

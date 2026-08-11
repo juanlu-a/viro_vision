@@ -213,3 +213,41 @@ describe('registro de modelos', () => {
     expect(MODEL_PROFILES[0].provider).toBe('gemini');
   });
 });
+
+describe('error de cuota de Gemini', () => {
+  // Payload real capturado de la API tras superar el límite del tier gratuito.
+  const REAL_QUOTA_ERROR = {
+    event_type: 'error',
+    error: {
+      code: 'quota_exceeded',
+      message:
+        'You exceeded your current quota, please check your plan and billing details. ' +
+        '* Quota exceeded for metric: generativelanguage.googleapis.com/' +
+        'generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash\n' +
+        'Please retry in 29.220629527s.',
+    },
+  };
+
+  it('lo distingue por código para poder reintentar en vez de abortar la serie', () => {
+    const event = geminiProvider.readEvent(REAL_QUOTA_ERROR);
+
+    expect(event?.kind).toBe('error');
+    expect(event).toMatchObject({ code: 'quota_exceeded' });
+  });
+
+  it('extrae del mensaje cuántos segundos esperar, redondeando hacia arriba', () => {
+    const event = geminiProvider.readEvent(REAL_QUOTA_ERROR);
+
+    // Aprovechar el dato que da la API evita inventar un backoff arbitrario.
+    expect(event).toMatchObject({ retryAfterSeconds: 30 });
+  });
+
+  it('un error sin espera sugerida no inventa una', () => {
+    const event = geminiProvider.readEvent({
+      event_type: 'error',
+      error: { message: 'algo se rompió' },
+    });
+
+    expect(event).toMatchObject({ kind: 'error', retryAfterSeconds: undefined });
+  });
+});

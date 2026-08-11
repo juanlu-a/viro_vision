@@ -49,6 +49,21 @@ export class VisionHttpError extends Error {
   }
 }
 
+/**
+ * Cuota agotada. Se distingue del resto porque **es esperable y se resuelve esperando**: el tier
+ * gratuito de Gemini admite 20 requests por minuto y una medición completa son 7, así que dos
+ * mediciones seguidas lo alcanzan. El proveedor informa cuánto esperar y ese dato se conserva.
+ */
+export class VisionQuotaError extends Error {
+  readonly retryAfterSeconds: number;
+
+  constructor(detail: string, retryAfterSeconds: number) {
+    super(detail);
+    this.name = 'VisionQuotaError';
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 /** Se lanza ante un evento de error a mitad de stream (llega con HTTP 200). */
 export class VisionStreamError extends Error {
   readonly detail: string;
@@ -99,6 +114,7 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
   let usage: TokenUsage | null = null;
   let stopReason: string | null = null;
   let streamError: string | null = null;
+  let quotaRetryAfter: number | null = null;
 
   const response = await fetch(request.url, {
     method: 'POST',
@@ -169,6 +185,7 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
           break;
         case 'error':
           streamError = event.message;
+          if (event.code === 'quota_exceeded') quotaRetryAfter = event.retryAfterSeconds ?? 30;
           break;
         case 'start':
         default:
@@ -180,7 +197,10 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
 
   marks.doneAt ??= performance.now();
 
-  if (streamError) throw new VisionStreamError(streamError);
+  if (streamError) {
+    if (quotaRetryAfter != null) throw new VisionQuotaError(streamError, quotaRetryAfter);
+    throw new VisionStreamError(streamError);
+  }
 
   return {
     marks,

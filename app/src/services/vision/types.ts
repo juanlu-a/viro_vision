@@ -109,7 +109,14 @@ export type ProviderEvent =
       /** El usage trae sólo output_tokens: hay que fusionarlo con lo registrado, no pisarlo. */
       usageIsPartial?: boolean;
     }
-  | { kind: 'error'; message: string };
+  | {
+      kind: 'error';
+      message: string;
+      /** Código del proveedor, si lo trae. `quota_exceeded` se maneja distinto. */
+      code?: string;
+      /** Segundos que el proveedor pide esperar antes de reintentar. */
+      retryAfterSeconds?: number;
+    };
 
 export interface ProviderRequest {
   url: string;

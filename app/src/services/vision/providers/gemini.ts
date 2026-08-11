@@ -90,8 +90,17 @@ function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
       return { kind: 'stop', usage: readUsage(payload) };
     case 'interaction.failed':
     case 'error': {
-      const error = payload.error as { message?: string } | undefined;
-      return { kind: 'error', message: error?.message ?? 'error de stream' };
+      const error = payload.error as { message?: string; code?: string } | undefined;
+      const message = error?.message ?? 'error de stream';
+      // El error de cuota trae en el propio texto cuánto esperar ("Please retry in 29.2s").
+      // Aprovecharlo evita adivinar un backoff.
+      const match = /retry in ([\d.]+)s/i.exec(message);
+      return {
+        kind: 'error',
+        message,
+        code: error?.code,
+        retryAfterSeconds: match ? Math.ceil(Number(match[1])) : undefined,
+      };
     }
     case 'interaction.created':
     case 'interaction.status_update':
