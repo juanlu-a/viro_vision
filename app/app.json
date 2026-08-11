@@ -8,14 +8,17 @@
     "scheme": "virovision",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.virovision.app",
       "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
-        "NSBluetoothPeripheralUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento."
+        "NSBluetoothPeripheralUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
+        "NSPhotoLibraryUsageDescription": "ViroVision accede a tus fotos para medir cuánto tarda el reconocimiento de ómnibus en la nube. Es una herramienta de desarrollo."
       }
     },
     "android": {
+      "package": "com.virovision.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -51,7 +54,13 @@
           "bluetoothAlwaysPermission": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ViroVision accede a tus fotos para medir cuánto tarda el reconocimiento de ómnibus en la nube. Es una herramienta de desarrollo."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
