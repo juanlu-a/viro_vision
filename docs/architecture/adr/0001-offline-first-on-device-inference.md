@@ -1,9 +1,29 @@
 # ADR 0001 — Offline-first: self-contained, on-device inference
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-08-10 — see "Update" below)
 - **Date:** 2026-07-09
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, requirement
+
+> **Update 2026-08-10 — cloud as an optional accelerator.** After the tutor meeting on model
+> integration and performance (`docs/REUNIONES-TUTOR.md`), point 3 below is relaxed: **the cloud is
+> now allowed as an optional accelerator on the recognition path**, with **local inference as the
+> guaranteed fallback**. The hard requirement is unchanged — *with no internet, recognition and the
+> auditory response keep working*. Concretely:
+>
+> - A runtime **model gateway** may route an inference to the cloud when there is connectivity and
+>   doing so buys accuracy or simplicity (the tutor's example: basic-basket products tolerate more
+>   latency in exchange for precision). It must fall back to the local model automatically when
+>   there is no coverage, and it must never be the only path.
+> - Latency-critical cases (bus lines) stay local by default.
+> - Cloud-only recognition, with no local fallback, remains **forbidden** — that is the dependency
+>   this ADR exists to prevent.
+> - The cloud benchmark added in `app/src/services/vision/` is **development instrumentation only**:
+>   it measures time-to-first-token from the phone and must never be called from the
+>   camera → detection/OCR → announcement path.
+>
+> Everything else in this ADR stands. Where the text below says "never a cloud API", read it as
+> "never a cloud API *as the only path*".
 
 ## Context
 

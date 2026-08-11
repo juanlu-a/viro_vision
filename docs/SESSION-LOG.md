@@ -72,6 +72,50 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   → Settings → Components, or `xcodebuild -downloadPlatform iOS`). App bundles fine via `expo export`.
 - **Docs:** added this `SESSION-LOG.md` and `docs/ROADMAP.md`.
 
+## 2026-08-10 — Reunión con el tutor: integración del modelo y performance
+
+- **Primera reunión registrada con el tutor** sobre *dónde* corre la inferencia. Se creó
+  `docs/REUNIONES-TUTOR.md` como registro de reuniones con el director de tesis; los apuntes completos
+  (Gemma 2B en celular, *model gateway* dinámico local↔nube, caminos A–D de stack, capacidades de Gemma
+  y recolección de datos) viven ahí.
+- **Postura acordada sobre offline-first:** la nube pasa a ser **acelerador opcional** y lo local queda
+  como **fallback garantizado** — el requisito "funciona sin internet" se mantiene. Esto **desalinea
+  ADR 0001** (que hoy dice "never a cloud API"); queda pendiente enmendarlo formalmente.
+- **Descartado:** correr Gemma en la RPi Zero 2 W (~0.5 GB de RAM no alcanzan). En el dispositivo
+  sobrevive YOLO + Coral TPU. Afecta a **B2**.
+- **iOS vs. Android sube a decisión bloqueante:** Apple Vision + Core ML es iOS-only, React Native
+  Vision Camera es cross-platform; no se elige stack sin cerrar antes el perfil de usuario.
+- **Próximos pasos del tutor:** probar Gemma con Edge Gallery en el celular · mock de llamada a nube
+  desde la app para medir latencia · documentar Apple Vision + RN Vision Camera como alternativa ·
+  validar perfil de usuario iOS vs. Android.
+
+## 2026-08-10 (cont.) — Dev build en iPhone + benchmark de latencia en la nube
+
+- **Dev build iOS por el camino gratis.** Fijado `ios.bundleIdentifier` / `android.package` =
+  `com.virovision.app` (cerraba el pendiente A2), regenerado el proyecto nativo con
+  `expo prebuild --clean -p ios`, y documentado el procedimiento completo de firma con Apple ID
+  personal en [`dev-build-ios.md`](dev-build-ios.md) — incluida la **caducidad a los 7 días** y el
+  paso de confiar en el certificado desde Ajustes del teléfono. El bloqueo del simulador del 18/07
+  ya no aplica: el runtime iOS 26.5 está instalado.
+- **Paso 2 del tutor implementado:** `app/src/services/vision/` mide latencia contra un modelo de
+  visión en la nube leyendo el cartel de un ómnibus real. Métricas: hasta headers, hasta primer
+  byte, hasta primer evento, **hasta el primer token (TTFT)** y total. Una corrida de calentamiento
+  se descarta (handshake TLS + compilación del JSON Schema), las corridas son secuenciales, y se
+  reporta mediana y p90 — nunca promedio con pocas muestras.
+- **Decisión técnica:** HTTP crudo con streaming SSE sobre `expo/fetch`, no `@anthropic-ai/sdk`. El
+  SDK declara que **React Native no está soportado**, y además su decoder se interpondría entre la
+  red y el timestamp, ocultando el momento de los headers y del primer byte. Para un benchmark el
+  instrumento tiene que ser más delgado que lo medido.
+- **Pantalla:** `dev/vision-bench` es una **ruta, no una pestaña**, enlazada desde Ajustes sólo bajo
+  `__DEV__`. Primera navegación programática del proyecto (`router.push`).
+- **ADR 0001 enmendado** con nota fechada: la nube pasa a **acelerador opcional** con lo local como
+  **fallback garantizado**; la nube como único camino sigue prohibida. Alinea el ADR con lo acordado
+  con el tutor.
+- **Riesgo documentado:** `EXPO_PUBLIC_ANTHROPIC_API_KEY` se inlinea en el bundle JS. Es
+  instrumentación de tesis, no puede viajar en un build distribuible; queda advertido en
+  `.env.example`.
+- tsc / lint / 39 tests / bundle iOS + Android en verde. Nada del código nuevo es iOS-only.
+
 ## Open threads / next
 - Merge **PR #7** (email/password auth).
 - Install the iOS simulator runtime to see the app (or run on a real device via EAS dev build).

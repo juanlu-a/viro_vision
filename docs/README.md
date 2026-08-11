@@ -6,6 +6,10 @@ Thesis deliverables, architecture and decision records.
 
 - `architecture/` — system architecture, component and data-flow diagrams, and ADRs
   (Architecture Decision Records). _To be populated._
+- [`REUNIONES-TUTOR.md`](REUNIONES-TUTOR.md) — registro de reuniones con el director de tesis.
+- [`dev-build-ios.md`](dev-build-ios.md) — correr la app en un iPhone físico (development build).
+- [`SESSION-LOG.md`](SESSION-LOG.md) — historia cronológica del trabajo.
+- [`ROADMAP.md`](ROADMAP.md) · [`PROJECT-STATUS.md`](PROJECT-STATUS.md) — plan y estado actual.
 
 ## Thesis deliverables (from the project plan)
 
