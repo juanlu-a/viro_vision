@@ -25,17 +25,20 @@ export const Colors = {
     background: '#061D3A', // Azul Profundo — el fondo del ícono de la app
     // Superficies apenas despegadas del fondo: casi todo el contenido vive en tarjetas, así que
     // si son muy claras el azul que domina la pantalla deja de ser el Azul Profundo de la marca.
-    surface: '#0A2B54',
+    surface: '#0E2B4F', // del manual (sección modo claro/oscuro)
     surfaceElevated: '#0D3567',
     border: '#123F76', // decorativo (tarjetas): no necesita 3:1
     borderStrong: '#1C6AC4', // borde de controles (campos, foco): 3:1 — WCAG 1.4.11
-    text: '#F4F6F8', // Gris Niebla — 12.31:1 AAA
-    textSecondary: '#A9C0DE', // 7.4:1 AAA
-    primary: '#2BD69A', // Verde claro de marca — 7.11:1 AAA
+    text: '#E8EFF7', // del manual — 14.56:1 sobre fondo, 12.27:1 sobre superficie (AAA)
+    textSecondary: '#9FB8D4', // del manual — 8.26:1 sobre fondo (AAA)
+    // Azul del manual para modo oscuro: es el rol de "acción primaria" que define la marca.
+    // 5.98:1 sobre el fondo y 5.04:1 sobre la superficie — AA, no AAA (ver theme.test.ts).
+    primary: '#4D9BFF',
     primaryMuted: '#0B3350',
-    onPrimary: '#061D3A', // texto OSCURO sobre relleno claro: 8.99:1. Blanco sobre verde falla.
+    // Texto OSCURO sobre el relleno azul: 5.36:1. Blanco encima daría 2.82:1 y fallaría.
+    onPrimary: '#061D3A',
     danger: '#F3AAAD', // 7.09:1 AAA
-    success: '#2BD69A',
+    success: '#2BD69A', // Verde Lectura del manual — 8.99:1 AAA
     tabInactive: '#A9C0DE',
   },
   light: {
@@ -44,17 +47,14 @@ export const Colors = {
     surfaceElevated: '#FFFFFF',
     border: '#CFD7E0', // decorativo (tarjetas): no necesita 3:1
     borderStrong: '#7990A9', // borde de controles (campos, foco): 3.04:1 — WCAG 1.4.11
-    text: '#061D3A', // Azul Profundo — 15.57:1 AAA
-    textSecondary: '#3D5273', // 7.6:1 AAA
-    // Verde, igual que en el tema oscuro. El manual pone al Azul Sensor como "acción primaria",
-    // pero ese azul falla contraste sobre fondo oscuro, así que ahí el acento tiene que ser verde
-    // — y un acento que cambia de color entre temas es peor que apartarse del rol del manual.
-    // Verde Lectura oscurecido hasta AAA: 7.19:1 sobre el fondo.
-    primary: '#105E3F',
-    primaryMuted: '#E3F3EC',
-    onPrimary: '#FFFFFF', // 7.79:1 sobre el primario
+    text: '#061D3A', // del manual — 15.57:1 AAA
+    textSecondary: '#33475E', // del manual — 8.80:1 AAA
+    // Azul Sensor del manual: el rol de "acción primaria". 5.86:1 sobre el fondo — AA, no AAA.
+    primary: '#1256D4',
+    primaryMuted: '#E3EAF8',
+    onPrimary: '#FFFFFF', // 6.35:1 sobre el primario
     danger: '#A5171C', // 7.08:1 AAA
-    success: '#105E3F', // Verde Lectura oscurecido hasta AAA — 7.19:1
+    success: '#105E3F', // Verde Lectura oscurecido hasta AAA — 7.19:1 (el crudo da 2.44:1)
     tabInactive: '#3D5273',
   },
 } as const;

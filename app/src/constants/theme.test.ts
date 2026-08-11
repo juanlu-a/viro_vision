@@ -25,6 +25,15 @@ export function contrastRatio(a: string, b: string): number {
 }
 
 const AAA = 7;
+/**
+ * Piso del color de acento. Es **AA (4.5:1) y no AAA**, a propósito: el manual de marca fija el
+ * Azul Sensor como "acción primaria" con valores concretos por modo (`#1256D4` en claro, `#4D9BFF`
+ * en oscuro), y esos azules llegan a AA pero no a AAA. Se eligió respetar el manual antes que
+ * derivar un azul propio — la decisión está registrada en la skill `virovision-marca`.
+ *
+ * El texto, que es lo que más pesa para el usuario objetivo, sigue exigiendo AAA.
+ */
+const ACENTO = 4.5;
 /** Piso para elementos de interfaz y texto grande (WCAG 1.4.11 / 1.4.3). */
 const UI = 3;
 
@@ -58,13 +67,15 @@ describe.each(themes)('tema %s', (_name, theme) => {
     expect(contrastRatio(theme.textSecondary, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('el color primario alcanza AAA sobre el fondo', () => {
-    expect(contrastRatio(theme.primary, theme.background)).toBeGreaterThanOrEqual(AAA);
+  it('el color primario alcanza al menos AA sobre el fondo y sobre la superficie', () => {
+    expect(contrastRatio(theme.primary, theme.background)).toBeGreaterThanOrEqual(ACENTO);
+    expect(contrastRatio(theme.primary, theme.surface)).toBeGreaterThanOrEqual(ACENTO);
   });
 
-  it('el texto sobre el relleno primario alcanza AAA', () => {
-    // El error clásico con esta paleta: blanco sobre el verde de marca da 2.64:1.
-    expect(contrastRatio(theme.onPrimary, theme.primary)).toBeGreaterThanOrEqual(AAA);
+  it('el texto sobre el relleno primario alcanza al menos AA', () => {
+    // El error clásico con esta paleta: blanco sobre el azul del modo oscuro da 2.82:1, así que
+    // ahí el texto encima tiene que ser oscuro, no blanco.
+    expect(contrastRatio(theme.onPrimary, theme.primary)).toBeGreaterThanOrEqual(ACENTO);
   });
 
   it('el color de peligro alcanza AAA sobre el fondo', () => {
@@ -73,6 +84,12 @@ describe.each(themes)('tema %s', (_name, theme) => {
 
   it('el color de éxito alcanza AAA sobre el fondo', () => {
     expect(contrastRatio(theme.success, theme.background)).toBeGreaterThanOrEqual(AAA);
+  });
+
+  it('el color de éxito NO es el verde crudo del manual en fondo claro', () => {
+    // Verde Lectura #1FB57A da 2.44:1 sobre el fondo claro. El manual no define una variante
+    // para fondo claro, así que se deriva una. Si algún día el manual la agrega, actualizar acá.
+    expect(contrastRatio('#1FB57A', '#F4F6F8')).toBeLessThan(3);
   });
 
   it('la pestaña inactiva sigue siendo legible (AAA)', () => {

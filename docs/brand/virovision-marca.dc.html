@@ -289,8 +289,78 @@ a:hover { color: #061D3A; }
   <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
     <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
       <div>
-        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Usos incorrectos</h2>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Modo claro y oscuro</h2>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">07</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+          <div style="border:1px solid #E2E8EF;border-radius:8px;background:#F4F6F8;padding:28px;display:flex;flex-direction:column;gap:20px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Modo claro</div>
+            <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:center;gap:14px">
+                <svg viewBox="0 0 200 200" style="width:40px;height:40px">
+                  <g fill="none" stroke-linecap="round" stroke-width="18">
+                    <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+                    <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+                  </g>
+                  <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+                </svg>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#33475E">Escuchando</div>
+              </div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;color:#061D3A;letter-spacing:-0.02em">Línea 60</div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:10px;height:10px;border-radius:999px;background:#1FB57A"></div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#1FB57A">Detección confirmada · 98%</div>
+              </div>
+              <div style="background:#1256D4;color:#FFFFFF;border-radius:6px;padding:14px;text-align:center;font-weight:600;font-size:16px">Repetir aviso</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.9;color:#5A7089">Fondo #F4F6F8 · Superficie #FFFFFF<br />Texto #061D3A · Secundario #33475E<br />Azul #1256D4 · Verde #1FB57A</div>
+          </div>
+
+          <div style="border:1px solid #10345E;border-radius:8px;background:#061D3A;padding:28px;display:flex;flex-direction:column;gap:20px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#7E9FC4">Modo oscuro</div>
+            <div style="background:#0E2B4F;border:1px solid #173D68;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:center;gap:14px">
+                <svg viewBox="0 0 200 200" style="width:40px;height:40px">
+                  <g fill="none" stroke-linecap="round" stroke-width="18">
+                    <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#4D9BFF"></path>
+                    <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#2BD69A"></path>
+                  </g>
+                  <circle cx="100" cy="92" r="17" fill="#FFFFFF"></circle>
+                </svg>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#9FB8D4">Escuchando</div>
+              </div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;color:#E8EFF7;letter-spacing:-0.02em">Línea 60</div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:10px;height:10px;border-radius:999px;background:#2BD69A"></div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#2BD69A">Detección confirmada · 98%</div>
+              </div>
+              <div style="background:#4D9BFF;color:#061D3A;border-radius:6px;padding:14px;text-align:center;font-weight:600;font-size:16px">Repetir aviso</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.9;color:#7E9FC4">Fondo #061D3A · Superficie #0E2B4F<br />Texto #E8EFF7 · Secundario #9FB8D4<br />Azul #4D9BFF · Verde #2BD69A</div>
+          </div>
+
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Regla</div>
+            <div style="font-size:15px;line-height:1.6;color:#33475E">Los acentos se aclaran en modo oscuro (+2 pasos de luminosidad) para mantener 4.5:1 contra la superficie. Nunca usar #1256D4 sobre #061D3A.</div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Símbolo</div>
+            <div style="font-size:15px;line-height:1.6;color:#33475E">Pupila azul profundo en claro, blanca en oscuro. El ícono de app usa siempre fondo #061D3A en los dos modos.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Usos incorrectos</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">08</div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
         <div style="border:1px solid #E2E8EF;border-radius:8px;background:#FFFFFF;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:center">
@@ -341,7 +411,7 @@ a:hover { color: #061D3A; }
     <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
       <div>
         <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Exportar</h2>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">08</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">09</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
         <p style="font-size:17px;line-height:1.65;margin:0;max-width:62ch;color:#33475E;text-wrap:pretty">Código fuente del símbolo, listo para pegar en tu agente, en el repo o en Figma.</p>

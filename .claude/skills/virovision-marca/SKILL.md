@@ -48,13 +48,21 @@ con el manual, el test falla.
 
 **Antes de tocar cualquier color, corré `npm test -- theme`.**
 
-### Desviación deliberada: el acento es VERDE en los dos temas
+### El acento sigue al manual: azul en ambos temas
 
-El manual asigna al **Azul Sensor** el rol de *acción primaria*. La app no lo respeta, a propósito:
-ese azul falla contraste sobre fondo oscuro, así que en el tema oscuro el acento tiene que ser
-verde igual. Un acento que **cambia de color entre temas** es peor que apartarse del rol nominal
-del manual, así que ambos usan Verde Lectura ajustado en luminosidad — `#2BD69A` en oscuro
-(8.99:1) y `#105E3F` en claro (7.19:1). El azul queda como color de marca en el símbolo.
+El manual asigna al **Azul Sensor** el rol de *acción primaria* y fija un valor por modo. La app
+los usa tal cual: `#1256D4` en claro (5.86:1 sobre fondo) y `#4D9BFF` en oscuro (5.98:1). Son
+**AA, no AAA** — se eligió respetar el manual antes que derivar un azul propio, y `theme.test.ts`
+exige AA para el acento y AAA para el texto, con el porqué escrito al lado del umbral.
+
+Ojo con el texto encima del relleno: en oscuro **blanco sobre el azul da 2.82:1 y falla**, así que
+`onPrimary` es el azul profundo (5.98:1). En claro sí va blanco (6.35:1).
+
+### La única desviación que queda: el verde en fondo claro
+
+El manual define Verde Lectura `#1FB57A` y su variante para fondo oscuro `#2BD69A`, pero **no una
+para fondo claro**. El crudo da **2.44:1** sobre `#F4F6F8` — ilegible. La app usa `#105E3F`
+(7.19:1) como color de éxito en el tema claro. **Si el manual agrega esa variante, reemplazarla.**
 
 ## Tipografía
 

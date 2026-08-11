@@ -15,6 +15,12 @@ Geometría (lienzo 200×200): arcos de radio 96 desde (100,168) hasta (32,44) y 
 Variantes sobre oscuro: #4D9BFF / #2BD69A / pupila blanca.
 Proporción: 70% neutros, 20% azul, 10% verde.
 
+## Modo claro y oscuro
+- Claro: fondo #F4F6F8, superficie #FFFFFF, texto #061D3A, secundario #33475E, azul #1256D4, verde #1FB57A
+- Oscuro: fondo #061D3A, superficie #0E2B4F, texto #E8EFF7, secundario #9FB8D4, azul #4D9BFF, verde #2BD69A
+- Los acentos se aclaran en oscuro para mantener 4.5:1 contra la superficie; nunca #1256D4 sobre #061D3A.
+- Pupila del símbolo: #061D3A en claro, #FFFFFF en oscuro. El ícono de app usa fondo #061D3A en ambos modos.
+
 ## Tipografía
 - Títulos: Space Grotesk Bold, tracking −2%
 - Texto: IBM Plex Sans Regular/SemiBold, mínimo 17 px
