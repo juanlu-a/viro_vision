@@ -57,7 +57,8 @@ Gemma sobre celular como alternativa concreta al camino YOLO + Coral TPU en el d
 ### 4. Postura acordada sobre offline-first
 
 El *model gateway* choca con [`ADR 0001`](architecture/adr/0001-offline-first-on-device-inference.md),
-que hoy dice literalmente *"inference always runs locally — never a cloud API"*.
+que **decía**, antes de la enmienda del 2026-08-10, *"Recognition inference always runs locally —
+never a cloud API"*.
 
 **Postura del equipo:** la **nube pasa a ser un acelerador opcional** y lo local queda como **fallback
 garantizado**. El requisito duro se mantiene intacto: *sin internet, el reconocimiento y la respuesta
@@ -77,7 +78,8 @@ simplicidad, nunca como único camino.
 - Los caminos B y C implican **capturar con la cámara del celular**, lo que compite con el pilar
   hardware (gafas + RPi). Falta definir explícitamente si el dispositivo sigue siendo el capturador
   principal o pasa a ser opcional.
-- Alimenta el **ADR 0004 — On-device inference runtime**, todavía sin escribir.
+- ✅ Alimentó el [**ADR 0004 — Runtime de inferencia on-device (Gemma vía LiteRT-LM)**](architecture/adr/0004-on-device-inference-runtime.md),
+  escrito el 2026-08-11, en estado *Proposed*, a discutir en la próxima reunión.
 
 ### 6. Próximos pasos acordados
 

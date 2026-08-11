@@ -102,7 +102,13 @@ export type ProviderEvent =
    * completado, y devolver sólo el uso perdería la marca de cierre — el total quedaría medido
    * contra el fin del stream (que incluye latencia de transporte) en vez del evento real.
    */
-  | { kind: 'stop'; stopReason?: string; usage?: TokenUsage }
+  | {
+      kind: 'stop';
+      stopReason?: string;
+      usage?: TokenUsage;
+      /** El usage trae sólo output_tokens: hay que fusionarlo con lo registrado, no pisarlo. */
+      usageIsPartial?: boolean;
+    }
   | { kind: 'error'; message: string };
 
 export interface ProviderRequest {

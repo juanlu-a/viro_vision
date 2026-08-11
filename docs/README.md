@@ -4,8 +4,10 @@ Thesis deliverables, architecture and decision records.
 
 ## Contents
 
-- `architecture/` — system architecture, component and data-flow diagrams, and ADRs
-  (Architecture Decision Records). _To be populated._
+- `architecture/` — diagramas de arquitectura y flujo de datos *(a poblar)*;
+  [`architecture/adr/`](architecture/adr/) tiene los ADRs: 0001 offline-first (enmendado),
+  0002 backend & auth, 0004 runtime de inferencia on-device.
+- [`supabase.md`](supabase.md) · [`ci-cd.md`](ci-cd.md) — setup del backend y de CI/CD.
 - [`REUNIONES-TUTOR.md`](REUNIONES-TUTOR.md) — registro de reuniones con el director de tesis.
 - [`dev-build-ios.md`](dev-build-ios.md) — correr la app en un iPhone físico (development build).
 - [`SESSION-LOG.md`](SESSION-LOG.md) — historia cronológica del trabajo.

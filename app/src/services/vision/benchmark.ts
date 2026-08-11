@@ -87,6 +87,10 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
     mediaType: options.mediaType,
   });
 
+  // Serializar ANTES de marcar el envío: en una foto de varios MB, stringify come decenas de ms
+  // de hilo JS que si no quedarían contabilizados como latencia de red.
+  const payloadJson = JSON.stringify(request.body);
+
   const startedAtEpoch = Date.now();
   const marks: LatencyMarks = { requestSentAt: performance.now() };
   const eventCounts: Record<string, number> = {};
@@ -99,7 +103,7 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
   const response = await fetch(request.url, {
     method: 'POST',
     headers: request.headers,
-    body: JSON.stringify(request.body),
+    body: payloadJson,
     signal: options.signal,
   });
   marks.headersAt = performance.now();
@@ -150,9 +154,18 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
           break;
         case 'stop':
           if (event.stopReason) stopReason = event.stopReason;
-          // El uso puede venir adjunto al cierre; no perderlo ni perder la marca.
-          if (event.usage) usage = event.usage;
-          marks.doneAt ??= receivedAt;
+          if (event.usage) {
+            // Un usage parcial (Anthropic manda sólo output_tokens al cerrar) se fusiona con el
+            // input ya registrado; pisarlo dejaría input_tokens en cero.
+            usage =
+              event.usageIsPartial && usage
+                ? { ...usage, output_tokens: event.usage.output_tokens }
+                : event.usage;
+          }
+          // Asignación, no `??=`: los proveedores emiten más de un evento terminal y queremos el
+          // ÚLTIMO. Con `??=` Anthropic latcheaba en `message_delta` — un frame antes de
+          // `message_stop` — y Gemini en el suyo, midiendo cosas distintas bajo el mismo nombre.
+          marks.doneAt = receivedAt;
           break;
         case 'error':
           streamError = event.message;

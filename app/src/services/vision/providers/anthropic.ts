@@ -82,8 +82,20 @@ function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
       return null;
     }
     case 'message_delta': {
+      // `message_delta` es el ÚNICO evento con el conteo final de tokens de salida; el de
+      // `message_start` es el inicial (1-4). Trae sólo `output_tokens`, así que se marca como
+      // parcial para que el motor lo fusione en vez de pisar el input ya registrado.
       const delta = payload.delta as { stop_reason?: string } | undefined;
-      return { kind: 'stop', stopReason: delta?.stop_reason };
+      const usage = payload.usage as { output_tokens?: number } | undefined;
+      return {
+        kind: 'stop',
+        stopReason: delta?.stop_reason,
+        usage:
+          usage?.output_tokens == null
+            ? undefined
+            : { input_tokens: 0, output_tokens: usage.output_tokens },
+        usageIsPartial: usage?.output_tokens != null,
+      };
     }
     case 'message_stop':
       return { kind: 'stop' };

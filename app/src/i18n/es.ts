@@ -68,6 +68,8 @@ export const es = {
     cancelHint: 'Interrumpe la medición en curso.',
     warmingUp: 'Calentando (corrida descartada)…',
     cancelled: 'Medición cancelada.',
+    ofLabel: 'de',
+    photoUnreadable: 'No se pudo leer la foto elegida. Probá con otra.',
     running: 'Midiendo corrida',
     resultsSection: 'Resultados',
     noResults: 'Todavía no hay mediciones.',

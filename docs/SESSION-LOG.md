@@ -106,27 +106,35 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   SDK declara que **React Native no está soportado**, y además su decoder se interpondría entre la
   red y el timestamp, ocultando el momento de los headers y del primer byte. Para un benchmark el
   instrumento tiene que ser más delgado que lo medido.
-- **Pantalla:** `dev/vision-bench` es una **ruta, no una pestaña**, enlazada desde Ajustes sólo bajo
-  `__DEV__`. Primera navegación programática del proyecto (`router.push`).
+- **Pantalla:** `dev/vision-bench` es una **ruta, no una pestaña**. El enlace desde Ajustes aparece
+  con `__DEV__` **o con clave cargada**: así el benchmark también existe en un build de release
+  local — necesario para medir en la calle sin la laptop — y desaparece solo en cualquier build que
+  no lleve clave. Primera navegación programática del proyecto (`router.push`).
 - **ADR 0001 enmendado** con nota fechada: la nube pasa a **acelerador opcional** con lo local como
   **fallback garantizado**; la nube como único camino sigue prohibida. Alinea el ADR con lo acordado
   con el tutor.
-- **Riesgo documentado:** `EXPO_PUBLIC_ANTHROPIC_API_KEY` se inlinea en el bundle JS. Es
+- **Riesgo documentado:** las claves `EXPO_PUBLIC_GEMINI_API_KEY` / `EXPO_PUBLIC_ANTHROPIC_API_KEY`
+  se inlinean en el bundle JS. Es
   instrumentación de tesis, no puede viajar en un build distribuible; queda advertido en
   `.env.example`.
-- **Modelo y respuesta, decididos priorizando velocidad:** por defecto **Haiku 4.5** (Opus 5 queda
-  disponible para contrastar), y la respuesta se reduce a **dos campos: `numero` y `nombre`** —
+- **Modelo y respuesta, decididos priorizando velocidad:** el proveedor primario es **Gemini**
+  (tier gratuito sin tarjeta y, sobre todo, de la misma familia que Gemma: comparar Gemma local
+  contra Gemini en la nube cambia una sola variable). Por defecto **Gemini 3.6 Flash**; Anthropic
+  queda como segundo proveedor opcional. El default real es *el primer modelo cuyo proveedor tiene
+  clave cargada* (`defaultModel()`). La respuesta se reduce a **dos campos: `numero` y `nombre`** —
   menos salida es menos latencia, y son los dos datos que el anuncio de voz necesita. Se le pide
   explícitamente devolver `null` antes que adivinar: para un usuario ciego un número inventado es
   peor que un "no pude leerlo".
   Cambiar de modelo **no es cambiar un string**: la API responde 400 —no ignora— parámetros que el
   modelo no admite, y Haiku 4.5 rechaza `output_config.effort` y no soporta thinking adaptativo. De
-  ahí el registro de perfiles en `config.ts` y el armado de request en `request.ts`, puro y testeado.
+  ahí el registro de perfiles en `config.ts` y el armado de request en `providers/anthropic.ts` y
+  `providers/gemini.ts` (prompts compartidos en `providers/prompts.ts`), módulos puros y testeados.
+  El motor de medición quedó aparte en `benchmark.ts`, agnóstico del proveedor.
 - **Gemma local, restricción encontrada:** no se puede conectar a un modelo que corre dentro de otra
   app — iOS aísla cada app en su sandbox. Los caminos reales son (a) que la app de Gemma exponga un
   servidor HTTP local, y ahí el adapter es trivial porque `sse.ts` y las métricas son agnósticas del
-  proveedor, o (b) embeberlo con un módulo nativo sobre MediaPipe (el "Camino A" del tutor, proyecto
-  aparte). Pendiente de averiguar cuál app/versión se está usando. Dato valioso: Gemma probado a mano
+  proveedor, o (b) embeberlo con **LiteRT-LM** dentro de ViroVision — no MediaPipe LLM Inference,
+  que quedó en modo mantenimiento. Es el "Camino A" del tutor, formalizado en ADR 0004. Pendiente de averiguar cuál app/versión se está usando. Dato valioso: Gemma probado a mano
   en el iPhone **anda bien**, lo que valida el Camino A antes de invertir en él.
 - tsc / lint / 52 tests / bundle iOS + Android en verde. Nada del código nuevo es iOS-only.
 - **El incidente de TCC de macOS volvió a pasar** (ya había ocurrido el 18/07), esta vez a mitad de

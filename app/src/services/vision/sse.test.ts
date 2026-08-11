@@ -15,6 +15,11 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
           index += 1;
           return { done: false, value };
         },
+        // Un reader real siempre expone cancel(); el lector lo usa para no filtrar el socket
+        // cuando aborta a mitad de stream.
+        async cancel() {
+          index = chunks.length;
+        },
         releaseLock() {},
       };
     },

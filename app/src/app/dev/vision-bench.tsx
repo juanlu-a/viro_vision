@@ -3,11 +3,12 @@
  * de un ómnibus (paso 2 de la reunión con el tutor, 2026-08-10).
  *
  * Es una ruta suelta, no una pestaña: no debe aparecer en la barra de navegación del producto.
- * El enlace desde Ajustes está detrás de `__DEV__`.
+ * El enlace desde Ajustes aparece con `__DEV__` o con una clave de proveedor cargada.
  */
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
@@ -37,9 +38,17 @@ export default function VisionBenchScreen() {
   const isBusy = state.status === 'warmup' || state.status === 'running';
   const lastRun = state.runs[state.runs.length - 1];
 
+  // `accessibilityLiveRegion` es SÓLO Android. Sin esto, en iPhone un usuario de VoiceOver no
+  // escucha ningún cambio de estado — y esta pantalla es, entera, una máquina de estados.
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility(state.message);
+  }, [state.message]);
+
   return (
     <>
-      <Stack.Screen options={{ headerShown: true, title: t.title }} />
+      {/* Sin título en el header nativo: `ScreenHeader` ya lo anuncia como encabezado, y
+          duplicarlo hace que VoiceOver lea el título dos veces. */}
+      <Stack.Screen options={{ headerShown: true, title: '' }} />
       {/* El header nativo ya cubre el notch: sin `edges` el safe area se aplicaría dos veces. */}
       <Screen scroll edges={[]}>
         <ScreenHeader title={t.title} subtitle={t.intro} />
@@ -55,12 +64,15 @@ export default function VisionBenchScreen() {
         <Card>
           <SectionLabel>{t.photoSection}</SectionLabel>
           {state.photo ? (
-            <View style={styles.photoRow}>
+            <View
+              style={styles.photoRow}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={`${t.photoSelected}. ${state.photo.width} por ${state.photo.height} píxeles. ${t.payloadLabel}: ${formatBytes(state.photo.base64.length)}.`}>
               <Image
                 source={{ uri: state.photo.uri }}
                 style={styles.thumbnail}
                 accessibilityIgnoresInvertColors
-                alt={t.photoSelected}
               />
               <View style={styles.photoMeta}>
                 <ThemedText type="small" themeColor="textSecondary">
@@ -119,21 +131,17 @@ export default function VisionBenchScreen() {
           </ThemedText>
         </View>
 
-        {isBusy ? (
-          <AccessibleButton
-            label={t.cancelButton}
-            hint={t.cancelHint}
-            variant="danger"
-            onPress={cancel}
-          />
-        ) : (
-          <AccessibleButton
-            label={`${t.runButton} (${RUN_COUNT})`}
-            hint={t.runHint}
-            disabled={!state.photo || !isVisionConfigured}
-            onPress={() => run(RUN_COUNT)}
-          />
-        )}
+        {/*
+          Un solo botón que cambia de rol, no dos que se montan y desmontan: si el elemento
+          enfocado desaparece al activarlo, VoiceOver pierde el foco y salta al tope de la pantalla.
+        */}
+        <AccessibleButton
+          label={isBusy ? t.cancelButton : `${t.runButton} ${RUN_COUNT} ${t.runsLabel}`}
+          hint={isBusy ? t.cancelHint : t.runHint}
+          variant={isBusy ? 'danger' : 'primary'}
+          disabled={!isBusy && (!state.photo || !isVisionConfigured)}
+          onPress={isBusy ? cancel : () => run(RUN_COUNT)}
+        />
 
         {state.runs.length > 0 && (
           <Card>
@@ -150,9 +158,11 @@ export default function VisionBenchScreen() {
                   <ThemedText type="small" style={styles.metricLabel}>
                     {label}
                   </ThemedText>
-                  <ThemedText type="code">{formatMs(summary.medianMs)}</ThemedText>
-                  <ThemedText type="code" themeColor="textSecondary">
-                    {formatMs(summary.p90Ms)}
+                  <ThemedText type="smallBold">
+                    {t.medianLabel} {formatMs(summary.medianMs)}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t.p90Label} {formatMs(summary.p90Ms)}
                   </ThemedText>
                 </View>
               );
@@ -215,10 +225,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
+  // Columna, no fila: con Dynamic Type grande una fila de 3 columnas aplasta los números
+  // contra el borde mientras la etiqueta se parte en varias líneas.
   metricRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
+    gap: 2,
   },
   metricLabel: {
     flex: 1,

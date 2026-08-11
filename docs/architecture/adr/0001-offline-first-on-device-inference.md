@@ -48,11 +48,17 @@ a cloud recognition API — reintroducing the exact internet dependency we are t
 2. **Model runs locally in both architectures.**
    - **On-device:** RPi Zero 2 W + Coral TPU via TensorFlow Lite / OpenCV.
    - **Offload-to-phone:** the model is **bundled into the app** and runs through a **local**
-     mobile runtime (TFLite / ONNX Runtime / ExecuTorch via a React Native native module).
-     "Offload to the phone" means offload to the phone's **local compute**, *not* to a server.
-3. **Internet is allowed only for non-essential features** — e.g. app/model updates, remote config,
-   optional data sync, analytics. These must degrade gracefully and never sit on the critical
-   recognition → announcement path.
+     mobile runtime. "Offload to the phone" means offload to the phone's **local compute**, *not*
+     to a server. The concrete runtime and model are decided in
+     [ADR 0004](0004-on-device-inference-runtime.md) — **Gemma via LiteRT-LM**, which supersedes the
+     TFLite / ONNX Runtime / ExecuTorch options originally listed here.
+3. **Internet is optional on every path.** *(Amended 2026-08-10 — this point replaces the original
+   "internet only for non-essential features".)* Non-essential features — app/model updates, remote
+   config, optional data sync, analytics — may use the network freely and must degrade gracefully.
+   On the **essential** recognition path, the cloud is allowed only as an **optional accelerator**
+   behind a runtime model gateway, with local inference as the **guaranteed fallback**: losing
+   connectivity may degrade accuracy or latency, but must never break recognition or the audio
+   response. Cloud-only recognition, with no local fallback, stays forbidden.
 
 ## Consequences
 

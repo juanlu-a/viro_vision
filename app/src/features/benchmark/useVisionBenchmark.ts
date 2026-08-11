@@ -10,7 +10,7 @@
  *     los timestamps. Sólo se hace setState entre corridas.
  */
 import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { strings } from '@/i18n';
 import {
@@ -18,6 +18,8 @@ import {
   availableModels,
   benchmarkBusVision,
   defaultModel,
+  formatMs,
+  summarize,
 } from '@/services/vision';
 import type { BenchmarkResult, ThinkingMode } from '@/services/vision';
 import type { BenchmarkState, SelectedPhoto } from './types';
@@ -39,27 +41,33 @@ export function useVisionBenchmark() {
   /** Espejo del estado, para leer foto y modo dentro de `run` sin re-crear el callback. */
   const stateRef = useRef(initialState);
 
+  // Navegar hacia atrás a mitad de una medición dejaba la serie corriendo: hasta 7 requests
+  // siguiendo en vuelo, sin forma de cancelarlas, quemando cuota y contaminando cualquier
+  // medición posterior si se vuelve a entrar a la pantalla.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   const update = useCallback((patch: Partial<BenchmarkState>) => {
     stateRef.current = { ...stateRef.current, ...patch };
     setState(stateRef.current);
   }, []);
 
   const pickPhoto = useCallback(async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      update({ status: 'error', message: strings.benchmark.permissionDenied });
-      return;
-    }
+    try {
+      // Sin gate de permisos a propósito: en SDK 57 la fototeca no lo requiere (iOS usa el
+      // picker fuera de proceso, Android 13+ devuelve la lista vacía). Pedirlo sólo agregaba un
+      // diálogo cuya negativa bloqueaba un selector que igual habría funcionado.
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        base64: true,
+        quality: 1,
+      });
+      if (result.canceled) return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      base64: true,
-      quality: 1,
-    });
-    if (result.canceled) return;
-
-    const asset = result.assets?.[0];
-    if (!asset?.base64) return;
+      const asset = result.assets?.[0];
+      if (!asset?.base64) {
+        update({ status: 'error', message: strings.benchmark.photoUnreadable });
+        return;
+      }
 
     const photo: SelectedPhoto = {
       uri: asset.uri,
@@ -69,15 +77,21 @@ export function useVisionBenchmark() {
       height: asset.height,
     };
 
-    // Cambiar de foto invalida las corridas previas: el tamaño del payload es un eje del experimento.
-    update({
-      photo,
-      runs: [],
-      status: 'idle',
-      currentRun: 0,
-      totalRuns: 0,
-      message: strings.benchmark.photoSelected,
-    });
+      // Cambiar de foto invalida las corridas previas: el tamaño del payload es un eje del
+      // experimento.
+      update({
+        photo,
+        runs: [],
+        status: 'idle',
+        currentRun: 0,
+        totalRuns: 0,
+        message: strings.benchmark.photoSelected,
+      });
+    } catch (err) {
+      // Sin esto, un throw del picker era una promesa rechazada sin manejar: para un usuario
+      // ciego, "no pasó nada" es indistinguible de "el botón no anda".
+      update({ status: 'error', message: describeError(err) });
+    }
   }, [update]);
 
   const setThinking = useCallback(
@@ -134,26 +148,34 @@ export function useVisionBenchmark() {
           update({
             status: 'running',
             currentRun: index + 1,
-            message: `${strings.benchmark.running} ${index + 1} de ${totalRuns}`,
+            message: `${strings.benchmark.running} ${index + 1} ${strings.benchmark.ofLabel} ${totalRuns}`,
           });
           collected.push(await benchmarkBusVision(options));
         }
 
         if (controller.signal.aborted) {
-          // Cancelación deliberada: volver a idle sin resultados parciales ni cartel de error.
-          update({ status: 'idle', currentRun: 0, runs: [], message: strings.benchmark.cancelled });
+          // Cancelación deliberada. Las corridas ya completadas son válidas por separado, así
+          // que se conservan en vez de tirarlas.
+          update({
+            status: 'idle',
+            currentRun: 0,
+            runs: collected,
+            message: `${strings.benchmark.cancelled} ${collected.length} ${strings.benchmark.samplesLabel}`,
+          });
         } else {
+          // El mensaje lleva el TTFT: un desarrollador ciego no puede mirar la tabla.
+          const ttft = summarize(collected, 'toFirstTextDelta');
           update({
             status: 'done',
             currentRun: 0,
             runs: collected,
-            message: `${collected.length} ${strings.benchmark.samplesLabel}`,
+            message: `${collected.length} ${strings.benchmark.samplesLabel}. ${strings.benchmark.metricToFirstTextDelta}: ${formatMs(ttft.medianMs)}.`,
           });
         }
       } catch (err) {
         // Un abort llega como excepción: es cancelación, no falla. No pintarlo como error.
         if (controller.signal.aborted || isAbortError(err)) {
-          update({ status: 'idle', currentRun: 0, runs: [], message: strings.benchmark.cancelled });
+          update({ status: 'idle', currentRun: 0, message: strings.benchmark.cancelled });
         } else {
           update({ status: 'error', currentRun: 0, message: describeError(err) });
         }

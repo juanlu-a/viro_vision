@@ -5,7 +5,7 @@ Format: short Markdown, numbered `NNNN-title.md`, status one of Proposed / Accep
 
 | # | Title | Status |
 |---|-------|--------|
-| [0001](0001-offline-first-on-device-inference.md) | Offline-first: self-contained, on-device inference | Accepted |
+| [0001](0001-offline-first-on-device-inference.md) | Offline-first: self-contained, on-device inference | Accepted (enmendado 2026-08-10 — nube como acelerador opcional) |
 | [0002](0002-backend-and-auth-supabase.md) | Backend & auth: Supabase as the online account layer | Accepted |
 | [0004](0004-on-device-inference-runtime.md) | Runtime de inferencia on-device (Gemma vía LiteRT-LM) | Proposed |
 

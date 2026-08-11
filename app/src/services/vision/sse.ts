@@ -59,6 +59,9 @@ export async function readSseStream(
 
   let buffer = '';
   let sawFirstByte = false;
+  /** Llegada del último chunk con datos. El frame de cola se sella con esto y no con `now()`
+   *  después del cierre, que sumaría el round trip de cierre de conexión. */
+  let lastReceivedAt = 0;
 
   try {
     for (;;) {
@@ -67,6 +70,7 @@ export async function readSseStream(
       if (!value || value.length === 0) continue;
 
       const receivedAt = now();
+      lastReceivedAt = receivedAt;
       if (!sawFirstByte) {
         sawFirstByte = true;
         options.onFirstByte?.(receivedAt);
@@ -91,7 +95,11 @@ export async function readSseStream(
     // Cola sin línea en blanco final (algunos servidores cierran sin ella).
     buffer += decoder.decode();
     const trailing = parseFrame(buffer);
-    if (trailing) onFrame(trailing, now());
+    if (trailing) onFrame(trailing, lastReceivedAt || now());
+  } catch (err) {
+    // Sin cancel(), un throw a mitad de stream libera el lock pero deja el socket vivo.
+    await reader.cancel().catch(() => {});
+    throw err;
   } finally {
     reader.releaseLock();
   }
