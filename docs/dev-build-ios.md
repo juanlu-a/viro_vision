@@ -101,4 +101,29 @@ o un APK por EAS, que no requiere toolchain local ni cuenta paga.
   instalado era iOS 26.2 y Xcode esperaba 26.5. Se resolvió instalando el runtime que falta
   (Xcode → Settings → Components, o `xcodebuild -downloadPlatform iOS`).
 - **El iPhone aparece como `unavailable`** en `xcrun devicectl list devices`: está bloqueado,
-  desconectado, o falta aceptar *Confiar en esta computadora*.
+  desconectado, o falta aceptar *Confiar en esta computadora*. Cuando pasa a
+  `connected (no DDI)`, Xcode todavía está montando la imagen de desarrollo — esperá a que
+  termine el *"Preparing iPhone…"* en Window → Devices and Simulators.
+
+- **`Communication with Apple failed` / `No profiles for 'com.virovision.app' were found`** en
+  Signing & Capabilities: el texto que importa es *"Your team has no devices"*. Con provisioning
+  gratuito el perfil se emite **atado a un dispositivo**, así que no existe hasta que haya uno
+  registrado. Conectá el iPhone, elegilo como destino y compilá — `xcodebuild` lo registra y
+  genera el perfil solo. El botón *Try Again* no alcanza.
+
+- **`Error: EPERM: operation not permitted, uv_cwd`** al correr cualquier comando de npm dentro
+  del repo: es **TCC de macOS** bloqueando la carpeta Documentos, no permisos Unix (verificalo con
+  `ls -ld ~/Documents` — si dice `drwx------` de tu usuario, los permisos del filesystem están
+  bien). El síntoma característico es que `cd` funciona pero `getcwd()` falla.
+
+  ```sh
+  tccutil reset SystemPolicyDocumentsFolder com.apple.Terminal
+  ```
+
+  Después **⌘Q en Terminal** y volvé a abrirlo: al entrar al repo aparece el diálogo de permiso.
+  **Abrir una pestaña o ventana nueva NO sirve** — siguen siendo hijas del mismo proceso
+  `Terminal.app`, y TCC se evalúa cuando arranca la app. Alternativa gráfica: Ajustes del Sistema
+  → Privacidad y seguridad → Archivos y carpetas (o Acceso a disco completo).
+
+  Xcode tiene su propio permiso, así que aunque la terminal esté bloqueada podés compilar con
+  **⌘R** desde Xcode. Ocurrió el 2026-07-18 y otra vez el 2026-08-10.

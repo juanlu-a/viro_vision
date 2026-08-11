@@ -115,6 +115,14 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   instrumentación de tesis, no puede viajar en un build distribuible; queda advertido en
   `.env.example`.
 - tsc / lint / 39 tests / bundle iOS + Android en verde. Nada del código nuevo es iOS-only.
+- **El incidente de TCC de macOS volvió a pasar** (ya había ocurrido el 18/07), esta vez a mitad de
+  sesión: todo comando de npm dentro del repo moría con `EPERM: uv_cwd`, y `git` no podía leer el
+  directorio. Los permisos Unix estaban intactos — era TCC bloqueando la carpeta Documentos. La
+  lección nueva, que en julio faltaba: **abrir una pestaña o ventana nueva de Terminal no arregla
+  nada**, porque son hijas del mismo proceso `Terminal.app` y TCC se evalúa al arrancar la app. Se
+  resolvió con `tccutil reset SystemPolicyDocumentsFolder com.apple.Terminal` + ⌘Q. Xcode tiene su
+  propio permiso, así que compilar con ⌘R sigue funcionando aunque la terminal esté bloqueada.
+  Todo esto quedó en la sección "Problemas conocidos" de `dev-build-ios.md`.
 
 ## Open threads / next
 - Merge **PR #7** (email/password auth).
