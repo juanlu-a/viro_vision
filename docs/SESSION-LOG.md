@@ -146,6 +146,54 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   propio permiso, así que compilar con ⌘R sigue funcionando aunque la terminal esté bloqueada.
   Todo esto quedó en la sección "Problemas conocidos" de `dev-build-ios.md`.
 
+## 2026-08-11 — Marca, temas, y el benchmark andando en el teléfono
+
+- **Dev build en iPhone resuelto de punta a punta.** Se pelearon cuatro bloqueos encadenados, todos
+  documentados en [`dev-build-ios.md`](dev-build-ios.md): provisioning gratuito (el perfil se emite
+  atado a un dispositivo, así que "Try Again" no puede funcionar hasta que haya uno registrado),
+  Modo de desarrollador del teléfono, TCC de macOS, y `ENABLE_USER_SCRIPT_SANDBOXING` bloqueando la
+  escritura de `ip.txt`. La app corre hoy en un iPhone 15 Pro en Debug y en **Release** — o sea,
+  sin laptop, que es lo que hace falta para medir en la calle.
+- **Gemini como proveedor primario.** Anthropic y OpenAI exigen tarjeta; Gemini tiene tier gratuito
+  sin ella. Y resultó mejor experimento: **misma familia que Gemma**, así que comparar local vs.
+  nube cambia una sola variable. Probado contra la API real antes de compilar, lo que destapó que
+  los eventos se discriminan por `event_type` y no por `type` — leerlo mal descartaba todos los
+  eventos en silencio, con TTFT en `NaN` y sin ningún error visible.
+- **Cuota del tier gratuito: 20 requests/minuto.** Reproducido con curl. La medición bajó de 7 a 5
+  llamadas y el benchmark ahora espera lo que la API pide (`Please retry in 29.2s`) y reintenta esa
+  corrida. Con menos muestras el p90 pasa a ser el máximo, así que la tabla lo rotula como tal:
+  un percentil sobre 4 valores aparenta un rigor que no tiene.
+- **Revisión con cuatro agentes en paralelo** (tres + Codex). 25 defectos reales. El más grave era
+  de accesibilidad: **`accessibilityLiveRegion` es sólo Android**, así que en iPhone un usuario de
+  VoiceOver no escuchaba ningún mensaje de estado — en una pantalla que es, entera, una máquina de
+  estados. Tres eran de medición y producían números falsos sin fallar a la vista: tokens de salida
+  de Anthropic siempre los iniciales, `doneAt` latcheando en el primer evento terminal (que difería
+  entre proveedores), y `requestSentAt` marcado antes de serializar un cuerpo de varios MB.
+- **Identidad de marca aplicada.** Ícono propio generado desde los SVG del manual, con dos
+  desviaciones deliberadas por cómo renderiza cada sistema (iOS sin redondear, Android al 50 %).
+  El manual se editó dos veces durante la sesión —el Azul Profundo pasó a `#061D3A` y se agregó una
+  sección de modo claro/oscuro— y cada vez se regeneraron íconos y tokens.
+- **Los tokens de color NO son los hex del manual**, y `theme.test.ts` lo verifica: tres colores del
+  manual fallan WCAG como texto (Azul Sensor sobre Azul Profundo da 2.66:1). No es un error del
+  manual —un logo no es texto— pero usarlos como color de interfaz habría degradado la accesibilidad
+  por debajo del tema anterior. El test ya atajó dos regresiones invisibles a ojo: `borderStrong`
+  cayendo bajo 3:1 al oscurecer el manual, y el acento cambiando de color entre temas.
+- **Selector de tema** (sistema / claro / oscuro) persistido en AsyncStorage, no en Supabase: es una
+  preferencia de accesibilidad y tiene que funcionar sin red ni cuenta. Va como `radiogroup` y el
+  estado seleccionado cambia también el grosor del borde, no sólo el relleno.
+- **Barra de pestañas nativa** (`NativeTabs`): Liquid Glass en iOS 26, Material en Android. Más allá
+  de lo estético, hereda del sistema el manejo de foco, rotor de VoiceOver y tamaños de texto, que
+  en una barra dibujada a mano habría que reimplementar y mantener.
+- **Pantalla de dispositivo** con nombre, batería y firmware. La batería se comunica por texto y la
+  barra es sólo refuerzo visual. Como BLE sigue siendo un stub, hay un dispositivo simulado detrás
+  de `EXPO_PUBLIC_SIMULATE_DEVICE`, rotulado como tal: no finge que el Bluetooth funciona.
+- **ADR 0004** escrito (Proposed): Gemma vía **LiteRT-LM**, no MediaPipe LLM Inference, que quedó en
+  mantenimiento. Deja explícita la pregunta de alcance para el tutor: si Gemma multimodal lee el
+  cartel directamente, ¿sigue haciendo falta el pipeline YOLO + OCR en el camino del teléfono?
+- **Restricción encontrada:** el sandbox de iOS impide usar el Gemma que corre en otra app. Tenerlo
+  andando en Edge Gallery prueba viabilidad sobre el hardware objetivo, pero no acerca el producto.
+- 97 tests, tsc, lint y bundles iOS + Android en verde. PR #10 abierto.
+
 ## Open threads / next
 - Merge **PR #7** (email/password auth).
 - Install the iOS simulator runtime to see the app (or run on a real device via EAS dev build).
