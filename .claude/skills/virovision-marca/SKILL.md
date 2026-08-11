@@ -24,7 +24,7 @@ trazo 18, extremos redondeados; pupila `r=17` en `(100,92)`.
 |---|---|---|
 | Azul Sensor | `#1256D4` | arco izquierdo, acción primaria |
 | Verde Lectura | `#1FB57A` | arco derecho, estado confirmado |
-| Azul Profundo | `#0A2F5C` | pupila, texto, fondos oscuros |
+| Azul Profundo | `#061D3A` | pupila, texto, fondos oscuros |
 | Gris Niebla | `#F4F6F8` | fondo base |
 
 Variantes sobre oscuro: `#4D9BFF` / `#2BD69A` / pupila blanca. Proporción: 70 % neutros, 20 % azul,
@@ -36,7 +36,7 @@ Variantes sobre oscuro: `#4D9BFF` / `#2BD69A` / pupila blanca. Proporción: 70 %
 
 | Combinación | Contraste | |
 |---|---|---|
-| Azul Sensor sobre Azul Profundo | **2.10:1** | falla |
+| Azul Sensor sobre Azul Profundo | **2.66:1** | falla |
 | Verde Lectura sobre Gris Niebla | **2.44:1** | falla |
 | blanco sobre Verde Lectura (botón) | **2.64:1** | falla |
 
@@ -60,7 +60,7 @@ con el manual, el test falla.
 
 - Área de resguardo: **34 u** (un diámetro de pupila) en los cuatro lados.
 - Tamaño mínimo: **24 px** en pantalla, **10 mm** impreso.
-- Ícono de app: símbolo al **64 %** del lienzo, fondo `#0A2F5C`, radio 22 % del lado. Bajo 76 px el
+- Ícono de app: símbolo al **64 %** del lienzo, fondo `#061D3A`, radio 22 % del lado. Bajo 76 px el
   trazo pasa a 20–24 u.
 - **No** recolorear fuera de la paleta, **no** deformar, **sin** sombras ni efectos, **no** usar
   sobre fondos de bajo contraste.

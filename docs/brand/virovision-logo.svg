@@ -3,5 +3,5 @@
     <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
     <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
   </g>
-  <circle cx="100" cy="92" r="17" fill="#0A2F5C"></circle>
+  <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
 </svg>

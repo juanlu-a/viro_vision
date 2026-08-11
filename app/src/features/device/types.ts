@@ -9,6 +9,13 @@ export type ConnectionStatus =
 export interface DeviceInfo {
   id: string;
   name: string | null;
+  /**
+   * Nivel de batería 0–100, o null si el dispositivo todavía no lo reportó. Llega por la
+   * característica `status` del GATT (ver features/device/gatt.ts).
+   */
+  batteryLevel: number | null;
+  /** Versión de firmware informada por el dispositivo, o null. */
+  firmwareVersion: string | null;
 }
 
 export interface ConnectionState {

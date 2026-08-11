@@ -1,5 +1,5 @@
 <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ViroVision">
-  <rect width="1024" height="1024" rx="225" fill="#0A2F5C"></rect>
+  <rect width="1024" height="1024" rx="225" fill="#061D3A"></rect>
   <g transform="translate(184 184) scale(3.28)" fill="none" stroke-linecap="round" stroke-width="18">
     <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#4D9BFF"></path>
     <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#2BD69A"></path>

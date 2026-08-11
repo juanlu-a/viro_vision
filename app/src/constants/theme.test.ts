@@ -2,7 +2,7 @@
  * Verificación automática de contraste WCAG de los tokens de color.
  *
  * Existe porque el manual de marca y la accesibilidad tiran para lados distintos: los hex del
- * manual fallan como color de texto (Azul Sensor sobre Azul Profundo da 2.10:1). Sin este test,
+ * manual fallan como color de texto (Azul Sensor sobre Azul Profundo da 2.66:1). Sin este test,
  * cualquiera puede "corregir" un token para que coincida con el manual y degradar la app sin
  * enterarse. Acá el contraste deja de depender de que alguien se acuerde de chequearlo.
  *
@@ -101,7 +101,7 @@ describe('los hex crudos del manual de marca NO sirven como tokens de texto', ()
   // Documenta por qué los tokens no son los del manual. Si algún día estos valores pasaran,
   // habría que revisar la decisión — pero hoy fallan y el test lo deja asentado.
   it('Azul Sensor sobre Azul Profundo falla WCAG', () => {
-    expect(contrastRatio('#1256D4', '#0A2F5C')).toBeLessThan(3);
+    expect(contrastRatio('#1256D4', '#061D3A')).toBeLessThan(3);
   });
 
   it('Verde Lectura sobre Gris Niebla falla WCAG', () => {

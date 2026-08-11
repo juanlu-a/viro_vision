@@ -37,6 +37,6 @@ qlmanage -t -s 1024 -o . icon.svg && mv icon.svg.png icon.png
 
 El **design system de la app todavía no sigue esta paleta**. `app/src/constants/theme.ts` usa
 verde `#22C55E` sobre negro, mientras el manual define azul `#1256D4`, verde `#1FB57A` y azul
-profundo `#0A2F5C`. Hoy el ícono y la app no combinan. Alinearlos es parte de **A1 / ADR 0005**
+profundo `#061D3A`. Hoy el ícono y la app no combinan. Alinearlos es parte de **A1 / ADR 0005**
 (design system y estándares de accesibilidad) — y hay que verificar el contraste de la paleta
 nueva contra WCAG antes de adoptarla, que en esta app no es negociable.

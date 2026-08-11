@@ -4,7 +4,7 @@
  * Identidad de marca (ver `docs/brand/virovision-marca.md`): azul profundo, azul sensor y verde
  * lectura. **Los tokens NO son los hex del manual tal cual**, y eso es deliberado:
  *
- *   - Azul Sensor `#1256D4` sobre Azul Profundo da **2.10:1** — falla WCAG por lejos.
+ *   - Azul Sensor `#1256D4` sobre Azul Profundo da **2.66:1** — falla WCAG por lejos.
  *   - Verde Lectura `#1FB57A` sobre Gris Niebla da **2.44:1** — también falla.
  *   - Blanco sobre Verde Lectura (botón) da **2.64:1** — falla.
  *
@@ -22,18 +22,18 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   dark: {
-    background: '#0A2F5C', // Azul Profundo — el fondo del ícono de la app
+    background: '#061D3A', // Azul Profundo — el fondo del ícono de la app
     // Superficies apenas despegadas del fondo: casi todo el contenido vive en tarjetas, así que
     // si son muy claras el azul que domina la pantalla deja de ser el Azul Profundo de la marca.
-    surface: '#0D3466',
-    surfaceElevated: '#103A70',
-    border: '#17457F', // decorativo (tarjetas): no necesita 3:1
-    borderStrong: '#1976E6', // borde de controles (campos, foco): 3.03:1 — WCAG 1.4.11
+    surface: '#0A2B54',
+    surfaceElevated: '#0D3567',
+    border: '#123F76', // decorativo (tarjetas): no necesita 3:1
+    borderStrong: '#1C6AC4', // borde de controles (campos, foco): 3:1 — WCAG 1.4.11
     text: '#F4F6F8', // Gris Niebla — 12.31:1 AAA
     textSecondary: '#A9C0DE', // 7.4:1 AAA
     primary: '#2BD69A', // Verde claro de marca — 7.11:1 AAA
-    primaryMuted: '#12405F',
-    onPrimary: '#0A2F5C', // texto OSCURO sobre relleno claro: 7.11:1. Blanco sobre verde falla.
+    primaryMuted: '#0B3350',
+    onPrimary: '#061D3A', // texto OSCURO sobre relleno claro: 8.99:1. Blanco sobre verde falla.
     danger: '#F3AAAD', // 7.09:1 AAA
     success: '#2BD69A',
     tabInactive: '#A9C0DE',
@@ -44,7 +44,7 @@ export const Colors = {
     surfaceElevated: '#FFFFFF',
     border: '#CFD7E0', // decorativo (tarjetas): no necesita 3:1
     borderStrong: '#7990A9', // borde de controles (campos, foco): 3.04:1 — WCAG 1.4.11
-    text: '#0A2F5C', // Azul Profundo — 12.31:1 AAA
+    text: '#061D3A', // Azul Profundo — 15.57:1 AAA
     textSecondary: '#3D5273', // 7.6:1 AAA
     primary: '#104CBA', // Azul Sensor oscurecido hasta AAA — 7.01:1
     primaryMuted: '#E3EAF8',

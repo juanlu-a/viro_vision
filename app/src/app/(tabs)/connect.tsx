@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
+import { DeviceSummary } from '@/features/device/DeviceSummary';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
@@ -42,6 +43,12 @@ export default function ConnectScreen() {
           </View>
         </View>
       </Card>
+
+      {isConnected && state.device && (
+        <Card>
+          <DeviceSummary device={state.device} />
+        </Card>
+      )}
 
       {isConnected ? (
         <AccessibleButton

@@ -10,7 +10,7 @@ Geometría (lienzo 200×200): arcos de radio 96 desde (100,168) hasta (32,44) y 
 ## Color
 - Azul Sensor #1256D4 — arco izquierdo, acción primaria
 - Verde Lectura #1FB57A — arco derecho, estado confirmado
-- Azul Profundo #0A2F5C — pupila, texto, fondos oscuros
+- Azul Profundo #061D3A — pupila, texto, fondos oscuros
 - Gris Niebla #F4F6F8 — fondo base
 Variantes sobre oscuro: #4D9BFF / #2BD69A / pupila blanca.
 Proporción: 70% neutros, 20% azul, 10% verde.
@@ -23,7 +23,7 @@ Proporción: 70% neutros, 20% azul, 10% verde.
 ## Reglas
 - Área de resguardo: 34 u (1 diámetro de pupila) en los cuatro lados.
 - Tamaño mínimo: 24 px pantalla, 10 mm impreso.
-- Ícono de app: símbolo al 64% del lienzo, fondo #0A2F5C, radio 22% del lado. Bajo 76 px el trazo pasa a 20–24 u.
+- Ícono de app: símbolo al 64% del lienzo, fondo #061D3A, radio 22% del lado. Bajo 76 px el trazo pasa a 20–24 u.
 - No recolorear fuera de la paleta, no deformar, sin sombras ni efectos, no usar sobre fondos de bajo contraste.
 
 ## Archivos

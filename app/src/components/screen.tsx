@@ -43,8 +43,10 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     gap: Spacing.four,
   },
+  // Sin `justifyContent: center`: centraba verticalmente el contenido corto, y el título de una
+  // pantalla con scroll caía más abajo que el de una sin scroll. Los encabezados tienen que
+  // quedar en el mismo lugar en todas las pantallas.
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
   },
 });
