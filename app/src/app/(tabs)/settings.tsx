@@ -1,3 +1,6 @@
+import { router } from 'expo-router';
+
+import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -31,6 +34,21 @@ export default function SettingsScreen() {
           {strings.app.tagline}
         </ThemedText>
       </Card>
+
+      {/* Herramientas de medición de la tesis. Nunca en un build distribuible. */}
+      {__DEV__ && (
+        <Card>
+          <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+            {t.developer.toUpperCase()}
+          </ThemedText>
+          <AccessibleButton
+            label={t.openBenchmark}
+            hint={t.openBenchmarkHint}
+            variant="ghost"
+            onPress={() => router.push('/dev/vision-bench')}
+          />
+        </Card>
+      )}
     </Screen>
   );
 }

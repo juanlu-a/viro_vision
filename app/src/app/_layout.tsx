@@ -39,6 +39,8 @@ export default function RootLayout() {
         <ThemeProvider value={buildNavTheme(scheme)}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
+            {/* Ruta de desarrollo: no es pestaña y sólo se enlaza bajo __DEV__ (ver ajustes). */}
+            <Stack.Screen name="dev/vision-bench" />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>

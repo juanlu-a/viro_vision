@@ -1,0 +1,148 @@
+/**
+ * Hook que maneja la máquina de estados del benchmark de latencia en la nube.
+ *
+ * Higiene de medición que este hook garantiza:
+ *   - Una corrida de calentamiento DESCARTADA antes de las que cuentan (cubre el handshake TLS
+ *     y la compilación del JSON Schema, que se cachea 24 h del lado de la API).
+ *   - Las corridas son secuenciales, nunca en paralelo: dos requests simultáneas compiten por
+ *     el uplink y los tiempos dejan de significar nada.
+ *   - Nada de setState por delta de texto — un re-render entre lecturas del stream desplaza
+ *     los timestamps. Sólo se hace setState entre corridas.
+ */
+import * as ImagePicker from 'expo-image-picker';
+import { useCallback, useRef, useState } from 'react';
+
+import { strings } from '@/i18n';
+import { AnthropicNotConfiguredError, benchmarkBusVision } from '@/services/vision';
+import type { BenchmarkResult, ThinkingMode } from '@/services/vision';
+import type { BenchmarkState, SelectedPhoto } from './types';
+
+const initialState: BenchmarkState = {
+  status: 'idle',
+  currentRun: 0,
+  totalRuns: 0,
+  runs: [],
+  message: strings.benchmark.noResults,
+  photo: null,
+  thinking: 'off',
+};
+
+export function useVisionBenchmark() {
+  const [state, setState] = useState<BenchmarkState>(initialState);
+  const abortRef = useRef<AbortController | null>(null);
+  /** Espejo del estado, para leer foto y modo dentro de `run` sin re-crear el callback. */
+  const stateRef = useRef(initialState);
+
+  const update = useCallback((patch: Partial<BenchmarkState>) => {
+    stateRef.current = { ...stateRef.current, ...patch };
+    setState(stateRef.current);
+  }, []);
+
+  const pickPhoto = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      update({ status: 'error', message: strings.benchmark.permissionDenied });
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      base64: true,
+      quality: 1,
+    });
+    if (result.canceled) return;
+
+    const asset = result.assets?.[0];
+    if (!asset?.base64) return;
+
+    const photo: SelectedPhoto = {
+      uri: asset.uri,
+      base64: asset.base64,
+      mediaType: asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg',
+      width: asset.width,
+      height: asset.height,
+    };
+
+    // Cambiar de foto invalida las corridas previas: el tamaño del payload es un eje del experimento.
+    update({
+      photo,
+      runs: [],
+      status: 'idle',
+      currentRun: 0,
+      totalRuns: 0,
+      message: strings.benchmark.photoSelected,
+    });
+  }, [update]);
+
+  const setThinking = useCallback(
+    (thinking: ThinkingMode) => {
+      update({ thinking, runs: [], status: 'idle', currentRun: 0, totalRuns: 0 });
+    },
+    [update],
+  );
+
+  const run = useCallback(
+    async (totalRuns: number) => {
+      const { photo, thinking } = stateRef.current;
+      if (!photo) return;
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      update({
+        status: 'warmup',
+        runs: [],
+        currentRun: 0,
+        totalRuns,
+        message: strings.benchmark.warmingUp,
+      });
+
+      const options = {
+        imageBase64: photo.base64,
+        mediaType: photo.mediaType,
+        thinking,
+        signal: controller.signal,
+      };
+
+      try {
+        // Calentamiento: se corre y se descarta. No entra en las estadísticas.
+        await benchmarkBusVision(options);
+
+        const collected: BenchmarkResult[] = [];
+        for (let index = 0; index < totalRuns; index += 1) {
+          if (controller.signal.aborted) break;
+          update({
+            status: 'running',
+            currentRun: index + 1,
+            message: `${strings.benchmark.running} ${index + 1} de ${totalRuns}`,
+          });
+          collected.push(await benchmarkBusVision(options));
+        }
+
+        update({
+          status: 'done',
+          currentRun: 0,
+          runs: collected,
+          message: `${collected.length} ${strings.benchmark.samplesLabel}`,
+        });
+      } catch (err) {
+        update({ status: 'error', currentRun: 0, message: describeError(err) });
+      } finally {
+        abortRef.current = null;
+      }
+    },
+    [update],
+  );
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  return { state, pickPhoto, setThinking, run, cancel };
+}
+
+function describeError(err: unknown): string {
+  if (err instanceof AnthropicNotConfiguredError) return strings.benchmark.notConfigured;
+  if (err instanceof Error) return `${strings.benchmark.errorTitle}: ${err.message}`;
+  return strings.benchmark.errorTitle;
+}
