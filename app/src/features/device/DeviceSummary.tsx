@@ -69,7 +69,7 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
                 styles.fill,
                 {
                   width: `${Math.max(0, Math.min(100, level))}%`,
-                  backgroundColor: isLow ? theme.danger : theme.primary,
+                  backgroundColor: isLow ? theme.danger : theme.success,
                 },
               ]}
             />

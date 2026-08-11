@@ -39,6 +39,7 @@ export const Colors = {
     onPrimary: '#061D3A',
     danger: '#F3AAAD', // 7.09:1 AAA
     success: '#2BD69A', // Verde Lectura del manual — 8.99:1 AAA
+    successMuted: '#0B3A33',
     tabInactive: '#A9C0DE',
   },
   light: {
@@ -55,6 +56,7 @@ export const Colors = {
     onPrimary: '#FFFFFF', // 6.35:1 sobre el primario
     danger: '#A5171C', // 7.08:1 AAA
     success: '#105E3F', // Verde Lectura oscurecido hasta AAA — 7.19:1 (el crudo da 2.44:1)
+    successMuted: '#E3F3EC',
     tabInactive: '#3D5273',
   },
 } as const;

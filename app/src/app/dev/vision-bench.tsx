@@ -29,7 +29,14 @@ const METRICS: { key: LatencyMetric; label: string }[] = [
   { key: 'total', label: strings.benchmark.metricTotal },
 ];
 
-const RUN_COUNT = 6;
+/**
+ * Corridas por medición. Con el calentamiento son RUN_COUNT + 1 llamadas, y el tier gratuito de
+ * Gemini admite 20 por minuto: 4 corridas dejan entrar cuatro mediciones por minuto en vez de dos.
+ */
+const RUN_COUNT = 4;
+
+/** Debajo de esto el p90 es simplemente el máximo, así que se rotula como tal. */
+const MUESTRAS_PARA_P90 = 8;
 
 export default function VisionBenchScreen() {
   const t = strings.benchmark;
@@ -153,13 +160,17 @@ export default function VisionBenchScreen() {
             <SectionLabel>{t.resultsSection}</SectionLabel>
             {METRICS.map(({ key, label }) => {
               const summary = summarize(state.runs, key);
+              // Con pocas muestras el p90 coincide con el máximo: mentiría llamarlo percentil.
+              const usaP90 = summary.samples >= MUESTRAS_PARA_P90;
+              const segundoLabel = usaP90 ? t.p90Label : t.maxLabel;
+              const segundoValor = usaP90 ? summary.p90Ms : summary.maxMs;
               return (
                 <View
                   key={key}
                   style={styles.metricRow}
                   accessible
                   accessibilityRole="text"
-                  accessibilityLabel={`${label}. ${t.medianLabel} ${formatMs(summary.medianMs)}. ${t.p90Label} ${formatMs(summary.p90Ms)}. ${summary.samples} ${t.samplesLabel}.`}>
+                  accessibilityLabel={`${label}. ${t.medianLabel} ${formatMs(summary.medianMs)}. ${segundoLabel} ${formatMs(segundoValor)}. ${summary.samples} ${t.samplesLabel}.`}>
                   <ThemedText type="small" style={styles.metricLabel}>
                     {label}
                   </ThemedText>
@@ -167,13 +178,15 @@ export default function VisionBenchScreen() {
                     {t.medianLabel} {formatMs(summary.medianMs)}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {t.p90Label} {formatMs(summary.p90Ms)}
+                    {segundoLabel} {formatMs(segundoValor)}
                   </ThemedText>
                 </View>
               );
             })}
             <ThemedText type="small" themeColor="textSecondary">
-              {`${t.medianLabel} · ${t.p90Label} — ${state.runs.length} ${t.samplesLabel}`}
+              {`${state.runs.length} ${t.samplesLabel}${
+                state.runs.length < MUESTRAS_PARA_P90 ? ` — ${t.fewSamples}` : ''
+              }`}
             </ThemedText>
           </Card>
         )}
@@ -183,7 +196,7 @@ export default function VisionBenchScreen() {
             <SectionLabel>{t.readingSection}</SectionLabel>
             {lastRun.parsed ? (
               <>
-                <ThemedText type="default">
+                <ThemedText type="default" themeColor="success" style={{ fontWeight: '700' }}>
                   {t.readingLine}: {lastRun.parsed.numero ?? '—'}
                 </ThemedText>
                 <ThemedText type="default">

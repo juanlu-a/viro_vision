@@ -100,6 +100,8 @@ export const es = {
     metricTotal: 'Total',
     medianLabel: 'Mediana',
     p90Label: 'p90',
+    maxLabel: 'máx',
+    fewSamples: 'pocas muestras para un percentil; se muestra el máximo',
     samplesLabel: 'muestras',
     readingSection: 'Última lectura',
     readingLine: 'Número',
