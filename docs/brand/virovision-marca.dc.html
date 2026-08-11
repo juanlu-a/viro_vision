@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+body { margin: 0; background: #F4F6F8; }
+a { color: #1256D4; text-decoration: none; }
+a:hover { color: #061D3A; }
+</style>
+</helmet>
+
+<div style="background:#F4F6F8;color:#061D3A;font-family:'IBM Plex Sans',system-ui,sans-serif;padding:0 0 120px 0">
+
+  <section style="max-width:1120px;margin:0 auto;padding:96px 48px 72px 48px;display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center">
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:#5A7089">Manual de marca · v1.0 · 2026</div>
+      <h1 style="font-family:'Space Grotesk',sans-serif;font-size:64px;line-height:1.02;font-weight:700;margin:0;letter-spacing:-0.02em">ViroVision</h1>
+      <p style="font-size:19px;line-height:1.6;margin:0;max-width:44ch;text-wrap:pretty;color:#33475E">Asistente de hardware para personas ciegas. Una cámara con IA que reconoce líneas de colectivo y productos de supermercado, y lo comunica por voz.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 12px;border:1px solid #C9D4DF;border-radius:999px;color:#33475E">Solo símbolo</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 12px;border:1px solid #C9D4DF;border-radius:999px;color:#33475E">Técnico y sobrio</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 12px;border:1px solid #C9D4DF;border-radius:999px;color:#33475E">Azul + verde</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:64px;aspect-ratio:1/1">
+      <svg viewBox="0 0 200 200" style="width:100%;max-width:320px;height:auto" role="img" aria-label="Símbolo ViroVision">
+        <g fill="none" stroke-linecap="round" stroke-width="{{ sw }}">
+          <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+          <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+        </g>
+        <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+      </svg>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">El símbolo</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">01</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px;max-width:62ch">
+        <p style="font-size:17px;line-height:1.65;margin:0;text-wrap:pretty;color:#33475E">Dos arcos que se encuentran en un vértice inferior. Leídos juntos forman un ojo abstracto; leídos por su punto de unión, una V geométrica. El punto central es la pupila y también el objeto detectado: el foco de la cámara.</p>
+        <p style="font-size:17px;line-height:1.65;margin:0;text-wrap:pretty;color:#33475E">El arco azul representa el dispositivo; el verde, la lectura confirmada. La marca funciona sin texto: es un símbolo único, sin logotipo acompañante.</p>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Construcción y resguardo</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">02</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:32px;display:flex;flex-direction:column;gap:16px">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto">
+            <g stroke="#C9D4DF" stroke-width="1" fill="none">
+              <path d="M0 25H200M0 100H200M0 175H200M25 0V200M100 0V200M175 0V200"></path>
+              <circle cx="100" cy="100" r="75"></circle>
+            </g>
+            <g fill="none" stroke-linecap="round" stroke-width="18">
+              <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+          </svg>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;color:#5A7089">Lienzo 200×200 · radio de arco 96 · trazo 18 · pupila r17 en (100, 92)</div>
+        </div>
+        <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:32px;display:flex;flex-direction:column;gap:16px">
+          <div style="position:relative;width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center">
+            <div style="position:absolute;inset:0;border:1px dashed #9FB3C6;border-radius:4px"></div>
+            <div style="position:absolute;inset:17%;border:1px dashed #1FB57A;border-radius:4px"></div>
+            <svg viewBox="0 0 200 200" style="width:66%;height:auto;position:relative">
+              <g fill="none" stroke-linecap="round" stroke-width="18">
+                <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+                <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+              </g>
+              <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+            </svg>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;color:#5A7089">Área de resguardo = 1× el diámetro de la pupila (34 u) en los cuatro lados. Tamaño mínimo: 24 px en pantalla, 10 mm impreso.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Color</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">03</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+          <div style="border:1px solid #E2E8EF;border-radius:8px;overflow:hidden;background:#FFFFFF">
+            <div style="height:120px;background:#1256D4"></div>
+            <div style="padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-weight:600;font-size:15px">Azul Sensor</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A7089;line-height:1.7">#1256D4<br />rgb 18 86 212<br />Pantone 2145 C</div>
+            </div>
+          </div>
+          <div style="border:1px solid #E2E8EF;border-radius:8px;overflow:hidden;background:#FFFFFF">
+            <div style="height:120px;background:#1FB57A"></div>
+            <div style="padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-weight:600;font-size:15px">Verde Lectura</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A7089;line-height:1.7">#1FB57A<br />rgb 31 181 122<br />Pantone 3405 C</div>
+            </div>
+          </div>
+          <div style="border:1px solid #E2E8EF;border-radius:8px;overflow:hidden;background:#FFFFFF">
+            <div style="height:120px;background:#061D3A"></div>
+            <div style="padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-weight:600;font-size:15px">Azul Profundo</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A7089;line-height:1.7">#061D3A<br />rgb 6 29 58<br />Texto y fondos</div>
+            </div>
+          </div>
+          <div style="border:1px solid #E2E8EF;border-radius:8px;overflow:hidden;background:#FFFFFF">
+            <div style="height:120px;background:#F4F6F8;border-bottom:1px solid #E2E8EF"></div>
+            <div style="padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-weight:600;font-size:15px">Gris Niebla</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A7089;line-height:1.7">#F4F6F8<br />rgb 244 246 248<br />Fondo base</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Contraste</div>
+            <div style="font-size:15px;line-height:1.6;color:#33475E">Azul Profundo sobre Gris Niebla: 12.8:1. Cumple AAA para texto normal.</div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Uso</div>
+            <div style="font-size:15px;line-height:1.6;color:#33475E">El verde señala estado positivo (detección confirmada); nunca se usa como fondo de texto largo.</div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Proporción</div>
+            <div style="font-size:15px;line-height:1.6;color:#33475E">70% neutros, 20% Azul Sensor, 10% Verde Lectura.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Tipografía</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">04</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:32px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Títulos · Space Grotesk Bold</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:52px;font-weight:700;letter-spacing:-0.02em;line-height:1.1">Detecta y avisa</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A7089">Aa Bb Cc 0123456789 · 32–72 px · tracking −2%</div>
+        </div>
+        <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:32px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Texto · IBM Plex Sans Regular / SemiBold</div>
+          <div style="font-size:19px;line-height:1.6;max-width:56ch;color:#33475E">La app anuncia el número de línea al acercarse el colectivo y lee la etiqueta del producto que la cámara tiene enfrente. Tamaño mínimo en pantalla: 17 px.</div>
+        </div>
+        <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:32px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Datos · IBM Plex Mono</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;color:#061D3A">LÍNEA 60 · 98% · 12 m</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Versiones</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">05</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <div style="border:1px solid #E2E8EF;border-radius:8px;background:#FFFFFF;padding:28px;display:flex;flex-direction:column;gap:16px;align-items:center">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto">
+            <g fill="none" stroke-linecap="round" stroke-width="18">
+              <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+          </svg>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5A7089;text-align:center">Principal</div>
+        </div>
+        <div style="border:1px solid #E2E8EF;border-radius:8px;background:#061D3A;padding:28px;display:flex;flex-direction:column;gap:16px;align-items:center">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto">
+            <g fill="none" stroke-linecap="round" stroke-width="18">
+              <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#4D9BFF"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#2BD69A"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#FFFFFF"></circle>
+          </svg>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9FC0E8;text-align:center">Fondo oscuro</div>
+        </div>
+        <div style="border:1px solid #E2E8EF;border-radius:8px;background:#FFFFFF;padding:28px;display:flex;flex-direction:column;gap:16px;align-items:center">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto">
+            <g fill="none" stroke-linecap="round" stroke-width="18" stroke="#061D3A">
+              <path d="M100 168 A 96 96 0 0 1 32 44"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+          </svg>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5A7089;text-align:center">Mono positivo</div>
+        </div>
+        <div style="border:1px solid #E2E8EF;border-radius:8px;background:#061D3A;padding:28px;display:flex;flex-direction:column;gap:16px;align-items:center">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto">
+            <g fill="none" stroke-linecap="round" stroke-width="18" stroke="#FFFFFF">
+              <path d="M100 168 A 96 96 0 0 1 32 44"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#FFFFFF"></circle>
+          </svg>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9FC0E8;text-align:center">Mono negativo</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Ícono de app</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">06</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:28px">
+        <div style="display:flex;gap:32px;align-items:flex-end;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+            <div style="width:180px;height:180px;border-radius:40px;background:#061D3A;display:flex;align-items:center;justify-content:center">
+              <svg viewBox="0 0 200 200" style="width:64%;height:auto">
+                <g fill="none" stroke-linecap="round" stroke-width="18">
+                  <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#4D9BFF"></path>
+                  <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#2BD69A"></path>
+                </g>
+                <circle cx="100" cy="92" r="17" fill="#FFFFFF"></circle>
+              </svg>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5A7089">180 px</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+            <div style="width:120px;height:120px;border-radius:27px;background:#061D3A;display:flex;align-items:center;justify-content:center">
+              <svg viewBox="0 0 200 200" style="width:64%;height:auto">
+                <g fill="none" stroke-linecap="round" stroke-width="18">
+                  <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#4D9BFF"></path>
+                  <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#2BD69A"></path>
+                </g>
+                <circle cx="100" cy="92" r="17" fill="#FFFFFF"></circle>
+              </svg>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5A7089">120 px</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+            <div style="width:76px;height:76px;border-radius:17px;background:#061D3A;display:flex;align-items:center;justify-content:center">
+              <svg viewBox="0 0 200 200" style="width:66%;height:auto">
+                <g fill="none" stroke-linecap="round" stroke-width="20">
+                  <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#4D9BFF"></path>
+                  <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#2BD69A"></path>
+                </g>
+                <circle cx="100" cy="92" r="18" fill="#FFFFFF"></circle>
+              </svg>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5A7089">76 px</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+            <div style="width:48px;height:48px;border-radius:11px;background:#061D3A;display:flex;align-items:center;justify-content:center">
+              <svg viewBox="0 0 200 200" style="width:68%;height:auto">
+                <g fill="none" stroke-linecap="round" stroke-width="24">
+                  <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#4D9BFF"></path>
+                  <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#2BD69A"></path>
+                </g>
+                <circle cx="100" cy="92" r="20" fill="#FFFFFF"></circle>
+              </svg>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5A7089">48 px</div>
+          </div>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.8;color:#5A7089;max-width:70ch">El símbolo ocupa el 64% del lienzo del ícono. Por debajo de 76 px el trazo engrosa a 20–24 u y la pupila crece para no cerrarse. Radio de esquina: 22% del lado (iOS aplica su propia máscara).</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Modo claro y oscuro</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">07</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+          <div style="border:1px solid #E2E8EF;border-radius:8px;background:#F4F6F8;padding:28px;display:flex;flex-direction:column;gap:20px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Modo claro</div>
+            <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:center;gap:14px">
+                <svg viewBox="0 0 200 200" style="width:40px;height:40px">
+                  <g fill="none" stroke-linecap="round" stroke-width="18">
+                    <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+                    <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+                  </g>
+                  <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+                </svg>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#33475E">Escuchando</div>
+              </div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;color:#061D3A;letter-spacing:-0.02em">Línea 60</div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:10px;height:10px;border-radius:999px;background:#1FB57A"></div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#1FB57A">Detección confirmada · 98%</div>
+              </div>
+              <div style="background:#1256D4;color:#FFFFFF;border-radius:6px;padding:14px;text-align:center;font-weight:600;font-size:16px">Repetir aviso</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.9;color:#5A7089">Fondo #F4F6F8 · Superficie #FFFFFF<br />Texto #061D3A · Secundario #33475E<br />Azul #1256D4 · Verde #1FB57A</div>
+          </div>
+
+          <div style="border:1px solid #10345E;border-radius:8px;background:#061D3A;padding:28px;display:flex;flex-direction:column;gap:20px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#7E9FC4">Modo oscuro</div>
+            <div style="background:#0E2B4F;border:1px solid #173D68;border-radius:6px;padding:24px;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:center;gap:14px">
+                <svg viewBox="0 0 200 200" style="width:40px;height:40px">
+                  <g fill="none" stroke-linecap="round" stroke-width="18">
+                    <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#4D9BFF"></path>
+                    <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#2BD69A"></path>
+                  </g>
+                  <circle cx="100" cy="92" r="17" fill="#FFFFFF"></circle>
+                </svg>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#9FB8D4">Escuchando</div>
+              </div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;color:#E8EFF7;letter-spacing:-0.02em">Línea 60</div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:10px;height:10px;border-radius:999px;background:#2BD69A"></div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#2BD69A">Detección confirmada · 98%</div>
+              </div>
+              <div style="background:#4D9BFF;color:#061D3A;border-radius:6px;padding:14px;text-align:center;font-weight:600;font-size:16px">Repetir aviso</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.9;color:#7E9FC4">Fondo #061D3A · Superficie #0E2B4F<br />Texto #E8EFF7 · Secundario #9FB8D4<br />Azul #4D9BFF · Verde #2BD69A</div>
+          </div>
+
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Regla</div>
+            <div style="font-size:15px;line-height:1.6;color:#33475E">Los acentos se aclaran en modo oscuro (+2 pasos de luminosidad) para mantener 4.5:1 contra la superficie. Nunca usar #1256D4 sobre #061D3A.</div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">Símbolo</div>
+            <div style="font-size:15px;line-height:1.6;color:#33475E">Pupila azul profundo en claro, blanca en oscuro. El ícono de app usa siempre fondo #061D3A en los dos modos.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 88px 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Usos incorrectos</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">08</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <div style="border:1px solid #E2E8EF;border-radius:8px;background:#FFFFFF;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:center">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto">
+            <g fill="none" stroke-linecap="round" stroke-width="18">
+              <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#E0563E"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#F0A500"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#7A1B1B"></circle>
+          </svg>
+          <div style="font-size:13px;line-height:1.5;color:#B33A2B;text-align:center">No recolorear fuera de la paleta</div>
+        </div>
+        <div style="border:1px solid #E2E8EF;border-radius:8px;background:#FFFFFF;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:center">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto;transform:scaleX(1.45)">
+            <g fill="none" stroke-linecap="round" stroke-width="18">
+              <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+          </svg>
+          <div style="font-size:13px;line-height:1.5;color:#B33A2B;text-align:center">No deformar ni estirar</div>
+        </div>
+        <div style="border:1px solid #E2E8EF;border-radius:8px;background:#FFFFFF;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:center">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto;filter:drop-shadow(6px 8px 4px rgba(10,47,92,0.45))">
+            <g fill="none" stroke-linecap="round" stroke-width="18">
+              <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+          </svg>
+          <div style="font-size:13px;line-height:1.5;color:#B33A2B;text-align:center">Sin sombras ni efectos</div>
+        </div>
+        <div style="border:1px solid #E2E8EF;border-radius:8px;background:#8FA3B5;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:center">
+          <svg viewBox="0 0 200 200" style="width:100%;height:auto">
+            <g fill="none" stroke-linecap="round" stroke-width="18">
+              <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"></path>
+              <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"></path>
+            </g>
+            <circle cx="100" cy="92" r="17" fill="#061D3A"></circle>
+          </svg>
+          <div style="font-size:13px;line-height:1.5;color:#7A1B1B;text-align:center">No sobre fondos de bajo contraste</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:0 48px 0 48px">
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:48px;border-top:1px solid #D8E0E8;padding-top:40px">
+      <div>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin:0 0 12px 0;letter-spacing:-0.01em">Exportar</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#5A7089">09</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+        <p style="font-size:17px;line-height:1.65;margin:0;max-width:62ch;color:#33475E;text-wrap:pretty">Código fuente del símbolo, listo para pegar en tu agente, en el repo o en Figma.</p>
+        <pre style="margin:0;background:#061D3A;color:#C8DCF5;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.7;padding:28px;border-radius:8px;overflow-x:auto;min-width:0">{{ snippet }}</pre>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <a href="virovision-logo.svg" download="" style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:6px">
+            <div style="font-weight:600;font-size:15px;color:#061D3A">virovision-logo.svg</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A7089">Símbolo a color</div>
+          </a>
+          <a href="virovision-logo-mono.svg" download="" style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:6px">
+            <div style="font-weight:600;font-size:15px;color:#061D3A">virovision-logo-mono.svg</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A7089">Monocromo, currentColor</div>
+          </a>
+          <a href="virovision-app-icon.svg" download="" style="background:#FFFFFF;border:1px solid #E2E8EF;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:6px">
+            <div style="font-weight:600;font-size:15px;color:#061D3A">virovision-app-icon.svg</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5A7089">Ícono 1024, fondo incluido</div>
+          </a>
+        </div>
+        <a href="virovision-marca.md" style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#1256D4">virovision-marca.md · resumen de marca en texto para tu agente</a>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;strokeWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:18,&quot;min&quot;:10,&quot;max&quot;:28,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Símbolo&quot;,&quot;unit&quot;:&quot;u&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const vb = 'view' + 'Box';
+    return {
+      sw: this.props.strokeWidth ?? 18,
+      snippet: [
+        '<svg ' + vb + '="0 0 200 200" xmlns="http://www.w3.org/2000/svg">',
+        '  <g fill="none" stroke-linecap="round" stroke-width="18">',
+        '    <path d="M100 168 A 96 96 0 0 1 32 44" stroke="#1256D4"/>',
+        '    <path d="M100 168 A 96 96 0 0 0 168 44" stroke="#1FB57A"/>',
+        '  </g>',
+        '  <circle cx="100" cy="92" r="17" fill="#061D3A"/>',
+        '</svg>'
+      ].join('\n')
+    };
+  }
+}
+</script>
+</body>
+</html>

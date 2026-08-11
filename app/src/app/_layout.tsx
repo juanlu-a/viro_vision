@@ -1,11 +1,14 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
+import {
+  ThemePreferenceProvider,
+  useThemePreference,
+} from '@/features/theme/ThemePreferenceProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,11 +30,21 @@ function buildNavTheme(scheme: 'light' | 'dark') {
 }
 
 export default function RootLayout() {
-  const scheme = useColorScheme() === 'light' ? 'light' : 'dark';
+  return (
+    <ThemePreferenceProvider>
+      <RootNavigator />
+    </ThemePreferenceProvider>
+  );
+}
+
+function RootNavigator() {
+  const { scheme, isReady } = useThemePreference();
 
   useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+    // El splash se mantiene hasta saber qué tema aplicar: si no, la app pinta con un esquema y
+    // salta al otro, un parpadeo desorientador para alguien con baja visión.
+    if (isReady) SplashScreen.hideAsync();
+  }, [isReady]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -39,6 +52,8 @@ export default function RootLayout() {
         <ThemeProvider value={buildNavTheme(scheme)}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
+            {/* Ruta de desarrollo: no es pestaña; se enlaza desde Ajustes (ver settings.tsx). */}
+            <Stack.Screen name="dev/vision-bench" />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>

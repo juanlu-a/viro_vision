@@ -24,6 +24,23 @@ export interface BleClient {
   onRecognition(listener: (event: RecognitionEvent) => void): () => void;
 }
 
+/**
+ * Dispositivo simulado para poder ver y demostrar la pantalla de dispositivo conectado sin
+ * hardware — el pilar de hardware está bloqueado por compra de componentes (B2).
+ *
+ * Va detrás de una variable de entorno propia y no de `__DEV__` a propósito: así se puede activar
+ * en un build de release para una demo, y es imposible que se cuele en un build normal. La UI lo
+ * rotula como simulado; esto NO finge que el BLE funciona.
+ */
+const SIMULATE_DEVICE = process.env.EXPO_PUBLIC_SIMULATE_DEVICE === '1';
+
+const simulatedDevice: DeviceInfo = {
+  id: 'simulado-0001',
+  name: 'ViroVision (simulado)',
+  batteryLevel: 76,
+  firmwareVersion: '0.1.0-dev',
+};
+
 /** Thrown by the stub until the real BLE layer is implemented. */
 export class BleNotImplementedError extends Error {
   constructor() {
@@ -34,6 +51,7 @@ export class BleNotImplementedError extends Error {
 
 const stubClient: BleClient = {
   async connect() {
+    if (SIMULATE_DEVICE) return simulatedDevice;
     throw new BleNotImplementedError();
   },
   async disconnect() {

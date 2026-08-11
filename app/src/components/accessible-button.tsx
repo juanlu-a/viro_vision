@@ -66,8 +66,7 @@ export function AccessibleButton({
       ) : (
         <Text
           style={[styles.label, { color: labelColor }]}
-          numberOfLines={1}
-          accessibilityElementsHidden
+            accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants">
           {label}
         </Text>

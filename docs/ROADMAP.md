@@ -9,12 +9,15 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 - **Own design system** (extend `theme.ts` + accessible primitives), no component library.
 - **Recognition integration in the app is deferred** until Track B delivers a custom-trained model or
   a working device — no throwaway pretrained-YOLO demo. The app still defines the plug-in contract.
-- **Auth = Supabase email + password** (no Google/OAuth).
+- **Sin login** — la app abre directo a las pestañas (actualización de ADR 0002). El código de
+  Supabase email+password queda archivado, no borrado, por si vuelve como sync opcional.
 
 ## Cross-cutting principles
 - **Accessibility is the #1 product requirement — "screen-reader first".** Every screen/flow verified
   with real VoiceOver (iOS) + TalkBack (Android) — not assumed (Mascetti et al., see skill).
-- **Offline-first** (ADR 0001): nothing on camera→detection/OCR→announcement awaits a network call.
+- **Offline-first** (ADR 0001, enmendado 2026-08-10): el camino cámara→detección/OCR→anuncio debe
+  funcionar **sin red**. La nube se admite sólo como **acelerador opcional** en ese camino, nunca
+  como único recorrido, con la inferencia local como **fallback garantizado**.
   **Account layer stays separate** (ADR 0002).
 - **Minimalist / sober / modern:** few colors, strong contrast, large type, generous spacing, clear
   hierarchy, subtle motion (respect Reduce Motion), haptics for non-visual feedback.
@@ -33,7 +36,9 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 - **A2 · Permissions + accessible onboarding** *(next, parallel to A1)* — `app/src/features/permissions/`
   + a rationale-first onboarding route. Update `app.json`: Bluetooth (present) + WiFi/local-network
   (iOS `NSLocalNetworkUsageDescription`/`NSBonjourServices`; Android WiFi + `NEARBY_WIFI_DEVICES`) +
-  camera (via `expo-camera` when A5 nears). Also set a deliberate iOS `bundleIdentifier`.
+  camera (via `expo-camera` when A5 nears). ✅ iOS `bundleIdentifier` / Android `package` fijados en
+  `com.virovision.app` (2026-08-10 — ver `dev-build-ios.md`); `expo-image-picker` ya trae
+  `NSPhotoLibraryUsageDescription` para el benchmark.
 - **A3 · Navigation + core screens** ✅ *(done — no login)* — iOS bottom tabs (Inicio / Dispositivo /
   Ajustes), app opens directly (no login gate — see ADR 0002 update). Home / Dispositivo / Ajustes
   rebuilt on the design system. (Real Settings model backed by `services/storage` still pending.)
@@ -47,14 +52,26 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 
 - **B1 · ML / OCR** *(can start now)* — datasets (buses, products), train/fine-tune YOLO11, OCR
   approach, edge export (TFLite/Coral) + benchmarks. Deliverable: an exported model + I/O schema.
+  > ⚠️ **Pregunta de alcance abierta (ADR 0004):** si un Gemma multimodal lee el cartel directamente
+  > en el camino del teléfono, detección y OCR colapsan en un paso y buena parte de B1 desaparece —
+  > incluido el método que describe el documento principal de la tesis. **Hay que decidirlo
+  > explícitamente con el tutor, no por omisión.** Recomendación actual: conservar YOLO + OCR **como
+  > comparación** y medir ambos con el benchmark que ya existe.
 - **B2 · Hardware** *(blocked on buying components)* — RPi Zero 2 W + Coral TPU + Camera Module 3;
   capture; BLE peripheral/GATT server matching `gatt.ts`; two channels; enclosure; RTT comparison.
 - **B3 · Convergence contract** — model↔app message schema (align `RecognitionEvent`), on-device
   runtime, image transport — captured as ADRs.
 
-## ADRs to write
+## ADRs
+
+**Escritos:** [0001 Offline-first](architecture/adr/0001-offline-first-on-device-inference.md)
+(enmendado 2026-08-10 — nube como acelerador opcional) ·
+[0002 Backend & auth](architecture/adr/0002-backend-and-auth-supabase.md) ·
+[0004 Runtime de inferencia on-device — Gemma vía LiteRT-LM](architecture/adr/0004-on-device-inference-runtime.md)
+*(Proposed — a discutir con el tutor)*.
+
+**Por escribir:**
 - **ADR 0003 — Image transport for offload-to-phone** (WiFi/local-network vs BLE).
-- **ADR 0004 — On-device inference runtime** (TFLite / ONNX Runtime / ExecuTorch; Gemma pending).
 - **ADR 0005 — Design system & accessibility standards** (tokens, Dynamic Type, contrast, motion,
   screen-reader testing as a required step).
 

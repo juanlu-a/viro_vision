@@ -1,8 +1,20 @@
 /**
  * ViroVision design system — tokens.
  *
- * Identity: green + black (dark, default) with a clean white light mode. Minimalist, high-contrast,
- * accessibility-first (WCAG AA). Semantic color names so screens never hardcode hex values.
+ * Identidad de marca (ver `docs/brand/virovision-marca.md`): azul profundo, azul sensor y verde
+ * lectura. **Los tokens NO son los hex del manual tal cual**, y eso es deliberado:
+ *
+ *   - Azul Sensor `#1256D4` sobre Azul Profundo da **2.66:1** — falla WCAG por lejos.
+ *   - Verde Lectura `#1FB57A` sobre Gris Niebla da **2.44:1** — también falla.
+ *   - Blanco sobre Verde Lectura (botón) da **2.64:1** — falla.
+ *
+ * No es un error del manual: un logo no es texto, y WCAG no le exige contraste a un símbolo. Pero
+ * usar esos hex como color de texto o de relleno degradaría la accesibilidad — en una app para
+ * personas con baja visión eso no es aceptable. Así que los tokens **conservan el tono de la marca
+ * y ajustan la luminosidad** hasta alcanzar el contraste.
+ *
+ * Objetivo: **AAA (7:1)** para texto, AA (4.5:1) como piso. `theme.test.ts` lo verifica
+ * automáticamente — si alguien "corrige" un token para que coincida con el manual, el test falla.
  */
 import '@/global.css';
 
@@ -10,37 +22,54 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   dark: {
-    background: '#000000',
-    surface: '#141414',
-    surfaceElevated: '#1F1F1F',
-    border: '#2E2E2E',
-    text: '#FFFFFF',
-    textSecondary: '#A1A1AA',
-    primary: '#22C55E', // green-500 — bright green on black (high contrast)
-    primaryMuted: '#16351F', // subtle green tint for backgrounds
-    onPrimary: '#04140A', // near-black text on green
-    danger: '#F87171',
-    success: '#22C55E',
-    tabInactive: '#71717A',
+    background: '#061D3A', // Azul Profundo — el fondo del ícono de la app
+    // Superficies apenas despegadas del fondo: casi todo el contenido vive en tarjetas, así que
+    // si son muy claras el azul que domina la pantalla deja de ser el Azul Profundo de la marca.
+    surface: '#0E2B4F', // del manual (sección modo claro/oscuro)
+    surfaceElevated: '#0D3567',
+    border: '#123F76', // decorativo (tarjetas): no necesita 3:1
+    borderStrong: '#1C6AC4', // borde de controles (campos, foco): 3:1 — WCAG 1.4.11
+    text: '#E8EFF7', // del manual — 14.56:1 sobre fondo, 12.27:1 sobre superficie (AAA)
+    textSecondary: '#9FB8D4', // del manual — 8.26:1 sobre fondo (AAA)
+    // Verde: es el color distintivo de la marca y el que la app tiene que mostrar. El manual le
+    // asigna al azul el rol de "acción primaria", pero en pantalla el azul se confunde con el
+    // fondo azul profundo y la identidad se pierde. Decisión tomada mirando el resultado real.
+    // Verde Lectura del manual, variante para oscuro: 8.99:1 sobre el fondo (AAA).
+    primary: '#2BD69A',
+    primaryMuted: '#0B3A33',
+    // Texto OSCURO sobre el relleno verde: 8.99:1. Blanco encima daría 1.88:1 y fallaría.
+    onPrimary: '#061D3A',
+    danger: '#F3AAAD', // 7.09:1 AAA
+    success: '#2BD69A', // Verde Lectura del manual — 8.99:1 AAA
+    successMuted: '#0B3A33',
+    tabInactive: '#A9C0DE',
   },
   light: {
-    background: '#FFFFFF',
-    surface: '#F6F7F6',
+    background: '#F4F6F8', // Gris Niebla
+    surface: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
-    border: '#E4E4E7',
-    text: '#0A0A0A',
-    textSecondary: '#52525B',
-    primary: '#15803D', // green-700 — AA contrast on white
-    primaryMuted: '#E7F6EC',
-    onPrimary: '#FFFFFF',
-    danger: '#DC2626',
-    success: '#15803D',
-    tabInactive: '#8E8E93',
+    border: '#CFD7E0', // decorativo (tarjetas): no necesita 3:1
+    borderStrong: '#7990A9', // borde de controles (campos, foco): 3.04:1 — WCAG 1.4.11
+    text: '#061D3A', // del manual — 15.57:1 AAA
+    textSecondary: '#33475E', // del manual — 8.80:1 AAA
+    // Verde, para que el acento sea el mismo en los dos temas. Verde Lectura oscurecido hasta
+    // AAA: 7.19:1 sobre el fondo. El crudo del manual (#1FB57A) da 2.44:1 y es ilegible.
+    primary: '#105E3F',
+    primaryMuted: '#E3F3EC',
+    onPrimary: '#FFFFFF', // 7.79:1 sobre el primario
+    danger: '#A5171C', // 7.08:1 AAA
+    success: '#105E3F', // Verde Lectura oscurecido hasta AAA — 7.19:1 (el crudo da 2.44:1)
+    successMuted: '#E3F3EC',
+    tabInactive: '#3D5273',
   },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
-export type Theme = (typeof Colors)['light'];
+/**
+ * Un tema cualquiera. Deliberadamente `string` y no los literales de un tema concreto: si no,
+ * el tema oscuro no sería asignable a `Theme` y nada podría tratarlos de forma intercambiable.
+ */
+export type Theme = Record<ThemeColor, string>;
 
 export const Fonts = Platform.select({
   ios: {

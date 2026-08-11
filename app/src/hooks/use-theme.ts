@@ -1,14 +1,13 @@
 /**
- * Learn more about light and dark modes:
- * https://docs.expo.dev/guides/color-schemes/
+ * Devuelve los tokens de color del esquema efectivo.
+ *
+ * "Efectivo" = lo que el usuario eligió en Ajustes, ya resuelto contra el sistema cuando la
+ * preferencia es `system`. Ver ThemePreferenceProvider.
  */
-
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemePreference } from '@/features/theme/ThemePreferenceProvider';
 
 export function useTheme() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'unspecified' ? 'light' : scheme;
-
-  return Colors[theme];
+  const { scheme } = useThemePreference();
+  return Colors[scheme];
 }
