@@ -3,8 +3,13 @@
 Manual de marca y fuentes del símbolo. **Éstas son las fuentes**: los PNG de
 `app/assets/images/` se generan a partir de los SVG de acá, no al revés.
 
-- [`virovision-marca.md`](virovision-marca.md) — el manual: símbolo, geometría, paleta,
-  tipografía y reglas de uso.
+- [`virovision-manual-de-marca.pdf`](virovision-manual-de-marca.pdf) — **el manual completo**, en
+  la versión presentable (sirve para la tesis y para mostrarle al tutor).
+- [`virovision-marca.md`](virovision-marca.md) — las mismas reglas en texto plano: símbolo,
+  geometría, paleta, tipografía y usos incorrectos.
+- `virovision-marca.dc.html` · `virovision-marca-export.zip` — el documento fuente de Claude Design
+  y su exportación completa. Para re-importarlo o modificarlo, ver la skill `virovision-marca`
+  (`.claude/skills/virovision-marca/SKILL.md`), que tiene el prompt del MCP.
 - `virovision-logo.svg` — símbolo a color sobre fondo claro.
 - `virovision-logo-mono.svg` — versión monocroma (`currentColor`).
 - `virovision-app-icon.svg` — ícono de app 1024 tal como lo exportó el manual.
