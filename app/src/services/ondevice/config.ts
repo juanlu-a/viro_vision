@@ -35,3 +35,12 @@ export const CONFIGURACIONES = [
  * prompt son dos frases más una imagen.
  */
 export const MAX_CONTEXT_TOKENS = 1024;
+
+/**
+ * ¿Se muestra la pantalla del spike?
+ *
+ * Se gatea por variable de entorno y **no por `__DEV__`**: el spike hay que medirlo en un build de
+ * Release corriendo en el teléfono sin la laptop cerca, que es donde `__DEV__` vale `false`. Mismo
+ * criterio que el benchmark de nube, que se gatea por la presencia de la clave.
+ */
+export const isOnDeviceSpikeEnabled = (process.env.EXPO_PUBLIC_ONDEVICE_SPIKE ?? '') !== '';

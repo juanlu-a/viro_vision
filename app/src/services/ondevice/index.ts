@@ -5,7 +5,13 @@
  * importar esto desde `features/recognition/` o `features/audio/` — el camino cámara →
  * detección/OCR → anuncio tiene que funcionar sin depender de un experimento a medio validar.
  */
-export { CONFIGURACIONES, GEMMA_4_E2B_BYTES, GEMMA_4_E2B_URL, MAX_CONTEXT_TOKENS } from './config';
+export {
+  CONFIGURACIONES,
+  GEMMA_4_E2B_BYTES,
+  GEMMA_4_E2B_URL,
+  isOnDeviceSpikeEnabled,
+  MAX_CONTEXT_TOKENS,
+} from './config';
 export { sondearRuntime } from './probe';
 export type { EstimacionPorBackend, ResultadoSonda } from './probe';
 export {
