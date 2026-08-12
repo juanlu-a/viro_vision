@@ -1,30 +1,14 @@
 /**
- * Surface container with consistent padding, radius and a subtle border. Groups related content.
+ * Contenedor de superficie: agrupa contenido relacionado.
+ *
+ * La receta visual (fondo, borde, radio, padding) vive en `useSurfaces`, no acá: era la misma que
+ * usaban el campo de texto y el desplegable de tema, copiada tres veces.
  */
-import { StyleSheet, View, type ViewProps } from 'react-native';
+import { View, type ViewProps } from 'react-native';
 
-import { Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useSurfaces } from '@/hooks/use-surfaces';
 
 export function Card({ style, ...rest }: ViewProps) {
-  const theme = useTheme();
-  return (
-    <View
-      {...rest}
-      style={[
-        styles.card,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-        style,
-      ]}
-    />
-  );
+  const surfaces = useSurfaces();
+  return <View {...rest} style={[surfaces.panel, style]} />;
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Spacing.four,
-    gap: Spacing.three,
-  },
-});

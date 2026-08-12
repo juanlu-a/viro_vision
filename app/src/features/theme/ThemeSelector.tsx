@@ -17,6 +17,7 @@ import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { A11y, Fonts, Radius, Spacing } from '@/constants/theme';
+import { useSurfaces } from '@/hooks/use-surfaces';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
 import type { ThemePreference } from '@/services/storage/themePreference';
@@ -54,6 +55,7 @@ const OPTIONS: Opcion[] = [
 export function ThemeSelector() {
   const { preference, setPreference } = useThemePreference();
   const theme = useTheme();
+  const surfaces = useSurfaces();
   const [abierto, setAbierto] = useState(false);
 
   const actual = OPTIONS.find((o) => o.value === preference) ?? OPTIONS[0];
@@ -71,14 +73,7 @@ export function ThemeSelector() {
         accessibilityLabel={`${strings.settings.appearance}: ${actual.label}`}
         accessibilityHint={strings.settings.appearanceHint}
         onPress={() => setAbierto(true)}
-        style={({ pressed }) => [
-          styles.trigger,
-          {
-            backgroundColor: theme.surfaceElevated,
-            borderColor: theme.borderStrong,
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}>
+        style={({ pressed }) => [surfaces.control, styles.trigger, { opacity: pressed ? 0.85 : 1 }]}>
         <Ionicons
           name={actual.icon}
           size={20}
@@ -107,7 +102,7 @@ export function ThemeSelector() {
             gesto de cerrar es el propio del sistema, y un "botón" que ocupa toda la pantalla sólo
             estorbaría al recorrer las opciones. */}
         <Pressable
-          style={styles.backdrop}
+          style={surfaces.overlay}
           onPress={() => setAbierto(false)}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
@@ -117,10 +112,7 @@ export function ThemeSelector() {
             accessibilityViewIsModal
             accessibilityRole="radiogroup"
             accessibilityLabel={strings.settings.appearance}
-            style={[
-              styles.menu,
-              { backgroundColor: theme.surface, borderColor: theme.borderStrong },
-            ]}>
+            style={[surfaces.panelElevated, styles.menu]}>
             {OPTIONS.map((option) => {
               const selected = preference === option.value;
               return (
@@ -176,25 +168,13 @@ export function ThemeSelector() {
 
 const styles = StyleSheet.create({
   trigger: {
-    minHeight: A11y.minTouchTarget,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
   },
   triggerLabel: {
     flex: 1,
     fontFamily: Fonts.sansBold,
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   centro: {
     flex: 1,
@@ -202,8 +182,6 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   menu: {
-    borderRadius: Radius.lg,
-    borderWidth: 1,
     padding: Spacing.two,
     gap: Spacing.one,
   },
