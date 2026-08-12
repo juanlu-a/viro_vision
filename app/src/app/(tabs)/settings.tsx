@@ -5,6 +5,7 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
+import { Fonts } from '@/constants/theme';
 import { ThemeSelector } from '@/features/theme/ThemeSelector';
 import { strings } from '@/i18n';
 import { isVisionConfigured } from '@/services/vision';
@@ -27,7 +28,7 @@ export default function SettingsScreen() {
         <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
           {t.about.toUpperCase()}
         </ThemedText>
-        <ThemedText type="default" style={{ fontWeight: '600' }}>
+        <ThemedText type="default" style={{ fontFamily: Fonts.sansBold }}>
           {strings.app.name}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">

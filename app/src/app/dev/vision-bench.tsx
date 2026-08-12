@@ -15,7 +15,7 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useVisionBenchmark } from '@/features/benchmark/useVisionBenchmark';
 import { strings } from '@/i18n';
 import { availableModels, formatBytes, formatMs, isVisionConfigured, summarize } from '@/services/vision';
@@ -196,7 +196,7 @@ export default function VisionBenchScreen() {
             <SectionLabel>{t.readingSection}</SectionLabel>
             {lastRun.parsed ? (
               <>
-                <ThemedText type="default" themeColor="success" style={{ fontWeight: '700' }}>
+                <ThemedText type="default" themeColor="success" style={{ fontFamily: Fonts.sansBold }}>
                   {t.readingLine}: {lastRun.parsed.numero ?? '—'}
                 </ThemedText>
                 <ThemedText type="default">

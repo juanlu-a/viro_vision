@@ -10,7 +10,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
-import { A11y, Radius, Spacing } from '@/constants/theme';
+import { A11y, Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
 import type { ThemePreference } from '@/services/storage/themePreference';
@@ -85,6 +85,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    fontWeight: '600',
+    fontFamily: Fonts.sansBold,
   },
 });

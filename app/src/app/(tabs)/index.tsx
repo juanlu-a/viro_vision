@@ -6,7 +6,7 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { announce } from '@/features/audio/announcer';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -23,8 +23,11 @@ function FeatureRow({
   const theme = useTheme();
   return (
     <View style={styles.row} accessible accessibilityRole="text" accessibilityLabel={`${title}. ${desc}`}>
-      <View style={[styles.iconWrap, { backgroundColor: theme.primaryMuted }]}>
-        <Ionicons name={icon} size={22} color={theme.primary} />
+      {/* Relleno verde con el glifo oscuro encima, no al revés: el verde de marca sobre su
+          propio tinte claro da 2.24:1 y un ícono necesita 3:1 (WCAG 1.4.11). Además es lo que
+          más verde pone en pantalla, que es el peso que el manual le asigna. */}
+      <View style={[styles.iconWrap, { backgroundColor: theme.primary }]}>
+        <Ionicons name={icon} size={24} color={theme.onPrimary} />
       </View>
       <View style={styles.rowText}>
         <ThemedText type="default" style={styles.rowTitle}>
@@ -79,6 +82,6 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   rowTitle: {
-    fontWeight: '600',
+    fontFamily: Fonts.sansBold,
   },
 });

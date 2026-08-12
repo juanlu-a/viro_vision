@@ -7,7 +7,7 @@
 import * as Haptics from 'expo-haptics';
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 
-import { Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -34,12 +34,21 @@ export function AccessibleButton({
 
   const bg =
     variant === 'primary' ? theme.primary : variant === 'danger' ? theme.danger : 'transparent';
-  const borderColor = variant === 'secondary' ? theme.border : 'transparent';
+  // El primario va contorneado: en tema claro el verde de marca da 2.44:1 contra el fondo, y el
+  // *límite* de un control necesita 3:1 (WCAG 1.4.11). El borde lo aporta sin tocar el relleno.
+  const borderColor =
+    variant === 'primary'
+      ? theme.primaryEdge
+      : variant === 'secondary'
+        ? theme.borderStrong
+        : 'transparent';
   const labelColor =
     variant === 'primary' || variant === 'danger'
       ? theme.onPrimary
       : variant === 'ghost'
-        ? theme.primary
+        ? // `primary` acá sería texto verde de marca: 2.44:1 en claro. `success` es el mismo verde
+          // llevado hasta AAA, que es lo que un rótulo necesita.
+          theme.success
         : theme.text;
 
   const handlePress = () => {
@@ -57,7 +66,11 @@ export function AccessibleButton({
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       style={({ pressed }) => [
         styles.base,
-        { backgroundColor: bg, borderColor, borderWidth: variant === 'secondary' ? 1.5 : 0 },
+        {
+          backgroundColor: bg,
+          borderColor,
+          borderWidth: variant === 'primary' || variant === 'secondary' ? 1.5 : 0,
+        },
         pressed && styles.pressed,
         isDisabled && styles.disabled,
       ]}>
@@ -92,7 +105,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: Fonts.sansBold,
     textAlign: 'center',
     letterSpacing: 0.2,
   },
