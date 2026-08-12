@@ -8,25 +8,23 @@ Dos arcos que se encuentran en un vértice inferior: ojo abstracto y V geométri
 Geometría (lienzo 200×200): arcos de radio 96 desde (100,168) hasta (32,44) y (168,44); trazo 18, extremos redondeados; pupila r=17 en (100,92).
 
 ## Color
-- Verde Lectura #1FB57A — **primario**: botones, foco y estado confirmado. Arco derecho. Pantone 3405 C
-- Azul Sensor #1256D4 — **secundario**: superficies, enlaces y datos. Arco izquierdo. Pantone 2145 C
+- Verde Lectura #1FB57A — acento primario: botones, foco, estado confirmado
+- Azul Sensor #1256D4 — secundario: enlaces, datos, superficies oscuras
 - Azul Profundo #061D3A — pupila, texto, fondos oscuros
 - Gris Niebla #F4F6F8 — fondo base
 Variantes sobre oscuro: #4D9BFF / #2BD69A / pupila blanca.
-Proporción: 70% neutros, 20% Verde Lectura, 10% Azul Sensor.
-Azul Profundo sobre Gris Niebla: 12.8:1 (AAA para texto normal).
+Proporción: 70% neutros, 20% verde, 10% azul.
 
 ## Modo claro y oscuro
-- Claro: fondo #F4F6F8, superficie #FFFFFF, texto #061D3A, secundario #33475E, azul #1256D4, verde #1FB57A
-- Oscuro: fondo #061D3A, superficie #0E2B4F, texto #E8EFF7, secundario #9FB8D4, azul #4D9BFF, verde #2BD69A
-- El verde es el acento de acción en los dos modos y se aclara a #2BD69A en oscuro para mantener 4.5:1. El azul nunca se usa como botón sobre #061D3A.
-- Botón: relleno #1FB57A con texto #061D3A encima (claro) / #2BD69A con #061D3A (oscuro).
+- Claro: fondo #F4F6F8, superficie #FFFFFF, texto #061D3A, secundario #33475E, acento #1FB57A, secundario #1256D4
+- Oscuro: fondo #061D3A, superficie #0E2B4F, texto #E8EFF7, secundario #9FB8D4, acento #2BD69A, secundario #4D9BFF
+- El verde es el acento de acción en ambos modos (#2BD69A en oscuro); el azul no se usa como botón sobre #061D3A.
 - Pupila del símbolo: #061D3A en claro, #FFFFFF en oscuro. El ícono de app usa fondo #061D3A en ambos modos.
 
 ## Tipografía
-- Títulos: Space Grotesk Bold, 32–72 px, tracking −2%
+- Títulos: Space Grotesk Bold, tracking −2%
 - Texto: IBM Plex Sans Regular/SemiBold, mínimo 17 px
-- Datos: IBM Plex Mono (números de línea, porcentajes, distancias)
+- Datos: IBM Plex Mono
 
 ## Reglas
 - Área de resguardo: 34 u (1 diámetro de pupila) en los cuatro lados.
