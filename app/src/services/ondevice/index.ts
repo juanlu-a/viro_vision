@@ -18,6 +18,8 @@ export {
   cargarModelo,
   descargarModelo,
   diagnosticar,
+  espacioLibre,
+  limpiarCopias,
   generarConImagen,
   generarTexto,
   modeloCargado,

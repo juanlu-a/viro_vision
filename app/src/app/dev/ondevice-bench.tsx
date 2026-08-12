@@ -47,6 +47,7 @@ export default function OnDeviceBenchScreen() {
     setMultimodal,
     cargar,
     liberar,
+    limpiar,
     probarTexto,
     probarImagen,
   } = useOnDeviceSpike();
@@ -123,6 +124,16 @@ export default function OnDeviceBenchScreen() {
           <ThemedText type="small" themeColor="textSecondary">
             {state.archivo?.nombre ?? t.noModelPicked}
           </ThemedText>
+
+          {/* Sin esto no hay salida desde la app: las copias se acumulan en la caché y, con el
+              disco lleno, cargar aborta el proceso sin decir por qué. */}
+          <AccessibleButton
+            label={t.cleanCopies}
+            hint={t.cleanCopiesHint}
+            variant="secondary"
+            onPress={limpiar}
+            disabled={ocupado}
+          />
 
           {/* Backend y multimodal como botones que rotan, no como interruptores: el estado va en
               la etiqueta, así que VoiceOver lo lee sin depender de un `accessibilityState` que en

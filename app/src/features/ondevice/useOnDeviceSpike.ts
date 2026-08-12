@@ -21,6 +21,8 @@ import {
   cargarModelo,
   descargarModelo,
   diagnosticar,
+  espacioLibre,
+  limpiarCopias,
   generarConImagen,
   generarTexto,
   sondearRuntime,
@@ -31,7 +33,7 @@ import type {
   GeneracionResultado,
   ResultadoSonda,
 } from '@/services/ondevice';
-import { parseBusReading } from '@/services/vision';
+import { formatBytes, parseBusReading } from '@/services/vision';
 import type { BusReading } from '@/services/vision';
 import { SYSTEM_PROMPT, USER_PROMPT } from '@/services/vision/providers';
 
@@ -112,10 +114,14 @@ export function useOnDeviceSpike() {
     // Heurística sólo como valor inicial: el usuario puede corregirla con el interruptor. Los
     // modelos "1b"/"3-1b" son de sólo texto y activar multimodal con ellos falla al cargar.
     const pareceMultimodal = /e2b|e4b|gemma-?4/i.test(a.name);
+    // El diagnóstico se calcula **acá**, no al cargar: cargar puede abortar el proceso —XNNPack
+    // hace `abort()` si no puede escribir su caché de pesos— y un aborto nativo le gana de mano al
+    // render. Calculado al elegir, los números están en pantalla *antes* de arriesgar la carga.
     update({
       archivo: { uri: a.uri, nombre: a.name },
       multimodal: pareceMultimodal,
       carga: null,
+      diagnostico: diagnosticar(decodeURI(a.uri.replace('file://', '')), ref.current.backend),
       generacion: null,
       lectura: null,
       mensaje: a.name,
@@ -123,7 +129,19 @@ export function useOnDeviceSpike() {
   }, [update]);
 
   const setBackend = useCallback(
-    (backend: Backend) => update({ backend, carga: null, generacion: null, lectura: null }),
+    (backend: Backend) => {
+      const archivo = ref.current.archivo;
+      update({
+        backend,
+        carga: null,
+        generacion: null,
+        lectura: null,
+        // La estimación de memoria depende del backend: recalcularla o mostraría la del anterior.
+        diagnostico: archivo
+          ? diagnosticar(decodeURI(archivo.uri.replace('file://', '')), backend)
+          : null,
+      });
+    },
     [update],
   );
 
@@ -136,15 +154,28 @@ export function useOnDeviceSpike() {
     const { archivo, backend, multimodal } = ref.current;
     if (!archivo) return;
     const ruta = decodeURI(archivo.uri.replace('file://', ''));
-    // El diagnóstico se toma ANTES de cargar y se guarda pase lo que pase: si la carga falla, el
-    // mensaje de la librería es el mismo para una copia truncada que para falta de memoria.
-    update({ estado: 'loading', mensaje: t.loading, carga: null, diagnostico: diagnosticar(ruta, backend) });
+    update({ estado: 'loading', mensaje: t.loading, carga: null });
     try {
       const carga = await cargarModelo(ruta, backend, multimodal);
       update({ estado: 'idle', carga, mensaje: t.loaded });
     } catch (err) {
       update({ estado: 'idle', mensaje: `${t.loadError}: ${describir(err)}` });
     }
+  }, [update]);
+
+  const limpiar = useCallback(async () => {
+    update({ estado: 'loading', mensaje: t.cleaning });
+    const bytes = await limpiarCopias();
+    const libre = espacioLibre();
+    update({
+      estado: 'idle',
+      archivo: null,
+      carga: null,
+      diagnostico: null,
+      generacion: null,
+      lectura: null,
+      mensaje: `${t.cleaned} ${formatBytes(bytes)}. ${t.diskFree}: ${formatBytes(libre ?? 0)}.`,
+    });
   }, [update]);
 
   const liberar = useCallback(async () => {
@@ -192,6 +223,7 @@ export function useOnDeviceSpike() {
     setMultimodal,
     cargar,
     liberar,
+    limpiar,
     probarTexto,
     probarImagen,
   };

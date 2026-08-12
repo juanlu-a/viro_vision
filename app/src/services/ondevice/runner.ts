@@ -16,7 +16,7 @@
  * y se guardan las dos — si difieren mucho, el overhead está en el puente JS y eso también es un
  * dato.
  */
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import { createLLM, estimateMemory } from 'react-native-litert-lm';
 import type { Backend, GenerationStats, LiteRTLMInstance } from 'react-native-litert-lm';
 
@@ -188,4 +188,44 @@ export async function descargarModelo(): Promise<void> {
     // Si no se pudo liberar limpio, igual se suelta la referencia: insistir no ayuda.
   }
   instancia = null;
+}
+
+/**
+ * Borra las copias de modelos que dejó el selector de archivos, y devuelve cuántos bytes liberó.
+ *
+ * Hace falta porque el precio de copiar es acumulativo y silencioso: cada vez que se elige un
+ * archivo queda otra copia de varios GB en la caché de la app. Cuando el disco se llena, el
+ * síntoma **no** dice "disco lleno": XNNPack no puede escribir su caché de pesos y llama a
+ * `abort()`, así que la app se cierra sin mensaje — y falla incluso con un modelo chico que antes
+ * andaba, lo que hace parecer que se rompió el código.
+ */
+export async function limpiarCopias(): Promise<number> {
+  // Hay que soltar el modelo antes de borrar el archivo que está mapeado.
+  await descargarModelo();
+
+  let liberados = 0;
+  for (const carpeta of ['DocumentPicker', 'ImagePicker']) {
+    try {
+      const dir = new Directory(Paths.cache, carpeta);
+      if (!dir.exists) continue;
+      for (const entrada of dir.list()) {
+        if (entrada instanceof File) {
+          liberados += entrada.size ?? 0;
+        }
+        entrada.delete();
+      }
+    } catch {
+      // Que una carpeta no se pueda borrar no impide intentar con la otra.
+    }
+  }
+  return liberados;
+}
+
+/** Espacio libre en disco, para mostrarlo antes de copiar varios GB. */
+export function espacioLibre(): number | null {
+  try {
+    return Paths.availableDiskSpace;
+  } catch {
+    return null;
+  }
 }

@@ -93,6 +93,11 @@ export const es = {
     fileSize: 'Tamaño del archivo copiado',
     diskFree: 'Espacio libre en el disco',
     verdict: 'Veredicto de memoria',
+    cleanCopies: 'Borrar modelos copiados',
+    cleanCopiesHint:
+      'Libera el espacio de las copias que dejó el selector. Con el disco lleno la app se cierra sola al cargar, incluso con modelos chicos.',
+    cleaning: 'Borrando copias…',
+    cleaned: 'Liberado:',
     modelSection: 'Modelo',
     pickModel: 'Elegir archivo .litertlm',
     pickModelHint: 'Abre Archivos para elegir un modelo ya descargado. No baja nada.',
