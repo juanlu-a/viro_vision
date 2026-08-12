@@ -1,0 +1,43 @@
+/* GENERADO POR scripts/generate-theme-css.js — no editar a mano.
+   La paleta vive en src/constants/colors.js. Regenerar con: npm run theme:css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-background: 244 246 248;
+    --color-surface: 228 237 251;
+    --color-surface-elevated: 255 255 255;
+    --color-border: 191 210 245;
+    --color-border-strong: 91 127 185;
+    --color-text: 6 29 58;
+    --color-text-secondary: 51 71 94;
+    --color-primary: 31 181 122;
+    --color-primary-muted: 223 245 235;
+    --color-on-primary: 6 29 58;
+    --color-primary-edge: 16 94 63;
+    --color-danger: 165 23 28;
+    --color-success: 16 94 63;
+    --color-success-muted: 223 245 235;
+    --color-tab-inactive: 61 82 115;
+  }
+
+  .dark:root {
+    --color-background: 6 29 58;
+    --color-surface: 14 43 79;
+    --color-surface-elevated: 13 53 103;
+    --color-border: 18 63 118;
+    --color-border-strong: 77 155 255;
+    --color-text: 232 239 247;
+    --color-text-secondary: 159 184 212;
+    --color-primary: 43 214 154;
+    --color-primary-muted: 11 58 51;
+    --color-on-primary: 6 29 58;
+    --color-primary-edge: 43 214 154;
+    --color-danger: 243 170 173;
+    --color-success: 43 214 154;
+    --color-success-muted: 11 58 51;
+    --color-tab-inactive: 169 192 222;
+  }
+}

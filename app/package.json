@@ -29,6 +29,7 @@
     "expo-symbols": "~57.0.0",
     "expo-system-ui": "~57.0.0",
     "expo-web-browser": "~57.0.0",
+    "nativewind": "^4.2.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.0",
@@ -41,7 +42,8 @@
     "react-native-screens": "4.25.2",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.10.0"
+    "react-native-worklets": "0.10.0",
+    "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
@@ -60,7 +62,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "theme:css": "node ./scripts/generate-theme-css.js"
   },
   "private": true
 }

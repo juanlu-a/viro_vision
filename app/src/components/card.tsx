@@ -1,14 +1,19 @@
 /**
  * Contenedor de superficie: agrupa contenido relacionado.
  *
- * La receta visual (fondo, borde, radio, padding) vive en `useSurfaces`, no acá: era la misma que
- * usaban el campo de texto y el desplegable de tema, copiada tres veces.
+ * Escrito con clases de Tailwind (vía NativeWind). Los nombres son **semánticos**: `bg-surface`,
+ * no `bg-blue-900`. Un rol sobrevive a un cambio de marca; un color, no.
+ *
+ * No hace falta `dark:`: cada rol es una variable CSS y lo que cambia entre temas es su valor, no
+ * la clase. Los hex salen de `constants/colors.js`, la misma tabla que verifica `theme.test.ts`.
  */
 import { View, type ViewProps } from 'react-native';
 
-import { useSurfaces } from '@/hooks/use-surfaces';
-
-export function Card({ style, ...rest }: ViewProps) {
-  const surfaces = useSurfaces();
-  return <View {...rest} style={[surfaces.panel, style]} />;
+export function Card({ className, ...rest }: ViewProps & { className?: string }) {
+  return (
+    <View
+      {...rest}
+      className={`gap-three rounded-lg border border-border bg-surface p-four ${className ?? ''}`}
+    />
+  );
 }
