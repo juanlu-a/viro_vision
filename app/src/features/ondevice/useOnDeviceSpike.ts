@@ -88,9 +88,17 @@ export function useOnDeviceSpike() {
   }, [update]);
 
   const elegirArchivo = useCallback(async () => {
-    // Sin copiar a la caché: el archivo pesa 2,59 GB y duplicarlo llenaría el teléfono para nada.
-    const r = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: false });
-    if (r.canceled || !r.assets?.[0]) return;
+    // **Hay que copiarlo, aunque duela.** LiteRT-LM escribe su caché compilada en la carpeta del
+    // propio modelo (`cacheDir = parent(modelPath)`, en HybridLiteRTLM.swift). Un archivo elegido
+    // de otra app se puede leer pero no escribir al lado, así que el motor se crea y después falla
+    // al armar la conversación, con un error que no menciona permisos por ningún lado.
+    // El precio es una copia: 584 MB para el Gemma 3 1B, 2,59 GB para el Gemma 4 E2B.
+    update({ mensaje: t.copying });
+    const r = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+    if (r.canceled || !r.assets?.[0]) {
+      update({ mensaje: ref.current.archivo?.nombre ?? t.noModelPicked });
+      return;
+    }
     const a = r.assets[0];
     // Heurística sólo como valor inicial: el usuario puede corregirla con el interruptor. Los
     // modelos "1b"/"3-1b" son de sólo texto y activar multimodal con ellos falla al cargar.
@@ -123,7 +131,7 @@ export function useOnDeviceSpike() {
       const carga = await cargarModelo(decodeURI(archivo.uri.replace('file://', '')), backend, multimodal);
       update({ estado: 'idle', carga, mensaje: t.loaded });
     } catch (err) {
-      update({ estado: 'idle', mensaje: `${t.error}: ${describir(err)}` });
+      update({ estado: 'idle', mensaje: `${t.loadError}: ${describir(err)}` });
     }
   }, [update]);
 
@@ -138,7 +146,7 @@ export function useOnDeviceSpike() {
       const g = await generarTexto('Respondé solo con la palabra: listo.');
       update({ estado: 'idle', generacion: g, mensaje: t.result });
     } catch (err) {
-      update({ estado: 'idle', mensaje: `${t.error}: ${describir(err)}` });
+      update({ estado: 'idle', mensaje: `${t.runError}: ${describir(err)}` });
     }
   }, [update]);
 
@@ -160,7 +168,7 @@ export function useOnDeviceSpike() {
         mensaje: t.result,
       });
     } catch (err) {
-      update({ estado: 'idle', mensaje: `${t.error}: ${describir(err)}` });
+      update({ estado: 'idle', mensaje: `${t.runError}: ${describir(err)}` });
     }
   }, [update]);
 
