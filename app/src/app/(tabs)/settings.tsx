@@ -5,7 +5,6 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts } from '@/constants/theme';
 import { ThemeSelector } from '@/features/theme/ThemeSelector';
 import { strings } from '@/i18n';
 import { isOnDeviceSpikeEnabled } from '@/services/ondevice';
@@ -25,18 +24,6 @@ export default function SettingsScreen() {
         <ThemeSelector />
       </Card>
 
-      <Card>
-        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {t.about.toUpperCase()}
-        </ThemedText>
-        <ThemedText type="default" style={{ fontFamily: Fonts.sansBold }}>
-          {strings.app.name}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {strings.app.tagline}
-        </ThemedText>
-      </Card>
-
       {/*
         Herramientas de medición de la tesis. El gate es la presencia de la clave, no __DEV__:
         así el benchmark también existe en un build de release local (necesario para medir en la
@@ -51,7 +38,7 @@ export default function SettingsScreen() {
           <AccessibleButton
             label={t.openBenchmark}
             hint={t.openBenchmarkHint}
-            variant="ghost"
+            variant="secondary"
             onPress={() => router.push('/dev/vision-bench')}
           />
           {/* Mismo criterio que el benchmark: gatear por __DEV__ la escondía justo donde hay que
@@ -60,7 +47,7 @@ export default function SettingsScreen() {
             <AccessibleButton
               label={strings.ondevice.title}
               hint={strings.ondevice.probeHint}
-              variant="ghost"
+              variant="secondary"
               onPress={() => router.push('/dev/ondevice-bench')}
             />
           )}

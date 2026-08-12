@@ -1,6 +1,9 @@
 /**
- * Standard screen container: themed background, safe-area padding, centered max-width content,
- * consistent spacing, and an optional scroll mode (for forms / long content).
+ * Contenedor estándar de pantalla: fondo del tema, safe area, ancho máximo centrado, espaciado
+ * consistente y un modo scroll opcional.
+ *
+ * ⚠️ Si la pantalla muestra el **header nativo** (`headerShown: true`), pasá `edges={[]}`: el
+ * header ya cubre el inset de arriba, y aplicarlo otra vez acá lo duplica.
  */
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { type Edge, SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +25,12 @@ export function Screen({ children, scroll = false, edges = ['top'] }: ScreenProp
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive">
+            keyboardDismissMode="interactive"
+            // iOS ajusta solo el inset del primer ScrollView dentro de un navigation controller.
+            // Con el header nativo visible eso se suma al safe-area que ya aplica `SafeAreaView`,
+            // el inset se cuenta dos veces y el sistema "corrige" saltando el scroll hacia arriba
+            // mientras se hace scroll. Los insets los manejamos nosotros, así que se apaga.
+            contentInsetAdjustmentBehavior="never">
             <View style={styles.content}>{children}</View>
           </ScrollView>
         ) : (
