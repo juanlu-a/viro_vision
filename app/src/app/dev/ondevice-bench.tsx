@@ -13,14 +13,13 @@
  */
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
-import { AccessibilityInfo, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
 import { useOnDeviceSpike } from '@/features/ondevice/useOnDeviceSpike';
 import { strings } from '@/i18n';
 import { GEMMA_4_E2B_BYTES } from '@/services/ondevice';
@@ -80,7 +79,7 @@ export default function OnDeviceBenchScreen() {
             disabled={ocupado}
           />
           {sonda && !sonda.error && (
-            <View style={styles.filas}>
+            <View className="gap-three">
               <Fila
                 label={t.availableMemory}
                 value={
@@ -157,7 +156,7 @@ export default function OnDeviceBenchScreen() {
           </ThemedText>
 
           {carga && (
-            <View style={styles.filas}>
+            <View className="gap-three">
               <Fila label={t.loadTime} value={formatMs(carga.cargaMs)} />
               <Fila
                 label={t.memoryAfter}
@@ -196,7 +195,7 @@ export default function OnDeviceBenchScreen() {
             />
 
             {generacion && (
-              <View style={styles.filas}>
+              <View className="gap-three">
                 <Fila
                   label={t.ttft}
                   value={
@@ -225,9 +224,3 @@ export default function OnDeviceBenchScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  filas: {
-    gap: Spacing.three,
-  },
-});

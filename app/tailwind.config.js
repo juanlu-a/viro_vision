@@ -51,6 +51,37 @@ module.exports = {
         six: 64,
       },
       borderRadius: { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 },
+      // Las familias de marca, embebidas por el plugin `expo-font`. Los nombres son los PostScript
+      // de cada archivo: cada peso es una familia distinta, así que NO se combinan con `font-bold`
+      // —eso dispararía negrita sintética en Android—. Se cambia de familia, no de peso.
+      fontFamily: {
+        display: ['SpaceGrotesk-Bold'],
+        sans: ['IBMPlexSans-Regular'],
+        'sans-bold': ['IBMPlexSans-SemiBold'],
+        mono: ['IBMPlexMono-Regular'],
+      },
+      // Escala tipográfica del manual: piso de 17 px para texto. El par es [tamaño, interlínea].
+      fontSize: {
+        small: ['17px', '24px'],
+        base: ['18px', '27px'],
+        code: ['15px', '22px'],
+        subtitle: ['28px', '36px'],
+        title: ['40px', '46px'],
+      },
+      letterSpacing: {
+        // Tracking −2 % que pide el manual para los títulos en Space Grotesk Bold.
+        title: '-0.8px',
+        subtitle: '-0.56px',
+      },
+      minHeight: {
+        // Objetivo táctil mínimo (WCAG / plataformas). Igual que `A11y.minTouchTarget`.
+        touch: '48px',
+        button: '52px',
+      },
+      maxWidth: {
+        // Igual que `MaxContentWidth`: más ancho que esto, el texto se vuelve incómodo de leer.
+        content: '640px',
+      },
     },
   },
   plugins: [],

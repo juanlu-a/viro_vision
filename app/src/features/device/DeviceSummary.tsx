@@ -5,11 +5,9 @@
  * existe, y para uno con baja visión un indicador que sólo cambia de color no dice nada. La barra
  * es refuerzo visual del número, nunca su reemplazo.
  */
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
 import type { DeviceInfo } from './types';
 
@@ -18,7 +16,6 @@ const LOW_BATTERY = 20;
 
 export function DeviceSummary({ device }: { device: DeviceInfo }) {
   const t = strings.connect;
-  const theme = useTheme();
 
   const name = device.name ?? t.deviceUnnamed;
   const level = device.batteryLevel;
@@ -26,7 +23,7 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
   const batteryText = level == null ? t.batteryUnknown : `${level} %`;
 
   return (
-    <View style={styles.root}>
+    <View className="gap-three">
       <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
         {t.deviceSection.toUpperCase()}
       </ThemedText>
@@ -41,7 +38,7 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
         <ThemedText type="small" themeColor="textSecondary">
           {t.deviceNameLabel}
         </ThemedText>
-        <ThemedText type="default" style={styles.value}>
+        <ThemedText type="default" className="font-sans-bold">
           {name}
         </ThemedText>
       </View>
@@ -53,7 +50,7 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
         <ThemedText type="small" themeColor="textSecondary">
           {t.batteryLabel}
         </ThemedText>
-        <ThemedText type="default" style={styles.value}>
+        <ThemedText type="default" className="font-sans-bold">
           {batteryText}
           {isLow ? ` — ${t.batteryLow}` : ''}
         </ThemedText>
@@ -63,15 +60,10 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
             // oculta del lector de pantalla para no repetir el dato.
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
-            style={[styles.track, { backgroundColor: theme.surfaceElevated }]}>
+            className="mt-two h-[10px] overflow-hidden rounded-pill bg-surface-elevated">
             <View
-              style={[
-                styles.fill,
-                {
-                  width: `${Math.max(0, Math.min(100, level))}%`,
-                  backgroundColor: isLow ? theme.danger : theme.success,
-                },
-              ]}
+              className={`h-full rounded-pill ${isLow ? 'bg-danger' : 'bg-success'}`}
+              style={{ width: `${Math.max(0, Math.min(100, level))}%` }}
             />
           </View>
         )}
@@ -91,22 +83,3 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    gap: Spacing.three,
-  },
-  value: {
-    fontFamily: Fonts.sansBold,
-  },
-  track: {
-    height: 10,
-    borderRadius: Radius.pill,
-    marginTop: Spacing.two,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: Radius.pill,
-  },
-});

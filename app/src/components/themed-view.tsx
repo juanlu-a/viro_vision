@@ -1,16 +1,19 @@
+/**
+ * Vista con fondo del tema. Por defecto el fondo de pantalla.
+ */
 import { View, type ViewProps } from 'react-native';
 
-import { ThemeColor } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+const BACKGROUNDS = {
+  background: 'bg-background',
+  surface: 'bg-surface',
+  surfaceElevated: 'bg-surface-elevated',
+} as const;
 
 export type ThemedViewProps = ViewProps & {
-  lightColor?: string;
-  darkColor?: string;
-  type?: ThemeColor;
+  type?: keyof typeof BACKGROUNDS;
+  className?: string;
 };
 
-export function ThemedView({ style, lightColor, darkColor, type, ...otherProps }: ThemedViewProps) {
-  const theme = useTheme();
-
-  return <View style={[{ backgroundColor: theme[type ?? 'background'] }, style]} {...otherProps} />;
+export function ThemedView({ className, type = 'background', ...rest }: ThemedViewProps) {
+  return <View className={`${BACKGROUNDS[type]} ${className ?? ''}`} {...rest} />;
 }

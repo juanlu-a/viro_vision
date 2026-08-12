@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
@@ -6,7 +6,6 @@ import { DeviceSummary } from '@/features/device/DeviceSummary';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useDeviceConnection } from '@/features/device/useDeviceConnection';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -27,17 +26,17 @@ export default function ConnectScreen() {
 
       <Card>
         <View
-          style={styles.statusRow}
+          className="flex-row items-center gap-three"
           accessible
           accessibilityRole="text"
           accessibilityLiveRegion="polite"
           accessibilityLabel={`${t.statusLabel}: ${state.message}`}>
-          <View style={[styles.dot, { backgroundColor: dotColor }]} />
-          <View style={styles.statusText}>
+          <View className="h-[12px] w-[12px] rounded-pill" style={{ backgroundColor: dotColor }} />
+          <View className="flex-1 gap-[2px]">
             <ThemedText type="small" themeColor="textSecondary">
               {t.statusLabel.toUpperCase()}
             </ThemedText>
-            <ThemedText type="default" style={styles.statusValue}>
+            <ThemedText type="default" className="font-sans-bold">
               {state.message}
             </ThemedText>
           </View>
@@ -68,23 +67,3 @@ export default function ConnectScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: Radius.pill,
-  },
-  statusText: {
-    flex: 1,
-    gap: 2,
-  },
-  statusValue: {
-    fontFamily: Fonts.sansBold,
-  },
-});
