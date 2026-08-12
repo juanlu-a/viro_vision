@@ -63,7 +63,7 @@ export default function VisionBenchScreen() {
       />
       {/* El header nativo ya cubre el notch: sin `edges` el safe area se aplicaría dos veces. */}
       <Screen scroll edges={[]}>
-        <ScreenHeader title={t.title} subtitle={t.intro} />
+        <ScreenHeader title={t.title} subtitle={t.intro} mark="none" />
 
         {!isVisionConfigured && (
           <Card>

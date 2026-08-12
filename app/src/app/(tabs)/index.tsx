@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
@@ -43,20 +42,7 @@ export default function HomeScreen() {
   const t = strings.home;
   return (
     <Screen>
-      {/*
-        El símbolo de marca. Es la forma más fiel de traer el verde a la app: en el manual el verde
-        es el arco derecho del símbolo, no un color de interfaz. Decorativo para el lector de
-        pantalla — el nombre de la app ya lo dice el encabezado de abajo.
-      */}
-      <Image
-        source={require('@/../assets/images/splash-icon.png')}
-        style={styles.mark}
-        contentFit="contain"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
-
-      <ScreenHeader title={t.title} subtitle={t.subtitle} />
+      <ScreenHeader title={t.title} subtitle={t.subtitle} mark="large" />
 
       <Card>
         <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
@@ -76,10 +62,6 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  mark: {
-    width: 84,
-    height: 84,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
