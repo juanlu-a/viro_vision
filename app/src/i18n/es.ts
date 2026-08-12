@@ -98,6 +98,7 @@ export const es = {
       'Libera el espacio de las copias que dejó el selector. Con el disco lleno la app se cierra sola al cargar, incluso con modelos chicos.',
     cleaning: 'Borrando copias…',
     cleaned: 'Liberado:',
+    stored: 'guardado:',
     modelSection: 'Modelo',
     pickModel: 'Elegir archivo .litertlm',
     pickModelHint: 'Abre Archivos para elegir un modelo ya descargado. No baja nada.',

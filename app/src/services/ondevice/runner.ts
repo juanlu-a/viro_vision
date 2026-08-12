@@ -203,21 +203,18 @@ export async function limpiarCopias(): Promise<number> {
   // Hay que soltar el modelo antes de borrar el archivo que está mapeado.
   await descargarModelo();
 
-  let liberados = 0;
-  for (const carpeta of ['DocumentPicker', 'ImagePicker']) {
-    try {
-      const dir = new Directory(Paths.cache, carpeta);
-      if (!dir.exists) continue;
-      for (const entrada of dir.list()) {
-        if (entrada instanceof File) {
-          liberados += entrada.size ?? 0;
-        }
-        entrada.delete();
-      }
-    } catch {
-      // Que una carpeta no se pueda borrar no impide intentar con la otra.
+  let liberados = limpiarCarpetaCache('DocumentPicker') + limpiarCarpetaCache('ImagePicker');
+
+  try {
+    const dir = carpetaModelos();
+    for (const entrada of dir.list()) {
+      if (entrada instanceof File) liberados += entrada.size ?? 0;
+      entrada.delete();
     }
+  } catch {
+    // Idem: se informa lo que sí se pudo liberar.
   }
+
   return liberados;
 }
 
@@ -228,4 +225,71 @@ export function espacioLibre(): number | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Carpeta donde vive **el** modelo. Singular a propósito: guarda uno solo.
+ *
+ * Va en `document` y no en `cache` porque iOS puede vaciar la caché cuando le hace falta espacio, y
+ * hacerlo con un archivo de 2,59 GB mapeado a mitad de una inferencia sería peor que cualquier
+ * ahorro. Además es la carpeta donde la app puede escribir, que es lo que LiteRT-LM necesita para
+ * su caché compilada.
+ */
+function carpetaModelos(): Directory {
+  const dir = new Directory(Paths.document, 'modelos');
+  if (!dir.exists) dir.create({ intermediates: true });
+  return dir;
+}
+
+/**
+ * Deja el archivo elegido como **único** modelo guardado y devuelve su ruta.
+ *
+ * El selector deposita su copia en la caché. Acá se borra cualquier modelo anterior y se **mueve**
+ * la copia nueva a la carpeta definitiva: mover es renombrar dentro del mismo contenedor, así que
+ * no cuesta espacio adicional.
+ *
+ * Existe porque la versión anterior dejaba una copia nueva por cada vez que se elegía un archivo,
+ * sin borrar las viejas. Con modelos de 2,59 GB eso llevó la app a ~10 GB y terminó llenando el
+ * disco del teléfono — y el disco lleno se manifiesta como un cierre sin mensaje, no como un error.
+ */
+export async function adoptarModelo(uriCopiado: string): Promise<{ ruta: string; nombre: string }> {
+  await descargarModelo();
+
+  const destino = carpetaModelos();
+  for (const previo of destino.list()) previo.delete();
+
+  const origen = new File(uriCopiado);
+  const nombre = origen.name;
+  await origen.move(destino);
+
+  // La carpeta del selector puede quedar con restos de intentos anteriores.
+  limpiarCarpetaCache('DocumentPicker');
+
+  return { ruta: `${destino.uri.replace('file://', '')}/${nombre}`, nombre };
+}
+
+/** Cuánto ocupan hoy los modelos guardados. Para que el costo esté a la vista y no sorprenda. */
+export function tamanoModelosGuardados(): number {
+  try {
+    return carpetaModelos()
+      .list()
+      .reduce((total, e) => total + (e instanceof File ? (e.size ?? 0) : 0), 0);
+  } catch {
+    return 0;
+  }
+}
+
+function limpiarCarpetaCache(nombre: string): number {
+  let liberados = 0;
+  try {
+    const dir = new Directory(Paths.cache, nombre);
+    if (!dir.exists) return 0;
+    for (const entrada of dir.list()) {
+      if (entrada instanceof File) liberados += entrada.size ?? 0;
+      entrada.delete();
+    }
+  } catch {
+    // Que una carpeta no se pueda borrar no impide intentar con las otras.
+  }
+  return liberados;
 }

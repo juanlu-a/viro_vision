@@ -20,9 +20,11 @@ import { strings } from '@/i18n';
 import {
   cargarModelo,
   descargarModelo,
+  adoptarModelo,
   diagnosticar,
   espacioLibre,
   limpiarCopias,
+  tamanoModelosGuardados,
   generarConImagen,
   generarTexto,
   sondearRuntime,
@@ -111,6 +113,16 @@ export function useOnDeviceSpike() {
       return;
     }
     const a = r.assets[0];
+    // La copia del selector se **muda** a la carpeta de modelos, borrando cualquier modelo previo.
+    // Sin esto quedaba una copia nueva por cada elección: así la app llegó a ~10 GB.
+    update({ mensaje: t.copying });
+    let adoptado: { ruta: string; nombre: string };
+    try {
+      adoptado = await adoptarModelo(a.uri);
+    } catch (err) {
+      update({ mensaje: `${t.loadError}: ${describir(err)}` });
+      return;
+    }
     // Heurística sólo como valor inicial: el usuario puede corregirla con el interruptor. Los
     // modelos "1b"/"3-1b" son de sólo texto y activar multimodal con ellos falla al cargar.
     const pareceMultimodal = /e2b|e4b|gemma-?4/i.test(a.name);
@@ -118,13 +130,13 @@ export function useOnDeviceSpike() {
     // hace `abort()` si no puede escribir su caché de pesos— y un aborto nativo le gana de mano al
     // render. Calculado al elegir, los números están en pantalla *antes* de arriesgar la carga.
     update({
-      archivo: { uri: a.uri, nombre: a.name },
+      archivo: { uri: adoptado.ruta, nombre: adoptado.nombre },
       multimodal: pareceMultimodal,
       carga: null,
-      diagnostico: diagnosticar(decodeURI(a.uri.replace('file://', '')), ref.current.backend),
+      diagnostico: diagnosticar(adoptado.ruta, ref.current.backend),
       generacion: null,
       lectura: null,
-      mensaje: a.name,
+      mensaje: `${adoptado.nombre} · ${t.stored} ${formatBytes(tamanoModelosGuardados())}`,
     });
   }, [update]);
 
@@ -137,9 +149,7 @@ export function useOnDeviceSpike() {
         generacion: null,
         lectura: null,
         // La estimación de memoria depende del backend: recalcularla o mostraría la del anterior.
-        diagnostico: archivo
-          ? diagnosticar(decodeURI(archivo.uri.replace('file://', '')), backend)
-          : null,
+        diagnostico: archivo ? diagnosticar(archivo.uri, backend) : null,
       });
     },
     [update],
@@ -153,10 +163,9 @@ export function useOnDeviceSpike() {
   const cargar = useCallback(async () => {
     const { archivo, backend, multimodal } = ref.current;
     if (!archivo) return;
-    const ruta = decodeURI(archivo.uri.replace('file://', ''));
     update({ estado: 'loading', mensaje: t.loading, carga: null });
     try {
-      const carga = await cargarModelo(ruta, backend, multimodal);
+      const carga = await cargarModelo(archivo.uri, backend, multimodal);
       update({ estado: 'idle', carga, mensaje: t.loaded });
     } catch (err) {
       update({ estado: 'idle', mensaje: `${t.loadError}: ${describir(err)}` });
