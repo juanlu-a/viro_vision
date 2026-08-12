@@ -25,6 +25,7 @@ export {
   isVisionConfigured,
 } from './config';
 export { anthropicProvider, geminiProvider, getProvider } from './providers';
+export { acquireSlot, remainingSlots, resetRateLimiter } from './rateLimiter';
 export { busReadingSchema, parseBusReading } from './schema';
 export { formatBytes, formatMs, median, percentile, summarize } from './stats';
 export type { LatencyMetric, MetricSummary } from './stats';

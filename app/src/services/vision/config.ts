@@ -45,6 +45,16 @@ export const ANTHROPIC_VERSION = '2023-06-01';
  */
 export const MODEL_PROFILES: readonly ModelProfile[] = [
   {
+    // Default: el más liviano y rápido. Además tiene su **propia** cuota, separada de la de
+    // Flash, así que alternar entre ambos duplica el presupuesto de requests por minuto.
+    provider: 'gemini',
+    id: 'gemini-flash-lite-latest',
+    label: 'Gemini Flash Lite (gratis)',
+    supportsEffort: false,
+    supportsAdaptiveThinking: false,
+    maxTokens: 256,
+  },
+  {
     provider: 'gemini',
     id: 'gemini-3.6-flash',
     label: 'Gemini 3.6 Flash (gratis)',

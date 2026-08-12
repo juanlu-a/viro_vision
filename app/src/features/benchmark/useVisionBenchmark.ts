@@ -61,6 +61,8 @@ export function useVisionBenchmark() {
   const abortRef = useRef<AbortController | null>(null);
   /** Espejo del estado, para leer foto y modo dentro de `run` sin re-crear el callback. */
   const stateRef = useRef(initialState);
+  /** Configuración con la que ya se hizo el calentamiento, para no repetirlo. */
+  const calentadoRef = useRef<string | null>(null);
 
   // Navegar hacia atrás a mitad de una medición dejaba la serie corriendo: hasta 7 requests
   // siguiendo en vuelo, sin forma de cancelarlas, quemando cuota y contaminando cualquier
@@ -157,11 +159,20 @@ export function useVisionBenchmark() {
         model: model.id,
         thinking,
         signal: controller.signal,
+        onQuotaWait: (waitMs: number) =>
+          update({
+            message: `${strings.benchmark.quotaWait} ${Math.ceil(waitMs / 1000)} s…`,
+          }),
       };
 
       try {
-        // Calentamiento: se corre y se descarta. No entra en las estadísticas.
-        await benchmarkBusVision(options);
+        // El calentamiento (handshake TLS + caché de schema) sólo hace falta la primera vez con
+        // esta configuración. Repetirlo en cada medición gastaba una llamada de cuota sin aportar.
+        const firma = `${model.id}|${photo.uri}|${thinking}`;
+        if (calentadoRef.current !== firma) {
+          await benchmarkBusVision(options);
+          calentadoRef.current = firma;
+        }
 
         const collected: BenchmarkResult[] = [];
         for (let index = 0; index < totalRuns; index += 1) {

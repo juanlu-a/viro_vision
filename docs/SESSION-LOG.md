@@ -194,6 +194,23 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   andando en Edge Gallery prueba viabilidad sobre el hardware objetivo, pero no acerca el producto.
 - 97 tests, tsc, lint y bundles iOS + Android en verde. PR #10 abierto.
 
+## 2026-08-11 (cont.) — La cuota de Gemini
+
+- **La cuota se respeta antes de pedir, no después de fallar.** El tier gratuito admite 20 requests
+  por minuto **por modelo**, y la app las topaba todo el tiempo. Tres causas, no una: el
+  calentamiento se repetía en cada medición aunque no hubiera cambiado nada (una llamada tirada por
+  medición), no había ningún límite propio, y el único freno era reaccionar al 429. Ahora hay un
+  limitador de ventana móvil por modelo (17 de 20, con margen para lo que el servidor ya contó y
+  nosotros no) que espera con aviso en vez de fallar.
+- **El limitador espera *antes* de arrancar el cronómetro.** Si esperara con la medición ya
+  iniciada, la espera se contaría como latencia del modelo y el número no significaría nada.
+- Dos defectos del limitador los encontraron sus propios tests: `remainingSlots` ignoraba el máximo
+  inyectado, y una señal ya abortada dormía el minuto entero —el listener de `abort` se registraba
+  después de que el evento hubiera pasado, así que nunca se disparaba.
+- **`gemini-flash-lite-latest` pasa a ser el modelo por defecto.** Verificado contra la API real:
+  responde con el payload completo (imagen + streaming + salida estructurada) y tiene **su propia
+  cuota**, separada de la de Flash — contestó mientras Flash estaba agotado.
+
 ## Open threads / next
 - Merge **PR #7** (email/password auth).
 - Install the iOS simulator runtime to see the app (or run on a real device via EAS dev build).
