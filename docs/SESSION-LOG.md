@@ -238,6 +238,36 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   a tener alto fijo, lleve símbolo o no.
 - 109 tests, tsc y lint en verde.
 
+## 2026-08-12 — Spike de Gemma local, Tailwind, y el resto mergeado
+
+- **Se mergeó todo lo pendiente en tres PRs separados** (#11 cuota de Gemini, #12 manual de marca
+  v1.0, #13 documentación de convenciones y decisiones en la skill), en secuencia y no apilados,
+  como pide la regla del repo. Verificado con `git diff origin/main <rama-vieja>` que no se perdiera
+  nada: el único delta era el encabezado del log, partido a propósito en dos entradas.
+- **La skill del proyecto tenía afirmaciones que contradecían ADRs vigentes** — `app.md` y `ml.md`
+  seguían diciendo "never a cloud API" y proponiendo TFLite/ONNX/ExecuTorch. Un agente que las
+  leyera tomaba decisiones contra lo ya decidido. Corregido, y agregados `convenciones.md` y
+  `decisiones.md`.
+- **Spike de inferencia local (ADR 0004): el riesgo grande quedó descartado.**
+  `react-native-litert-lm` compila contra Expo 57 / RN 0.86 y **el Gemma 3 1B carga y genera** en el
+  iPhone. Todo lo demás que falló resultó ser gestión de disco, no viabilidad.
+- Tres causas distintas se disfrazaron del mismo síntoma, y ninguna se podía adivinar desde afuera:
+  la caché compilada va en la carpeta del modelo (un archivo de otra app se lee pero no se escribe
+  al lado); el disco lleno hace que XNNPack llame a `abort()` sin decir por qué, fallando incluso
+  con un modelo chico que antes andaba; y el Gemma 4 de Edge Gallery **no trae codificador de
+  visión**. Las tres salieron de leer el Swift de la librería y los logs nativos del teléfono, no
+  de probar variantes.
+- **El muro del entitlement sigue sin tocarse**: no llegamos a cargar el modelo grande porque nos
+  frenó el espacio en disco. Queda como la pregunta abierta, y es de presupuesto, no técnica.
+- **Tailwind en nativo, vía NativeWind**, que es lo que documenta Expo SDK 57. Dos decisiones para
+  que no empeorara lo que veníamos de ordenar: la paleta se movió a un archivo plano que consumen
+  TypeScript y Tailwind (una sola fuente, y `theme.test.ts` sigue verificando el hex que la app
+  usa), y cada color apunta a una variable CSS para que se escriba `bg-surface` una sola vez en vez
+  de `bg-surface dark:bg-dark-surface`. No queda un `StyleSheet` en la app.
+- Además: el scroll saltaba porque el inset superior se contaba dos veces con el header nativo; los
+  botones `ghost` no se leían como botones; y el selector de tema pasó a un desplegable compacto —
+  ocupando media pantalla, la apariencia parecía el ajuste más importante de la app.
+
 ## Open threads / next
 - Merge **PR #7** (email/password auth).
 - Install the iOS simulator runtime to see the app (or run on a real device via EAS dev build).
