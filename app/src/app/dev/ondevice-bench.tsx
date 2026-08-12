@@ -1,14 +1,18 @@
 /**
- * Pantalla de la sonda del runtime local (ADR 0004).
+ * Pantalla del spike de inferencia local (ADR 0004).
  *
  * REGLA DE FRONTERA (ADR 0001): herramienta de desarrollo. Va detrás de `__DEV__` a secas, no del
  * gate de claves que usa el benchmark de nube — acá no hay clave de API que gatear.
  *
- * Todo lo que se muestra se anuncia además por `announceForAccessibility`: `accessibilityLiveRegion`
- * es sólo Android, así que en iPhone —el equipo objetivo hoy— no anunciaría nada.
+ * El orden de la pantalla es el orden del experimento, del corte más barato al más caro: sondear
+ * (no carga nada) → elegir archivo → cargar → generar. Cada paso sólo se habilita si el anterior
+ * salió bien, para que un fallo se atribuya al paso correcto.
+ *
+ * Todo mensaje se anuncia con `announceForAccessibility`: `accessibilityLiveRegion` es sólo
+ * Android, así que en iPhone —el equipo objetivo hoy— no anunciaría nada.
  */
 import { Stack } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
@@ -17,10 +21,10 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { useOnDeviceSpike } from '@/features/ondevice/useOnDeviceSpike';
 import { strings } from '@/i18n';
-import { GEMMA_4_E2B_BYTES, sondearRuntime } from '@/services/ondevice';
-import type { ResultadoSonda } from '@/services/ondevice';
-import { formatBytes } from '@/services/vision';
+import { GEMMA_4_E2B_BYTES } from '@/services/ondevice';
+import { formatBytes, formatMs } from '@/services/vision';
 
 const t = strings.ondevice;
 
@@ -36,127 +40,185 @@ function Fila({ label, value }: { label: string; value: string }) {
 }
 
 export default function OnDeviceBenchScreen() {
-  const [estado, setEstado] = useState<'idle' | 'probing' | 'done'>('idle');
-  const [resultado, setResultado] = useState<ResultadoSonda | null>(null);
-  const vivo = useRef(true);
+  const {
+    state,
+    sondear,
+    elegirArchivo,
+    setBackend,
+    setMultimodal,
+    cargar,
+    liberar,
+    probarTexto,
+    probarImagen,
+  } = useOnDeviceSpike();
 
   useEffect(() => {
-    vivo.current = true;
-    return () => {
-      vivo.current = false;
-    };
-  }, []);
+    AccessibilityInfo.announceForAccessibility(state.mensaje);
+  }, [state.mensaje]);
 
-  const mensaje =
-    estado === 'probing'
-      ? t.probing
-      : !resultado
-        ? t.idle
-        : resultado.error
-          ? `${t.error}: ${resultado.error}`
-          : t.nativeOk;
-
-  useEffect(() => {
-    AccessibilityInfo.announceForAccessibility(mensaje);
-  }, [mensaje]);
-
-  const sondear = useCallback(async () => {
-    setEstado('probing');
-    const r = await sondearRuntime();
-    if (!vivo.current) return;
-    setResultado(r);
-    setEstado('done');
-  }, []);
+  const ocupado = state.estado !== 'idle';
+  const { sonda, carga, generacion } = state;
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: true, title: '', headerBackTitle: strings.common.back }} />
+      <Stack.Screen
+        options={{ headerShown: true, title: '', headerBackTitle: strings.common.back }}
+      />
       <Screen scroll>
         <ScreenHeader title={t.title} subtitle={t.intro} />
 
         <Card>
-          <AccessibleButton
-            label={estado === 'probing' ? t.probing : t.probeButton}
-            hint={t.probeHint}
-            onPress={sondear}
-            loading={estado === 'probing'}
-          />
-          <ThemedText type="small" themeColor="textSecondary">
-            {mensaje}
+          <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+            {t.estimates.toUpperCase()}
           </ThemedText>
-        </Card>
-
-        {resultado && !resultado.error && (
-          <>
-            <Card>
-              <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-                {t.title.toUpperCase()}
-              </ThemedText>
-              <View style={styles.filas}>
-                <Fila
-                  label={t.availableMemory}
-                  value={
-                    resultado.memoriaDisponibleBytes == null
-                      ? '—'
-                      : formatBytes(resultado.memoriaDisponibleBytes)
-                  }
-                />
-                <Fila label={t.modelSize} value={formatBytes(GEMMA_4_E2B_BYTES)} />
-                <Fila label={t.recommendedBackend} value={resultado.backendRecomendado ?? '—'} />
-                {resultado.avisoBackend && (
-                  <Fila label={t.backendWarning} value={resultado.avisoBackend} />
-                )}
-                <Fila
-                  label={t.multimodalBlocked}
-                  value={resultado.bloqueoMultimodal ?? t.multimodalOk}
-                />
-              </View>
-            </Card>
-
-            {resultado.estimaciones.map((e) => (
-              <Card key={e.backend}>
-                <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-                  {`${t.estimates} — ${e.label}`.toUpperCase()}
-                </ThemedText>
-                {e.error || !e.estimacion ? (
-                  <ThemedText type="small" themeColor="danger">
-                    {e.error ?? t.error}
-                  </ThemedText>
-                ) : (
-                  <View style={styles.filas}>
-                    <Fila label={t.estimateModel} value={formatBytes(e.estimacion.modelBytes)} />
-                    <Fila label={t.estimateKv} value={formatBytes(e.estimacion.kvCacheBytes)} />
-                    <Fila
-                      label={t.estimateOverhead}
-                      value={formatBytes(e.estimacion.overheadBytes)}
-                    />
-                    <Fila
-                      label={t.estimateTotal}
-                      value={formatBytes(e.estimacion.totalEstimatedBytes)}
-                    />
-                    <Fila
-                      label={t.estimateHeadroom}
-                      value={formatBytes(e.estimacion.headroomBytes)}
-                    />
-                    {/* El veredicto va como TEXTO, no como color: es la conclusión de la pantalla
-                        y quien la lee con VoiceOver tiene que recibirla igual que quien la ve. */}
-                    <ThemedText
-                      type="default"
-                      themeColor={e.estimacion.verdict === 'critical' ? 'danger' : 'success'}>
-                      {e.estimacion.verdict === 'safe'
+          <AccessibleButton
+            label={state.estado === 'probing' ? t.probing : t.probeButton}
+            hint={t.probeHint}
+            variant="ghost"
+            onPress={sondear}
+            disabled={ocupado}
+          />
+          {sonda && !sonda.error && (
+            <View style={styles.filas}>
+              <Fila
+                label={t.availableMemory}
+                value={
+                  sonda.memoriaDisponibleBytes == null
+                    ? '—'
+                    : formatBytes(sonda.memoriaDisponibleBytes)
+                }
+              />
+              <Fila label={t.recommendedBackend} value={sonda.backendRecomendado ?? '—'} />
+              <Fila label={t.multimodalBlocked} value={sonda.bloqueoMultimodal ?? t.multimodalOk} />
+              {sonda.estimaciones.map((e) =>
+                e.estimacion ? (
+                  <Fila
+                    key={e.backend}
+                    label={`${e.label} · ${formatBytes(GEMMA_4_E2B_BYTES)}`}
+                    value={`${formatBytes(e.estimacion.totalEstimatedBytes)} — ${
+                      e.estimacion.verdict === 'safe'
                         ? t.verdictSafe
                         : e.estimacion.verdict === 'tight'
                           ? t.verdictTight
-                          : t.verdictCritical}
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {e.estimacion.recommendation}
-                    </ThemedText>
-                  </View>
+                          : t.verdictCritical
+                    }`}
+                  />
+                ) : null,
+              )}
+            </View>
+          )}
+        </Card>
+
+        <Card>
+          <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+            {t.modelSection.toUpperCase()}
+          </ThemedText>
+          <AccessibleButton
+            label={t.pickModel}
+            hint={t.pickModelHint}
+            variant="ghost"
+            onPress={elegirArchivo}
+            disabled={ocupado}
+          />
+          <ThemedText type="small" themeColor="textSecondary">
+            {state.archivo?.nombre ?? t.noModelPicked}
+          </ThemedText>
+
+          {/* Backend y multimodal como botones que rotan, no como interruptores: el estado va en
+              la etiqueta, así que VoiceOver lo lee sin depender de un `accessibilityState` que en
+              un control propio hay que acordarse de mantener. */}
+          <AccessibleButton
+            label={`${t.backendSection}: ${state.backend}`}
+            hint={t.backendHint}
+            variant="secondary"
+            onPress={() => setBackend(state.backend === 'cpu' ? 'gpu' : 'cpu')}
+            disabled={ocupado}
+          />
+          <AccessibleButton
+            label={`${t.multimodalLabel}: ${state.multimodal ? t.yes : t.no}`}
+            hint={t.multimodalHint}
+            variant="secondary"
+            onPress={() => setMultimodal(!state.multimodal)}
+            disabled={ocupado}
+          />
+        </Card>
+
+        <Card>
+          <AccessibleButton
+            label={state.estado === 'loading' ? t.loading : t.loadModel}
+            hint={t.loadModelHint}
+            onPress={cargar}
+            disabled={ocupado || !state.archivo}
+            loading={state.estado === 'loading'}
+          />
+          <ThemedText type="small" themeColor="textSecondary">
+            {state.mensaje}
+          </ThemedText>
+
+          {carga && (
+            <View style={styles.filas}>
+              <Fila label={t.loadTime} value={formatMs(carga.cargaMs)} />
+              <Fila
+                label={t.memoryAfter}
+                value={
+                  carga.memoriaDespuesBytes == null ? '—' : formatBytes(carga.memoriaDespuesBytes)
+                }
+              />
+              <AccessibleButton
+                label={t.unload}
+                hint={t.unloadHint}
+                variant="ghost"
+                onPress={liberar}
+                disabled={ocupado}
+              />
+            </View>
+          )}
+        </Card>
+
+        {carga && (
+          <Card>
+            <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+              {t.result.toUpperCase()}
+            </ThemedText>
+            <AccessibleButton
+              label={t.runText}
+              hint={t.runTextHint}
+              variant="secondary"
+              onPress={probarTexto}
+              disabled={ocupado}
+            />
+            <AccessibleButton
+              label={t.runImage}
+              hint={t.runImageHint}
+              onPress={probarImagen}
+              disabled={ocupado || !state.multimodal}
+            />
+
+            {generacion && (
+              <View style={styles.filas}>
+                <Fila
+                  label={t.ttft}
+                  value={
+                    generacion.stats ? formatMs(generacion.stats.timeToFirstToken) : '—'
+                  }
+                />
+                <Fila label={t.totalTime} value={formatMs(generacion.totalMs)} />
+                <Fila
+                  label={t.tokensPerSecond}
+                  value={
+                    generacion.stats ? generacion.stats.tokensPerSecond.toFixed(1) : '—'
+                  }
+                />
+                {state.lectura && (
+                  <Fila
+                    label={t.parsed}
+                    value={`${state.lectura.numero ?? '—'} · ${state.lectura.nombre ?? '—'}`}
+                  />
                 )}
-              </Card>
-            ))}
-          </>
+                <Fila label={t.rawText} value={generacion.texto.slice(0, 400)} />
+              </View>
+            )}
+          </Card>
         )}
       </Screen>
     </>

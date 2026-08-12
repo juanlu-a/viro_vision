@@ -8,3 +8,11 @@
 export { CONFIGURACIONES, GEMMA_4_E2B_BYTES, GEMMA_4_E2B_URL, MAX_CONTEXT_TOKENS } from './config';
 export { sondearRuntime } from './probe';
 export type { EstimacionPorBackend, ResultadoSonda } from './probe';
+export {
+  cargarModelo,
+  descargarModelo,
+  generarConImagen,
+  generarTexto,
+  modeloCargado,
+} from './runner';
+export type { CargaResultado, GeneracionResultado } from './runner';
