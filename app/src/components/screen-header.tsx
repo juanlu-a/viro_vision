@@ -1,9 +1,12 @@
 /**
  * Encabezado de pantalla: símbolo de marca a la izquierda, título al lado, subtítulo debajo.
  *
- * El símbolo va acá y no en cada pantalla para que **todas tengan la misma estructura**: si una
- * lleva marca y otra no, los títulos caen a distinta altura y la app se siente descosida. Inicio
- * usa la variante grande; el resto la chica.
+ * **El símbolo va sólo en Inicio.** Repetirlo en cada pantalla lo convertía en decoración: la
+ * marca deja de decir "esta es la app" y pasa a ser ruido que se saltea. Lo que sí tienen que
+ * compartir todas es la *estructura*, y de eso se encarga `minHeight` en la fila del título: con
+ * o sin símbolo, el título cae siempre a la misma altura. Sin eso, el alto de la fila lo decidiría
+ * el elemento más alto —el símbolo en Inicio, la línea de texto en el resto— y los títulos
+ * quedarían desalineados entre pantallas.
  *
  * Hay **dos archivos de símbolo**, no uno recoloreado: el manual define la pupila azul profundo
  * sobre claro y blanca sobre oscuro, y una sola imagen no puede cumplir las dos cosas — con la
@@ -19,18 +22,18 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useThemePreference } from '@/features/theme/ThemePreferenceProvider';
 
-/** `large` sólo en Inicio; `none` cuando la pantalla ya muestra la marca de otra forma. */
-export type HeaderMark = 'large' | 'small' | 'none';
+/** `large` sólo en Inicio. El resto de las pantallas va sin marca. */
+export type HeaderMark = 'large' | 'none';
 
-const MARK_SIZE: Record<Exclude<HeaderMark, 'none'>, number> = {
-  large: 56,
-  small: 40,
-};
+const MARK_SIZE = 48;
+
+/** Alto fijo de la fila del título: el del símbolo, lleve símbolo o no. */
+const TITLE_ROW_HEIGHT = MARK_SIZE;
 
 export function ScreenHeader({
   title,
   subtitle,
-  mark = 'small',
+  mark = 'none',
 }: {
   title: string;
   subtitle?: string;
@@ -48,7 +51,7 @@ export function ScreenHeader({
                 ? require('@/../assets/images/symbol-dark.png')
                 : require('@/../assets/images/symbol-light.png')
             }
-            style={{ width: MARK_SIZE[mark], height: MARK_SIZE[mark] }}
+            style={{ width: MARK_SIZE, height: MARK_SIZE }}
             contentFit="contain"
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
@@ -77,6 +80,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+    minHeight: TITLE_ROW_HEIGHT,
   },
   title: {
     flex: 1,
