@@ -17,8 +17,9 @@ export type { EstimacionPorBackend, ResultadoSonda } from './probe';
 export {
   cargarModelo,
   descargarModelo,
+  diagnosticar,
   generarConImagen,
   generarTexto,
   modeloCargado,
 } from './runner';
-export type { CargaResultado, GeneracionResultado } from './runner';
+export type { CargaResultado, Diagnostico, GeneracionResultado } from './runner';

@@ -16,10 +16,29 @@
  * y se guardan las dos — si difieren mucho, el overhead está en el puente JS y eso también es un
  * dato.
  */
-import { createLLM } from 'react-native-litert-lm';
+import { File, Paths } from 'expo-file-system';
+import { createLLM, estimateMemory } from 'react-native-litert-lm';
 import type { Backend, GenerationStats, LiteRTLMInstance } from 'react-native-litert-lm';
 
 import { MAX_CONTEXT_TOKENS } from './config';
+
+/**
+ * Lo que se sabe **antes** de intentar cargar. Existe porque cuando la carga falla, el error de la
+ * librería no dice cuál de las causas posibles fue: "Failed to create conversation context" es el
+ * mismo mensaje para una copia truncada que para falta de memoria. Con estos tres números el
+ * diagnóstico se lee en pantalla en vez de adivinarse.
+ */
+export interface Diagnostico {
+  /** Tamaño real del archivo copiado. Si no coincide con el original, la copia se truncó. */
+  archivoBytes: number | null;
+  /** Espacio libre en el disco del teléfono. */
+  discoLibreBytes: number | null;
+  /** Memoria que el sistema dice tener disponible ahora. */
+  memoriaDisponibleBytes: number | null;
+  /** Veredicto de la estimación para **este** archivo y **este** backend. */
+  veredicto: string | null;
+  detalle: string | null;
+}
 
 export interface CargaResultado {
   /** Milisegundos hasta que `loadModel` resolvió. La métrica que el ADR 0004 pedía y nadie midió. */
@@ -27,6 +46,46 @@ export interface CargaResultado {
   /** Memoria del proceso después de cargar, para contrastar con la estimación previa. */
   memoriaDespuesBytes: number | null;
   backend: Backend;
+}
+
+/** Se calcula antes de cargar y **también se devuelve si la carga falla**, que es cuando importa. */
+export function diagnosticar(rutaArchivo: string, backend: Backend): Diagnostico {
+  const base: Diagnostico = {
+    archivoBytes: null,
+    discoLibreBytes: null,
+    memoriaDisponibleBytes: null,
+    veredicto: null,
+    detalle: null,
+  };
+
+  try {
+    base.archivoBytes = new File(rutaArchivo).size ?? null;
+  } catch {
+    // Un archivo ilegible ya es un diagnóstico: se reporta como null y sigue.
+  }
+  try {
+    base.discoLibreBytes = Paths.availableDiskSpace;
+  } catch {
+    /* dato accesorio */
+  }
+
+  try {
+    const disponible = createLLM().getMemoryUsage().availableMemoryBytes;
+    base.memoriaDisponibleBytes = disponible;
+    if (base.archivoBytes) {
+      const e = estimateMemory({
+        modelFileSizeBytes: base.archivoBytes,
+        availableMemoryBytes: disponible,
+        config: { backend, maxContextTokens: MAX_CONTEXT_TOKENS },
+      });
+      base.veredicto = e.verdict;
+      base.detalle = e.recommendation;
+    }
+  } catch {
+    /* si el nativo no responde, el resto del diagnóstico igual sirve */
+  }
+
+  return base;
 }
 
 export interface GeneracionResultado {
@@ -62,6 +121,8 @@ export async function cargarModelo(
   await descargarModelo();
 
   const llm = createLLM();
+  // `skipMemoryCheck` no se toca: la comprobación previa de la librería es justamente la que
+  // convierte un cierre por falta de memoria —que no deja rastro— en un error que se puede leer.
   const t0 = performance.now();
   await llm.loadModel(rutaArchivo, {
     backend,

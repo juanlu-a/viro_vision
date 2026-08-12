@@ -20,11 +20,17 @@ import { strings } from '@/i18n';
 import {
   cargarModelo,
   descargarModelo,
+  diagnosticar,
   generarConImagen,
   generarTexto,
   sondearRuntime,
 } from '@/services/ondevice';
-import type { CargaResultado, GeneracionResultado, ResultadoSonda } from '@/services/ondevice';
+import type {
+  CargaResultado,
+  Diagnostico,
+  GeneracionResultado,
+  ResultadoSonda,
+} from '@/services/ondevice';
 import { parseBusReading } from '@/services/vision';
 import type { BusReading } from '@/services/vision';
 import { SYSTEM_PROMPT, USER_PROMPT } from '@/services/vision/providers';
@@ -41,6 +47,8 @@ export interface SpikeState {
   backend: Backend;
   multimodal: boolean;
   carga: CargaResultado | null;
+  /** Se calcula al intentar cargar y sobrevive al fallo: es cuando más hace falta. */
+  diagnostico: Diagnostico | null;
   generacion: GeneracionResultado | null;
   lectura: BusReading | null;
 }
@@ -53,6 +61,7 @@ const inicial: SpikeState = {
   backend: 'cpu',
   multimodal: false,
   carga: null,
+  diagnostico: null,
   generacion: null,
   lectura: null,
 };
@@ -126,9 +135,12 @@ export function useOnDeviceSpike() {
   const cargar = useCallback(async () => {
     const { archivo, backend, multimodal } = ref.current;
     if (!archivo) return;
-    update({ estado: 'loading', mensaje: t.loading, carga: null });
+    const ruta = decodeURI(archivo.uri.replace('file://', ''));
+    // El diagnóstico se toma ANTES de cargar y se guarda pase lo que pase: si la carga falla, el
+    // mensaje de la librería es el mismo para una copia truncada que para falta de memoria.
+    update({ estado: 'loading', mensaje: t.loading, carga: null, diagnostico: diagnosticar(ruta, backend) });
     try {
-      const carga = await cargarModelo(decodeURI(archivo.uri.replace('file://', '')), backend, multimodal);
+      const carga = await cargarModelo(ruta, backend, multimodal);
       update({ estado: 'idle', carga, mensaje: t.loaded });
     } catch (err) {
       update({ estado: 'idle', mensaje: `${t.loadError}: ${describir(err)}` });

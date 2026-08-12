@@ -56,7 +56,7 @@ export default function OnDeviceBenchScreen() {
   }, [state.mensaje]);
 
   const ocupado = state.estado !== 'idle';
-  const { sonda, carga, generacion } = state;
+  const { sonda, carga, diagnostico, generacion } = state;
 
   return (
     <>
@@ -154,6 +154,45 @@ export default function OnDeviceBenchScreen() {
           <ThemedText type="small" themeColor="textSecondary">
             {state.mensaje}
           </ThemedText>
+
+          {/* El diagnóstico se muestra aunque la carga falle: ahí es donde sirve. Un archivo más
+              chico que el original significa copia truncada; un veredicto crítico, falta de
+              memoria. La librería usa el mismo mensaje de error para las dos cosas. */}
+          {diagnostico && (
+            <View className="gap-three">
+              <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+                {t.diagnosis.toUpperCase()}
+              </ThemedText>
+              <Fila
+                label={t.fileSize}
+                value={
+                  diagnostico.archivoBytes == null ? '—' : formatBytes(diagnostico.archivoBytes)
+                }
+              />
+              <Fila
+                label={t.diskFree}
+                value={
+                  diagnostico.discoLibreBytes == null
+                    ? '—'
+                    : formatBytes(diagnostico.discoLibreBytes)
+                }
+              />
+              <Fila
+                label={t.availableMemory}
+                value={
+                  diagnostico.memoriaDisponibleBytes == null
+                    ? '—'
+                    : formatBytes(diagnostico.memoriaDisponibleBytes)
+                }
+              />
+              <Fila label={t.verdict} value={diagnostico.veredicto ?? '—'} />
+              {diagnostico.detalle && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {diagnostico.detalle}
+                </ThemedText>
+              )}
+            </View>
+          )}
 
           {carga && (
             <View className="gap-three">
