@@ -44,6 +44,8 @@ export interface BenchmarkOptions {
    * hacer setState por delta desplaza los timestamps y arruina la medición.
    */
   onTextDelta?: (chunk: string) => void;
+  /** Se llama si hay que esperar por la cuota antes de enviar, con los ms estimados. */
+  onQuotaWait?: (waitMs: number) => void;
 }
 
 /**

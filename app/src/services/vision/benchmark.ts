@@ -16,6 +16,7 @@ import { fetch } from 'expo/fetch';
 
 import { apiKeyFor, defaultModel, findModelProfile, isProviderConfigured } from './config';
 import { getProvider } from './providers';
+import { acquireSlot } from './rateLimiter';
 import { parseBusReading } from './schema';
 import { readSseStream } from './sse';
 import type {
@@ -105,6 +106,11 @@ export async function benchmarkBusVision(options: BenchmarkOptions): Promise<Ben
   // Serializar ANTES de marcar el envío: en una foto de varios MB, stringify come decenas de ms
   // de hilo JS que si no quedarían contabilizados como latencia de red.
   const payloadJson = JSON.stringify(request.body);
+
+  // Respetar la cuota ANTES de arrancar el cronómetro. Si esperáramos con la medición ya iniciada,
+  // la espera se contaría como latencia del modelo y el número sería basura.
+  await acquireSlot(model.id, { onWait: options.onQuotaWait, signal: options.signal });
+  if (options.signal?.aborted) throw new VisionStreamError('cancelado');
 
   const startedAtEpoch = Date.now();
   const marks: LatencyMarks = { requestSentAt: performance.now() };
