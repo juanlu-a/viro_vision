@@ -116,7 +116,8 @@
             ]
           }
         }
-      ]
+      ],
+      "react-native-litert-lm"
     ],
     "experiments": {
       "typedRoutes": true,

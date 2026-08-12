@@ -53,6 +53,16 @@ export default function SettingsScreen() {
             variant="ghost"
             onPress={() => router.push('/dev/vision-bench')}
           />
+          {/* La sonda del runtime local va sólo en __DEV__: no hay clave de API que gatear, y
+              todavía es un spike sin validar (ADR 0004). */}
+          {__DEV__ && (
+            <AccessibleButton
+              label={strings.ondevice.title}
+              hint={strings.ondevice.probeHint}
+              variant="ghost"
+              onPress={() => router.push('/dev/ondevice-bench')}
+            />
+          )}
         </Card>
       )}
     </Screen>
