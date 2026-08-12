@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
@@ -7,7 +6,7 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { announce } from '@/features/audio/announcer';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -24,8 +23,11 @@ function FeatureRow({
   const theme = useTheme();
   return (
     <View style={styles.row} accessible accessibilityRole="text" accessibilityLabel={`${title}. ${desc}`}>
-      <View style={[styles.iconWrap, { backgroundColor: theme.primaryMuted }]}>
-        <Ionicons name={icon} size={22} color={theme.primary} />
+      {/* Relleno verde con el glifo oscuro encima, no al revés: el verde de marca sobre su
+          propio tinte claro da 2.24:1 y un ícono necesita 3:1 (WCAG 1.4.11). Además es lo que
+          más verde pone en pantalla, que es el peso que el manual le asigna. */}
+      <View style={[styles.iconWrap, { backgroundColor: theme.primary }]}>
+        <Ionicons name={icon} size={24} color={theme.onPrimary} />
       </View>
       <View style={styles.rowText}>
         <ThemedText type="default" style={styles.rowTitle}>
@@ -43,20 +45,7 @@ export default function HomeScreen() {
   const t = strings.home;
   return (
     <Screen>
-      {/*
-        El símbolo de marca. Es la forma más fiel de traer el verde a la app: en el manual el verde
-        es el arco derecho del símbolo, no un color de interfaz. Decorativo para el lector de
-        pantalla — el nombre de la app ya lo dice el encabezado de abajo.
-      */}
-      <Image
-        source={require('@/../assets/images/splash-icon.png')}
-        style={styles.mark}
-        contentFit="contain"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
-
-      <ScreenHeader title={t.title} subtitle={t.subtitle} />
+      <ScreenHeader title={t.title} subtitle={t.subtitle} mark="large" />
 
       <Card>
         <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
@@ -76,10 +65,6 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  mark: {
-    width: 84,
-    height: 84,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -97,6 +82,6 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   rowTitle: {
-    fontWeight: '600',
+    fontFamily: Fonts.sansBold,
   },
 });

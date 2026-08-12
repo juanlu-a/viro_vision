@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
 
-import { A11y, Radius, Spacing } from '@/constants/theme';
+import { A11y, Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type TextFieldProps = TextInputProps & {
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: Fonts.sansBold,
   },
   input: {
     minHeight: A11y.minTouchTarget,
@@ -73,6 +73,6 @@ const styles = StyleSheet.create({
   },
   error: {
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: Fonts.sans,
   },
 });

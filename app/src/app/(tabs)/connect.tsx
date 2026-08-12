@@ -6,7 +6,7 @@ import { DeviceSummary } from '@/features/device/DeviceSummary';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useDeviceConnection } from '@/features/device/useDeviceConnection';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -85,6 +85,6 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   statusValue: {
-    fontWeight: '600',
+    fontFamily: Fonts.sansBold,
   },
 });

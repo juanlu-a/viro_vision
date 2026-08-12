@@ -1,24 +1,27 @@
 /**
  * ViroVision design system — tokens.
  *
- * Identidad de marca (ver `docs/brand/virovision-marca.md`): azul profundo, azul sensor y verde
- * lectura. **Los tokens NO son los hex del manual tal cual**, y eso es deliberado:
+ * Fuente: `docs/brand/virovision-marca.md` (manual v1.0). El manual define los dos modos con
+ * nombre y hex, y acá se siguen **al pie de la letra** salvo donde se aclara lo contrario:
  *
- *   - Azul Sensor `#1256D4` sobre Azul Profundo da **2.66:1** — falla WCAG por lejos.
- *   - Verde Lectura `#1FB57A` sobre Gris Niebla da **2.44:1** — también falla.
- *   - Blanco sobre Verde Lectura (botón) da **2.64:1** — falla.
+ *   claro   fondo `#F4F6F8` · texto `#061D3A` / `#33475E` · acento `#1FB57A` · 2.º `#1256D4`
+ *   oscuro  fondo `#061D3A` · superficie `#0E2B4F` · texto `#E8EFF7` / `#9FB8D4` · acento `#2BD69A`
  *
- * No es un error del manual: un logo no es texto, y WCAG no le exige contraste a un símbolo. Pero
- * usar esos hex como color de texto o de relleno degradaría la accesibilidad — en una app para
- * personas con baja visión eso no es aceptable. Así que los tokens **conservan el tono de la marca
- * y ajustan la luminosidad** hasta alcanzar el contraste.
+ * Dos reglas del manual mandan sobre todo lo demás:
  *
- * Objetivo: **AAA (7:1)** para texto, AA (4.5:1) como piso. `theme.test.ts` lo verifica
- * automáticamente — si alguien "corrige" un token para que coincida con el manual, el test falla.
+ *   1. **El verde es el primario**: botones, foco y estado confirmado. El azul es secundario —
+ *      superficies, enlaces y datos. Proporción buscada: 70 % neutros, 20 % verde, 10 % azul.
+ *   2. **El acento apunta a 4.5:1**, no a 7:1. Por eso `#1FB57A` va como *relleno* con texto
+ *      `#061D3A` encima (6.39:1) y nunca como color de texto: sobre el fondo claro da 2.44:1.
+ *
+ * De ahí la separación de roles que puede sorprender: `primary` es un color de **relleno** y
+ * `success` un color de **texto**. En oscuro coinciden (`#2BD69A` da 8.99:1 y sirve para las dos
+ * cosas); en claro no pueden coincidir, porque ningún verde cumple los dos roles a la vez.
+ *
+ * Objetivo: **AAA (7:1)** para texto, 4.5:1 para el acento, 3:1 para bordes de control
+ * (WCAG 1.4.11). `theme.test.ts` lo verifica automáticamente.
  */
 import '@/global.css';
-
-import { Platform } from 'react-native';
 
 export const Colors = {
   dark: {
@@ -28,38 +31,49 @@ export const Colors = {
     surface: '#0E2B4F', // del manual (sección modo claro/oscuro)
     surfaceElevated: '#0D3567',
     border: '#123F76', // decorativo (tarjetas): no necesita 3:1
-    borderStrong: '#1C6AC4', // borde de controles (campos, foco): 3:1 — WCAG 1.4.11
+    borderStrong: '#4D9BFF', // azul secundario del manual — 5.98:1 sobre el fondo, 5.04:1 sobre la tarjeta
     text: '#E8EFF7', // del manual — 14.56:1 sobre fondo, 12.27:1 sobre superficie (AAA)
     textSecondary: '#9FB8D4', // del manual — 8.26:1 sobre fondo (AAA)
-    // Verde: es el color distintivo de la marca y el que la app tiene que mostrar. El manual le
-    // asigna al azul el rol de "acción primaria", pero en pantalla el azul se confunde con el
-    // fondo azul profundo y la identidad se pierde. Decisión tomada mirando el resultado real.
-    // Verde Lectura del manual, variante para oscuro: 8.99:1 sobre el fondo (AAA).
+    // Verde Lectura, variante del manual para fondo oscuro: 8.99:1 sobre el fondo (AAA). Acá sí
+    // sirve como relleno y como texto, así que `primary` y `success` son el mismo color.
     primary: '#2BD69A',
     primaryMuted: '#0B3A33',
     // Texto OSCURO sobre el relleno verde: 8.99:1. Blanco encima daría 1.88:1 y fallaría.
     onPrimary: '#061D3A',
+    // Acá el relleno ya se distingue solo (8.99:1), así que el borde es del mismo color: existe
+    // para que el componente tenga la misma forma en los dos temas, no para agregar contraste.
+    primaryEdge: '#2BD69A',
     danger: '#F3AAAD', // 7.09:1 AAA
     success: '#2BD69A', // Verde Lectura del manual — 8.99:1 AAA
     successMuted: '#0B3A33',
     tabInactive: '#A9C0DE',
   },
   light: {
-    background: '#F4F6F8', // Gris Niebla
-    surface: '#FFFFFF',
+    background: '#F4F6F8', // Gris Niebla — del manual
+    // Única desviación del manual, que pide superficie blanca: las tarjetas llevan un velo del
+    // Azul Sensor. Con superficies blancas sobre Gris Niebla el azul de la marca no aparecía por
+    // ningún lado en modo claro, y el manual le reserva justamente el rol de "superficie".
+    surface: '#E4EDFB', // 12 % de #1256D4 sobre blanco
+    // Blanco para lo que va *encima* de una tarjeta: separa por luminosidad, no sólo por borde.
     surfaceElevated: '#FFFFFF',
-    border: '#CFD7E0', // decorativo (tarjetas): no necesita 3:1
-    borderStrong: '#7990A9', // borde de controles (campos, foco): 3.04:1 — WCAG 1.4.11
+    border: '#BFD2F5', // decorativo (tarjetas): no necesita 3:1
+    borderStrong: '#5B7FB9', // controles: 3.74:1 sobre el fondo, 3.44:1 sobre la tarjeta
     text: '#061D3A', // del manual — 15.57:1 AAA
     textSecondary: '#33475E', // del manual — 8.80:1 AAA
-    // Verde, para que el acento sea el mismo en los dos temas. Verde Lectura oscurecido hasta
-    // AAA: 7.19:1 sobre el fondo. El crudo del manual (#1FB57A) da 2.44:1 y es ilegible.
-    primary: '#105E3F',
-    primaryMuted: '#E3F3EC',
-    onPrimary: '#FFFFFF', // 7.79:1 sobre el primario
+    // Verde Lectura tal cual el manual. Es un RELLENO: 2.44:1 como texto sobre el fondo, pero
+    // 6.39:1 con el texto azul profundo encima, que es exactamente el botón que dibuja el manual.
+    primary: '#1FB57A',
+    primaryMuted: '#DFF5EB',
+    onPrimary: '#061D3A', // del manual — 6.39:1 sobre el verde
+    // El relleno verde sobre el fondo claro da 2.44:1: por debajo del 3:1 que WCAG 1.4.11 le pide
+    // al **límite** de un control. Se resuelve como corresponde —contorneándolo— y no aclarando el
+    // fondo ni oscureciendo la marca: el borde da 7.19:1 y el botón sigue siendo verde de marca.
+    primaryEdge: '#105E3F',
     danger: '#A5171C', // 7.08:1 AAA
-    success: '#105E3F', // Verde Lectura oscurecido hasta AAA — 7.19:1 (el crudo da 2.44:1)
-    successMuted: '#E3F3EC',
+    // El mismo verde no sirve como TEXTO en claro (2.44:1). Se oscurece hasta AAA conservando el
+    // tono: es el color de los rótulos de estado ("Conectado", "confirmado"), no de los rellenos.
+    success: '#105E3F', // 7.19:1 sobre el fondo, 6.61:1 sobre la tarjeta
+    successMuted: '#DFF5EB',
     tabInactive: '#3D5273',
   },
 } as const;
@@ -71,26 +85,26 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
  */
 export type Theme = Record<ThemeColor, string>;
 
-export const Fonts = Platform.select({
-  ios: {
-    sans: 'system-ui',
-    serif: 'ui-serif',
-    rounded: 'ui-rounded',
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
+/**
+ * Familias tipográficas de la marca (manual, sección 04). Se embeben en el binario con el plugin
+ * `expo-font` de `app.json`, no se cargan en runtime: un cambio de fuente a mitad del arranque es
+ * un salto de layout, y en una app para baja visión eso desorienta más que en cualquier otra.
+ *
+ * Los nombres son los PostScript names de los archivos, que es lo que iOS exige. Android toma el
+ * nombre del archivo salvo que se declare, así que en `app.json` se declaran **iguales**: un solo
+ * string de `fontFamily` sirve en las dos plataformas y no hay un camino por sistema.
+ *
+ * `fontWeight` NO se combina con estas familias: cada peso es un archivo propio, y pedirle además
+ * un peso al sistema dispara negrita sintética (Android) o lo ignora (iOS).
+ */
+export const Fonts = {
+  /** Títulos. El manual pide tracking −2 %, aplicado en `themed-text`. */
+  display: 'SpaceGrotesk-Bold',
+  sans: 'IBMPlexSans-Regular',
+  sansBold: 'IBMPlexSans-SemiBold',
+  /** Datos: números de línea, latencias, identificadores. */
+  mono: 'IBMPlexMono-Regular',
+} as const;
 
 export const Spacing = {
   half: 2,

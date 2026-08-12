@@ -1,4 +1,14 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+/**
+ * Texto de la app, con la tipografía de la marca (manual, sección 04).
+ *
+ * Cada estilo fija `fontFamily` y **no** `fontWeight`: los pesos son archivos distintos y pedir
+ * además un peso al sistema produce negrita sintética en Android. El peso se elige cambiando de
+ * familia (`Fonts.sans` ↔ `Fonts.sansBold`).
+ *
+ * El manual pide **17 px como mínimo** para texto, y acá se respeta incluso en los rótulos
+ * chicos: el piso de tamaño es lo que más se nota en baja visión.
+ */
+import { StyleSheet, Text, type TextProps } from 'react-native';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -32,42 +42,46 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 
 const styles = StyleSheet.create({
   small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
+    fontFamily: Fonts.sans,
+    fontSize: 17,
+    lineHeight: 24,
   },
   smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
+    fontFamily: Fonts.sansBold,
+    fontSize: 17,
+    lineHeight: 24,
   },
   default: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: 500,
+    fontFamily: Fonts.sans,
+    fontSize: 18,
+    lineHeight: 27,
   },
   title: {
-    fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
+    fontFamily: Fonts.display,
+    fontSize: 40,
+    lineHeight: 46,
+    // Tracking −2 % del manual: Space Grotesk Bold en tamaños grandes se abre demasiado.
+    letterSpacing: -0.8,
   },
   subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
+    fontFamily: Fonts.display,
+    fontSize: 28,
+    lineHeight: 36,
+    letterSpacing: -0.56,
   },
   link: {
-    lineHeight: 30,
-    fontSize: 14,
+    fontFamily: Fonts.sans,
+    fontSize: 17,
+    lineHeight: 28,
   },
   linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
-    color: '#3c87f7',
+    fontFamily: Fonts.sansBold,
+    fontSize: 17,
+    lineHeight: 28,
   },
   code: {
     fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
+    fontSize: 15,
+    lineHeight: 22,
   },
 });

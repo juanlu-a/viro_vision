@@ -211,6 +211,33 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   responde con el payload completo (imagen + streaming + salida estructurada) y tiene **su propia
   cuota**, separada de la de Flash — contestó mientras Flash estaba agotado.
 
+## 2026-08-11 (cont.) — El manual de marca v1.0
+
+- **El manual cambió de postura y la app lo siguió.** En la v1.0, **Verde Lectura es el primario**
+  (botones, foco, estado confirmado) y el Azul Sensor pasó a secundario. Lo que hasta ayer estaba
+  anotado en la skill como desviación deliberada de la app es, desde esta versión, lo que el manual
+  dice. El piso de contraste del acento también lo fija el manual: 4.5:1, no 7:1.
+- **Relleno y texto no pueden ser el mismo verde en modo claro.** `#1FB57A` da 6.39:1 con el texto
+  azul profundo encima —el botón que dibuja el manual— pero 2.44:1 como color de texto. De ahí que
+  `primary` sea un color de relleno y `success` uno de texto; en oscuro coinciden, en claro no
+  pueden. El test lo verifica en las dos direcciones.
+- Un detalle que se pasa por alto: el relleno verde sobre el fondo claro queda **por debajo del 3:1
+  que WCAG 1.4.11 le exige al *límite* de un control**. Se resolvió contorneando el botón
+  (`primaryEdge`), no aclarando el fondo ni oscureciendo la marca.
+- El mismo test, extendido a las superficies, destapó que `borderStrong` del tema oscuro daba 2.65:1
+  sobre las tarjetas: pasa a `#4D9BFF`, que es el azul secundario que el manual ya definía.
+- **Tipografía de marca embebida** (Space Grotesk Bold, IBM Plex Sans, IBM Plex Mono) con el plugin
+  `expo-font`, no cargada en runtime: un cambio de fuente a mitad del arranque es un salto de layout.
+  Los `fontWeight` sueltos se reemplazaron por familia — con un archivo por peso, pedir además un
+  peso dispara negrita sintética en Android. Piso de texto a 17 px, como pide el manual.
+- **El símbolo son dos archivos, no uno recoloreado**: pupila azul profundo en claro, blanca en
+  oscuro. Con una sola imagen el ojo se veía hueco en uno de los dos temas.
+- El símbolo terminó **sólo en Inicio**. Estuvo un rato en todas las pantallas y se veía mal por una
+  razón que no era la obvia: mide 48 y la línea del título 46, así que en Inicio el texto quedaba
+  centrado sobre una fila más alta y *la misma tipografía se leía distinta*. La fila del título pasó
+  a tener alto fijo, lleve símbolo o no.
+- 109 tests, tsc y lint en verde.
+
 ## Open threads / next
 - Merge **PR #7** (email/password auth).
 - Install the iOS simulator runtime to see the app (or run on a real device via EAS dev build).

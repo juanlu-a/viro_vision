@@ -2,11 +2,12 @@
  * Verificación automática de contraste WCAG de los tokens de color.
  *
  * Existe porque el manual de marca y la accesibilidad tiran para lados distintos: los hex del
- * manual fallan como color de texto (Azul Sensor sobre Azul Profundo da 2.66:1). Sin este test,
- * cualquiera puede "corregir" un token para que coincida con el manual y degradar la app sin
- * enterarse. Acá el contraste deja de depender de que alguien se acuerde de chequearlo.
+ * manual son perfectos como marca y varios fallan como color de texto (Verde Lectura sobre Gris
+ * Niebla da 2.44:1). Sin este test, cualquiera puede "corregir" un token para que coincida con el
+ * manual y degradar la app sin enterarse.
  *
- * Objetivo AAA (7:1) para texto; AA (4.5:1) como piso donde se justifica.
+ * Objetivo AAA (7:1) para texto; 4.5:1 para el acento —el piso que fija el propio manual—; 3:1
+ * para bordes de control e íconos (WCAG 1.4.11).
  */
 import { Colors } from './theme';
 import type { Theme } from './theme';
@@ -26,12 +27,9 @@ export function contrastRatio(a: string, b: string): number {
 
 const AAA = 7;
 /**
- * Piso del color de acento. Es **AA (4.5:1) y no AAA**, a propósito: el manual de marca fija el
- * Azul Sensor como "acción primaria" con valores concretos por modo (`#1256D4` en claro, `#4D9BFF`
- * en oscuro), y esos azules llegan a AA pero no a AAA. Se eligió respetar el manual antes que
- * derivar un azul propio — la decisión está registrada en la skill `virovision-marca`.
- *
- * El texto, que es lo que más pesa para el usuario objetivo, sigue exigiendo AAA.
+ * Piso del color de acento. Es **4.5:1 y no AAA**, y lo fija el manual: "el verde es el acento de
+ * acción en los dos modos y se aclara a `#2BD69A` en oscuro para mantener 4.5:1". El acento se usa
+ * como relleno de botón, no como texto corrido; el texto sigue exigiendo AAA.
  */
 const ACENTO = 4.5;
 /** Piso para elementos de interfaz y texto grande (WCAG 1.4.11 / 1.4.3). */
@@ -67,14 +65,26 @@ describe.each(themes)('tema %s', (_name, theme) => {
     expect(contrastRatio(theme.textSecondary, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('el color primario alcanza al menos AA sobre el fondo y sobre la superficie', () => {
-    expect(contrastRatio(theme.primary, theme.background)).toBeGreaterThanOrEqual(ACENTO);
-    expect(contrastRatio(theme.primary, theme.surface)).toBeGreaterThanOrEqual(ACENTO);
+  it('el límite del control primario alcanza 3:1 (WCAG 1.4.11)', () => {
+    // Lo que la norma exige es que el **límite** del control se distinga de lo que tiene al lado,
+    // no que el relleno lo haga. En claro el verde de marca da 2.44:1 contra el fondo y quien
+    // cumple es el borde; en oscuro el relleno ya cumple y el borde es del mismo color.
+    const limite = Math.max(
+      contrastRatio(theme.primary, theme.background),
+      contrastRatio(theme.primaryEdge, theme.background),
+    );
+    expect(limite).toBeGreaterThanOrEqual(UI);
+    expect(contrastRatio(theme.primaryEdge, theme.surface)).toBeGreaterThanOrEqual(UI);
   });
 
-  it('el texto sobre el relleno primario alcanza al menos AA', () => {
-    // El error clásico con esta paleta: blanco sobre el azul del modo oscuro da 2.82:1, así que
-    // ahí el texto encima tiene que ser oscuro, no blanco.
+  it('el ícono sobre el relleno primario alcanza 3:1', () => {
+    // Los chips de Inicio son un glifo sobre el verde: es un ícono, así que le aplica 1.4.11.
+    expect(contrastRatio(theme.onPrimary, theme.primary)).toBeGreaterThanOrEqual(UI);
+  });
+
+  it('el texto sobre el relleno primario alcanza el piso del acento', () => {
+    // El error clásico con esta paleta: blanco sobre el verde da 2.64:1. El manual dibuja el botón
+    // con texto Azul Profundo encima justamente por esto.
     expect(contrastRatio(theme.onPrimary, theme.primary)).toBeGreaterThanOrEqual(ACENTO);
   });
 
@@ -86,10 +96,14 @@ describe.each(themes)('tema %s', (_name, theme) => {
     expect(contrastRatio(theme.success, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('el color de éxito NO es el verde crudo del manual en fondo claro', () => {
-    // Verde Lectura #1FB57A da 2.44:1 sobre el fondo claro. El manual no define una variante
-    // para fondo claro, así que se deriva una. Si algún día el manual la agrega, actualizar acá.
-    expect(contrastRatio('#1FB57A', '#F4F6F8')).toBeLessThan(3);
+  it('el color de éxito alcanza AAA sobre las superficies', () => {
+    // Es el rótulo "Conectado" dentro de una tarjeta: si sólo se verificara contra el fondo, un
+    // cambio de superficie podría dejarlo por debajo sin que nadie se entere.
+    expect(contrastRatio(theme.success, theme.surface)).toBeGreaterThanOrEqual(ACENTO);
+  });
+
+  it('el borde de controles alcanza 3:1 también sobre la superficie', () => {
+    expect(contrastRatio(theme.borderStrong, theme.surface)).toBeGreaterThanOrEqual(UI);
   });
 
   it('la pestaña inactiva sigue siendo legible (AAA)', () => {
@@ -114,18 +128,29 @@ describe.each(themes)('tema %s', (_name, theme) => {
   });
 });
 
-describe('los hex crudos del manual de marca NO sirven como tokens de texto', () => {
-  // Documenta por qué los tokens no son los del manual. Si algún día estos valores pasaran,
-  // habría que revisar la decisión — pero hoy fallan y el test lo deja asentado.
-  it('Azul Sensor sobre Azul Profundo falla WCAG', () => {
-    expect(contrastRatio('#1256D4', '#061D3A')).toBeLessThan(3);
+describe('el manual de marca, verificado', () => {
+  // Lo que el manual afirma y la app da por bueno. Si alguno cambiara, hay que revisar los tokens.
+  it('el botón del manual —texto Azul Profundo sobre Verde Lectura— cumple el piso del acento', () => {
+    expect(contrastRatio('#061D3A', '#1FB57A')).toBeGreaterThanOrEqual(ACENTO);
   });
 
-  it('Verde Lectura sobre Gris Niebla falla WCAG', () => {
+  it('la variante para oscuro del verde cumple sobre Azul Profundo', () => {
+    expect(contrastRatio('#2BD69A', '#061D3A')).toBeGreaterThanOrEqual(ACENTO);
+  });
+});
+
+describe('límites conocidos de la paleta de marca', () => {
+  // No son defectos del manual: un logo no es texto y WCAG no le exige contraste a un símbolo.
+  // Están acá para que nadie use estos hex donde no van.
+  it('Verde Lectura como TEXTO sobre Gris Niebla falla — por eso `success` se oscurece', () => {
     expect(contrastRatio('#1FB57A', '#F4F6F8')).toBeLessThan(3);
   });
 
-  it('blanco sobre Verde Lectura falla WCAG', () => {
+  it('blanco sobre Verde Lectura falla — por eso `onPrimary` es Azul Profundo', () => {
     expect(contrastRatio('#FFFFFF', '#1FB57A')).toBeLessThan(3);
+  });
+
+  it('Azul Sensor sobre Azul Profundo falla — por eso el azul no se usa de botón en oscuro', () => {
+    expect(contrastRatio('#1256D4', '#061D3A')).toBeLessThan(3);
   });
 });

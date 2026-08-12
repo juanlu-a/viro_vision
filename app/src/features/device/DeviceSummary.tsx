@@ -8,7 +8,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
 import type { DeviceInfo } from './types';
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   value: {
-    fontWeight: '600',
+    fontFamily: Fonts.sansBold,
   },
   track: {
     height: 10,
