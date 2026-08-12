@@ -10,12 +10,25 @@ does not have to share one audio channel between the OS screen reader and ViroVi
 
 ## Offline-first (hard requirement)
 Essential features must work **without internet**. When the app is the processing backend ("offload
-to phone" architecture), the recognition model is **bundled into the app and runs on-device** (e.g.
-via a local runtime — TFLite / ONNX Runtime / ExecuTorch through a RN native module), **never a
-cloud API**. Internet may be used only for non-essential extras (updates, remote config, optional
-sync); losing connectivity must never break recognition or the audio response. Practical
-implications: bundle model assets in the app, budget app size accordingly, and keep the recognition
-→ announcement path free of any network dependency.
+to phone" architecture), the model runs **on the phone's own compute** — "offload to the phone"
+means offload to local compute, *not* to a server. The concrete runtime is decided in **ADR 0004**:
+**Gemma via LiteRT-LM** (MediaPipe LLM Inference is in maintenance mode; the TFLite / ONNX Runtime /
+ExecuTorch options originally listed here are superseded).
+
+**Since the 2026-08-10 tutor meeting, ADR 0001 is amended: the cloud is allowed as an *optional
+accelerator*.** A runtime *model gateway* may route an inference to the cloud when there is coverage
+and it buys accuracy — the tutor's example is basic-basket products, which tolerate more latency in
+exchange for precision. Three constraints survive the amendment and are not negotiable:
+
+1. **Local inference is the guaranteed fallback.** With no internet, recognition and the auditory
+   response keep working. Losing connectivity may cost accuracy or latency, never the feature.
+2. **Cloud-only recognition, with no local fallback, stays forbidden.** That is the dependency
+   ADR 0001 exists to prevent, and the differentiator vs. Seeing AI / Lookout / OrCam.
+3. **Latency-critical cases (bus lines) stay local by default.**
+
+The cloud benchmark under `app/src/services/vision/` is **development instrumentation only** and
+carries a boundary comment saying so: it must never be called from the camera → detection/OCR →
+announcement path. See `references/convenciones.md` for the boundary-rule convention.
 
 ## Tooling
 - **React Native via Expo** with a **custom dev client** (not Expo Go alone — native modules like
@@ -80,6 +93,25 @@ login. The Supabase email-auth code (`features/auth/AuthContext.tsx`, `src/servi
 future *optional* sync. If login ever returns it's Supabase **email + password** (never Google/OAuth).
 See ADR 0002.
 
-## Scaffold status
-Structure + one accessible starting screen only. BLE and audio are typed stubs/interfaces this
-pass — no live GATT or routing yet.
+## Estado (2026-08-11)
+
+Ya no es un scaffold. Lo que existe y funciona:
+
+- **Cuatro pantallas** con pestañas **nativas** (`NativeTabs`: Liquid Glass en iOS 26, Material en
+  Android) — Inicio, Dispositivo, Ajustes, más una ruta suelta de desarrollo.
+- **Design system con tokens verificados por tests.** `constants/theme.ts` + `theme.test.ts`
+  comprueban contraste WCAG en los dos temas; ya atajó tres regresiones invisibles a ojo. Identidad
+  aplicada según el manual v1.0 (ver la skill `virovision-marca`), con tipografía de marca embebida
+  en el binario.
+- **Selector de tema** claro/oscuro/sistema, persistido en AsyncStorage — es una preferencia de
+  accesibilidad, así que funciona sin red ni cuenta.
+- **Benchmark de latencia contra modelos de visión en la nube** (`services/vision/`), con
+  time-to-first-token medido sobre streaming SSE, limitador de cuota y estadística de mediana/p90.
+  Es instrumentación de desarrollo, no producto.
+- **Corre en un iPhone físico** vía dev build firmado con Apple ID personal — ver
+  `docs/dev-build-ios.md`, incluida la caducidad de 7 días.
+- **109 tests**, tsc y lint en verde.
+
+Lo que sigue siendo un stub tipado, deliberadamente: **BLE/GATT** (no hay hardware todavía) y el
+**ruteo de audio** al auricular del dispositivo. Los dos fallan con un error tipado que dice "no
+implementado" en vez de fingir que funcionan.

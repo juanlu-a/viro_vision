@@ -54,6 +54,15 @@ final integration, bug-fixing and joint testing).
 | **Hardware / IoT** | `hardware/` | Glasses-mounted camera device: Raspberry Pi Zero 2 W + Coral TPU + Camera Module 3. See [references/hardware.md](references/hardware.md). |
 | **ML / OCR / CV** | `ml/` | YOLO11 detection (buses, products), OCR (bus signs, product labels), Edge AI. See [references/ml.md](references/ml.md). |
 
+Y tres referencias transversales, que aplican al trabajo diario más que cualquier otra cosa de este
+documento:
+
+| Referencia | Cuándo |
+|---|---|
+| [references/convenciones.md](references/convenciones.md) | **Antes de escribir código o abrir un PR.** Stack, estructura, patrones de servicio, errores tipados, tests, accesibilidad, y el flujo de ramas/commits. |
+| [references/decisiones.md](references/decisiones.md) | Antes de tomar una decisión que quizá ya se tomó. Índice de ADRs con su estado y **qué cambió** en cada enmienda. |
+| skill **`virovision-marca`** | Ante cualquier cosa visual: colores, tokens de tema, íconos, tipografía, material de la tesis. |
+
 ## Cross-cutting conventions & constraints
 - **Language:** the project and its documentation are in **Spanish**. Prefer Spanish for
   user-facing strings, thesis docs and comments where the surrounding context is Spanish.
@@ -78,10 +87,14 @@ final integration, bug-fixing and joint testing).
   team **implement and compare both**.
 
 ## Git / contribution conventions
+
 - **Do NOT add an AI co-author to commits.** Never append `Co-Authored-By: Claude ...` (or any
   AI-authorship trailer) to commit messages or PR descriptions. Commits are attributed to the human
   author only.
-- Prefer small, logically-grouped commits (e.g. infra, skill/docs, app) with descriptive messages.
+
+El resto —formato de commit, nombres de rama, la regla de no apilar PRs, cómo verificar que un
+merge no perdió nada— vive en **[references/convenciones.md](references/convenciones.md)**, para que
+no haya dos copias que se desincronicen.
 
 ## Repository map
 - `app/` — React Native mobile app (scaffolded with Expo + dev client).
