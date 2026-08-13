@@ -31,11 +31,13 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
 
 El número está reservado a propósito. Depende de tener hardware.
 
-### ADR 0004 — Runtime de inferencia on-device · **Proposed — a discutir con el tutor**
+### ADR 0004 — Runtime de inferencia on-device · **Proposed — con evidencia del spike (2026-08-13)**
 
-**Gemma vía LiteRT-LM**, empezando por la variante más chica, con la cámara del teléfono como
-fuente. Descarta MediaPipe LLM Inference (en mantenimiento) y Core ML + Apple Vision (cierra la
-plataforma a iOS).
+Proponía **Gemma vía LiteRT-LM**. El spike lo midió: el camino de visión de LiteRT-LM **no funciona
+en iOS** (bug de la librería, aislado con evidencia); el mismo modelo por **ExecuTorch/MLX** sí ve,
+pero tarda ~6,4 s. La recomendación vigente es **detección + OCR preentrenados** (ExecuTorch,
+~250 MB, fracciones de segundo, devuelve coordenadas) como camino primario del teléfono, VLM local
+como comparación. Ver `docs/spike-vision-local.md`. Sigue descartado MediaPipe (en mantenimiento).
 
 Restricción encontrada y anotada: **el sandbox de iOS impide usar el Gemma que corre dentro de otra
 app**. Tenerlo andando en Edge Gallery prueba que el hardware da, pero no acerca el producto.

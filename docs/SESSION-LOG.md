@@ -238,6 +238,58 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   a tener alto fijo, lleve símbolo o no.
 - 109 tests, tsc y lint en verde.
 
+## 2026-08-12 — Spike de Gemma local, Tailwind, y el resto mergeado
+
+- **Se mergeó todo lo pendiente en tres PRs separados** (#11 cuota de Gemini, #12 manual de marca
+  v1.0, #13 documentación de convenciones y decisiones en la skill), en secuencia y no apilados,
+  como pide la regla del repo. Verificado con `git diff origin/main <rama-vieja>` que no se perdiera
+  nada: el único delta era el encabezado del log, partido a propósito en dos entradas.
+- **La skill del proyecto tenía afirmaciones que contradecían ADRs vigentes** — `app.md` y `ml.md`
+  seguían diciendo "never a cloud API" y proponiendo TFLite/ONNX/ExecuTorch. Un agente que las
+  leyera tomaba decisiones contra lo ya decidido. Corregido, y agregados `convenciones.md` y
+  `decisiones.md`.
+- **Spike de inferencia local (ADR 0004): el riesgo grande quedó descartado.**
+  `react-native-litert-lm` compila contra Expo 57 / RN 0.86 y **el Gemma 3 1B carga y genera** en el
+  iPhone. Todo lo demás que falló resultó ser gestión de disco, no viabilidad.
+- Tres causas distintas se disfrazaron del mismo síntoma, y ninguna se podía adivinar desde afuera:
+  la caché compilada va en la carpeta del modelo (un archivo de otra app se lee pero no se escribe
+  al lado); el disco lleno hace que XNNPack llame a `abort()` sin decir por qué, fallando incluso
+  con un modelo chico que antes andaba; y el Gemma 4 de Edge Gallery **no trae codificador de
+  visión**. Las tres salieron de leer el Swift de la librería y los logs nativos del teléfono, no
+  de probar variantes.
+- **El muro del entitlement sigue sin tocarse**: no llegamos a cargar el modelo grande porque nos
+  frenó el espacio en disco. Queda como la pregunta abierta, y es de presupuesto, no técnica.
+- **Tailwind en nativo, vía NativeWind**, que es lo que documenta Expo SDK 57. Dos decisiones para
+  que no empeorara lo que veníamos de ordenar: la paleta se movió a un archivo plano que consumen
+  TypeScript y Tailwind (una sola fuente, y `theme.test.ts` sigue verificando el hex que la app
+  usa), y cada color apunta a una variable CSS para que se escriba `bg-surface` una sola vez en vez
+  de `bg-surface dark:bg-dark-surface`. No queda un `StyleSheet` en la app.
+- Además: el scroll saltaba porque el inset superior se contaba dos veces con el header nativo; los
+  botones `ghost` no se leían como botones; y el selector de tema pasó a un desplegable compacto —
+  ocupando media pantalla, la apariencia parecía el ajuste más importante de la app.
+
+## 2026-08-13 — El spike de visión local cierra: era la librería, no el teléfono
+
+- **La visión de LiteRT-LM no funciona en iOS.** Aislado con método: tres modelos multimodales
+  (756 MB, 1,4 GB, 2,5 GB) fallan idéntico sólo con visión activa; memoria (veredicto "safe" y
+  fallaba igual), disco, contexto (1024→256 sin cambio), precisión y decodificado restringido,
+  descartados uno por uno. Tres hipótesis mías murieron contra la evidencia en el camino — la de
+  RAM documentada incluida, cuando el modelo de 756 MB también falló.
+- **La contraprueba: ExecuTorch (MLX) sí ve.** El mismo Gemma 4 E2B multimodal carga en ~4 s y lee
+  el cartel bien. Dos errores de uso en el medio, los dos medidos y arreglados: `forward()` sin la
+  plantilla de chat devuelve vacío (`sendMessage()` la aplica), y sin decodificado restringido la
+  forma del JSON tiene que ir en el prompt — el modelo inventaba claves. También leía la matrícula
+  en vez del cartel hasta que el prompt lo prohibió.
+- **Pero 6,4 s totales es lento para un ómnibus acercándose.** El OCR local (CRAFT + CRNN en
+  español, ~250 MB) lee en fracciones de segundo y devuelve posición — lo que habilita priorizar
+  el más cercano. Recomendación para el tutor: detección + OCR preentrenados como camino primario,
+  VLM como comparación. Es la arquitectura de la tesis sin pagar el entrenamiento.
+- En el camino, dos incidentes con moraleja: la app llegó a ~10 GB porque cada elección de archivo
+  copiaba el modelo sin borrar el anterior (ahora guarda uno solo y muestra diagnóstico antes de
+  cargar), y declarar `expo-file-system` rompió el arranque con un símbolo faltante — el árbol de
+  dependencias estaba atrasado respecto del SDK y hubo que realinearlo entero.
+- Síntesis para el equipo en `docs/spike-vision-local.md`; ADR 0004 actualizado.
+
 ## Open threads / next
 - Merge **PR #7** (email/password auth).
 - Install the iOS simulator runtime to see the app (or run on a real device via EAS dev build).

@@ -10,6 +10,7 @@ Thesis deliverables, architecture and decision records.
 - [`supabase.md`](supabase.md) · [`ci-cd.md`](ci-cd.md) — setup del backend y de CI/CD.
 - [`REUNIONES-TUTOR.md`](REUNIONES-TUTOR.md) — registro de reuniones con el director de tesis.
 - [`dev-build-ios.md`](dev-build-ios.md) — correr la app en un iPhone físico (development build).
+- [Spike: visión local en el teléfono](spike-vision-local.md) — resultados medidos de los cuatro caminos (nube, LiteRT-LM, ExecuTorch, OCR) y la recomendación.
 - [`SESSION-LOG.md`](SESSION-LOG.md) — historia cronológica del trabajo.
 - [`ROADMAP.md`](ROADMAP.md) · [`PROJECT-STATUS.md`](PROJECT-STATUS.md) — plan y estado actual.
 

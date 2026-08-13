@@ -7,18 +7,37 @@
  */
 export {
   CONFIGURACIONES,
+  CONTEXTOS,
   GEMMA_4_E2B_BYTES,
   GEMMA_4_E2B_URL,
   isOnDeviceSpikeEnabled,
+  MODELOS_REMOTOS,
   MAX_CONTEXT_TOKENS,
 } from './config';
 export { sondearRuntime } from './probe';
+export type { ModeloRemoto } from './config';
 export type { EstimacionPorBackend, ResultadoSonda } from './probe';
 export {
   cargarModelo,
   descargarModelo,
+  descargarModeloRemoto,
+  adoptarModelo,
+  diagnosticar,
+  espacioLibre,
+  limpiarCopias,
+  tamanoModelosGuardados,
   generarConImagen,
   generarTexto,
   modeloCargado,
 } from './runner';
-export type { CargaResultado, GeneracionResultado } from './runner';
+export type { CargaResultado, Diagnostico, GeneracionResultado } from './runner';
+export { cargarOcr, leerImagen, liberarOcr, ocrCargado } from './ocr';
+export type { LecturaOcr } from './ocr';
+export {
+  etCargado,
+  etCargar,
+  etGenerarConImagen,
+  etLiberar,
+  etReiniciarConversacion,
+} from './executorchLlm';
+export type { EtCargaResultado, EtGeneracionResultado } from './executorchLlm';

@@ -3,6 +3,8 @@ import '@/global.css';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { initExecutorch } from 'react-native-executorch';
+import { ExpoResourceFetcher } from 'react-native-executorch-expo-resource-fetcher';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -13,6 +15,10 @@ import {
 } from '@/features/theme/ThemePreferenceProvider';
 
 SplashScreen.preventAutoHideAsync();
+
+// ExecuTorch descarga sus modelos por su cuenta y necesita saber con qué. Se configura una sola
+// vez, al arrancar: hacerlo al usarlo dejaría la primera llamada compitiendo con la inicialización.
+initExecutorch({ resourceFetcher: ExpoResourceFetcher });
 
 function buildNavTheme(scheme: 'light' | 'dark') {
   const c = Colors[scheme];
