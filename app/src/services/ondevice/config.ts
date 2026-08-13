@@ -59,3 +59,63 @@ export const MAX_OUTPUT_TOKENS = 64;
  * criterio que el benchmark de nube, que se gatea por la presencia de la clave.
  */
 export const isOnDeviceSpikeEnabled = (process.env.EXPO_PUBLIC_ONDEVICE_SPIKE ?? '') !== '';
+
+/**
+ * Modelos con entrada de imagen que se pueden bajar desde la app, del más chico al más grande.
+ *
+ * Por qué hay varios y no sólo Gemma: el ADR 0004 eligió **el runtime** (LiteRT-LM) y "la variante
+ * más chica primero". Gemma 4 E2B es el más chico de la familia Gemma que lee imágenes, y en un
+ * iPhone 15 Pro no logra crear la conversación con el codificador de visión activo. Estos otros
+ * corren en el mismo runtime y pesan la mitad o menos, así que probarlos no cambia la decisión de
+ * arquitectura — cambia sólo qué pesos se cargan.
+ *
+ * Todos son abiertos y sin aprobación manual: el descargador de la app no puede autenticarse.
+ */
+export interface ModeloRemoto {
+  id: string;
+  label: string;
+  url: string;
+  bytes: number;
+  /** Falso sólo para los de texto, que sirven para probar el runtime pero no para leer un cartel. */
+  multimodal: boolean;
+}
+
+export const MODELOS_REMOTOS: readonly ModeloRemoto[] = [
+  {
+    // El más chico con visión. Sin descargas registradas todavía: si falla, no sorprende.
+    id: 'minicpm5-1b-int4',
+    label: 'MiniCPM5 1B int4',
+    url: 'https://huggingface.co/litert-community/MiniCPM5-1B/resolve/main/minicpm_wi4b32_wi8_afp32.litertlm',
+    bytes: 792_723_456,
+    multimodal: true,
+  },
+  {
+    // El candidato de referencia: la mitad que Gemma 4, y el más usado de los que leen imagen.
+    id: 'fastvlm-0.5b',
+    label: 'FastVLM 0.5B',
+    url: 'https://huggingface.co/litert-community/FastVLM-0.5B/resolve/main/FastVLM-0.5B.litertlm',
+    bytes: 1_156_579_328,
+    multimodal: true,
+  },
+  {
+    id: 'smolvlm2-2.2b',
+    label: 'SmolVLM2 2.2B',
+    url: 'https://huggingface.co/litert-community/SmolVLM2-2.2B/resolve/main/SmolVLM2-2.2B.litertlm',
+    bytes: 1_511_193_088,
+    multimodal: true,
+  },
+  {
+    id: 'qwen2-vl-2b',
+    label: 'Qwen2-VL 2B',
+    url: 'https://huggingface.co/litert-community/Qwen2-VL-2B/resolve/main/Qwen2-VL-2B.litertlm',
+    bytes: 1_783_627_776,
+    multimodal: true,
+  },
+  {
+    id: 'gemma-4-e2b',
+    label: 'Gemma 4 E2B',
+    url: GEMMA_4_E2B_URL,
+    bytes: GEMMA_4_E2B_BYTES,
+    multimodal: true,
+  },
+];

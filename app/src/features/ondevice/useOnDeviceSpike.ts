@@ -22,10 +22,12 @@ import {
   cargarModelo,
   CONTEXTOS,
   descargarModelo,
+  descargarModeloRemoto,
   diagnosticar,
   espacioLibre,
   limpiarCopias,
   MAX_CONTEXT_TOKENS,
+  MODELOS_REMOTOS,
   tamanoModelosGuardados,
   generarConImagen,
   generarTexto,
@@ -33,6 +35,7 @@ import {
 } from '@/services/ondevice';
 import type {
   CargaResultado,
+  ModeloRemoto,
   Diagnostico,
   GeneracionResultado,
   ResultadoSonda,
@@ -54,6 +57,12 @@ export interface SpikeState {
   multimodal: boolean;
   precision: 'f32' | 'f16';
   contexto: number;
+  /** Cuál de los modelos del catálogo está seleccionado para descargar. */
+  remoto: ModeloRemoto;
+  /** Fracción 0–1 mientras se descarga, `null` si no hay descarga en curso. */
+  progreso: number | null;
+  /** Cuánto tardó la última descarga. Es costo de onboarding, no latencia. */
+  descargaMs: number | null;
   carga: CargaResultado | null;
   /** Se calcula al intentar cargar y sobrevive al fallo: es cuando más hace falta. */
   diagnostico: Diagnostico | null;
@@ -70,6 +79,9 @@ const inicial: SpikeState = {
   multimodal: false,
   precision: 'f16',
   contexto: MAX_CONTEXT_TOKENS,
+  remoto: MODELOS_REMOTOS[1],
+  progreso: null,
+  descargaMs: null,
   carga: null,
   diagnostico: null,
   generacion: null,
@@ -144,6 +156,34 @@ export function useOnDeviceSpike() {
       lectura: null,
       mensaje: `${adoptado.nombre} · ${t.stored} ${formatBytes(tamanoModelosGuardados())}`,
     });
+  }, [update]);
+
+  /** Rota entre los modelos del catálogo, del más chico al más grande. */
+  const rotarRemoto = useCallback(() => {
+    const i = MODELOS_REMOTOS.indexOf(ref.current.remoto);
+    update({ remoto: MODELOS_REMOTOS[(i + 1) % MODELOS_REMOTOS.length] });
+  }, [update]);
+
+  const descargar = useCallback(async () => {
+    const { remoto } = ref.current;
+    update({ estado: 'loading', mensaje: t.downloading, progreso: 0, carga: null });
+    try {
+      const r = await descargarModeloRemoto(remoto.url, (fraccion) =>
+        // Sólo se re-renderiza el progreso: el resto del estado no cambia durante la descarga.
+        update({ progreso: fraccion }),
+      );
+      update({
+        estado: 'idle',
+        progreso: null,
+        descargaMs: r.ms,
+        archivo: { uri: r.ruta, nombre: r.nombre },
+        multimodal: remoto.multimodal,
+        diagnostico: diagnosticar(r.ruta, ref.current.backend, ref.current.contexto),
+        mensaje: `${r.nombre} · ${t.stored} ${formatBytes(tamanoModelosGuardados())}`,
+      });
+    } catch (err) {
+      update({ estado: 'idle', progreso: null, mensaje: `${t.downloadError}: ${describir(err)}` });
+    }
   }, [update]);
 
   const setBackend = useCallback(
@@ -252,6 +292,8 @@ export function useOnDeviceSpike() {
     state,
     sondear,
     elegirArchivo,
+    rotarRemoto,
+    descargar,
     setBackend,
     setMultimodal,
     setPrecision,

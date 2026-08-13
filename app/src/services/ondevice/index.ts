@@ -11,9 +11,11 @@ export {
   GEMMA_4_E2B_BYTES,
   GEMMA_4_E2B_URL,
   isOnDeviceSpikeEnabled,
+  MODELOS_REMOTOS,
   MAX_CONTEXT_TOKENS,
 } from './config';
 export { sondearRuntime } from './probe';
+export type { ModeloRemoto } from './config';
 export type { EstimacionPorBackend, ResultadoSonda } from './probe';
 export {
   cargarModelo,

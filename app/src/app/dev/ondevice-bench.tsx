@@ -43,6 +43,8 @@ export default function OnDeviceBenchScreen() {
     state,
     sondear,
     elegirArchivo,
+    rotarRemoto,
+    descargar,
     setBackend,
     setMultimodal,
     setPrecision,
@@ -116,6 +118,30 @@ export default function OnDeviceBenchScreen() {
           <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
             {t.modelSection.toUpperCase()}
           </ThemedText>
+          {/* Descargar desde la app garantiza la variante correcta: las `-gpu` y `-web` de Gemma
+              no traen codificador de visión y no pueden leer un cartel. */}
+          <AccessibleButton
+            label={`${t.remoteModel}: ${state.remoto.label} (${formatBytes(state.remoto.bytes)})`}
+            hint={t.remoteModelHint}
+            variant="secondary"
+            onPress={rotarRemoto}
+            disabled={ocupado}
+          />
+          <AccessibleButton
+            label={
+              state.progreso == null
+                ? t.download
+                : `${t.downloading} ${Math.round(state.progreso * 100)} %`
+            }
+            hint={t.downloadHint}
+            onPress={descargar}
+            disabled={ocupado}
+            loading={state.progreso != null}
+          />
+          {state.descargaMs != null && (
+            <Fila label={t.downloadTime} value={formatMs(state.descargaMs)} />
+          )}
+
           <AccessibleButton
             label={t.pickModel}
             hint={t.pickModelHint}

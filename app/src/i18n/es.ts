@@ -99,6 +99,14 @@ export const es = {
     cleaning: 'Borrando copias…',
     cleaned: 'Liberado:',
     stored: 'guardado:',
+    remoteModel: 'Modelo a descargar',
+    remoteModelHint:
+      'Modelos con entrada de imagen que corren en el mismo runtime. Ordenados del más chico al más grande.',
+    download: 'Descargar',
+    downloadHint: 'Baja el modelo elegido a la app y reemplaza el que estuviera guardado.',
+    downloading: 'Descargando…',
+    downloadError: 'No se pudo descargar',
+    downloadTime: 'Tiempo de descarga',
     contextLabel: 'Contexto',
     contextHint:
       'Tokens reservados para el KV cache. Menos contexto es menos memoria; la tarea sólo necesita un prompt corto, la imagen y dos campos de respuesta.',
