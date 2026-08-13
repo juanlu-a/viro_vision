@@ -64,6 +64,7 @@
         }
       ],
       "./plugins/withoutUserScriptSandboxing",
+      "./plugins/withDevelopmentTeam",
       [
         "expo-font",
         {
@@ -116,7 +117,8 @@
             ]
           }
         }
-      ]
+      ],
+      "react-native-litert-lm"
     ],
     "experiments": {
       "typedRoutes": true,

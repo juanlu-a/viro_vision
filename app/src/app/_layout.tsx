@@ -54,6 +54,7 @@ function RootNavigator() {
             <Stack.Screen name="(tabs)" />
             {/* Ruta de desarrollo: no es pestaña; se enlaza desde Ajustes (ver settings.tsx). */}
             <Stack.Screen name="dev/vision-bench" />
+            <Stack.Screen name="dev/ondevice-bench" />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>
