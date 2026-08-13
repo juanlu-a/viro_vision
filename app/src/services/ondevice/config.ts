@@ -31,10 +31,25 @@ export const CONFIGURACIONES = [
 ] as const;
 
 /**
- * Contexto deliberadamente chico: el KV cache es el único término de memoria que controlamos, y el
- * prompt son dos frases más una imagen.
+ * Presupuestos de contexto para probar, del más holgado al más apretado.
+ *
+ * El KV cache es el único término de memoria que controlamos desde JS, y crece linealmente con el
+ * contexto. La tarea no necesita casi nada: dos frases de prompt, una imagen, y una respuesta de
+ * dos campos cortos. Bajarlo es la palanca más barata para hacerle lugar al codificador de visión,
+ * que es lo que no entra.
+ *
+ * 512 es el default: por debajo, una imagen puede no entrar en el contexto —ocupa varios cientos
+ * de tokens al codificarse— y el fallo se confundiría con el de memoria.
  */
-export const MAX_CONTEXT_TOKENS = 1024;
+export const CONTEXTOS = [1024, 512, 256] as const;
+
+export const MAX_CONTEXT_TOKENS = 512;
+
+/**
+ * Techo de salida. La respuesta son dos campos cortos, así que pedir más sólo reserva KV cache que
+ * no se va a usar.
+ */
+export const MAX_OUTPUT_TOKENS = 64;
 
 /**
  * ¿Se muestra la pantalla del spike?

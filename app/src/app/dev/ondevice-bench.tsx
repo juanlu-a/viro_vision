@@ -46,6 +46,7 @@ export default function OnDeviceBenchScreen() {
     setBackend,
     setMultimodal,
     setPrecision,
+    rotarContexto,
     cargar,
     liberar,
     limpiar,
@@ -144,6 +145,13 @@ export default function OnDeviceBenchScreen() {
             hint={t.backendHint}
             variant="secondary"
             onPress={() => setBackend(state.backend === 'cpu' ? 'gpu' : 'cpu')}
+            disabled={ocupado}
+          />
+          <AccessibleButton
+            label={`${t.contextLabel}: ${state.contexto}`}
+            hint={t.contextHint}
+            variant="secondary"
+            onPress={rotarContexto}
             disabled={ocupado}
           />
           <AccessibleButton

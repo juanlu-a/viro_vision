@@ -99,6 +99,9 @@ export const es = {
     cleaning: 'Borrando copias…',
     cleaned: 'Liberado:',
     stored: 'guardado:',
+    contextLabel: 'Contexto',
+    contextHint:
+      'Tokens reservados para el KV cache. Menos contexto es menos memoria; la tarea sólo necesita un prompt corto, la imagen y dos campos de respuesta.',
     precisionLabel: 'Precisión de activaciones',
     precisionHint:
       'f16 usa la mitad de memoria de activaciones que f32. Sólo aplica en iOS. Si el modelo no entra, probá f16 primero.',

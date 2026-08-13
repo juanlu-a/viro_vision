@@ -7,6 +7,7 @@
  */
 export {
   CONFIGURACIONES,
+  CONTEXTOS,
   GEMMA_4_E2B_BYTES,
   GEMMA_4_E2B_URL,
   isOnDeviceSpikeEnabled,

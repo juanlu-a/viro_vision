@@ -20,7 +20,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { createLLM, estimateMemory } from 'react-native-litert-lm';
 import type { Backend, GenerationStats, LiteRTLMInstance } from 'react-native-litert-lm';
 
-import { MAX_CONTEXT_TOKENS } from './config';
+import { MAX_CONTEXT_TOKENS, MAX_OUTPUT_TOKENS } from './config';
 
 /**
  * Lo que se sabe **antes** de intentar cargar. Existe porque cuando la carga falla, el error de la
@@ -49,7 +49,11 @@ export interface CargaResultado {
 }
 
 /** Se calcula antes de cargar y **también se devuelve si la carga falla**, que es cuando importa. */
-export function diagnosticar(rutaArchivo: string, backend: Backend): Diagnostico {
+export function diagnosticar(
+  rutaArchivo: string,
+  backend: Backend,
+  contexto: number = MAX_CONTEXT_TOKENS,
+): Diagnostico {
   const base: Diagnostico = {
     archivoBytes: null,
     discoLibreBytes: null,
@@ -76,7 +80,7 @@ export function diagnosticar(rutaArchivo: string, backend: Backend): Diagnostico
       const e = estimateMemory({
         modelFileSizeBytes: base.archivoBytes,
         availableMemoryBytes: disponible,
-        config: { backend, maxContextTokens: MAX_CONTEXT_TOKENS },
+        config: { backend, maxContextTokens: contexto },
       });
       base.veredicto = e.verdict;
       base.detalle = e.recommendation;
@@ -120,6 +124,7 @@ export async function cargarModelo(
   backend: Backend,
   multimodal: boolean,
   precision: 'f32' | 'f16' = 'f16',
+  maxContextTokens: number = MAX_CONTEXT_TOKENS,
 ): Promise<CargaResultado> {
   await descargarModelo();
 
@@ -129,7 +134,9 @@ export async function cargarModelo(
   const t0 = performance.now();
   await llm.loadModel(rutaArchivo, {
     backend,
-    maxContextTokens: MAX_CONTEXT_TOKENS,
+    maxContextTokens,
+    // La respuesta son dos campos cortos: reservar más salida sería KV cache tirado.
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
     multimodal,
     // `f16` reduce a la mitad la memoria de activaciones, y es lo que recomienda el propio
     // estimador de la librería cuando el veredicto da "tight". Es una opción **sólo de iOS**, que

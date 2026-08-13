@@ -18,12 +18,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { strings } from '@/i18n';
 import {
-  cargarModelo,
-  descargarModelo,
   adoptarModelo,
+  cargarModelo,
+  CONTEXTOS,
+  descargarModelo,
   diagnosticar,
   espacioLibre,
   limpiarCopias,
+  MAX_CONTEXT_TOKENS,
   tamanoModelosGuardados,
   generarConImagen,
   generarTexto,
@@ -51,6 +53,7 @@ export interface SpikeState {
   backend: Backend;
   multimodal: boolean;
   precision: 'f32' | 'f16';
+  contexto: number;
   carga: CargaResultado | null;
   /** Se calcula al intentar cargar y sobrevive al fallo: es cuando más hace falta. */
   diagnostico: Diagnostico | null;
@@ -66,6 +69,7 @@ const inicial: SpikeState = {
   backend: 'cpu',
   multimodal: false,
   precision: 'f16',
+  contexto: MAX_CONTEXT_TOKENS,
   carga: null,
   diagnostico: null,
   generacion: null,
@@ -135,7 +139,7 @@ export function useOnDeviceSpike() {
       archivo: { uri: adoptado.ruta, nombre: adoptado.nombre },
       multimodal: pareceMultimodal,
       carga: null,
-      diagnostico: diagnosticar(adoptado.ruta, ref.current.backend),
+      diagnostico: diagnosticar(adoptado.ruta, ref.current.backend, ref.current.contexto),
       generacion: null,
       lectura: null,
       mensaje: `${adoptado.nombre} · ${t.stored} ${formatBytes(tamanoModelosGuardados())}`,
@@ -151,7 +155,7 @@ export function useOnDeviceSpike() {
         generacion: null,
         lectura: null,
         // La estimación de memoria depende del backend: recalcularla o mostraría la del anterior.
-        diagnostico: archivo ? diagnosticar(archivo.uri, backend) : null,
+        diagnostico: archivo ? diagnosticar(archivo.uri, backend, ref.current.contexto) : null,
       });
     },
     [update],
@@ -167,12 +171,23 @@ export function useOnDeviceSpike() {
     [update],
   );
 
+  /** Rota entre los presupuestos de contexto. Bajarlo es la palanca más barata contra la memoria. */
+  const rotarContexto = useCallback(() => {
+    const { archivo, backend, contexto } = ref.current;
+    const siguiente = CONTEXTOS[(CONTEXTOS.indexOf(contexto as never) + 1) % CONTEXTOS.length];
+    update({
+      contexto: siguiente,
+      carga: null,
+      diagnostico: archivo ? diagnosticar(archivo.uri, backend, siguiente) : null,
+    });
+  }, [update]);
+
   const cargar = useCallback(async () => {
-    const { archivo, backend, multimodal, precision } = ref.current;
+    const { archivo, backend, multimodal, precision, contexto } = ref.current;
     if (!archivo) return;
     update({ estado: 'loading', mensaje: t.loading, carga: null });
     try {
-      const carga = await cargarModelo(archivo.uri, backend, multimodal, precision);
+      const carga = await cargarModelo(archivo.uri, backend, multimodal, precision, contexto);
       update({ estado: 'idle', carga, mensaje: t.loaded });
     } catch (err) {
       update({ estado: 'idle', mensaje: `${t.loadError}: ${describir(err)}` });
@@ -240,6 +255,7 @@ export function useOnDeviceSpike() {
     setBackend,
     setMultimodal,
     setPrecision,
+    rotarContexto,
     cargar,
     liberar,
     limpiar,
