@@ -17,6 +17,7 @@ export type { EstimacionPorBackend, ResultadoSonda } from './probe';
 export {
   cargarModelo,
   descargarModelo,
+  descargarModeloRemoto,
   adoptarModelo,
   diagnosticar,
   espacioLibre,

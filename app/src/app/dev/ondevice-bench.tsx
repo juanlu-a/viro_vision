@@ -246,8 +246,15 @@ export default function OnDeviceBenchScreen() {
 
             {generacion && (
               <View className="gap-three">
+                {/* El TTFT medido sobre el primer token **del stream**, igual que el benchmark
+                    de nube. El que reporta el runtime nativo va aparte: si difieren mucho, el
+                    costo está en el puente JS y eso también es un dato. */}
                 <Fila
                   label={t.ttft}
+                  value={generacion.ttftMs == null ? '—' : formatMs(generacion.ttftMs)}
+                />
+                <Fila
+                  label={t.ttftNative}
                   value={
                     generacion.stats ? formatMs(generacion.stats.timeToFirstToken) : '—'
                   }

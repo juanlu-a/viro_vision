@@ -92,6 +92,8 @@ export interface GeneracionResultado {
   texto: string;
   /** Medido desde JS: incluye el ida y vuelta por el puente. */
   totalMs: number;
+  /** Hasta el primer token **con contenido**. `null` si el runtime no emitió ninguno. */
+  ttftMs: number | null;
   /** Lo que reporta la librería desde el runtime nativo. `null` si no las expuso. */
   stats: GenerationStats | null;
 }
@@ -148,22 +150,40 @@ export async function generarConImagen(
   prompt: string,
   rutaImagen: string,
 ): Promise<GeneracionResultado> {
-  return medir((llm) => llm.sendMessageWithImage(prompt, rutaImagen));
+  return medir((llm, onToken) => llm.sendMessageWithImageAsync(prompt, rutaImagen, onToken));
 }
 
 /** Genera sólo con texto. Sirve para probar que el runtime anda con un modelo chico. */
 export async function generarTexto(prompt: string): Promise<GeneracionResultado> {
-  return medir((llm) => llm.sendMessage(prompt));
+  return medir((llm, onToken) => llm.sendMessageAsync(prompt, onToken));
 }
 
+/**
+ * Mide una generación **en streaming**, y no con la variante que devuelve todo junto.
+ *
+ * No es un detalle: con la versión no-streaming, "el primer token" llega cuando la respuesta ya
+ * terminó, así que el time-to-first-token da ~1 ms y no significa nada. El benchmark de nube mide
+ * el TTFT sobre el primer delta de texto del stream; si acá se midiera de otra forma, los dos
+ * números dejarían de ser comparables — que es justamente lo que este spike existe para permitir.
+ */
 async function medir(
-  fn: (llm: LiteRTLMInstance) => Promise<string>,
+  fn: (
+    llm: LiteRTLMInstance,
+    onToken: (token: string, done: boolean) => void,
+  ) => Promise<void>,
 ): Promise<GeneracionResultado> {
   const llm = instancia;
   if (!llm) throw new Error('No hay modelo cargado.');
 
+  let texto = '';
+  let primerTokenMs: number | null = null;
+
   const t0 = performance.now();
-  const texto = await fn(llm);
+  await fn(llm, (token, done) => {
+    // El primer token con contenido, no el primer callback: algunos runtimes emiten uno vacío.
+    if (primerTokenMs === null && token.length > 0) primerTokenMs = performance.now() - t0;
+    if (!done) texto += token;
+  });
   const totalMs = performance.now() - t0;
 
   let stats: GenerationStats | null = null;
@@ -173,7 +193,7 @@ async function medir(
     stats = null;
   }
 
-  return { texto, totalMs, stats };
+  return { texto, totalMs, ttftMs: primerTokenMs, stats };
 }
 
 /**
@@ -266,6 +286,39 @@ export async function adoptarModelo(uriCopiado: string): Promise<{ ruta: string;
   limpiarCarpetaCache('DocumentPicker');
 
   return { ruta: `${destino.uri.replace('file://', '')}/${nombre}`, nombre };
+}
+
+/**
+ * Descarga el modelo multimodal directamente a la carpeta de la app.
+ *
+ * Es el camino que el ADR 0004 define para el producto —el modelo se baja la primera vez que se
+ * usa— y acá además resuelve dos problemas del spike: garantiza la **variante correcta** (el
+ * `gemma-4-E2B-it.litertlm` sin sufijo; las `-gpu` y `-web` no traen codificador de visión y no
+ * pueden leer un cartel), y mide cuánto tarda, que es un costo de onboarding real y todavía no
+ * medido por nadie.
+ *
+ * Descarga al destino final, no a una carpeta temporal: no hay espacio para dos copias de 2,59 GB.
+ */
+export async function descargarModeloRemoto(
+  url: string,
+  onProgress: (fraccion: number, bytes: number, total: number) => void,
+): Promise<{ ruta: string; nombre: string; ms: number }> {
+  await descargarModelo();
+
+  const destino = carpetaModelos();
+  // Un modelo a la vez: lo viejo se va antes de traer lo nuevo, o no entra.
+  for (const previo of destino.list()) previo.delete();
+
+  const t0 = performance.now();
+  const archivo = await File.downloadFileAsync(url, destino, {
+    idempotent: true,
+    onProgress: ({ bytesWritten, totalBytes }) => {
+      onProgress(totalBytes > 0 ? bytesWritten / totalBytes : 0, bytesWritten, totalBytes);
+    },
+  });
+  const ms = performance.now() - t0;
+
+  return { ruta: archivo.uri.replace('file://', ''), nombre: archivo.name, ms };
 }
 
 /** Cuánto ocupan hoy los modelos guardados. Para que el costo esté a la vista y no sorprenda. */
