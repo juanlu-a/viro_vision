@@ -35,7 +35,7 @@ import type {
   GeneracionResultado,
   ResultadoSonda,
 } from '@/services/ondevice';
-import { formatBytes, parseBusReading } from '@/services/vision';
+import { busReadingSchema, formatBytes, parseBusReading } from '@/services/vision';
 import type { BusReading } from '@/services/vision';
 import { SYSTEM_PROMPT, USER_PROMPT } from '@/services/vision/providers';
 
@@ -219,6 +219,8 @@ export function useOnDeviceSpike() {
       const g = await generarConImagen(
         `${SYSTEM_PROMPT}\n\n${USER_PROMPT}`,
         decodeURI(foto.assets[0].uri.replace('file://', '')),
+        // El mismo schema que le exige la nube: misma forma de salida, mismo parser.
+        busReadingSchema,
       );
       update({
         estado: 'idle',

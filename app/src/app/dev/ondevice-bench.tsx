@@ -249,7 +249,10 @@ export default function OnDeviceBenchScreen() {
               label={t.runImage}
               hint={t.runImageHint}
               onPress={probarImagen}
-              disabled={ocupado || !state.multimodal}
+              // Habilitado siempre que haya modelo cargado, aunque no se haya marcado multimodal:
+              // un botón deshabilitado no explica nada, y el error del runtime dice más que
+              // nuestra suposición sobre si el modelo acepta imagen.
+              disabled={ocupado}
             />
 
             {generacion && (

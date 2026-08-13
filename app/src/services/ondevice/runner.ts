@@ -135,6 +135,10 @@ export async function cargarModelo(
     // estimador de la librería cuando el veredicto da "tight". Es una opción **sólo de iOS**, que
     // es la plataforma donde el modelo grande no entraba; en Android el SDK no la expone.
     activationDataType: precision,
+    // Habilita el decodificado restringido, que es lo que permite exigir el JSON por schema en
+    // vez de pedirlo por prompt y rezar. Tiene un costo fijo al crear la conversación, así que se
+    // paga una vez y no por mensaje.
+    enableStructuredOutput: true,
   });
   const cargaMs = performance.now() - t0;
 
@@ -150,12 +154,32 @@ export async function cargarModelo(
   return { cargaMs, memoriaDespuesBytes, backend };
 }
 
-/** Genera con una imagen. Sólo tiene sentido con un modelo multimodal (Gemma 4, no Gemma 3 1B). */
+/**
+ * Genera a partir de una imagen, **exigiendo** la forma de la respuesta por schema.
+ *
+ * Usa `execute` con partes multimodales en vez de `sendMessageWithImage` por una razón concreta:
+ * es la única variante que acepta `responseSchema`, y con eso el runtime **garantiza** que la
+ * salida parsea contra el schema en lugar de pedirlo por prompt y confiar. El benchmark de nube
+ * usa salida estructurada del mismo modo, así que además mantiene la comparación honesta: si uno
+ * tuviera la forma garantizada y el otro no, la diferencia de precisión no sería del modelo.
+ *
+ * El orden —imagen primero, texto después— es el mismo que usa el proveedor de nube.
+ */
 export async function generarConImagen(
   prompt: string,
   rutaImagen: string,
+  schema: object,
 ): Promise<GeneracionResultado> {
-  return medir((llm, onToken) => llm.sendMessageWithImageAsync(prompt, rutaImagen, onToken));
+  return medir((llm, onToken) =>
+    llm.execute(
+      [
+        { type: 'image', path: rutaImagen },
+        { type: 'text', text: prompt },
+      ],
+      onToken,
+      { responseSchema: JSON.stringify(schema) },
+    ),
+  );
 }
 
 /** Genera sólo con texto. Sirve para probar que el runtime anda con un modelo chico. */
@@ -175,7 +199,7 @@ async function medir(
   fn: (
     llm: LiteRTLMInstance,
     onToken: (token: string, done: boolean) => void,
-  ) => Promise<void>,
+  ) => Promise<unknown>,
 ): Promise<GeneracionResultado> {
   const llm = instancia;
   if (!llm) throw new Error('No hay modelo cargado.');
