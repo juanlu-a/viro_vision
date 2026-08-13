@@ -1,24 +1,19 @@
 /**
- * Pantalla del spike de inferencia local (ADR 0004).
+ * El laboratorio del spike de visión local (ADR 0004): todos los caminos, con todas las perillas.
  *
- * REGLA DE FRONTERA (ADR 0001): herramienta de desarrollo. Va detrás de `__DEV__` a secas, no del
- * gate de claves que usa el benchmark de nube — acá no hay clave de API que gatear.
- *
- * El orden de la pantalla es el orden del experimento, del corte más barato al más caro: sondear
- * (no carga nada) → elegir archivo → cargar → generar. Cada paso sólo se habilita si el anterior
- * salió bien, para que un fallo se atribuya al paso correcto.
+ * Es un componente y no una pantalla porque el usuario lo quiso **en Inicio** mientras dure la
+ * etapa de prueba: la elección definitiva de flujo todavía no está tomada, y compararlos desde la
+ * pantalla real es parte del experimento. Cuando el equipo decida un camino, esto se reduce o
+ * vuelve a una pantalla de desarrollo — es deliberadamente fácil de mover.
  *
  * Todo mensaje se anuncia con `announceForAccessibility`: `accessibilityLiveRegion` es sólo
- * Android, así que en iPhone —el equipo objetivo hoy— no anunciaría nada.
+ * Android, así que en iPhone no anunciaría nada.
  */
-import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
-import { Screen } from '@/components/screen';
-import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { useOnDeviceSpike } from '@/features/ondevice/useOnDeviceSpike';
 import { strings } from '@/i18n';
@@ -37,7 +32,7 @@ function Fila({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function OnDeviceBenchScreen() {
+export function OnDeviceLab() {
   const {
     state,
     elegirArchivo,
@@ -67,12 +62,6 @@ export default function OnDeviceBenchScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{ headerShown: true, title: '', headerBackTitle: strings.common.back }}
-      />
-      {/* `edges={[]}`: el header nativo ya cubre el inset de arriba. */}
-      <Screen scroll edges={[]}>
-        <ScreenHeader title={t.title} subtitle={t.intro} />
 
         {/* La contraprueba del spike: el mismo Gemma 4, por el runtime de Apple (MLX) en vez
             del delegado Metal de LiteRT. Responde si la visión falla por la librería o por el
@@ -372,7 +361,6 @@ export default function OnDeviceBenchScreen() {
             )}
           </Card>
         )}
-      </Screen>
     </>
   );
 }

@@ -17,9 +17,11 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { announce } from '@/features/audio/announcer';
+import { OnDeviceLab } from '@/features/ondevice/OnDeviceLab';
 import { useLector } from '@/features/reader/useLector';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
+import { isOnDeviceSpikeEnabled } from '@/services/ondevice';
 import { loadUserName } from '@/services/storage/userName';
 import { formatMs } from '@/services/vision';
 
@@ -135,6 +137,11 @@ export default function HomeScreen() {
           </View>
         )}
       </Card>
+
+      {/* El laboratorio completo del spike, en Inicio a pedido del equipo mientras dure la
+          etapa de prueba: la elección definitiva de flujo no está tomada, y compararlo desde la
+          pantalla real es parte del experimento. Gateado por la misma variable de siempre. */}
+      {isOnDeviceSpikeEnabled && <OnDeviceLab />}
 
       <Card>
         <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">

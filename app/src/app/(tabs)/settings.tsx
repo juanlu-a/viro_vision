@@ -9,7 +9,6 @@ import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemeSelector } from '@/features/theme/ThemeSelector';
 import { strings } from '@/i18n';
-import { isOnDeviceSpikeEnabled } from '@/services/ondevice';
 import { loadUserName, saveUserName } from '@/services/storage/userName';
 import { isVisionConfigured } from '@/services/vision';
 
@@ -80,16 +79,6 @@ export default function SettingsScreen() {
             variant="secondary"
             onPress={() => router.push('/dev/vision-bench')}
           />
-          {/* Mismo criterio que el benchmark: gatear por __DEV__ la escondía justo donde hay que
-              medirla, que es un build de Release en el teléfono. Va por variable de entorno. */}
-          {isOnDeviceSpikeEnabled && (
-            <AccessibleButton
-              label={strings.ondevice.title}
-              hint={strings.ondevice.probeHint}
-              variant="secondary"
-              onPress={() => router.push('/dev/ondevice-bench')}
-            />
-          )}
         </Card>
       )}
     </Screen>
