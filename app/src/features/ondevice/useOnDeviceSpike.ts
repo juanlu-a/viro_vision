@@ -25,6 +25,9 @@ import {
   descargarModelo,
   descargarModeloRemoto,
   diagnosticar,
+  etCargar,
+  etGenerarConImagen,
+  etLiberar,
   espacioLibre,
   leerImagen,
   liberarOcr,
@@ -38,6 +41,7 @@ import {
 } from '@/services/ondevice';
 import type {
   CargaResultado,
+  EtGeneracionResultado,
   LecturaOcr,
   ModeloRemoto,
   Diagnostico,
@@ -71,6 +75,10 @@ export interface SpikeState {
   /** Resultado del OCR local, que es el otro camino que el spike compara. */
   ocr: LecturaOcr | null;
   ocrCargaMs: number | null;
+  /** Resultados del mismo Gemma multimodal pero por ExecuTorch (MLX en iOS). La contraprueba. */
+  etCargaMs: number | null;
+  etGeneracion: EtGeneracionResultado | null;
+  etLectura: BusReading | null;
   carga: CargaResultado | null;
   /** Se calcula al intentar cargar y sobrevive al fallo: es cuando más hace falta. */
   diagnostico: Diagnostico | null;
@@ -93,6 +101,9 @@ const inicial: SpikeState = {
   descargaMs: null,
   ocr: null,
   ocrCargaMs: null,
+  etCargaMs: null,
+  etGeneracion: null,
+  etLectura: null,
   carga: null,
   diagnostico: null,
   generacion: null,
@@ -112,6 +123,7 @@ export function useOnDeviceSpike() {
       // y de culpar al modelo equivocado en la próxima prueba.
       void descargarModelo();
       liberarOcr();
+      etLiberar();
     };
   }, []);
 
@@ -220,6 +232,34 @@ export function useOnDeviceSpike() {
       update({ estado: 'idle', ocr: r, mensaje: t.result });
     } catch (err) {
       update({ estado: 'idle', mensaje: `${t.ocrError}: ${describir(err)}` });
+    }
+  }, [update]);
+
+  /** Descarga (~3 GB la primera vez) y carga el Gemma 4 multimodal por ExecuTorch. */
+  const etPreparar = useCallback(async () => {
+    update({ estado: 'loading', mensaje: t.etLoading, progreso: 0, etGeneracion: null });
+    try {
+      const r = await etCargar((fraccion) => update({ progreso: fraccion }));
+      update({ estado: 'idle', progreso: null, etCargaMs: r.descargaYCargaMs, mensaje: t.etReady });
+    } catch (err) {
+      update({ estado: 'idle', progreso: null, mensaje: `${t.etError}: ${describir(err)}` });
+    }
+  }, [update]);
+
+  const etLeerImagen = useCallback(async () => {
+    const foto = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (foto.canceled || !foto.assets?.[0]) return;
+
+    update({ estado: 'running', mensaje: t.running, etGeneracion: null, etLectura: null });
+    try {
+      // Mismo prompt que la nube y que LiteRT: sin eso la comparación no significa nada.
+      const g = await etGenerarConImagen(
+        `${SYSTEM_PROMPT}\n\n${USER_PROMPT}`,
+        foto.assets[0].uri,
+      );
+      update({ estado: 'idle', etGeneracion: g, etLectura: parseBusReading(g.texto), mensaje: t.result });
+    } catch (err) {
+      update({ estado: 'idle', mensaje: `${t.etError}: ${describir(err)}` });
     }
   }, [update]);
 
@@ -345,6 +385,8 @@ export function useOnDeviceSpike() {
     descargar,
     prepararOcr,
     leerConOcr,
+    etPreparar,
+    etLeerImagen,
     setBackend,
     setMultimodal,
     setPrecision,

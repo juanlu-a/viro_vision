@@ -47,6 +47,8 @@ export default function OnDeviceBenchScreen() {
     descargar,
     prepararOcr,
     leerConOcr,
+    etPreparar,
+    etLeerImagen,
     setBackend,
     setMultimodal,
     setPrecision,
@@ -113,6 +115,52 @@ export default function OnDeviceBenchScreen() {
                   />
                 ) : null,
               )}
+            </View>
+          )}
+        </Card>
+
+        {/* La contraprueba del spike: el mismo Gemma 4, por el runtime de Apple (MLX) en vez
+            del delegado Metal de LiteRT. Responde si la visión falla por la librería o por el
+            teléfono. */}
+        <Card>
+          <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+            {t.etSection.toUpperCase()}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t.etIntro}
+          </ThemedText>
+          <AccessibleButton
+            label={
+              state.progreso == null || state.estado !== 'loading'
+                ? t.etPrepare
+                : `${t.etLoading} ${Math.round(state.progreso * 100)} %`
+            }
+            hint={t.etPrepareHint}
+            variant="secondary"
+            onPress={etPreparar}
+            disabled={ocupado}
+          />
+          <AccessibleButton
+            label={t.etRead}
+            hint={t.etReadHint}
+            onPress={etLeerImagen}
+            disabled={ocupado || state.etCargaMs == null}
+          />
+          {state.etCargaMs != null && <Fila label={t.etLoadTime} value={formatMs(state.etCargaMs)} />}
+          {state.etGeneracion && (
+            <View className="gap-three">
+              <Fila
+                label={t.ttft}
+                value={state.etGeneracion.ttftMs == null ? '—' : formatMs(state.etGeneracion.ttftMs)}
+              />
+              <Fila label={t.totalTime} value={formatMs(state.etGeneracion.totalMs)} />
+              {state.etLectura && (
+                <Fila
+                  label={t.parsed}
+                  value={`${state.etLectura.numero ?? '—'} · ${state.etLectura.nombre ?? '—'}`}
+                />
+              )}
+              <Fila label={t.rawText} value={state.etGeneracion.texto.slice(0, 400)} />
             </View>
           )}
         </Card>

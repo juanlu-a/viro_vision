@@ -122,6 +122,17 @@ export const es = {
     ocrReadTime: 'Tiempo de lectura',
     ocrDetections: 'Textos detectados',
     ocrNone: 'No se detectó texto.',
+    etSection: 'Gemma multimodal (ExecuTorch)',
+    etIntro:
+      'El mismo Gemma 4 E2B, por otro runtime (MLX en iOS). La contraprueba: si acá la visión anda, el problema era la librería; si falla igual, es el teléfono.',
+    etPrepare: 'Descargar y cargar (~3 GB)',
+    etPrepareHint: 'Baja el modelo multimodal la primera vez y lo carga. Tarda varios minutos.',
+    etLoading: 'Descargando y cargando Gemma multimodal…',
+    etReady: 'Gemma multimodal listo.',
+    etError: 'Falló ExecuTorch',
+    etRead: 'Leer el cartel de una foto (ExecuTorch)',
+    etReadHint: 'Elige una foto y le pide número y nombre de línea al modelo, con el mismo prompt que los demás caminos.',
+    etLoadTime: 'Descarga + carga',
     strictJson: 'JSON garantizado',
     strictJsonHint:
       'Exige la forma de la respuesta por schema. Se inicializa al crear la conversación, que es justo donde falla la carga: apagalo para descartarlo como causa.',

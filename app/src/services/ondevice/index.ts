@@ -33,3 +33,5 @@ export {
 export type { CargaResultado, Diagnostico, GeneracionResultado } from './runner';
 export { cargarOcr, leerImagen, liberarOcr, ocrCargado } from './ocr';
 export type { LecturaOcr } from './ocr';
+export { etCargado, etCargar, etGenerarConImagen, etLiberar } from './executorchLlm';
+export type { EtCargaResultado, EtGeneracionResultado } from './executorchLlm';
