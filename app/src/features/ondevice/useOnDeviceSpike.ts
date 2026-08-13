@@ -28,6 +28,7 @@ import {
   etCargar,
   etGenerarConImagen,
   etLiberar,
+  etReiniciarConversacion,
   espacioLibre,
   leerImagen,
   liberarOcr,
@@ -236,6 +237,9 @@ export function useOnDeviceSpike() {
 
     update({ estado: 'running', mensaje: t.running, etGeneracion: null, etLectura: null });
     try {
+      // Cada corrida arranca sin historia: con historia acumulada, la segunda re-procesa la
+      // primera y los tiempos dejan de ser comparables.
+      etReiniciarConversacion();
       // Mismo prompt que la nube y que LiteRT: sin eso la comparación no significa nada.
       const g = await etGenerarConImagen(
         `${SYSTEM_PROMPT}\n\n${USER_PROMPT}`,

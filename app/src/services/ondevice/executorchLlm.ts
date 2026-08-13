@@ -15,14 +15,6 @@
  */
 import { GEMMA4_E2B_MM, LLMModule } from 'react-native-executorch';
 
-/**
- * Dónde va la imagen dentro del prompt. Viene del `tokenizer_config.json` del modelo
- * (`image_token`): el runner reemplaza cada aparición por la imagen correspondiente, y exige que
- * haya tantos marcadores como imágenes — pasarle una imagen sin marcador es el error
- * "More image/audio paths provided than placeholders in prompt".
- */
-const IMAGE_TOKEN = '<|image|>';
-
 export interface EtCargaResultado {
   descargaYCargaMs: number;
 }
@@ -70,11 +62,28 @@ export async function etGenerarConImagen(
     if (ttftMs === null && token.length > 0) ttftMs = performance.now() - t0;
   };
   try {
-    // La imagen primero y el texto después, igual que en los otros dos caminos del spike.
-    const texto = await llm.forward(`${IMAGE_TOKEN}\n${prompt}`, [rutaImagen]);
-    return { texto, totalMs: performance.now() - t0, ttftMs };
+    // `sendMessage` y no `forward`: forward manda el texto CRUDO, sin la plantilla de chat de
+    // Gemma (<start_of_turn> y compañía), y el modelo responde con un fin-de-turno inmediato —
+    // generación de 3 s con texto vacío, medido en el teléfono. sendMessage aplica la plantilla y
+    // coloca la imagen solo.
+    const historia = await llm.sendMessage(prompt, { imagePath: rutaImagen });
+    const respuesta = [...historia].reverse().find((m) => m.role === 'assistant');
+    return { texto: respuesta?.content ?? '', totalMs: performance.now() - t0, ttftMs };
   } finally {
     onTokenActual = null;
+  }
+}
+
+/**
+ * Borra la conversación acumulada. `sendMessage` guarda historia, y en un benchmark cada corrida
+ * debe arrancar igual que la anterior: con historia acumulada, la segunda corrida re-procesa la
+ * primera y los tiempos dejan de ser comparables.
+ */
+export function etReiniciarConversacion(): void {
+  try {
+    modulo?.deleteMessage(0);
+  } catch {
+    // Sin historia que borrar: no es un error.
   }
 }
 
