@@ -107,6 +107,7 @@ export const es = {
     downloading: 'Descargando…',
     downloadError: 'No se pudo descargar',
     downloadTime: 'Tiempo de descarga',
+    ramWarning: 'Este modelo necesita, con visión activa,',
     strictJson: 'JSON garantizado',
     strictJsonHint:
       'Exige la forma de la respuesta por schema. Se inicializa al crear la conversación, que es justo donde falla la carga: apagalo para descartarlo como causa.',

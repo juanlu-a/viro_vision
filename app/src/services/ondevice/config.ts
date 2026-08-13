@@ -78,6 +78,16 @@ export interface ModeloRemoto {
   bytes: number;
   /** Falso sólo para los de texto, que sirven para probar el runtime pero no para leer un cartel. */
   multimodal: boolean;
+  /**
+   * RAM disponible que el modelo necesita **con la visión activa**, según la documentación de la
+   * librería. `null` cuando no está documentada.
+   *
+   * Es un dato aparte del tamaño del archivo y no se deduce de él: Gemma 4 E2B pesa 2,58 GB y pide
+   * 4 GB. La diferencia es el codificador de visión, que se carga bajo demanda y **no entra en la
+   * estimación de memoria** de la librería —que modela pesos y KV cache, o sea el camino de texto—.
+   * Por eso el estimador puede decir "entra cómodo" y la carga fallar igual.
+   */
+  ramMinimaBytes: number | null;
 }
 
 export const MODELOS_REMOTOS: readonly ModeloRemoto[] = [
@@ -88,6 +98,7 @@ export const MODELOS_REMOTOS: readonly ModeloRemoto[] = [
     url: 'https://huggingface.co/litert-community/MiniCPM5-1B/resolve/main/minicpm_wi4b32_wi8_afp32.litertlm',
     bytes: 792_723_456,
     multimodal: true,
+    ramMinimaBytes: null,
   },
   {
     // El candidato de referencia: la mitad que Gemma 4, y el más usado de los que leen imagen.
@@ -96,6 +107,7 @@ export const MODELOS_REMOTOS: readonly ModeloRemoto[] = [
     url: 'https://huggingface.co/litert-community/FastVLM-0.5B/resolve/main/FastVLM-0.5B.litertlm',
     bytes: 1_156_579_328,
     multimodal: true,
+    ramMinimaBytes: null,
   },
   {
     id: 'smolvlm2-2.2b',
@@ -103,6 +115,7 @@ export const MODELOS_REMOTOS: readonly ModeloRemoto[] = [
     url: 'https://huggingface.co/litert-community/SmolVLM2-2.2B/resolve/main/SmolVLM2-2.2B.litertlm',
     bytes: 1_511_193_088,
     multimodal: true,
+    ramMinimaBytes: null,
   },
   {
     id: 'qwen2-vl-2b',
@@ -110,6 +123,7 @@ export const MODELOS_REMOTOS: readonly ModeloRemoto[] = [
     url: 'https://huggingface.co/litert-community/Qwen2-VL-2B/resolve/main/Qwen2-VL-2B.litertlm',
     bytes: 1_783_627_776,
     multimodal: true,
+    ramMinimaBytes: null,
   },
   {
     id: 'gemma-4-e2b',
@@ -117,5 +131,10 @@ export const MODELOS_REMOTOS: readonly ModeloRemoto[] = [
     url: GEMMA_4_E2B_URL,
     bytes: GEMMA_4_E2B_BYTES,
     multimodal: true,
+    // 4 GB+, documentado por la librería. Un iPhone 15 Pro reporta ~3,3 GB disponibles.
+    ramMinimaBytes: 4 * 1024 ** 3,
   },
 ];
+
+/** Modelo de la librería para Gemma 3n, público y sin autenticación (litert.dev). */
+export const GEMMA_3N_E2B_URL = 'https://litert.dev/gemma-3n-E2B-it-int4.litertlm';

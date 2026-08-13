@@ -128,6 +128,15 @@ export default function OnDeviceBenchScreen() {
             onPress={rotarRemoto}
             disabled={ocupado}
           />
+          {/* El aviso va **antes** de bajar un archivo de gigabytes: la RAM que pide la visión no
+              se deduce del tamaño, y el estimador de la librería no la modela. */}
+          {state.remoto.ramMinimaBytes != null &&
+            state.sonda?.memoriaDisponibleBytes != null &&
+            state.sonda.memoriaDisponibleBytes < state.remoto.ramMinimaBytes && (
+              <ThemedText type="small" themeColor="danger">
+                {`${t.ramWarning} ${formatBytes(state.remoto.ramMinimaBytes)}. ${t.availableMemory}: ${formatBytes(state.sonda.memoriaDisponibleBytes)}.`}
+              </ThemedText>
+            )}
           <AccessibleButton
             label={
               state.progreso == null
