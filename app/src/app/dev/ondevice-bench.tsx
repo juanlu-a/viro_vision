@@ -48,6 +48,7 @@ export default function OnDeviceBenchScreen() {
     setBackend,
     setMultimodal,
     setPrecision,
+    setJsonEstricto,
     rotarContexto,
     cargar,
     liberar,
@@ -171,6 +172,13 @@ export default function OnDeviceBenchScreen() {
             hint={t.backendHint}
             variant="secondary"
             onPress={() => setBackend(state.backend === 'cpu' ? 'gpu' : 'cpu')}
+            disabled={ocupado}
+          />
+          <AccessibleButton
+            label={`${t.strictJson}: ${state.jsonEstricto ? t.yes : t.no}`}
+            hint={t.strictJsonHint}
+            variant="secondary"
+            onPress={() => setJsonEstricto(!state.jsonEstricto)}
             disabled={ocupado}
           />
           <AccessibleButton

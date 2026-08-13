@@ -107,6 +107,9 @@ export const es = {
     downloading: 'Descargando…',
     downloadError: 'No se pudo descargar',
     downloadTime: 'Tiempo de descarga',
+    strictJson: 'JSON garantizado',
+    strictJsonHint:
+      'Exige la forma de la respuesta por schema. Se inicializa al crear la conversación, que es justo donde falla la carga: apagalo para descartarlo como causa.',
     contextLabel: 'Contexto',
     contextHint:
       'Tokens reservados para el KV cache. Menos contexto es menos memoria; la tarea sólo necesita un prompt corto, la imagen y dos campos de respuesta.',

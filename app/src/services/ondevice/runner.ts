@@ -125,6 +125,7 @@ export async function cargarModelo(
   multimodal: boolean,
   precision: 'f32' | 'f16' = 'f16',
   maxContextTokens: number = MAX_CONTEXT_TOKENS,
+  structuredOutput: boolean = true,
 ): Promise<CargaResultado> {
   await descargarModelo();
 
@@ -143,9 +144,10 @@ export async function cargarModelo(
     // es la plataforma donde el modelo grande no entraba; en Android el SDK no la expone.
     activationDataType: precision,
     // Habilita el decodificado restringido, que es lo que permite exigir el JSON por schema en
-    // vez de pedirlo por prompt y rezar. Tiene un costo fijo al crear la conversación, así que se
-    // paga una vez y no por mensaje.
-    enableStructuredOutput: true,
+    // vez de pedirlo por prompt y rezar. Es configurable porque **se inicializa justo donde falla
+    // la carga** —al crear la conversación—, así que hay que poder descartarlo como causa antes
+    // de culpar al codificador de visión.
+    enableStructuredOutput: structuredOutput,
   });
   const cargaMs = performance.now() - t0;
 
@@ -175,7 +177,7 @@ export async function cargarModelo(
 export async function generarConImagen(
   prompt: string,
   rutaImagen: string,
-  schema: object,
+  schema: object | null,
 ): Promise<GeneracionResultado> {
   return medir((llm, onToken) =>
     llm.execute(
@@ -184,7 +186,9 @@ export async function generarConImagen(
         { type: 'text', text: prompt },
       ],
       onToken,
-      { responseSchema: JSON.stringify(schema) },
+      // Sin `enableStructuredOutput` al cargar, exigir el schema acá daría error: se pide por
+      // prompt y se valida con el parser, como hace cualquier cliente sin salida garantizada.
+      schema ? { responseSchema: JSON.stringify(schema) } : undefined,
     ),
   );
 }

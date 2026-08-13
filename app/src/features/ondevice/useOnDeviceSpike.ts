@@ -57,6 +57,7 @@ export interface SpikeState {
   multimodal: boolean;
   precision: 'f32' | 'f16';
   contexto: number;
+  jsonEstricto: boolean;
   /** Cuál de los modelos del catálogo está seleccionado para descargar. */
   remoto: ModeloRemoto;
   /** Fracción 0–1 mientras se descarga, `null` si no hay descarga en curso. */
@@ -79,6 +80,7 @@ const inicial: SpikeState = {
   multimodal: false,
   precision: 'f16',
   contexto: MAX_CONTEXT_TOKENS,
+  jsonEstricto: true,
   remoto: MODELOS_REMOTOS[1],
   progreso: null,
   descargaMs: null,
@@ -206,6 +208,11 @@ export function useOnDeviceSpike() {
     [update],
   );
 
+  const setJsonEstricto = useCallback(
+    (jsonEstricto: boolean) => update({ jsonEstricto, carga: null }),
+    [update],
+  );
+
   const setPrecision = useCallback(
     (precision: 'f32' | 'f16') => update({ precision, carga: null }),
     [update],
@@ -223,11 +230,18 @@ export function useOnDeviceSpike() {
   }, [update]);
 
   const cargar = useCallback(async () => {
-    const { archivo, backend, multimodal, precision, contexto } = ref.current;
+    const { archivo, backend, multimodal, precision, contexto, jsonEstricto } = ref.current;
     if (!archivo) return;
     update({ estado: 'loading', mensaje: t.loading, carga: null });
     try {
-      const carga = await cargarModelo(archivo.uri, backend, multimodal, precision, contexto);
+      const carga = await cargarModelo(
+        archivo.uri,
+        backend,
+        multimodal,
+        precision,
+        contexto,
+        jsonEstricto,
+      );
       update({ estado: 'idle', carga, mensaje: t.loaded });
     } catch (err) {
       update({ estado: 'idle', mensaje: `${t.loadError}: ${describir(err)}` });
@@ -274,8 +288,8 @@ export function useOnDeviceSpike() {
       const g = await generarConImagen(
         `${SYSTEM_PROMPT}\n\n${USER_PROMPT}`,
         decodeURI(foto.assets[0].uri.replace('file://', '')),
-        // El mismo schema que le exige la nube: misma forma de salida, mismo parser.
-        busReadingSchema,
+        // Sólo se puede exigir el schema si el modelo se cargó con decodificado restringido.
+        ref.current.jsonEstricto ? busReadingSchema : null,
       );
       update({
         estado: 'idle',
@@ -297,6 +311,7 @@ export function useOnDeviceSpike() {
     setBackend,
     setMultimodal,
     setPrecision,
+    setJsonEstricto,
     rotarContexto,
     cargar,
     liberar,
