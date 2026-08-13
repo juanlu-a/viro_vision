@@ -268,6 +268,28 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   botones `ghost` no se leían como botones; y el selector de tema pasó a un desplegable compacto —
   ocupando media pantalla, la apariencia parecía el ajuste más importante de la app.
 
+## 2026-08-13 — El spike de visión local cierra: era la librería, no el teléfono
+
+- **La visión de LiteRT-LM no funciona en iOS.** Aislado con método: tres modelos multimodales
+  (756 MB, 1,4 GB, 2,5 GB) fallan idéntico sólo con visión activa; memoria (veredicto "safe" y
+  fallaba igual), disco, contexto (1024→256 sin cambio), precisión y decodificado restringido,
+  descartados uno por uno. Tres hipótesis mías murieron contra la evidencia en el camino — la de
+  RAM documentada incluida, cuando el modelo de 756 MB también falló.
+- **La contraprueba: ExecuTorch (MLX) sí ve.** El mismo Gemma 4 E2B multimodal carga en ~4 s y lee
+  el cartel bien. Dos errores de uso en el medio, los dos medidos y arreglados: `forward()` sin la
+  plantilla de chat devuelve vacío (`sendMessage()` la aplica), y sin decodificado restringido la
+  forma del JSON tiene que ir en el prompt — el modelo inventaba claves. También leía la matrícula
+  en vez del cartel hasta que el prompt lo prohibió.
+- **Pero 6,4 s totales es lento para un ómnibus acercándose.** El OCR local (CRAFT + CRNN en
+  español, ~250 MB) lee en fracciones de segundo y devuelve posición — lo que habilita priorizar
+  el más cercano. Recomendación para el tutor: detección + OCR preentrenados como camino primario,
+  VLM como comparación. Es la arquitectura de la tesis sin pagar el entrenamiento.
+- En el camino, dos incidentes con moraleja: la app llegó a ~10 GB porque cada elección de archivo
+  copiaba el modelo sin borrar el anterior (ahora guarda uno solo y muestra diagnóstico antes de
+  cargar), y declarar `expo-file-system` rompió el arranque con un símbolo faltante — el árbol de
+  dependencias estaba atrasado respecto del SDK y hubo que realinearlo entero.
+- Síntesis para el equipo en `docs/spike-vision-local.md`; ADR 0004 actualizado.
+
 ## Open threads / next
 - Merge **PR #7** (email/password auth).
 - Install the iOS simulator runtime to see the app (or run on a real device via EAS dev build).

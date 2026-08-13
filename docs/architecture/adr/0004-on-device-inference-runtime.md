@@ -150,6 +150,29 @@ para decidir con el tutor.**
 Tampoco hay todavía números de tiempo de carga ni de time-to-first-token con imagen, que son los que
 harían comparable el camino local contra el benchmark de nube.
 
+## Actualización 2026-08-13 — la contraprueba cierra el spike
+
+Resultados completos y hallazgos en [`docs/spike-vision-local.md`](../../spike-vision-local.md).
+Lo que cambia para este ADR:
+
+1. **El camino de visión de LiteRT-LM no funciona en iOS** (vía `react-native-litert-lm`): tres
+   modelos multimodales de 756 MB a 2,5 GB fallan idéntico al crear la conversación, con memoria,
+   disco, contexto y precisión descartados con evidencia. El texto sí funciona. Bug reportable.
+2. **La contraprueba lo confirma**: el mismo Gemma 4 E2B multimodal, por **ExecuTorch** (MLX en
+   iOS), carga en ~4 s y lee el cartel correctamente. El problema era la librería, no el hardware.
+3. **Pero el VLM local es lento para este caso de uso**: TTFT ~5,6 s, total ~6,4 s. Un ómnibus
+   acercándose no espera eso.
+4. **La pregunta de alcance de este ADR ya tiene evidencia**: el pipeline detección + OCR con
+   modelos **preentrenados** de ExecuTorch (COCO trae la clase "bus"; OCR CRAFT+CRNN en español,
+   ~250 MB) lee en fracciones de segundo y devuelve coordenadas — que son lo que permite priorizar
+   el ómnibus más cercano. La recomendación pasa de "conservar como comparación" a **"detección +
+   OCR como camino primario del teléfono, VLM local como término de comparación en el informe"**,
+   a validar con el tutor.
+
+Consecuencias nuevas: el mínimo de iOS sube a **17.0** (podspec de ExecuTorch); hoy conviven dos
+runtimes en el binario y hay que decidir uno; la cuenta paga de Apple queda desacoplada de la
+visión local (sirve para distribuir, no para esto).
+
 ## Próximos pasos
 
 1. Averiguar qué app hospeda a Gemma en el iPhone y si expone servidor local → habilitaría medir
