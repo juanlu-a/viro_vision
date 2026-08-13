@@ -64,7 +64,8 @@ export default function OnDeviceBenchScreen() {
       <Stack.Screen
         options={{ headerShown: true, title: '', headerBackTitle: strings.common.back }}
       />
-      <Screen scroll>
+      {/* `edges={[]}`: el header nativo ya cubre el inset de arriba. */}
+      <Screen scroll edges={[]}>
         <ScreenHeader title={t.title} subtitle={t.intro} />
 
         <Card>
@@ -74,7 +75,7 @@ export default function OnDeviceBenchScreen() {
           <AccessibleButton
             label={state.estado === 'probing' ? t.probing : t.probeButton}
             hint={t.probeHint}
-            variant="ghost"
+            variant="secondary"
             onPress={sondear}
             disabled={ocupado}
           />
@@ -116,7 +117,7 @@ export default function OnDeviceBenchScreen() {
           <AccessibleButton
             label={t.pickModel}
             hint={t.pickModelHint}
-            variant="ghost"
+            variant="secondary"
             onPress={elegirArchivo}
             disabled={ocupado}
           />
@@ -167,7 +168,7 @@ export default function OnDeviceBenchScreen() {
               <AccessibleButton
                 label={t.unload}
                 hint={t.unloadHint}
-                variant="ghost"
+                variant="secondary"
                 onPress={liberar}
                 disabled={ocupado}
               />

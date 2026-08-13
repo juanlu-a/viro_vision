@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
 
 import { A11y, Fonts, Radius, Spacing } from '@/constants/theme';
+import { useSurfaces } from '@/hooks/use-surfaces';
 import { useTheme } from '@/hooks/use-theme';
 
 export type TextFieldProps = TextInputProps & {
@@ -16,6 +17,7 @@ export type TextFieldProps = TextInputProps & {
 
 export function TextField({ label, hint, error, style, ...rest }: TextFieldProps) {
   const theme = useTheme();
+  const surfaces = useSurfaces();
   const [focused, setFocused] = useState(false);
 
   return (
@@ -38,8 +40,8 @@ export function TextField({ label, hint, error, style, ...rest }: TextFieldProps
           styles.input,
           {
             color: theme.text,
-            backgroundColor: theme.surface,
-            borderColor: error ? theme.danger : focused ? theme.primary : theme.border,
+            // Sólo el color de borde depende del estado; el resto de la caja es la receta común.
+            borderColor: error ? theme.danger : focused ? theme.primary : surfaces.control.borderColor,
           },
           style,
         ]}

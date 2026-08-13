@@ -21,8 +21,6 @@
  * Objetivo: **AAA (7:1)** para texto, 4.5:1 para el acento, 3:1 para bordes de control
  * (WCAG 1.4.11). `theme.test.ts` lo verifica automáticamente.
  */
-import '@/global.css';
-
 export const Colors = {
   dark: {
     background: '#061D3A', // Azul Profundo — el fondo del ícono de la app
@@ -47,6 +45,9 @@ export const Colors = {
     success: '#2BD69A', // Verde Lectura del manual — 8.99:1 AAA
     successMuted: '#0B3A33',
     tabInactive: '#A9C0DE',
+    // Velo de los modales. Más opaco en oscuro: sobre un fondo ya oscuro, un velo suave no
+    // separa lo suficiente el contenido de arriba del de atrás.
+    overlay: 'rgba(2, 10, 22, 0.72)',
   },
   light: {
     background: '#F4F6F8', // Gris Niebla — del manual
@@ -75,6 +76,7 @@ export const Colors = {
     success: '#105E3F', // 7.19:1 sobre el fondo, 6.61:1 sobre la tarjeta
     successMuted: '#DFF5EB',
     tabInactive: '#3D5273',
+    overlay: 'rgba(6, 29, 58, 0.45)',
   },
 } as const;
 
