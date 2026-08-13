@@ -1,28 +1,30 @@
 /**
- * Accessible labeled text input. Visible label + hint, generous target, theme-aware, and an error
- * state that is announced (live region). Built on the standard RN `TextInput`.
+ * Campo de texto etiquetado y accesible: etiqueta visible + pista, objetivo generoso, y un estado
+ * de error que se anuncia. Sobre el `TextInput` estándar de RN.
  */
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
+import { Text, TextInput, type TextInputProps, View } from 'react-native';
 
-import { A11y, Fonts, Radius, Spacing } from '@/constants/theme';
-import { useSurfaces } from '@/hooks/use-surfaces';
 import { useTheme } from '@/hooks/use-theme';
 
 export type TextFieldProps = TextInputProps & {
   label: string;
   hint?: string;
   error?: string;
+  className?: string;
 };
 
-export function TextField({ label, hint, error, style, ...rest }: TextFieldProps) {
+export function TextField({ label, hint, error, className, ...rest }: TextFieldProps) {
+  // `placeholderTextColor` es una prop, no un estilo: NativeWind no la alcanza.
   const theme = useTheme();
-  const surfaces = useSurfaces();
   const [focused, setFocused] = useState(false);
 
+  // Sólo el borde depende del estado; el resto de la caja es siempre igual.
+  const borde = error ? 'border-danger' : focused ? 'border-primary' : 'border-border-strong';
+
   return (
-    <View style={styles.container}>
-      <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+    <View className="gap-one">
+      <Text className="font-sans-bold text-small text-text-secondary">{label}</Text>
       <TextInput
         {...rest}
         onFocus={(e) => {
@@ -36,45 +38,13 @@ export function TextField({ label, hint, error, style, ...rest }: TextFieldProps
         accessibilityLabel={label}
         accessibilityHint={hint}
         placeholderTextColor={theme.textSecondary}
-        style={[
-          styles.input,
-          {
-            color: theme.text,
-            // Sólo el color de borde depende del estado; el resto de la caja es la receta común.
-            borderColor: error ? theme.danger : focused ? theme.primary : surfaces.control.borderColor,
-          },
-          style,
-        ]}
+        className={`min-h-touch rounded-md border-[1.5px] px-three py-two font-sans text-small text-text ${borde} ${className ?? ''}`}
       />
       {error ? (
-        <Text
-          accessibilityLiveRegion="polite"
-          style={[styles.error, { color: theme.danger }]}>
+        <Text accessibilityLiveRegion="polite" className="font-sans text-small text-danger">
           {error}
         </Text>
       ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    gap: Spacing.one,
-  },
-  label: {
-    fontSize: 14,
-    fontFamily: Fonts.sansBold,
-  },
-  input: {
-    minHeight: A11y.minTouchTarget,
-    borderWidth: 1.5,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 17,
-  },
-  error: {
-    fontSize: 13,
-    fontFamily: Fonts.sans,
-  },
-});

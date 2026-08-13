@@ -8,14 +8,14 @@
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
-import { AccessibilityInfo, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useVisionBenchmark } from '@/features/benchmark/useVisionBenchmark';
 import { strings } from '@/i18n';
 import { availableModels, formatBytes, formatMs, isVisionConfigured, summarize } from '@/services/vision';
@@ -77,16 +77,16 @@ export default function VisionBenchScreen() {
           <SectionLabel>{t.photoSection}</SectionLabel>
           {state.photo ? (
             <View
-              style={styles.photoRow}
+              className="flex-row items-center gap-three"
               accessible
               accessibilityRole="text"
               accessibilityLabel={`${t.photoSelected}. ${state.photo.width} por ${state.photo.height} píxeles. ${t.payloadLabel}: ${formatBytes(state.photo.base64.length)}.`}>
               <Image
                 source={{ uri: state.photo.uri }}
-                style={styles.thumbnail}
+                className="h-[72px] w-[72px] rounded-md"
                 accessibilityIgnoresInvertColors
               />
-              <View style={styles.photoMeta}>
+              <View className="flex-1 gap-[2px]">
                 <ThemedText type="small" themeColor="textSecondary">
                   {state.photo.width} × {state.photo.height} px
                 </ThemedText>
@@ -167,11 +167,13 @@ export default function VisionBenchScreen() {
               return (
                 <View
                   key={key}
-                  style={styles.metricRow}
+                  // Columna, no fila: con Dynamic Type grande una fila de 3 columnas aplasta
+                  // los números contra el borde y parte la etiqueta en varias líneas.
+                  className="gap-[2px]"
                   accessible
                   accessibilityRole="text"
                   accessibilityLabel={`${label}. ${t.medianLabel} ${formatMs(summary.medianMs)}. ${segundoLabel} ${formatMs(segundoValor)}. ${summary.samples} ${t.samplesLabel}.`}>
-                  <ThemedText type="small" style={styles.metricLabel}>
+                  <ThemedText type="small" className="flex-1">
                     {label}
                   </ThemedText>
                   <ThemedText type="smallBold">
@@ -227,28 +229,3 @@ function SectionLabel({ children }: { children: string }) {
     </ThemedText>
   );
 }
-
-const styles = StyleSheet.create({
-  photoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
-  thumbnail: {
-    width: 72,
-    height: 72,
-    borderRadius: Radius.md,
-  },
-  photoMeta: {
-    flex: 1,
-    gap: 2,
-  },
-  // Columna, no fila: con Dynamic Type grande una fila de 3 columnas aplasta los números
-  // contra el borde mientras la etiqueta se parte en varias líneas.
-  metricRow: {
-    gap: 2,
-  },
-  metricLabel: {
-    flex: 1,
-  },
-});

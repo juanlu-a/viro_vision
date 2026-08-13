@@ -5,6 +5,7 @@
  * que el layout raíz no pinte primero con un esquema y salte al otro: un flash de tema es molesto
  * para cualquiera y desorientador para alguien con baja visión.
  */
+import { colorScheme as nativewindColorScheme } from 'nativewind';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
@@ -58,6 +59,14 @@ export function ThemePreferenceProvider({ children }: { children: React.ReactNod
       preference === 'system' ? (systemScheme === 'light' ? 'light' : 'dark') : preference;
     return { preference, scheme: resolved, setPreference, isReady };
   }, [preference, systemScheme, setPreference, isReady]);
+
+  // NativeWind lleva su propio esquema, y por defecto sigue al del sistema. Si no se lo empujamos,
+  // el usuario elige "Claro" y todo lo que use `dark:` se queda oscuro — el selector de tema
+  // dejaría de funcionar en silencio, sólo para las partes migradas a Tailwind. Es el precio de
+  // tener dos sistemas de estilos y hay que pagarlo en un solo lugar: acá.
+  useEffect(() => {
+    nativewindColorScheme.set(preference);
+  }, [preference]);
 
   return (
     <ThemePreferenceContext.Provider value={value}>{children}</ThemePreferenceContext.Provider>

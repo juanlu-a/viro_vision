@@ -1,13 +1,15 @@
 /**
- * Large, high-contrast, screen-reader-friendly button built from the standard RN `Pressable`.
+ * Botón grande, de alto contraste y amable con el lector de pantalla, sobre el `Pressable` de RN.
  *
- * Standard native component (Mascetti et al. strategy) with an explicit accessibility role, label and
- * hint, a ≥48dp target, theme-aware colors, and subtle haptic feedback (useful non-visual signal).
+ * Componente nativo estándar (estrategia de Mascetti et al.) con rol, etiqueta y pista explícitos,
+ * objetivo ≥48 dp, colores del tema y una vibración sutil — que es una señal no visual útil.
+ *
+ * El primario va **contorneado**: en tema claro el verde de marca da 2.44:1 contra el fondo, y el
+ * *límite* de un control necesita 3:1 (WCAG 1.4.11). El borde lo aporta sin tocar el relleno.
  */
 import * as Haptics from 'expo-haptics';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, Text } from 'react-native';
 
-import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -21,6 +23,22 @@ export type AccessibleButtonProps = {
   loading?: boolean;
 };
 
+const CAJA: Record<ButtonVariant, string> = {
+  primary: 'bg-primary border-[1.5px] border-primary-edge',
+  secondary: 'border-[1.5px] border-border-strong',
+  ghost: '',
+  danger: 'bg-danger',
+};
+
+const ROTULO: Record<ButtonVariant, string> = {
+  primary: 'text-on-primary',
+  secondary: 'text-text',
+  // `primary` acá sería texto verde de marca: 2.44:1 en claro. `success` es el mismo verde llevado
+  // hasta AAA, que es lo que un rótulo necesita.
+  ghost: 'text-success',
+  danger: 'text-on-primary',
+};
+
 export function AccessibleButton({
   label,
   onPress,
@@ -31,25 +49,6 @@ export function AccessibleButton({
 }: AccessibleButtonProps) {
   const theme = useTheme();
   const isDisabled = disabled || loading;
-
-  const bg =
-    variant === 'primary' ? theme.primary : variant === 'danger' ? theme.danger : 'transparent';
-  // El primario va contorneado: en tema claro el verde de marca da 2.44:1 contra el fondo, y el
-  // *límite* de un control necesita 3:1 (WCAG 1.4.11). El borde lo aporta sin tocar el relleno.
-  const borderColor =
-    variant === 'primary'
-      ? theme.primaryEdge
-      : variant === 'secondary'
-        ? theme.borderStrong
-        : 'transparent';
-  const labelColor =
-    variant === 'primary' || variant === 'danger'
-      ? theme.onPrimary
-      : variant === 'ghost'
-        ? // `primary` acá sería texto verde de marca: 2.44:1 en claro. `success` es el mismo verde
-          // llevado hasta AAA, que es lo que un rótulo necesita.
-          theme.success
-        : theme.text;
 
   const handlePress = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -64,22 +63,16 @@ export function AccessibleButton({
       accessibilityLabel={label}
       accessibilityHint={hint}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
-      style={({ pressed }) => [
-        styles.base,
-        {
-          backgroundColor: bg,
-          borderColor,
-          borderWidth: variant === 'primary' || variant === 'secondary' ? 1.5 : 0,
-        },
-        pressed && styles.pressed,
-        isDisabled && styles.disabled,
-      ]}>
+      className={`min-h-button items-center justify-center rounded-md px-four py-three active:opacity-75 ${
+        CAJA[variant]
+      } ${isDisabled ? 'opacity-40' : ''}`}>
       {loading ? (
-        <ActivityIndicator color={labelColor} />
+        // El color del indicador es una prop, no un estilo: NativeWind no lo alcanza.
+        <ActivityIndicator color={variant === 'primary' ? theme.onPrimary : theme.text} />
       ) : (
         <Text
-          style={[styles.label, { color: labelColor }]}
-            accessibilityElementsHidden
+          className={`text-center font-sans-bold text-small tracking-[0.2px] ${ROTULO[variant]}`}
+          accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants">
           {label}
         </Text>
@@ -87,26 +80,3 @@ export function AccessibleButton({
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    minHeight: 52,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.four,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.75,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  label: {
-    fontSize: 17,
-    fontFamily: Fonts.sansBold,
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-});

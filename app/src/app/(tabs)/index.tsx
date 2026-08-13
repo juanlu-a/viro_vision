@@ -1,12 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { announce } from '@/features/audio/announcer';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -22,15 +21,19 @@ function FeatureRow({
 }) {
   const theme = useTheme();
   return (
-    <View style={styles.row} accessible accessibilityRole="text" accessibilityLabel={`${title}. ${desc}`}>
+    <View
+      className="flex-row items-center gap-three"
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={`${title}. ${desc}`}>
       {/* Relleno verde con el glifo oscuro encima, no al revés: el verde de marca sobre su
           propio tinte claro da 2.24:1 y un ícono necesita 3:1 (WCAG 1.4.11). Además es lo que
           más verde pone en pantalla, que es el peso que el manual le asigna. */}
-      <View style={[styles.iconWrap, { backgroundColor: theme.primary }]}>
+      <View className="h-[44px] w-[44px] items-center justify-center rounded-md bg-primary">
         <Ionicons name={icon} size={24} color={theme.onPrimary} />
       </View>
-      <View style={styles.rowText}>
-        <ThemedText type="default" style={styles.rowTitle}>
+      <View className="flex-1 gap-[2px]">
+        <ThemedText type="default" className="font-sans-bold">
           {title}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
@@ -63,25 +66,3 @@ export default function HomeScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowText: {
-    flex: 1,
-    gap: 2,
-  },
-  rowTitle: {
-    fontFamily: Fonts.sansBold,
-  },
-});

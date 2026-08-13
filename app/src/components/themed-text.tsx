@@ -1,87 +1,70 @@
 /**
  * Texto de la app, con la tipografía de la marca (manual, sección 04).
  *
- * Cada estilo fija `fontFamily` y **no** `fontWeight`: los pesos son archivos distintos y pedir
- * además un peso al sistema produce negrita sintética en Android. El peso se elige cambiando de
- * familia (`Fonts.sans` ↔ `Fonts.sansBold`).
+ * Cada variante fija **familia** y no peso: los pesos son archivos distintos y pedir además un
+ * `font-bold` produce negrita sintética en Android. Se cambia de familia, no de peso.
  *
- * El manual pide **17 px como mínimo** para texto, y acá se respeta incluso en los rótulos
- * chicos: el piso de tamaño es lo que más se nota en baja visión.
+ * El manual pide **17 px como mínimo** para texto, y se respeta incluso en los rótulos chicos: el
+ * piso de tamaño es lo que más se nota en baja visión.
  */
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { Text, type TextProps } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import type { ThemeColor } from '@/constants/theme';
+
+export type ThemedTextType =
+  | 'default'
+  | 'title'
+  | 'small'
+  | 'smallBold'
+  | 'subtitle'
+  | 'link'
+  | 'linkPrimary'
+  | 'code';
 
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?: ThemedTextType;
   themeColor?: ThemeColor;
+  className?: string;
 };
 
-export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
-  const theme = useTheme();
+const VARIANTS: Record<ThemedTextType, string> = {
+  default: 'font-sans text-base',
+  title: 'font-display text-title tracking-title',
+  subtitle: 'font-display text-subtitle tracking-subtitle',
+  small: 'font-sans text-small',
+  smallBold: 'font-sans-bold text-small',
+  link: 'font-sans text-small leading-7',
+  linkPrimary: 'font-sans-bold text-small leading-7',
+  code: 'font-mono text-code',
+};
 
+/** Los roles de color, como clases. Tailwind necesita el nombre completo para no purgarlo. */
+const COLORS: Record<ThemeColor, string> = {
+  background: 'text-background',
+  surface: 'text-surface',
+  surfaceElevated: 'text-surface-elevated',
+  border: 'text-border',
+  borderStrong: 'text-border-strong',
+  text: 'text-text',
+  textSecondary: 'text-text-secondary',
+  primary: 'text-primary',
+  primaryMuted: 'text-primary-muted',
+  primaryEdge: 'text-primary-edge',
+  onPrimary: 'text-on-primary',
+  danger: 'text-danger',
+  success: 'text-success',
+  successMuted: 'text-success-muted',
+  tabInactive: 'text-tab-inactive',
+  overlay: 'text-text',
+};
+
+export function ThemedText({
+  className,
+  type = 'default',
+  themeColor = 'text',
+  ...rest
+}: ThemedTextProps) {
   return (
-    <Text
-      style={[
-        { color: theme[themeColor ?? 'text'] },
-        type === 'default' && styles.default,
-        type === 'title' && styles.title,
-        type === 'small' && styles.small,
-        type === 'smallBold' && styles.smallBold,
-        type === 'subtitle' && styles.subtitle,
-        type === 'link' && styles.link,
-        type === 'linkPrimary' && styles.linkPrimary,
-        type === 'code' && styles.code,
-        style,
-      ]}
-      {...rest}
-    />
+    <Text className={`${VARIANTS[type]} ${COLORS[themeColor]} ${className ?? ''}`} {...rest} />
   );
 }
-
-const styles = StyleSheet.create({
-  small: {
-    fontFamily: Fonts.sans,
-    fontSize: 17,
-    lineHeight: 24,
-  },
-  smallBold: {
-    fontFamily: Fonts.sansBold,
-    fontSize: 17,
-    lineHeight: 24,
-  },
-  default: {
-    fontFamily: Fonts.sans,
-    fontSize: 18,
-    lineHeight: 27,
-  },
-  title: {
-    fontFamily: Fonts.display,
-    fontSize: 40,
-    lineHeight: 46,
-    // Tracking −2 % del manual: Space Grotesk Bold en tamaños grandes se abre demasiado.
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    fontFamily: Fonts.display,
-    fontSize: 28,
-    lineHeight: 36,
-    letterSpacing: -0.56,
-  },
-  link: {
-    fontFamily: Fonts.sans,
-    fontSize: 17,
-    lineHeight: 28,
-  },
-  linkPrimary: {
-    fontFamily: Fonts.sansBold,
-    fontSize: 17,
-    lineHeight: 28,
-  },
-  code: {
-    fontFamily: Fonts.mono,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-});

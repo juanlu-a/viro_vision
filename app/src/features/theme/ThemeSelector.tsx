@@ -13,11 +13,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { A11y, Fonts, Radius, Spacing } from '@/constants/theme';
-import { useSurfaces } from '@/hooks/use-surfaces';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
 import type { ThemePreference } from '@/services/storage/themePreference';
@@ -54,8 +52,8 @@ const OPTIONS: Opcion[] = [
 
 export function ThemeSelector() {
   const { preference, setPreference } = useThemePreference();
+  // `theme` sigue haciendo falta: el color de un ícono es una prop, no un estilo.
   const theme = useTheme();
-  const surfaces = useSurfaces();
   const [abierto, setAbierto] = useState(false);
 
   const actual = OPTIONS.find((o) => o.value === preference) ?? OPTIONS[0];
@@ -73,7 +71,7 @@ export function ThemeSelector() {
         accessibilityLabel={`${strings.settings.appearance}: ${actual.label}`}
         accessibilityHint={strings.settings.appearanceHint}
         onPress={() => setAbierto(true)}
-        style={({ pressed }) => [surfaces.control, styles.trigger, { opacity: pressed ? 0.85 : 1 }]}>
+        className="min-h-touch flex-row items-center gap-two rounded-md border border-border-strong bg-surface-elevated px-three active:opacity-85">
         <Ionicons
           name={actual.icon}
           size={20}
@@ -81,7 +79,7 @@ export function ThemeSelector() {
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         />
-        <ThemedText type="small" style={styles.triggerLabel}>
+        <ThemedText type="smallBold" className="flex-1">
           {actual.label}
         </ThemedText>
         <Ionicons
@@ -102,17 +100,17 @@ export function ThemeSelector() {
             gesto de cerrar es el propio del sistema, y un "botón" que ocupa toda la pantalla sólo
             estorbaría al recorrer las opciones. */}
         <Pressable
-          style={surfaces.overlay}
+          className="absolute inset-0 bg-overlay"
           onPress={() => setAbierto(false)}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         />
-        <View style={styles.centro} pointerEvents="box-none">
+        <View className="flex-1 justify-center p-four" pointerEvents="box-none">
           <View
             accessibilityViewIsModal
             accessibilityRole="radiogroup"
             accessibilityLabel={strings.settings.appearance}
-            style={[surfaces.panelElevated, styles.menu]}>
+            className="gap-one rounded-lg border border-border-strong bg-surface-elevated p-two">
             {OPTIONS.map((option) => {
               const selected = preference === option.value;
               return (
@@ -123,13 +121,9 @@ export function ThemeSelector() {
                   accessibilityLabel={option.label}
                   accessibilityHint={option.hint}
                   onPress={() => elegir(option.value)}
-                  style={({ pressed }) => [
-                    styles.option,
-                    {
-                      backgroundColor: selected ? theme.primary : 'transparent',
-                      opacity: pressed ? 0.85 : 1,
-                    },
-                  ]}>
+                  className={`min-h-touch flex-row items-center gap-three rounded-md px-three active:opacity-85 ${
+                    selected ? 'bg-primary' : ''
+                  }`}>
                   <Ionicons
                     name={option.icon}
                     size={20}
@@ -138,11 +132,9 @@ export function ThemeSelector() {
                     importantForAccessibility="no-hide-descendants"
                   />
                   <ThemedText
-                    type="small"
-                    style={[
-                      styles.optionLabel,
-                      { color: selected ? theme.onPrimary : theme.text },
-                    ]}>
+                    type="smallBold"
+                    themeColor={selected ? 'onPrimary' : 'text'}
+                    className="flex-1">
                     {option.label}
                   </ThemedText>
                   {/* El check es refuerzo del estado, no su único portador: el relleno cambia y
@@ -165,36 +157,3 @@ export function ThemeSelector() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  trigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  triggerLabel: {
-    flex: 1,
-    fontFamily: Fonts.sansBold,
-  },
-  centro: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: Spacing.four,
-  },
-  menu: {
-    padding: Spacing.two,
-    gap: Spacing.one,
-  },
-  option: {
-    minHeight: A11y.minTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
-  },
-  optionLabel: {
-    flex: 1,
-    fontFamily: Fonts.sansBold,
-  },
-});

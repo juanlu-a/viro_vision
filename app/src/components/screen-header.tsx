@@ -16,19 +16,15 @@
  * y anunciar "imagen" antes de cada encabezado sería ruido en cada navegación.
  */
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
 import { useThemePreference } from '@/features/theme/ThemePreferenceProvider';
 
 /** `large` sólo en Inicio. El resto de las pantallas va sin marca. */
 export type HeaderMark = 'large' | 'none';
 
 const MARK_SIZE = 48;
-
-/** Alto fijo de la fila del título: el del símbolo, lleve símbolo o no. */
-const TITLE_ROW_HEIGHT = MARK_SIZE;
 
 export function ScreenHeader({
   title,
@@ -42,8 +38,10 @@ export function ScreenHeader({
   const { scheme } = useThemePreference();
 
   return (
-    <View style={styles.container}>
-      <View style={styles.titleRow}>
+    <View className="gap-two">
+      {/* `min-h-[48px]`: el alto fijo hace que el título caiga a la misma altura lleve
+          símbolo o no. Sin eso lo decidiría el elemento más alto de cada pantalla. */}
+      <View className="min-h-[48px] flex-row items-center gap-three">
         {mark !== 'none' && (
           <Image
             source={
@@ -59,7 +57,7 @@ export function ScreenHeader({
         )}
         {/* `flex: 1` para que el título envuelva en dos líneas en vez de empujar al símbolo
             fuera de pantalla cuando el usuario agranda el tipo del sistema. */}
-        <ThemedText type="title" accessibilityRole="header" style={styles.title}>
+        <ThemedText type="title" accessibilityRole="header" className="flex-1">
           {title}
         </ThemedText>
       </View>
@@ -71,18 +69,3 @@ export function ScreenHeader({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    gap: Spacing.two,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    minHeight: TITLE_ROW_HEIGHT,
-  },
-  title: {
-    flex: 1,
-  },
-});
