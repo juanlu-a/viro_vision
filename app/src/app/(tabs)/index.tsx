@@ -7,7 +7,6 @@
  * propósito: la decisión de cuál queda es del equipo, y compararlos desde la pantalla real es
  * parte del experimento. Ajustes vuelve a ser sólo configuración.
  */
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
@@ -16,53 +15,19 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { announce } from '@/features/audio/announcer';
+import { CloudBenchLab } from '@/features/benchmark/CloudBenchLab';
 import { OnDeviceLab } from '@/features/ondevice/OnDeviceLab';
 import { useLector } from '@/features/reader/useLector';
-import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
 import { isOnDeviceSpikeEnabled } from '@/services/ondevice';
 import { loadUserName } from '@/services/storage/userName';
-import { formatMs } from '@/services/vision';
+import { formatMs, isVisionConfigured } from '@/services/vision';
 
 const CAMINO_LABEL = {
   ocr: strings.reader.pathOcr,
   vlm: strings.reader.pathVlm,
   nube: strings.reader.pathCloud,
 } as const;
-
-function FeatureRow({
-  icon,
-  title,
-  desc,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  desc: string;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      className="flex-row items-center gap-three"
-      accessible
-      accessibilityRole="text"
-      accessibilityLabel={`${title}. ${desc}`}>
-      {/* Relleno verde con el glifo oscuro encima, no al revés: el verde de marca sobre su
-          propio tinte claro da 2.24:1 y un ícono necesita 3:1 (WCAG 1.4.11). */}
-      <View className="h-[44px] w-[44px] items-center justify-center rounded-md bg-primary">
-        <Ionicons name={icon} size={24} color={theme.onPrimary} />
-      </View>
-      <View className="flex-1 gap-[2px]">
-        <ThemedText type="default" className="font-sans-bold">
-          {title}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {desc}
-        </ThemedText>
-      </View>
-    </View>
-  );
-}
 
 export default function HomeScreen() {
   const t = strings.home;
@@ -143,20 +108,13 @@ export default function HomeScreen() {
           pantalla real es parte del experimento. Gateado por la misma variable de siempre. */}
       {isOnDeviceSpikeEnabled && <OnDeviceLab />}
 
-      <Card>
-        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {t.howItWorks.toUpperCase()}
-        </ThemedText>
-        <FeatureRow icon="bus" title={t.useBus} desc={t.useBusDesc} />
-        <FeatureRow icon="cart" title={t.useProduct} desc={t.useProductDesc} />
-      </Card>
-
-      <AccessibleButton
-        label={t.testAudioButton}
-        hint={t.testAudioHint}
-        variant="secondary"
-        onPress={() => announce(t.testAudioPhrase)}
-      />
+      {/* El benchmark de nube cierra el laboratorio: mismo gate de siempre — la clave, no
+          __DEV__, para poder medir en la calle con un build de Release. */}
+      {(__DEV__ || isVisionConfigured) && (
+        <Card>
+          <CloudBenchLab />
+        </Card>
+      )}
     </Screen>
   );
 }

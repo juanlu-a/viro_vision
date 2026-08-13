@@ -60,8 +60,6 @@ function RootNavigator() {
         <ThemeProvider value={buildNavTheme(scheme)}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
-            {/* Ruta de desarrollo: no es pestaña; se enlaza desde Ajustes (ver settings.tsx). */}
-            <Stack.Screen name="dev/vision-bench" />
           </Stack>
         </ThemeProvider>
       </SafeAreaProvider>

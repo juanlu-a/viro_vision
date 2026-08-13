@@ -1,24 +1,30 @@
 /**
- * Pantalla de desarrollo: mide la latencia de un modelo de visión en la nube leyendo el cartel
- * de un ómnibus (paso 2 de la reunión con el tutor, 2026-08-10).
+ * El benchmark de latencia en la nube, como componente embebible (antes, pantalla de desarrollo).
  *
- * Es una ruta suelta, no una pestaña: no debe aparecer en la barra de navegación del producto.
- * El enlace desde Ajustes aparece con `__DEV__` o con una clave de proveedor cargada.
+ * Vive en Inicio junto al resto del laboratorio mientras dure la etapa de prueba: el equipo está
+ * comparando caminos desde la pantalla real. Mide TTFT y latencia total contra el proveedor
+ * configurado (paso 2 de la reunión con el tutor, 2026-08-10).
+ *
+ * `accessibilityLiveRegion` es sólo Android: los cambios de estado se anuncian con
+ * `announceForAccessibility`, porque esta sección es, entera, una máquina de estados.
  */
 import { Image } from 'expo-image';
-import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
-import { Screen } from '@/components/screen';
-import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts } from '@/constants/theme';
 import { useVisionBenchmark } from '@/features/benchmark/useVisionBenchmark';
 import { strings } from '@/i18n';
-import { availableModels, formatBytes, formatMs, isVisionConfigured, summarize } from '@/services/vision';
+import {
+  availableModels,
+  formatBytes,
+  formatMs,
+  isVisionConfigured,
+  summarize,
+} from '@/services/vision';
 import type { LatencyMetric } from '@/services/vision';
 
 const METRICS: { key: LatencyMetric; label: string }[] = [
@@ -38,7 +44,7 @@ const RUN_COUNT = 4;
 /** Debajo de esto el p90 es simplemente el máximo, así que se rotula como tal. */
 const MUESTRAS_PARA_P90 = 8;
 
-export default function VisionBenchScreen() {
+export function CloudBenchLab() {
   const t = strings.benchmark;
   const { state, pickPhoto, setModel, setThinking, run, cancel } = useVisionBenchmark();
 
@@ -53,17 +59,12 @@ export default function VisionBenchScreen() {
 
   return (
     <>
-      {/*
-        Sin título en el header nativo: `ScreenHeader` ya lo anuncia como encabezado y duplicarlo
-        hace que VoiceOver lo lea dos veces. `headerBackTitle` sí hace falta: sin él, iOS usa el
-        título de la ruta anterior, que es el nombre interno del grupo — "(tabs)".
-      */}
-      <Stack.Screen
-        options={{ headerShown: true, title: '', headerBackTitle: strings.common.back }}
-      />
-      {/* El header nativo ya cubre el notch: sin `edges` el safe area se aplicaría dos veces. */}
-      <Screen scroll edges={[]}>
-        <ScreenHeader title={t.title} subtitle={t.intro} mark="none" />
+      <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+        {t.title.toUpperCase()}
+      </ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        {t.intro}
+      </ThemedText>
 
         {!isVisionConfigured && (
           <Card>
@@ -217,7 +218,6 @@ export default function VisionBenchScreen() {
             )}
           </Card>
         )}
-      </Screen>
     </>
   );
 }
