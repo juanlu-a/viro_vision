@@ -99,6 +99,9 @@ export const es = {
     cleaning: 'Borrando copias…',
     cleaned: 'Liberado:',
     stored: 'guardado:',
+    precisionLabel: 'Precisión de activaciones',
+    precisionHint:
+      'f16 usa la mitad de memoria de activaciones que f32. Sólo aplica en iOS. Si el modelo no entra, probá f16 primero.',
     modelSection: 'Modelo',
     pickModel: 'Elegir archivo .litertlm',
     pickModelHint: 'Abre Archivos para elegir un modelo ya descargado. No baja nada.',

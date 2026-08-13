@@ -119,6 +119,7 @@ export async function cargarModelo(
   rutaArchivo: string,
   backend: Backend,
   multimodal: boolean,
+  precision: 'f32' | 'f16' = 'f16',
 ): Promise<CargaResultado> {
   await descargarModelo();
 
@@ -130,6 +131,10 @@ export async function cargarModelo(
     backend,
     maxContextTokens: MAX_CONTEXT_TOKENS,
     multimodal,
+    // `f16` reduce a la mitad la memoria de activaciones, y es lo que recomienda el propio
+    // estimador de la librería cuando el veredicto da "tight". Es una opción **sólo de iOS**, que
+    // es la plataforma donde el modelo grande no entraba; en Android el SDK no la expone.
+    activationDataType: precision,
   });
   const cargaMs = performance.now() - t0;
 

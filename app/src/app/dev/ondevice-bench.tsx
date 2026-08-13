@@ -45,6 +45,7 @@ export default function OnDeviceBenchScreen() {
     elegirArchivo,
     setBackend,
     setMultimodal,
+    setPrecision,
     cargar,
     liberar,
     limpiar,
@@ -143,6 +144,13 @@ export default function OnDeviceBenchScreen() {
             hint={t.backendHint}
             variant="secondary"
             onPress={() => setBackend(state.backend === 'cpu' ? 'gpu' : 'cpu')}
+            disabled={ocupado}
+          />
+          <AccessibleButton
+            label={`${t.precisionLabel}: ${state.precision}`}
+            hint={t.precisionHint}
+            variant="secondary"
+            onPress={() => setPrecision(state.precision === 'f16' ? 'f32' : 'f16')}
             disabled={ocupado}
           />
           <AccessibleButton

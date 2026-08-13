@@ -50,6 +50,7 @@ export interface SpikeState {
   archivo: { uri: string; nombre: string } | null;
   backend: Backend;
   multimodal: boolean;
+  precision: 'f32' | 'f16';
   carga: CargaResultado | null;
   /** Se calcula al intentar cargar y sobrevive al fallo: es cuando más hace falta. */
   diagnostico: Diagnostico | null;
@@ -64,6 +65,7 @@ const inicial: SpikeState = {
   archivo: null,
   backend: 'cpu',
   multimodal: false,
+  precision: 'f16',
   carga: null,
   diagnostico: null,
   generacion: null,
@@ -160,12 +162,17 @@ export function useOnDeviceSpike() {
     [update],
   );
 
+  const setPrecision = useCallback(
+    (precision: 'f32' | 'f16') => update({ precision, carga: null }),
+    [update],
+  );
+
   const cargar = useCallback(async () => {
-    const { archivo, backend, multimodal } = ref.current;
+    const { archivo, backend, multimodal, precision } = ref.current;
     if (!archivo) return;
     update({ estado: 'loading', mensaje: t.loading, carga: null });
     try {
-      const carga = await cargarModelo(archivo.uri, backend, multimodal);
+      const carga = await cargarModelo(archivo.uri, backend, multimodal, precision);
       update({ estado: 'idle', carga, mensaje: t.loaded });
     } catch (err) {
       update({ estado: 'idle', mensaje: `${t.loadError}: ${describir(err)}` });
@@ -230,6 +237,7 @@ export function useOnDeviceSpike() {
     elegirArchivo,
     setBackend,
     setMultimodal,
+    setPrecision,
     cargar,
     liberar,
     limpiar,
