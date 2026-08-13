@@ -49,7 +49,7 @@ import type {
 } from '@/services/ondevice';
 import { busReadingSchema, formatBytes, parseBusReading } from '@/services/vision';
 import type { BusReading } from '@/services/vision';
-import { SYSTEM_PROMPT, USER_PROMPT } from '@/services/vision/providers';
+import { JSON_SHAPE_PROMPT, SYSTEM_PROMPT, USER_PROMPT } from '@/services/vision/providers';
 
 const t = strings.ondevice;
 
@@ -242,7 +242,8 @@ export function useOnDeviceSpike() {
       etReiniciarConversacion();
       // Mismo prompt que la nube y que LiteRT: sin eso la comparación no significa nada.
       const g = await etGenerarConImagen(
-        `${SYSTEM_PROMPT}\n\n${USER_PROMPT}`,
+        // El sufijo del JSON va sólo acá: en este camino no hay schema que garantice la forma.
+        `${SYSTEM_PROMPT}\n\n${USER_PROMPT}\n\n${JSON_SHAPE_PROMPT}`,
         foto.assets[0].uri,
       );
       update({ estado: 'idle', etGeneracion: g, etLectura: parseBusReading(g.texto), mensaje: t.result });
