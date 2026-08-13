@@ -37,7 +37,6 @@ import {
   tamanoModelosGuardados,
   generarConImagen,
   generarTexto,
-  sondearRuntime,
 } from '@/services/ondevice';
 import type {
   CargaResultado,
@@ -46,7 +45,6 @@ import type {
   ModeloRemoto,
   Diagnostico,
   GeneracionResultado,
-  ResultadoSonda,
 } from '@/services/ondevice';
 import { busReadingSchema, formatBytes, parseBusReading } from '@/services/vision';
 import type { BusReading } from '@/services/vision';
@@ -59,13 +57,11 @@ type Backend = 'cpu' | 'gpu';
 export interface SpikeState {
   estado: 'idle' | 'probing' | 'loading' | 'running';
   mensaje: string;
-  sonda: ResultadoSonda | null;
   archivo: { uri: string; nombre: string } | null;
   backend: Backend;
   multimodal: boolean;
   precision: 'f32' | 'f16';
   contexto: number;
-  jsonEstricto: boolean;
   /** Cuál de los modelos del catálogo está seleccionado para descargar. */
   remoto: ModeloRemoto;
   /** Fracción 0–1 mientras se descarga, `null` si no hay descarga en curso. */
@@ -89,13 +85,11 @@ export interface SpikeState {
 const inicial: SpikeState = {
   estado: 'idle',
   mensaje: t.idle,
-  sonda: null,
   archivo: null,
   backend: 'cpu',
   multimodal: false,
   precision: 'f16',
   contexto: MAX_CONTEXT_TOKENS,
-  jsonEstricto: true,
   remoto: MODELOS_REMOTOS[1],
   progreso: null,
   descargaMs: null,
@@ -131,16 +125,6 @@ export function useOnDeviceSpike() {
     ref.current = { ...ref.current, ...patch };
     if (vivo.current) setState(ref.current);
   }, []);
-
-  const sondear = useCallback(async () => {
-    update({ estado: 'probing', mensaje: t.probing });
-    const sonda = await sondearRuntime();
-    update({
-      estado: 'idle',
-      sonda,
-      mensaje: sonda.error ? `${t.error}: ${sonda.error}` : t.nativeOk,
-    });
-  }, [update]);
 
   const elegirArchivo = useCallback(async () => {
     // **Hay que copiarlo, aunque duela.** LiteRT-LM escribe su caché compilada en la carpeta del
@@ -283,11 +267,6 @@ export function useOnDeviceSpike() {
     [update],
   );
 
-  const setJsonEstricto = useCallback(
-    (jsonEstricto: boolean) => update({ jsonEstricto, carga: null }),
-    [update],
-  );
-
   const setPrecision = useCallback(
     (precision: 'f32' | 'f16') => update({ precision, carga: null }),
     [update],
@@ -305,7 +284,7 @@ export function useOnDeviceSpike() {
   }, [update]);
 
   const cargar = useCallback(async () => {
-    const { archivo, backend, multimodal, precision, contexto, jsonEstricto } = ref.current;
+    const { archivo, backend, multimodal, precision, contexto } = ref.current;
     if (!archivo) return;
     update({ estado: 'loading', mensaje: t.loading, carga: null });
     try {
@@ -315,7 +294,6 @@ export function useOnDeviceSpike() {
         multimodal,
         precision,
         contexto,
-        jsonEstricto,
       );
       update({ estado: 'idle', carga, mensaje: t.loaded });
     } catch (err) {
@@ -364,7 +342,7 @@ export function useOnDeviceSpike() {
         `${SYSTEM_PROMPT}\n\n${USER_PROMPT}`,
         decodeURI(foto.assets[0].uri.replace('file://', '')),
         // Sólo se puede exigir el schema si el modelo se cargó con decodificado restringido.
-        ref.current.jsonEstricto ? busReadingSchema : null,
+        busReadingSchema,
       );
       update({
         estado: 'idle',
@@ -379,7 +357,6 @@ export function useOnDeviceSpike() {
 
   return {
     state,
-    sondear,
     elegirArchivo,
     rotarRemoto,
     descargar,
@@ -390,7 +367,6 @@ export function useOnDeviceSpike() {
     setBackend,
     setMultimodal,
     setPrecision,
-    setJsonEstricto,
     rotarContexto,
     cargar,
     liberar,

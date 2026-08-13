@@ -133,9 +133,6 @@ export const es = {
     etRead: 'Leer el cartel de una foto (ExecuTorch)',
     etReadHint: 'Elige una foto y le pide número y nombre de línea al modelo, con el mismo prompt que los demás caminos.',
     etLoadTime: 'Descarga + carga',
-    strictJson: 'JSON garantizado',
-    strictJsonHint:
-      'Exige la forma de la respuesta por schema. Se inicializa al crear la conversación, que es justo donde falla la carga: apagalo para descartarlo como causa.',
     contextLabel: 'Contexto',
     contextHint:
       'Tokens reservados para el KV cache. Menos contexto es menos memoria; la tarea sólo necesita un prompt corto, la imagen y dos campos de respuesta.',

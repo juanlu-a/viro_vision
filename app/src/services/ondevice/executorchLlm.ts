@@ -15,6 +15,14 @@
  */
 import { GEMMA4_E2B_MM, LLMModule } from 'react-native-executorch';
 
+/**
+ * Dónde va la imagen dentro del prompt. Viene del `tokenizer_config.json` del modelo
+ * (`image_token`): el runner reemplaza cada aparición por la imagen correspondiente, y exige que
+ * haya tantos marcadores como imágenes — pasarle una imagen sin marcador es el error
+ * "More image/audio paths provided than placeholders in prompt".
+ */
+const IMAGE_TOKEN = '<|image|>';
+
 export interface EtCargaResultado {
   descargaYCargaMs: number;
 }
@@ -62,7 +70,8 @@ export async function etGenerarConImagen(
     if (ttftMs === null && token.length > 0) ttftMs = performance.now() - t0;
   };
   try {
-    const texto = await llm.forward(prompt, [rutaImagen]);
+    // La imagen primero y el texto después, igual que en los otros dos caminos del spike.
+    const texto = await llm.forward(`${IMAGE_TOKEN}\n${prompt}`, [rutaImagen]);
     return { texto, totalMs: performance.now() - t0, ttftMs };
   } finally {
     onTokenActual = null;

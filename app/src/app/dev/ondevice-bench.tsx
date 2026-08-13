@@ -22,7 +22,6 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { useOnDeviceSpike } from '@/features/ondevice/useOnDeviceSpike';
 import { strings } from '@/i18n';
-import { GEMMA_4_E2B_BYTES } from '@/services/ondevice';
 import { formatBytes, formatMs } from '@/services/vision';
 
 const t = strings.ondevice;
@@ -41,7 +40,6 @@ function Fila({ label, value }: { label: string; value: string }) {
 export default function OnDeviceBenchScreen() {
   const {
     state,
-    sondear,
     elegirArchivo,
     rotarRemoto,
     descargar,
@@ -52,7 +50,6 @@ export default function OnDeviceBenchScreen() {
     setBackend,
     setMultimodal,
     setPrecision,
-    setJsonEstricto,
     rotarContexto,
     cargar,
     liberar,
@@ -66,7 +63,7 @@ export default function OnDeviceBenchScreen() {
   }, [state.mensaje]);
 
   const ocupado = state.estado !== 'idle';
-  const { sonda, carga, diagnostico, generacion } = state;
+  const { carga, diagnostico, generacion } = state;
 
   return (
     <>
@@ -76,48 +73,6 @@ export default function OnDeviceBenchScreen() {
       {/* `edges={[]}`: el header nativo ya cubre el inset de arriba. */}
       <Screen scroll edges={[]}>
         <ScreenHeader title={t.title} subtitle={t.intro} />
-
-        <Card>
-          <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-            {t.estimates.toUpperCase()}
-          </ThemedText>
-          <AccessibleButton
-            label={state.estado === 'probing' ? t.probing : t.probeButton}
-            hint={t.probeHint}
-            variant="secondary"
-            onPress={sondear}
-            disabled={ocupado}
-          />
-          {sonda && !sonda.error && (
-            <View className="gap-three">
-              <Fila
-                label={t.availableMemory}
-                value={
-                  sonda.memoriaDisponibleBytes == null
-                    ? '—'
-                    : formatBytes(sonda.memoriaDisponibleBytes)
-                }
-              />
-              <Fila label={t.recommendedBackend} value={sonda.backendRecomendado ?? '—'} />
-              <Fila label={t.multimodalBlocked} value={sonda.bloqueoMultimodal ?? t.multimodalOk} />
-              {sonda.estimaciones.map((e) =>
-                e.estimacion ? (
-                  <Fila
-                    key={e.backend}
-                    label={`${e.label} · ${formatBytes(GEMMA_4_E2B_BYTES)}`}
-                    value={`${formatBytes(e.estimacion.totalEstimatedBytes)} — ${
-                      e.estimacion.verdict === 'safe'
-                        ? t.verdictSafe
-                        : e.estimacion.verdict === 'tight'
-                          ? t.verdictTight
-                          : t.verdictCritical
-                    }`}
-                  />
-                ) : null,
-              )}
-            </View>
-          )}
-        </Card>
 
         {/* La contraprueba del spike: el mismo Gemma 4, por el runtime de Apple (MLX) en vez
             del delegado Metal de LiteRT. Responde si la visión falla por la librería o por el
@@ -222,15 +177,6 @@ export default function OnDeviceBenchScreen() {
             onPress={rotarRemoto}
             disabled={ocupado}
           />
-          {/* El aviso va **antes** de bajar un archivo de gigabytes: la RAM que pide la visión no
-              se deduce del tamaño, y el estimador de la librería no la modela. */}
-          {state.remoto.ramMinimaBytes != null &&
-            state.sonda?.memoriaDisponibleBytes != null &&
-            state.sonda.memoriaDisponibleBytes < state.remoto.ramMinimaBytes && (
-              <ThemedText type="small" themeColor="danger">
-                {`${t.ramWarning} ${formatBytes(state.remoto.ramMinimaBytes)}. ${t.availableMemory}: ${formatBytes(state.sonda.memoriaDisponibleBytes)}.`}
-              </ThemedText>
-            )}
           <AccessibleButton
             label={
               state.progreso == null
@@ -275,13 +221,6 @@ export default function OnDeviceBenchScreen() {
             hint={t.backendHint}
             variant="secondary"
             onPress={() => setBackend(state.backend === 'cpu' ? 'gpu' : 'cpu')}
-            disabled={ocupado}
-          />
-          <AccessibleButton
-            label={`${t.strictJson}: ${state.jsonEstricto ? t.yes : t.no}`}
-            hint={t.strictJsonHint}
-            variant="secondary"
-            onPress={() => setJsonEstricto(!state.jsonEstricto)}
             disabled={ocupado}
           />
           <AccessibleButton
