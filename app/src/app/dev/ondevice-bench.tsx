@@ -45,6 +45,8 @@ export default function OnDeviceBenchScreen() {
     elegirArchivo,
     rotarRemoto,
     descargar,
+    prepararOcr,
+    leerConOcr,
     setBackend,
     setMultimodal,
     setPrecision,
@@ -111,6 +113,50 @@ export default function OnDeviceBenchScreen() {
                   />
                 ) : null,
               )}
+            </View>
+          )}
+        </Card>
+
+        {/* El OCR va primero porque es el camino más barato: ~250 MB de modelos entrenados
+            contra los 3 GB de un multimodal, y hace exactamente la tarea —leer texto de una
+            foto— en vez de hacerla como caso particular de entender la escena. */}
+        <Card>
+          <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+            {t.ocrSection.toUpperCase()}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t.ocrIntro}
+          </ThemedText>
+          <AccessibleButton
+            label={t.ocrPrepare}
+            hint={t.ocrPrepareHint}
+            variant="secondary"
+            onPress={prepararOcr}
+            disabled={ocupado}
+          />
+          <AccessibleButton
+            label={t.ocrRead}
+            hint={t.ocrReadHint}
+            onPress={leerConOcr}
+            disabled={ocupado}
+          />
+          {state.ocrCargaMs != null && (
+            <Fila label={t.ocrLoadTime} value={formatMs(state.ocrCargaMs)} />
+          )}
+          {state.ocr && (
+            <View className="gap-three">
+              <Fila label={t.ocrReadTime} value={formatMs(state.ocr.ms)} />
+              <Fila
+                label={t.ocrDetections}
+                value={
+                  state.ocr.detecciones.length === 0
+                    ? t.ocrNone
+                    : state.ocr.detecciones
+                        .slice(0, 8)
+                        .map((d) => `${d.text} (${Math.round(d.score * 100)} %)`)
+                        .join('\n')
+                }
+              />
             </View>
           )}
         </Card>

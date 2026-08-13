@@ -20,11 +20,14 @@ import { strings } from '@/i18n';
 import {
   adoptarModelo,
   cargarModelo,
+  cargarOcr,
   CONTEXTOS,
   descargarModelo,
   descargarModeloRemoto,
   diagnosticar,
   espacioLibre,
+  leerImagen,
+  liberarOcr,
   limpiarCopias,
   MAX_CONTEXT_TOKENS,
   MODELOS_REMOTOS,
@@ -35,6 +38,7 @@ import {
 } from '@/services/ondevice';
 import type {
   CargaResultado,
+  LecturaOcr,
   ModeloRemoto,
   Diagnostico,
   GeneracionResultado,
@@ -64,6 +68,9 @@ export interface SpikeState {
   progreso: number | null;
   /** Cuánto tardó la última descarga. Es costo de onboarding, no latencia. */
   descargaMs: number | null;
+  /** Resultado del OCR local, que es el otro camino que el spike compara. */
+  ocr: LecturaOcr | null;
+  ocrCargaMs: number | null;
   carga: CargaResultado | null;
   /** Se calcula al intentar cargar y sobrevive al fallo: es cuando más hace falta. */
   diagnostico: Diagnostico | null;
@@ -84,6 +91,8 @@ const inicial: SpikeState = {
   remoto: MODELOS_REMOTOS[1],
   progreso: null,
   descargaMs: null,
+  ocr: null,
+  ocrCargaMs: null,
   carga: null,
   diagnostico: null,
   generacion: null,
@@ -102,6 +111,7 @@ export function useOnDeviceSpike() {
       // Salir de la pantalla con varios GB mapeados es la forma más rápida de que iOS mate la app
       // y de culpar al modelo equivocado en la próxima prueba.
       void descargarModelo();
+      liberarOcr();
     };
   }, []);
 
@@ -185,6 +195,31 @@ export function useOnDeviceSpike() {
       });
     } catch (err) {
       update({ estado: 'idle', progreso: null, mensaje: `${t.downloadError}: ${describir(err)}` });
+    }
+  }, [update]);
+
+  /** Descarga (la primera vez) y carga el pipeline de OCR en español. */
+  const prepararOcr = useCallback(async () => {
+    update({ estado: 'loading', mensaje: t.ocrLoading, progreso: 0, ocr: null });
+    try {
+      const r = await cargarOcr((fraccion) => update({ progreso: fraccion }));
+      update({ estado: 'idle', progreso: null, ocrCargaMs: r.ms, mensaje: t.ocrReady });
+    } catch (err) {
+      update({ estado: 'idle', progreso: null, mensaje: `${t.ocrError}: ${describir(err)}` });
+    }
+  }, [update]);
+
+  /** Lee una foto con el OCR local. Es el camino alternativo al modelo multimodal. */
+  const leerConOcr = useCallback(async () => {
+    const foto = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (foto.canceled || !foto.assets?.[0]) return;
+
+    update({ estado: 'running', mensaje: t.running, ocr: null });
+    try {
+      const r = await leerImagen(foto.assets[0].uri);
+      update({ estado: 'idle', ocr: r, mensaje: t.result });
+    } catch (err) {
+      update({ estado: 'idle', mensaje: `${t.ocrError}: ${describir(err)}` });
     }
   }, [update]);
 
@@ -308,6 +343,8 @@ export function useOnDeviceSpike() {
     elegirArchivo,
     rotarRemoto,
     descargar,
+    prepararOcr,
+    leerConOcr,
     setBackend,
     setMultimodal,
     setPrecision,

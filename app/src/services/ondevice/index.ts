@@ -31,3 +31,5 @@ export {
   modeloCargado,
 } from './runner';
 export type { CargaResultado, Diagnostico, GeneracionResultado } from './runner';
+export { cargarOcr, leerImagen, liberarOcr, ocrCargado } from './ocr';
+export type { LecturaOcr } from './ocr';
