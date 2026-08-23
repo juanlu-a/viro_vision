@@ -50,15 +50,20 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 
 ## Track B — ML/OCR + Hardware groundwork *(parallel, in `ml/` + `hardware/`)*
 
-- **B1 · ML / OCR** *(can start now)* — datasets (buses, products), train/fine-tune YOLO11, OCR
-  approach, edge export (TFLite/Coral) + benchmarks. Deliverable: an exported model + I/O schema.
-  > ⚠️ **Pregunta de alcance abierta (ADR 0004):** si un Gemma multimodal lee el cartel directamente
-  > en el camino del teléfono, detección y OCR colapsan en un paso y buena parte de B1 desaparece —
-  > incluido el método que describe el documento principal de la tesis. **Hay que decidirlo
-  > explícitamente con el tutor, no por omisión.** Recomendación actual: conservar YOLO + OCR **como
-  > comparación** y medir ambos con el benchmark que ya existe.
+- **B1 · ML / OCR** *(can start now — redefinido por ADR 0006, 2026-08-22)* — **nada se entrena**:
+  los modelos vienen preentrenados. El trabajo es (a) armar los **datasets de evaluación** (bondis y
+  productos): resultado esperado vs. obtenido → **recall, precision, accuracy, F1** — la forma de
+  medir precisión del proyecto; (b) elegir el detector para la TPU (`rfdetr-nano` / `yolo26` /
+  YOLO11-nano) y **medirlo sobre la RPi Zero 2 W + Coral** (riesgo técnico abierto); (c) cerrar la
+  decisión de supermercado midiendo **Gemma 3 1B con visión** contra Gemini Flash. Deliverable: el
+  pipeline de bondis exportado + la tabla de métricas.
+  > La pregunta de alcance de ADR 0004 quedó **cerrada por ADR 0006** con la evidencia del spike:
+  > el VLM no reemplaza a detección + OCR (6,4 s contra fracciones de segundo, sin coordenadas).
+  > Queda como término de comparación en el informe. Validación con el tutor pendiente.
 - **B2 · Hardware** *(blocked on buying components)* — RPi Zero 2 W + Coral TPU + Camera Module 3;
-  capture; BLE peripheral/GATT server matching `gatt.ts`; two channels; enclosure; RTT comparison.
+  capture; **detección + recorte del banner en la TPU** (rol de preprocesadora, ADR 0006); **botón
+  físico + máquina de estados de modos** (ADR 0007, incluye exponer el modo por GATT); BLE
+  peripheral/GATT server matching `gatt.ts`; two channels; enclosure; RTT comparison.
 - **B3 · Convergence contract** — model↔app message schema (align `RecognitionEvent`), on-device
   runtime, image transport — captured as ADRs.
 
@@ -67,8 +72,12 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 **Escritos:** [0001 Offline-first](architecture/adr/0001-offline-first-on-device-inference.md)
 (enmendado 2026-08-10 — nube como acelerador opcional) ·
 [0002 Backend & auth](architecture/adr/0002-backend-and-auth-supabase.md) ·
-[0004 Runtime de inferencia on-device — Gemma vía LiteRT-LM](architecture/adr/0004-on-device-inference-runtime.md)
-*(Proposed — a discutir con el tutor)*.
+[0004 Runtime de inferencia on-device](architecture/adr/0004-on-device-inference-runtime.md)
+*(Proposed — actualizado 2026-08-22: el runtime se resuelve por caso de uso)* ·
+[0006 Pipelines por caso de uso](architecture/adr/0006-pipelines-por-caso-de-uso.md)
+*(Proposed — a validar con tutor)* ·
+[0007 Botones físicos y modos de operación](architecture/adr/0007-botones-fisicos-modos-de-operacion.md)
+*(Proposed — a validar con tutor)*.
 
 **Por escribir:**
 - **ADR 0003 — Image transport for offload-to-phone** (WiFi/local-network vs BLE).
@@ -87,4 +96,5 @@ Recognition wiring in the app (**A5**) waits for B1/B2.
 - **A1–A3:** launch app (dev client), drive each flow with VoiceOver + TalkBack; check focus order,
   labels/roles/hints, Dynamic Type, contrast, reduce-motion; CI green; login persists offline.
 - **A4:** connect to device/mock, receive a `RecognitionEvent`, hear it on the device earphone output.
-- **B1:** model trains and exports; report accuracy + on-device latency.
+- **B1:** el pipeline de bondis corre sobre el dataset de evaluación; reportar recall / precision /
+  accuracy / F1 + latencia on-device (ADR 0006).

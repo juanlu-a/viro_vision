@@ -52,7 +52,7 @@ final integration, bug-fixing and joint testing).
 |--------|--------|---------|
 | **Mobile app** | `app/` | React Native (Expo). BLE (GATT) data/control link to the device, routing TTS audio to the device's earphone, config, and first-class accessibility. See [references/app.md](references/app.md). |
 | **Hardware / IoT** | `hardware/` | Glasses-mounted camera device: Raspberry Pi Zero 2 W + Coral TPU + Camera Module 3. See [references/hardware.md](references/hardware.md). |
-| **ML / OCR / CV** | `ml/` | YOLO11 detection (buses, products), OCR (bus signs, product labels), Edge AI. See [references/ml.md](references/ml.md). |
+| **ML / OCR / CV** | `ml/` | Per-use-case pipelines (ADR 0006): buses = pretrained detection on the Coral TPU → banner crop → OCR; supermarket = vision LLM (local small vs. cloud, pending). Evaluation datasets with recall/precision/accuracy/F1. See [references/ml.md](references/ml.md). |
 
 Y tres referencias transversales, que aplican al trabajo diario más que cualquier otra cosa de este
 documento:
@@ -77,9 +77,11 @@ documento:
   with no local fallback, stays forbidden**, and latency-critical cases (bus lines) stay local by
   default. Losing connectivity may cost accuracy or latency, never the recognition or the audio.
   This is still a core differentiator vs. cloud-dependent tools (Seeing AI, Lookout, OrCam).
-  The concrete on-device runtime is decided in ADR 0004: **Gemma via LiteRT-LM** (MediaPipe LLM
-  Inference is in maintenance mode). In the
-  "offload to phone" architecture the model runs **locally on the phone**, not on a server.
+  There is no single on-device runtime: since **ADR 0006** (2026-08-22) each use case has its own
+  pipeline — buses = local detection (Coral TPU) → banner crop → OCR; supermarket = vision LLM
+  (local small model or cloud, pending). ADR 0004's "Gemma via LiteRT-LM" is no longer the primary
+  path. In the "offload to phone" architecture the model runs **locally on the phone**, not on a
+  server.
 - **Low cost, portable.** Hardware and processing choices balance accuracy against cost, size, power
   and feasibility. The device must be cheap and easy to carry.
 - **Two evaluated architectures:** (a) process on-device (standalone), and (b) offload image

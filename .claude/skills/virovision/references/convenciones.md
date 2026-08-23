@@ -176,3 +176,7 @@ git diff origin/main <rama-vieja>   # vacío = todo el contenido está en main
 | `docs/REUNIONES-TUTOR.md` | después de cada reunión con el tutor |
 | un ADR nuevo | cuando se toma una decisión con consecuencias, aunque sea provisoria (`Proposed`) |
 | esta skill | cuando cambia **cómo se trabaja**, no cuando cambia el código |
+
+Los diagramas de flujo/estados van en **mermaid** (GitHub los renderiza y se versionan como
+texto), con el diagrama canónico en `docs/architecture/README.md` — los demás documentos lo
+linkean, nunca lo duplican.

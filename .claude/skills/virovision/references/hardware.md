@@ -9,9 +9,14 @@ design.
 ## Selected components
 
 ### Compute: Raspberry Pi Zero 2 W + Coral TPU
-Single-board Linux computer — the chosen balance of **cost, size, power and processing**. Runs
-local models via TensorFlow Lite / OpenCV, accelerated by the **Coral TPU**. Wi-Fi enables the
-alternative "offload to phone" architecture, so both architectures can be compared on one board.
+Single-board Linux computer — the chosen balance of **cost, size, power and processing**. Since
+ADR 0006 (2026-08-22) the **Coral TPU's role is preprocessing the bus pipeline**: run the
+pretrained detector (TFLite / OpenCV) → crop the banner strip → send **only the crop** to the
+phone's OCR (best case: the whole pipeline runs on the TPU and only the result travels). It no
+longer describes "running the full models" as its job. Detection performance on this exact
+TPU+board combo is **unmeasured** — the main open technical risk of the bus path. Wi-Fi enables
+the alternative "offload to phone" architecture, so both architectures can be compared on one
+board.
 
 ### Camera: Raspberry Pi Camera Module 3
 Sony IMX708, 12 MP, **autofocus**. Connects via the dedicated **CSI** connector — crucially, it
@@ -35,6 +40,18 @@ BLE cannot carry real-time audio, so the device runs **two channels**:
 2. **Separate audio channel** — Bluetooth Classic (A2DP/HFP) or wired, to the device earphone.
 
 This dual-channel design must be reflected in the app↔device integration architecture.
+
+## Botones físicos y modos de operación (ADR 0007)
+
+El dispositivo lleva **entrada física (botón)** y el reconocimiento funciona por **modos
+explícitos** — nunca siempre prendido: anunciar todo lo que la cámara ve, todo el tiempo, aturde.
+Desde *esperando*: **1 click** = modo detección de ómnibus (pipeline local detección + OCR);
+**2 clicks** = modo supermercado (pipeline LLM con visión); **click largo** desde cualquier modo =
+volver a esperando. Cada transición se anuncia por audio — el usuario no tiene otro indicador de
+estado. El diagrama canónico vive en
+[`docs/architecture/README.md`](../../../../docs/architecture/README.md); el firmware suma la máquina
+de estados y el debounce (umbral de click largo y ventana de doble click a definir con hardware
+real), y el GATT debe exponer el modo actual a la app.
 
 ## Two evaluated architectures
 - **On-device (standalone):** RPi + Coral TPU run detection/OCR locally; device only sends results.

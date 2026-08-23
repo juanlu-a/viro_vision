@@ -4,13 +4,17 @@ Thesis deliverables, architecture and decision records.
 
 ## Contents
 
-- `architecture/` — diagramas de arquitectura y flujo de datos *(a poblar)*;
-  [`architecture/adr/`](architecture/adr/) tiene los ADRs: 0001 offline-first (enmendado),
-  0002 backend & auth, 0004 runtime de inferencia on-device.
+- [`architecture/`](architecture/README.md) — el diagrama de modos de operación y el flujo de
+  datos por caso de uso; [`architecture/adr/`](architecture/adr/) tiene los ADRs: 0001
+  offline-first (enmendado), 0002 backend & auth, 0004 runtime de inferencia on-device
+  (actualizado), 0006 pipelines por caso de uso, 0007 botones físicos y modos.
 - [`supabase.md`](supabase.md) · [`ci-cd.md`](ci-cd.md) — setup del backend y de CI/CD.
 - [`REUNIONES-TUTOR.md`](REUNIONES-TUTOR.md) — registro de reuniones con el director de tesis.
 - [`dev-build-ios.md`](dev-build-ios.md) — correr la app en un iPhone físico (development build).
 - [Spike: visión local en el teléfono](spike-vision-local.md) — resultados medidos de los cuatro caminos (nube, LiteRT-LM, ExecuTorch, OCR) y la recomendación.
+- [Pruebas y decisiones](pruebas-y-decisiones.md) — todo lo probado con sus números, pros/contras
+  y las decisiones por caso de uso; **borrador de la sección homónima del documento principal de
+  la tesis**.
 - [`SESSION-LOG.md`](SESSION-LOG.md) — historia cronológica del trabajo.
 - [`ROADMAP.md`](ROADMAP.md) · [`PROJECT-STATUS.md`](PROJECT-STATUS.md) — plan y estado actual.
 
