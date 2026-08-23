@@ -21,7 +21,14 @@ export default function ConnectScreen() {
     isConnected ? theme.success : state.status === 'error' ? theme.danger : theme.textSecondary;
 
   return (
-    <Screen>
+    <Screen
+      scroll
+      // Tirar hacia abajo = buscar/actualizar el dispositivo: el gesto estándar de "traeme la
+      // información fresca", aplicado a lo único que esta pantalla informa. Si ya hay una
+      // operación en vuelo, el gesto no la pisa.
+      onRefresh={async () => {
+        if (!isBusy) await connect();
+      }}>
       <ScreenHeader title={t.title} subtitle={t.intro} />
 
       <Card>

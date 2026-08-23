@@ -55,7 +55,7 @@ export default function HomeScreen() {
   const saludo = nombre ? `${t.greeting}, ${nombre}. ${t.subtitle}` : t.subtitle;
 
   return (
-    <Screen scroll>
+    <Screen scroll onRefresh={async () => setNombre(await loadUserName())}>
       <ScreenHeader title={t.title} subtitle={saludo} mark="large" />
 
       {/* La acción principal: primera en la pantalla y primera para el lector de pantalla. */}
