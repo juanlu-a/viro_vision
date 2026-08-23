@@ -93,6 +93,9 @@ documento:
 - **Do NOT add an AI co-author to commits.** Never append `Co-Authored-By: Claude ...` (or any
   AI-authorship trailer) to commit messages or PR descriptions. Commits are attributed to the human
   author only.
+- **Every new piece of work starts on a fresh feature branch, created before the first edit**,
+  from an up-to-date `main` — never commit on `main` or on a previous task's branch. Details in
+  `references/convenciones.md`.
 
 El resto —formato de commit, nombres de rama, la regla de no apilar PRs, cómo verificar que un
 merge no perdió nada— vive en **[references/convenciones.md](references/convenciones.md)**, para que
