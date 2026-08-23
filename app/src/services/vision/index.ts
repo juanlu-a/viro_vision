@@ -1,19 +1,35 @@
 /**
- * Benchmark de latencia contra un modelo de visión en la nube.
- *
- * Herramienta de desarrollo (paso 2 de la reunión con el tutor del 2026-08-10). No forma parte
- * del camino esencial de reconocimiento, que corre local y offline — ver ADR 0001.
+ * Visión en la nube: el benchmark de latencia (instrumentación de desarrollo, ADR 0001) y el
+ * camino de producto de supermercado (candidato nube de ADR 0006, decisión pendiente).
  *
  * Gemini es el proveedor primario (tier gratuito, misma familia que Gemma); Anthropic queda
- * disponible para contrastar contra otra familia de modelos.
+ * disponible para contrastar contra otra familia de modelos. El camino de ómnibus NO importa
+ * nada de acá: corre local (detección + OCR) porque la latencia manda — ver ADR 0006.
  */
+export { benchmarkBusVision } from './benchmark';
 export {
   VisionHttpError,
   VisionNotConfiguredError,
   VisionQuotaError,
   VisionStreamError,
-  benchmarkBusVision,
-} from './benchmark';
+} from './errors';
+export {
+  PRODUCTO_MODEL,
+  buildProductoRequest,
+  parseProductoLeido,
+  productoSchema,
+} from './producto';
+export type { ProductoLeido } from './producto';
+export { reconocerProducto } from './reconocerProducto';
+export type { ReconocimientoProducto } from './reconocerProducto';
+export {
+  JSON_SHAPE_PROMPT,
+  PRODUCTO_JSON_SHAPE_PROMPT,
+  PRODUCTO_SYSTEM_PROMPT,
+  PRODUCTO_USER_PROMPT,
+  SYSTEM_PROMPT,
+  USER_PROMPT,
+} from './providers/prompts';
 export {
   MODEL_PROFILES,
   availableModels,

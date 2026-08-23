@@ -323,9 +323,34 @@ Las decisiones salieron de la reunión de equipo del 2026-08-21; hoy quedaron es
   resuelve por caso de uso). La skill `virovision` realineada entera (ml, hardware, app,
   decisiones, SKILL.md) — era la memoria que un agente nuevo lee primero y contradecía lo decidido.
 
+## 2026-08-23 — Los modos de operación llegan a la app
+
+Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
+
+- **La máquina de estados de ADR 0007, en código** (`features/reader/modes.ts`): esperando /
+  modo ómnibus / modo supermercado, con los gestos del botón físico (click, doble click, click
+  largo) como transiciones. Sin salto directo entre modos — igual que el diagrama canónico, y con
+  un test por cada celda de la tabla porque el firmware va a implementar la misma máquina.
+- **Inicio deja los "caminos" del spike y pasa a modos**: dos botones que mutan entre activar y
+  desactivar (uno que muta, no dos que se intercambian — VoiceOver no pierde el foco), el modo
+  visible también como texto, y cada transición anunciada por voz (ADR 0007: el usuario no tiene
+  otro indicador de estado).
+- **Ómnibus corre siempre local** (OCR, sin red); **supermercado estrena su camino real**:
+  `services/vision/reconocerProducto.ts` — el candidato nube de ADR 0006 (Gemini Flash, prompt y
+  schema de producto compartidos con el candidato local para que la comparación mida el modelo).
+  Con clave va a la nube; sin clave, o si la nube falla con el modelo local ya cargado, degrada a
+  Gemma vía ExecuTorch avisando. La cuota agotada no degrada: se resuelve esperando y se dice
+  cuánto.
+- **Los errores tipados de visión se mudaron a `errors.ts`**: el camino de producto los necesita
+  y no debía importar `benchmark.ts`, que la regla de frontera reserva a instrumentación.
+- En el camino se **rescataron dos ramas huérfanas sin PR** (`feat/lector-en-inicio`, que los ADRs
+  ya citaban como existente, quedó incluida acá; `docs/decisiones-equipo-2026-08` salió como PR
+  #18) y quedó como regla de la skill + memoria: **todo trabajo nuevo arranca en su feature
+  branch, antes del primer edit**.
+
 ## Open threads / next
-- **Decidir supermercado**: medir Gemma 3 1B con visión sobre productos reales; resolver el
-  despliegue de la clave si gana la nube (ADR 0006).
+- **Decidir supermercado**: medir Gemma 3 1B con visión sobre productos reales (el modo ya junta
+  evidencia desde la pantalla real); resolver el despliegue de la clave si gana la nube (ADR 0006).
 - **Validar ADR 0006 y 0007 con el tutor** — todo quedó en Proposed.
 - Armar el **dataset de evaluación** (captura + etiquetado esperado/obtenido) para ambos casos.
 - Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
