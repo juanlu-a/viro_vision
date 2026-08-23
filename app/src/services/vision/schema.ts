@@ -36,6 +36,21 @@ function isStringOrNull(value: unknown): value is string | null {
  * Tolera envoltura en bloques ``` por si el modelo la agrega pese al schema.
  */
 export function parseBusReading(text: string): BusReading | null {
+  const candidate = parseJsonRecord(text);
+  if (!candidate) return null;
+
+  if (!isStringOrNull(candidate.numero)) return null;
+  if (!isStringOrNull(candidate.nombre)) return null;
+
+  return { numero: candidate.numero, nombre: candidate.nombre };
+}
+
+/**
+ * El paso común a todos los parsers de respuesta de modelo: texto → objeto JSON plano, con la
+ * misma tolerancia a bloques ``` y a truncamiento. Compartido para que la lectura de ómnibus y
+ * la de producto (ADR 0006) no puedan divergir en qué aceptan.
+ */
+export function parseJsonRecord(text: string): Record<string, unknown> | null {
   const trimmed = stripCodeFence(text.trim());
   if (trimmed.length === 0) return null;
 
@@ -47,12 +62,7 @@ export function parseBusReading(text: string): BusReading | null {
   }
 
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const candidate = value as Record<string, unknown>;
-
-  if (!isStringOrNull(candidate.numero)) return null;
-  if (!isStringOrNull(candidate.nombre)) return null;
-
-  return { numero: candidate.numero, nombre: candidate.nombre };
+  return value as Record<string, unknown>;
 }
 
 function stripCodeFence(text: string): string {

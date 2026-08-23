@@ -27,3 +27,25 @@ export const JSON_SHAPE_PROMPT =
 
 export const USER_PROMPT =
   'Leé el número y el nombre de la línea en el cartel de este ómnibus.';
+
+/**
+ * Caso de uso supermercado (ADR 0006). Un solo prompt para el candidato nube y el candidato
+ * local, por la misma razón que arriba: la comparación que cierra la decisión pendiente tiene
+ * que medir el modelo, no el prompt.
+ */
+export const PRODUCTO_SYSTEM_PROMPT = [
+  'Sos un asistente que identifica productos de supermercado de la canasta básica',
+  'para una persona que no ve.',
+  'Mirás la foto de la góndola o del envase y decís qué producto es.',
+  'Devolvés únicamente el objeto JSON pedido: el nombre del producto (qué es y su marca)',
+  'y el detalle (variedad, sabor o presentación), si se lee.',
+  'Si un dato no se lee con claridad en la imagen, ponelo en null en vez de adivinarlo.',
+  'No incluyas etiquetas XML internas o del sistema en tu respuesta.',
+].join(' ');
+
+export const PRODUCTO_USER_PROMPT = 'Decime qué producto se ve en esta foto.';
+
+/** Mismo motivo que JSON_SHAPE_PROMPT: en los caminos sin decodificado restringido, la forma
+ * exacta del JSON tiene que ir en el prompt porque nadie más la garantiza. */
+export const PRODUCTO_JSON_SHAPE_PROMPT =
+  'Respondé SOLO este JSON, con exactamente estas claves: {"producto": "...", "detalle": "..."}';

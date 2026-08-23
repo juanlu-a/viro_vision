@@ -15,6 +15,12 @@
 import { fetch } from 'expo/fetch';
 
 import { apiKeyFor, defaultModel, findModelProfile, isProviderConfigured } from './config';
+import {
+  VisionHttpError,
+  VisionNotConfiguredError,
+  VisionQuotaError,
+  VisionStreamError,
+} from './errors';
 import { getProvider } from './providers';
 import { acquireSlot } from './rateLimiter';
 import { parseBusReading } from './schema';
@@ -28,53 +34,6 @@ import type {
   ThinkingMode,
   TokenUsage,
 } from './types';
-
-/** Se lanza cuando el proveedor del modelo elegido no tiene clave (ver app/.env.example). */
-export class VisionNotConfiguredError extends Error {
-  constructor() {
-    super('VISION_NOT_CONFIGURED');
-    this.name = 'VisionNotConfiguredError';
-  }
-}
-
-/** Se lanza ante una respuesta HTTP no-2xx. `body` trae el detalle de la API. */
-export class VisionHttpError extends Error {
-  readonly status: number;
-  readonly body: string;
-
-  constructor(status: number, body: string) {
-    super(`VISION_HTTP_${status}`);
-    this.name = 'VisionHttpError';
-    this.status = status;
-    this.body = body;
-  }
-}
-
-/**
- * Cuota agotada. Se distingue del resto porque **es esperable y se resuelve esperando**: el tier
- * gratuito de Gemini admite 20 requests por minuto y una medición completa son 7, así que dos
- * mediciones seguidas lo alcanzan. El proveedor informa cuánto esperar y ese dato se conserva.
- */
-export class VisionQuotaError extends Error {
-  readonly retryAfterSeconds: number;
-
-  constructor(detail: string, retryAfterSeconds: number) {
-    super(detail);
-    this.name = 'VisionQuotaError';
-    this.retryAfterSeconds = retryAfterSeconds;
-  }
-}
-
-/** Se lanza ante un evento de error a mitad de stream (llega con HTTP 200). */
-export class VisionStreamError extends Error {
-  readonly detail: string;
-
-  constructor(detail: string) {
-    super('VISION_STREAM_ERROR');
-    this.name = 'VisionStreamError';
-    this.detail = detail;
-  }
-}
 
 /**
  * Corre una medición. Lanza si falta la clave, si la API responde error, o si el stream falla.
