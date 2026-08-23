@@ -290,10 +290,47 @@ for the forward plan see [`ROADMAP.md`](ROADMAP.md).
   dependencias estaba atrasado respecto del SDK y hubo que realinearlo entero.
 - Síntesis para el equipo en `docs/spike-vision-local.md`; ADR 0004 actualizado.
 
+## 2026-08-18/19 — Reinstalación por caducidad del provisioning (los 7 días)
+
+- **La app caducó a los 7 días y se reinstaló en el iPhone**, esta vez en **Release** (bundle
+  embebido: funciona sin Metro ni Mac). Lección nueva para `dev-build-ios.md`, pendiente de anotar
+  ahí: cuando el perfil ya venció, el `xcodebuild` que lanza `expo run:ios` **no lo regenera** —
+  hay que compilar una vez con `xcodebuild -allowProvisioningUpdates` y recién después instalar.
+- El incidente de TCC de macOS ocurrió **por tercera vez** (18/07, 10/08, 21/08), mismo síntoma y
+  misma salida documentada.
+
+## 2026-08-22 — Reunión de equipo: pipelines por caso de uso, botones, y cómo se mide
+
+Las decisiones salieron de la reunión de equipo del 2026-08-21; hoy quedaron escritas.
+
+- **Bondis → camino local** (la latencia manda): detección **preentrenada en la Coral TPU** del
+  dispositivo → recorte del banner → OCR sobre el recorte. La TPU pasa de "correr los modelos
+  completos" a **preprocesadora** — al celular llega el recorte, no el frame, y el OCR deja de
+  distraerse con matrículas. **ADR 0006** (Proposed, a validar con tutor).
+- **Supermercado → LLM con visión, elección pendiente** (la complejidad manda): Gemma 3 1B local
+  (~700 MB) vs. Gemini Flash nube, con la restricción dura de que sea **gratuito para el usuario**
+  — exigir credenciales propias rompe la accesibilidad. Lo destraba medir Gemma 3 1B con visión
+  sobre productos reales. También en ADR 0006.
+- **La precisión se mide con datasets de evaluación**: esperado vs. obtenido → recall, precision,
+  accuracy, F1. Nada se entrena — los modelos vienen preentrenados, y la tarea B1 del roadmap
+  cambió de "entrenar" a "evaluar".
+- **Botones físicos y modos de operación** (**ADR 0007**, Proposed): 1 click = modo ómnibus,
+  2 clicks = modo supermercado, click largo = esperando. Nunca audio no solicitado. Primer
+  diagrama del repo (mermaid, canónico en `docs/architecture/README.md`).
+- **Documentado de punta a punta**: `docs/pruebas-y-decisiones.md` nuevo — todo lo probado (nube,
+  LiteRT-LM, ExecuTorch, OCR) con números, pros/contras y trazabilidad a ADRs; es el **borrador de
+  la sección homónima del documento principal de la tesis**. ADR 0004 actualizado (el runtime se
+  resuelve por caso de uso). La skill `virovision` realineada entera (ml, hardware, app,
+  decisiones, SKILL.md) — era la memoria que un agente nuevo lee primero y contradecía lo decidido.
+
 ## Open threads / next
-- Merge **PR #7** (email/password auth).
-- Install the iOS simulator runtime to see the app (or run on a real device via EAS dev build).
+- **Decidir supermercado**: medir Gemma 3 1B con visión sobre productos reales; resolver el
+  despliegue de la clave si gana la nube (ADR 0006).
+- **Validar ADR 0006 y 0007 con el tutor** — todo quedó en Proposed.
+- Armar el **dataset de evaluación** (captura + etiquetado esperado/obtenido) para ambos casos.
+- Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
+  abierto del camino de bondis).
+- Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
 - Pending interactive setup: **Supabase** project + `app/.env`; **EAS** `login`/`init` + `EXPO_TOKEN` +
-  `EAS_ENABLED`; **Apple** Developer account (device builds only). See `PROJECT-STATUS.md`.
-- Start **Track A / A1** (design system + accessibility foundation) and **A2** (permissions), and
-  **Track B / B1** (datasets + YOLO11).
+  `EAS_ENABLED`; **Apple** Developer account (para escapar de la caducidad de 7 días). See
+  `PROJECT-STATUS.md`.

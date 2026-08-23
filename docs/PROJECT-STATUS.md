@@ -1,6 +1,6 @@
 # ViroVision — Project status & session handoff
 
-_Living status/continuation doc. Last updated: 2026-08-11._
+_Living status/continuation doc. Last updated: 2026-08-22._
 
 This captures where the project stands so anyone (including a fresh Claude Code session, together with
 the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
@@ -49,10 +49,19 @@ docs/       thesis deliverables, ADRs, this file
   WITHOUT login** (opens directly to the tabs; offline-first, Apple doesn't require login). The
   Supabase email-auth code is **archived** — present but not wired into navigation — kept for a
   possible future *optional* sync. If login ever returns → email + password, never Google/OAuth.
-- **ADR 0004 — On-device inference runtime** *(Proposed)*: embed **Gemma via LiteRT-LM** (not
-  MediaPipe LLM Inference, which is in maintenance), smallest variant first, image from the phone
-  camera. Open question for the tutor: whether a multimodal Gemma replaces the YOLO + OCR pipeline
-  on the phone path — that would remove much of B1, which the thesis describes as *the* method.
+- **ADR 0004 — On-device inference runtime** *(Proposed; actualizado 2026-08-13 y 2026-08-22)*:
+  proponía Gemma vía LiteRT-LM; el spike mostró que su visión está rota en iOS y que el VLM por
+  ExecuTorch funciona pero tarda 6,4 s. La pregunta del runtime se resuelve **por caso de uso** →
+  ADR 0006.
+- **ADR 0006 — Pipelines por caso de uso** *(Proposed 2026-08-22, a validar con tutor)*: **bondis
+  = local** (detección preentrenada en la Coral TPU → recorte del banner → OCR; la TPU pasa a
+  **preprocesadora**); **supermercado = LLM con visión, pendiente** (Gemma 3 1B local vs. Gemini
+  Flash nube; restricción dura: gratuito para el usuario). La precisión se mide con **datasets de
+  evaluación** (recall / precision / accuracy / F1) — nada se entrena. Ver
+  `docs/pruebas-y-decisiones.md`.
+- **ADR 0007 — Botones físicos y modos** *(Proposed 2026-08-22)*: 1 click = modo ómnibus, 2 clicks
+  = modo supermercado, click largo = esperando. Nunca audio no solicitado. Diagrama canónico en
+  `docs/architecture/README.md`.
 - **Git convention:** no AI co-author trailers on commits/PRs (also in the skill).
 
 ## App tech stack

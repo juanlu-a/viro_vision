@@ -48,7 +48,9 @@ See [`app/README.md`](app/README.md) for the full app guide.
 - **Accessibility is a hard requirement** (VoiceOver / TalkBack, real usability testing with blind users).
 - **Offline-first / self-contained.** Essential features (detection, OCR, audio feedback) must work
   **without internet** — the recognition model is bundled and runs locally (on the device or on the
-  phone), never a cloud API. Non-essential features may use the internet.
+  phone), never a cloud API **as the only path** (since ADR 0001 was amended on 2026-08-10 the
+  cloud may act as an *optional accelerator*, with local inference as the guaranteed fallback).
+  Non-essential features may use the internet.
 - **Low cost, portable**, adapted to the Uruguayan context.
 - Two device architectures are evaluated: **on-device** processing vs. **offload to the phone**
   (in both, inference stays local).

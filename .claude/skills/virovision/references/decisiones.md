@@ -31,7 +31,7 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
 
 El número está reservado a propósito. Depende de tener hardware.
 
-### ADR 0004 — Runtime de inferencia on-device · **Proposed — con evidencia del spike (2026-08-13)**
+### ADR 0004 — Runtime de inferencia on-device · **Proposed — actualizado 2026-08-22: se resuelve por caso de uso**
 
 Proponía **Gemma vía LiteRT-LM**. El spike lo midió: el camino de visión de LiteRT-LM **no funciona
 en iOS** (bug de la librería, aislado con evidencia); el mismo modelo por **ExecuTorch/MLX** sí ve,
@@ -42,16 +42,36 @@ como comparación. Ver `docs/spike-vision-local.md`. Sigue descartado MediaPipe 
 Restricción encontrada y anotada: **el sandbox de iOS impide usar el Gemma que corre dentro de otra
 app**. Tenerlo andando en Edge Gallery prueba que el hardware da, pero no acerca el producto.
 
-**La pregunta que este ADR NO cierra, y que es de alcance de tesis, no técnica:** si Gemma
-multimodal lee el cartel directamente, el pipeline **YOLO + OCR** deja de ser necesario en el camino
-del teléfono — y eso borraría buena parte de la tarea B1 del roadmap, que el documento de tesis
-describe como *el* método. Recomendación registrada: **conservar los dos y medirlos uno contra
-otro**; el benchmark ya construido mide con la misma vara cualquier backend, así que el costo
-marginal de comparar es bajo y el valor para la tesis es alto.
+**Qué cambió el 2026-08-22** (reunión de equipo del 21): la pregunta de "el" runtime **deja de
+existir** — se resuelve por caso de uso en ADR 0006. "Gemma vía LiteRT-LM" deja de ser el camino
+primario; si lo local gana en supermercado, el candidato es un Gemma chico sobre **ExecuTorch**. La
+pregunta de alcance (¿el VLM reemplaza a YOLO + OCR?) quedó **cerrada con evidencia**: no — 6,4 s
+contra fracciones de segundo, y sin coordenadas para priorizar. El VLM queda como término de
+comparación en el informe.
 
 ### ADR 0005 — Design system y estándares de accesibilidad · **planeado, sin escribir**
 
 Buena parte ya está implementada (tokens, `theme.test.ts`, tipografía de marca); falta escribirla.
+
+### ADR 0006 — Pipelines por caso de uso · **Proposed (2026-08-22) — a validar con tutor**
+
+**Qué cambió**: deja de haber un runtime único (lo que buscaba ADR 0004). Cada caso de uso tiene su
+pipeline. **Bondis = local** (la latencia manda): detección **preentrenada en la Coral TPU** del
+dispositivo → recorte del banner → OCR sobre el recorte — la TPU pasa de "correr los modelos
+completos" a **preprocesadora**, y al celular llega el recorte, no el frame. **Supermercado = LLM
+con visión** (la complejidad manda), elección **PENDIENTE**: Gemma 3 1B local (~700 MB) vs. Gemini
+Flash nube, con la restricción dura de que sea **gratuito para el usuario** (exigir credenciales
+propias rompe la accesibilidad). La precisión del proyecto se mide con **datasets de evaluación**
+(esperado vs. obtenido → recall, precision, accuracy, F1) — de evaluación, no de entrenamiento: la
+tarea B1 cambia de "entrenar" a "evaluar". Ver `docs/pruebas-y-decisiones.md`.
+
+### ADR 0007 — Botones físicos y modos de operación · **Proposed (2026-08-22) — a validar con tutor**
+
+**Qué cambió**: hasta ahora no había ninguna interfaz de entrada física especificada. El
+reconocimiento funciona por **modos explícitos** activados con el botón del dispositivo — nunca
+audio no solicitado. Desde *esperando*: 1 click = modo ómnibus (pipeline local), 2 clicks = modo
+supermercado (pipeline LLM), click largo = volver a esperando. Cada transición se anuncia por
+audio. Diagrama canónico en `docs/architecture/README.md`.
 
 ## Decisiones sin ADR, pero vigentes
 
