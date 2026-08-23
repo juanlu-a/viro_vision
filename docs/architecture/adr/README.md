@@ -7,7 +7,9 @@ Format: short Markdown, numbered `NNNN-title.md`, status one of Proposed / Accep
 |---|-------|--------|
 | [0001](0001-offline-first-on-device-inference.md) | Offline-first: self-contained, on-device inference | Accepted (enmendado 2026-08-10 — nube como acelerador opcional) |
 | [0002](0002-backend-and-auth-supabase.md) | Backend & auth: Supabase as the online account layer | Accepted |
-| [0004](0004-on-device-inference-runtime.md) | Runtime de inferencia on-device (Gemma vía LiteRT-LM) | Proposed |
+| [0004](0004-on-device-inference-runtime.md) | Runtime de inferencia on-device (Gemma vía LiteRT-LM) | Proposed (actualizado 2026-08-22 — el runtime se resuelve por caso de uso, ver 0006) |
+| [0006](0006-pipelines-por-caso-de-uso.md) | Pipelines por caso de uso: bondis local (TPU preprocesadora), supermercado LLM (pendiente) | Proposed — a validar con tutor |
+| [0007](0007-botones-fisicos-modos-de-operacion.md) | Botones físicos y modos de operación del dispositivo | Proposed — a validar con tutor |
 
 > **0003 está reservado** para el transporte de imagen en la arquitectura offload-to-phone
 > (WiFi/local-network vs. BLE), pendiente de escribir — ver `ROADMAP.md`.

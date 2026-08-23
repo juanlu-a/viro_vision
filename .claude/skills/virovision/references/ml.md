@@ -10,13 +10,14 @@
 
 ## Models & techniques
 
-### YOLO (You Only Look Once) — object detection
+### Detection — pretrained, running on the Coral TPU as a preprocessor
 Single-pass detection (class + bounding box), well suited to **real-time / low-latency** and
-embedded use. Target version **YOLO11**, usable for detection/segmentation/classification/pose.
-Pretrained on **COCO** (80 common classes — includes `person`, `car`, `bus`, `bicycle`, …), giving
-a useful starting point. Comes in **size variants** (nano → large): pick small models for the
-constrained device, larger ones when more compute is available — key for the edge/mobile tradeoff
-(latency, memory, device compatibility).
+embedded use. Candidates: **YOLO11-nano / `yolo26` / `rfdetr-nano`** — all pretrained on **COCO**
+(80 classes, includes `bus`), so **no training is required**. Since ADR 0006 (2026-08-22) the
+detector's role is **preprocessing on the device's Coral TPU**: detect the bus → crop the banner
+strip → hand only the crop to the OCR (best case: the whole pipeline runs on the TPU). The crop is
+what removes OCR distractions (license plates, ads) and gives it large letters; the box size gives
+proximity-based prioritization for free.
 
 ### OCR
 Deep-learning OCR (robust to variable lighting, non-ideal angles, diverse fonts). Central to
@@ -24,30 +25,40 @@ ViroVision for reading **bus line numbers/names** and **product-label text**. Ex
 research: LED-display / vehicle-sign OCR, motion and lighting variability.
 
 ### Edge AI / on-device (offline-first, hard requirement)
-Local inference is the **guaranteed fallback**, so essential recognition works **offline**. Two
-deployment targets, both fully local:
-- **On the device:** RPi Zero 2 W + Coral TPU via **TensorFlow Lite / OpenCV**.
-- **On the phone** ("offload to phone" architecture): the model runs on the phone's own compute, not
-  on a server. Runtime decided in **ADR 0004**: **Gemma via LiteRT-LM** (supersedes the TFLite /
-  ONNX Runtime / ExecuTorch options originally listed here; MediaPipe LLM Inference is in
-  maintenance mode).
+Local inference is the **guaranteed fallback**, so essential recognition works **offline**. Since
+**ADR 0006** (2026-08-22) there is no single runtime — **each use case has its own pipeline**:
+
+- **Buses (latency rules) → fully local:** detection on the **Coral TPU** (pretrained, see above)
+  → banner crop → **OCR (CRAFT + CRNN, Spanish, ~250 MB)** on the crop, via **ExecuTorch** on the
+  phone (or on the TPU if it fits). No LLM in this path.
+- **Supermarket (complexity rules) → vision LLM, choice PENDING:** **Gemma 3 1B local (~700 MB,
+  via ExecuTorch — NOT the 3 GB multimodal)** vs. **Gemini Flash in the cloud**. Hard constraint:
+  the model must be **free for the user** — requiring their own account/credentials breaks
+  accessibility. What unblocks it: measuring Gemma 3 1B *with vision* on real products.
+
+**LiteRT-LM is no longer the primary path** (superseding what ADR 0004 originally proposed): the
+2026-08 spike showed its vision path is broken on iOS (library bug, isolated with evidence), while
+the same model works via **ExecuTorch** — but the 3 GB multimodal VLM takes ~6.4 s total, too slow
+for buses. It remains a comparison term in the report. See
+[`docs/spike-vision-local.md`](../../../../docs/spike-vision-local.md) and
+[`docs/pruebas-y-decisiones.md`](../../../../docs/pruebas-y-decisiones.md).
 
 **Since ADR 0001 was amended (2026-08-10), the cloud is allowed as an *optional accelerator*** —
 never as the only path, and never for latency-critical cases. See
 [references/decisiones.md](decisiones.md).
 
-Benefits: low latency (no connectivity dependency), data privacy (local processing), offline
-operation. Choose model size/quantization (e.g. INT8, Coral-compiled / TFLite) to fit both the
-device and the phone-bundle size budget.
+**La pregunta de alcance de ADR 0004 quedó cerrada por ADR 0006**: el VLM multimodal no reemplaza
+a detección + OCR en el camino del teléfono (6,4 s contra fracciones de segundo, y sin coordenadas
+para priorizar). Detección + OCR es el camino primario de bondis; el VLM queda como término de
+comparación en el informe.
 
-**Pregunta de alcance abierta, para el tutor** (ADR 0004): si un Gemma multimodal lee el cartel
-directamente, el pipeline **YOLO + OCR deja de ser necesario en el camino del teléfono**. Eso no es
-una optimización — borraría buena parte de la tarea B1, que el documento de tesis describe como *el*
-método. Recomendación registrada: conservar los dos y **medirlos uno contra otro**.
-
-## Datasets
-Custom datasets to be **generated and labeled** for (a) metropolitan bus lines and (b) basic-basket
-supermarket products — capture, preprocess, label, train/fine-tune, evaluate on held-out test data.
+## Datasets — evaluation, not training (ADR 0006)
+Custom **evaluation datasets** to be generated and labeled for (a) metropolitan bus lines and (b)
+basic-basket supermarket products: expected result vs. obtained result. The models are pretrained;
+**nothing gets trained**. The metrics — **recall, precision, accuracy, F1** — are *the* way this
+project measures precision, and the instrument that closes the pending supermarket decision
+(Gemma 3 1B vs. Gemini Flash). Definitions and what each metric captures per use case:
+[`docs/pruebas-y-decisiones.md`](../../../../docs/pruebas-y-decisiones.md).
 
 ## Open / pending (`PENDIENTE` in the thesis)
 - **Google Gemma** for edge — architecture, edge variants, vision performance, viability on the
@@ -56,5 +67,7 @@ supermarket products — capture, preprocess, label, train/fine-tune, evaluate o
   (barcode vs. direct vision; existing datasets); real-time detection benchmarks on embedded HW.
 
 ## Status
-Approach chosen (YOLO11 + OCR + TFLite on edge). Datasets, training/fine-tuning and edge export are
-still to be done.
+Pipelines decided per use case (ADR 0006, Proposed — tutor validation pending): buses = detection
+on Coral TPU → banner crop → OCR; supermarket = vision LLM (local small vs. cloud, **pending**).
+Still to be done: evaluation datasets + metrics, detector export/measurement on the Coral TPU, and
+the supermarket decision.

@@ -11,9 +11,14 @@ does not have to share one audio channel between the OS screen reader and ViroVi
 ## Offline-first (hard requirement)
 Essential features must work **without internet**. When the app is the processing backend ("offload
 to phone" architecture), the model runs **on the phone's own compute** — "offload to the phone"
-means offload to local compute, *not* to a server. The concrete runtime is decided in **ADR 0004**:
-**Gemma via LiteRT-LM** (MediaPipe LLM Inference is in maintenance mode; the TFLite / ONNX Runtime /
-ExecuTorch options originally listed here are superseded).
+means offload to local compute, *not* to a server. Since **ADR 0006** (2026-08-22) the phone's role
+is **per use case**: in bus mode it receives the **banner crop** from the device's TPU (not raw
+frames) and runs the **OCR** (CRAFT + CRNN Spanish, ~250 MB, via ExecuTorch); in supermarket mode
+it runs the vision-LLM path (Gemma 3 1B local via ExecuTorch, or Gemini Flash cloud — **pending**).
+The modes themselves are triggered by the device's **physical button** (ADR 0007), not by the app;
+the app is the configuration surface and mirrors the mode state. "Gemma via LiteRT-LM" (ADR 0004
+original) is no longer the primary path — its vision is broken on iOS (see
+`docs/spike-vision-local.md`).
 
 **Since the 2026-08-10 tutor meeting, ADR 0001 is amended: the cloud is allowed as an *optional
 accelerator*.** A runtime *model gateway* may route an inference to the cloud when there is coverage

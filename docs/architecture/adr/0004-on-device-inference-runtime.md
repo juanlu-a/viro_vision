@@ -184,3 +184,24 @@ visión local (sirve para distribuir, no para esto).
 Ver también: [ADR 0001](0001-offline-first-on-device-inference.md) (y su nota del 2026-08-10 sobre la
 nube como acelerador opcional), [`REUNIONES-TUTOR.md`](../../REUNIONES-TUTOR.md), y
 `.claude/skills/virovision/references/ml.md`.
+
+## Actualización 2026-08-22 — la pregunta se resuelve por caso de uso
+
+La reunión de equipo del 2026-08-21 tomó la evidencia del spike y la llevó a su conclusión: **deja
+de haber "un" runtime on-device que decidir**. La pregunta que este ADR planteaba se responde por
+caso de uso, y la decisión vive en [ADR 0006](0006-pipelines-por-caso-de-uso.md):
+
+- **Bondis:** detección + OCR local (sin LLM), con la Coral TPU del dispositivo como
+  preprocesadora (detección → recorte del banner) y el OCR sobre el recorte. Es la recomendación
+  de la actualización 2026-08-13, ahora adoptada por el equipo.
+- **Supermercado:** LLM con visión — Gemma 3 1B local (~700 MB) o Gemini Flash en la nube,
+  **pendiente**, con la restricción de que el modelo sea gratuito para el usuario.
+
+**"Gemma vía LiteRT-LM" deja de ser el camino primario** que da título a este ADR: LiteRT-LM no ve
+en iOS (punto 1 de la actualización anterior) y el VLM multimodal es demasiado lento para bondis
+(punto 3). Si el camino local gana en supermercado, el candidato es un Gemma chico sobre
+**ExecuTorch** — el runtime que sí funcionó. El VLM multimodal queda como término de comparación
+en el informe.
+
+El estado sigue **Proposed**: la validación con el tutor está pendiente, igual que la de ADR 0006
+y [ADR 0007](0007-botones-fisicos-modos-de-operacion.md).

@@ -145,6 +145,13 @@ Trampas ya pisadas, que no hay que repetir:
 
 ## Git
 
+- **Todo trabajo nuevo empieza creando su feature branch, antes del primer edit.** Desde un
+  `main` al día (`git fetch` + rama desde `origin/main`), nunca sobre `main` directo ni sobre la
+  rama de la sesión anterior. Al arrancar una sesión: `git branch --show-current`; si la rama
+  actual es de otro tema, primero se le abre PR (o se descarta a conciencia) y recién después se
+  crea la rama nueva. La lección viene de dos ramas que quedaron huérfanas sin PR
+  (`feat/lector-en-inicio`, `docs/decisiones-equipo-2026-08`) mientras los ADRs ya referenciaban
+  su contenido como existente.
 - **Conventional Commits con scope**, asunto en español: `fix(vision):`, `feat(marca):`,
   `docs:`. El cuerpo explica **el razonamiento**, no el diff — se lee dentro de seis meses.
 - **Nunca agregues un trailer de co-autoría de IA.** Los commits son del autor humano.
@@ -176,3 +183,7 @@ git diff origin/main <rama-vieja>   # vacío = todo el contenido está en main
 | `docs/REUNIONES-TUTOR.md` | después de cada reunión con el tutor |
 | un ADR nuevo | cuando se toma una decisión con consecuencias, aunque sea provisoria (`Proposed`) |
 | esta skill | cuando cambia **cómo se trabaja**, no cuando cambia el código |
+
+Los diagramas de flujo/estados van en **mermaid** (GitHub los renderiza y se versionan como
+texto), con el diagrama canónico en `docs/architecture/README.md` — los demás documentos lo
+linkean, nunca lo duplican.
