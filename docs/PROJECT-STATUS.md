@@ -111,9 +111,9 @@ opcional — la distribución real va por TestFlight desde Xcode.
 2. **Supabase** (see `docs/supabase.md`): create project → enable **Email** auth → (optional) turn off
    email confirmation for testing → fill `app/.env`. No Google Cloud / OAuth needed.
 3. **Apple Developer Program — listo (2026-08, cuenta Individual del Apple ID del proyecto).**
-   Habilita **TestFlight desde Xcode** (`npm run ios:testflight`, sin EAS); flujo en
-   [`dev-build-ios.md`](dev-build-ios.md). Falta: crear la app en App Store Connect, la API key
-   para subir desde la terminal, y la primera subida + testers.
+   **TestFlight funcionando**: app creada en App Store Connect, API key, primer build subido el
+   2026-08-29 y en Beta App Review; cada merge a `main` sube un build (workflow `TestFlight`), y
+   desde cualquier rama se dispara uno al grupo Beta. Links en [`dev-build-ios.md`](dev-build-ios.md).
 
 ## What's next — options (was mid-discussion)
 

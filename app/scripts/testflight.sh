@@ -29,7 +29,8 @@ SCHEME=ViroVision
 BUILD_DIR=build
 ARCHIVE="$BUILD_DIR/ViroVision.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
-BUILD_NUMBER="$(date +%Y%m%d%H%M)"
+# Sobreescribible desde CI, que lo necesita después para asignar el build a su grupo.
+BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 
 if [ ! -d "$WORKSPACE" ]; then
   echo "No existe $WORKSPACE: corré primero 'npx expo prebuild -p ios'." >&2

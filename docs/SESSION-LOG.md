@@ -371,6 +371,24 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
   del montaje de la imagen de desarrollo — `kAMDMobileImageMounterDeviceLocked`); con TestFlight
   deja de importar.
 
+## 2026-08-29 (cont.) — Primer build en TestFlight y la pipeline
+
+- **Primer build subido** con `scripts/testflight.sh` + API key de App Store Connect. Dos
+  tropiezos con moraleja: la key tiene que ser rol **Administración** (con Gestor de apps la
+  firma de distribución falla: `Cloud signing permission error`), y Expo escribe `CFBundleVersion`
+  como literal, así que el build number se fija con PlistBuddy y no por build setting (la primera
+  subida salió como "1"). `app.json` declara `ITSAppUsesNonExemptEncryption=false`.
+- **Distribución sin agregar testers a mano**: grupos externos con **link público** — *Testers
+  ViroVision* (oficial, `main`) y *Beta ViroVision* (features desde una rama). Precio: cada build
+  pasa por Beta App Review (el primero de la 1.0 quedó `WAITING_FOR_REVIEW`; los siguientes se
+  aprueban en minutos). Contacto, descripción beta y "qué probar" cargados por API.
+- **Pipeline**: `.github/workflows/testflight.yml` en runner macOS (gratis, repo público): prebuild
+  → archive → subida → `scripts/testflight-distribute.mjs` (espera el procesamiento, asigna al
+  grupo, envía a revisión). `scripts/asc.mjs` es el cliente de la ASC API sin dependencias (JWT
+  ES256 con `node:crypto`). Secrets y variables del repo espejan el `.env` local.
+- Se descartó EAS para esto (PR #21 cerrado, PR #22 mergeado): TestFlight es de Apple y Xcode
+  hace todo; EAS sumaba cuenta, servicio y cupo sin necesidad.
+
 ## Open threads / next
 - **Decidir supermercado**: medir Gemma 3 1B con visión sobre productos reales (el modo ya junta
   evidencia desde la pantalla real); resolver el despliegue de la clave si gana la nube (ADR 0006).
