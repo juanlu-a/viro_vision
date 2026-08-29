@@ -7,9 +7,10 @@
  *
  *     error: Signing for "ViroVision" requires a development team.
  *
- * Con provisioning gratuito (Apple ID personal, sin Developer Program) el equipo es el "Personal
- * Team" del ID, y su identificador es estable. Fijarlo acá hace que el prebuild sea reproducible en
- * vez de dejar un paso manual en Xcode que hay que recordar cada vez.
+ * El equipo es el del Apple ID del proyecto, inscripto en el Apple Developer Program desde
+ * 2026-08 (antes, el "Personal Team" gratuito del mismo ID — el identificador se conserva).
+ * Fijarlo acá hace que el prebuild sea reproducible en vez de dejar un paso manual en Xcode que
+ * hay que recordar cada vez. EAS Build no pasa por acá: firma con sus propias credenciales.
  *
  * Si alguien clona el repo con otro Apple ID, esto hay que cambiarlo — o sacarlo y volver a
  * seleccionar el equipo a mano. El identificador propio sale de:
@@ -19,7 +20,7 @@
  */
 const { withXcodeProject } = require('expo/config-plugins');
 
-/** Personal Team del Apple ID del equipo. Ver la nota de arriba si cambia el ID. */
+/** Team del Apple ID del proyecto (Developer Program). Ver la nota de arriba si cambia el ID. */
 const DEVELOPMENT_TEAM = 'VPNXQ8K2P8';
 
 module.exports = function withDevelopmentTeam(config) {

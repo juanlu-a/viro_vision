@@ -48,3 +48,5 @@ example
 
 expo-env.d.ts
 # @end expo-cli
+# Archives y .ipa de scripts/testflight.sh
+build/

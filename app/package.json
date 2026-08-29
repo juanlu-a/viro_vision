@@ -67,7 +67,8 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "theme:css": "node ./scripts/generate-theme-css.js"
+    "theme:css": "node ./scripts/generate-theme-css.js",
+    "ios:testflight": "bash ./scripts/testflight.sh"
   },
   "private": true
 }
