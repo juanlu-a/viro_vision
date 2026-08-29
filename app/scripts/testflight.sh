@@ -44,6 +44,10 @@ if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ] && [ -n "${ASC_KEY_PA
 fi
 
 echo "› Archive (build $BUILD_NUMBER)…"
+# Expo escribe CFBundleVersion como literal en Info.plist (no como $(CURRENT_PROJECT_VERSION)), así
+# que pasar la build setting a xcodebuild no alcanza — medido: la primera subida salió como "1".
+# ios/ es un artefacto regenerable, editarlo acá no ensucia el repo.
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" ios/ViroVision/Info.plist
 rm -rf "$ARCHIVE"
 xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
