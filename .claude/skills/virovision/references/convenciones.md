@@ -35,9 +35,9 @@ Todo cambio nativo va por `app.json` o por un **config plugin** en `app/plugins/
 
 Para correr en el iPhone: `docs/dev-build-ios.md`. Desde 2026-08 hay **Apple Developer Program**
 (cuenta Individual del Apple ID del proyecto), así que el camino para el equipo y los testers es
-**TestFlight** vía EAS (`npx eas-cli build --platform ios --profile production` + `eas submit`); el
-dev build por cable (`npx expo run:ios --device "iPhone de Juan"` **desde `app/`**) sigue siendo el
-ciclo de desarrollo, ya sin la caducidad de 7 días.
+**TestFlight desde Xcode** (`npm run ios:testflight`, sin EAS ni terceros); el dev build por cable
+(`npx expo run:ios --device "iPhone de Juan"` **desde `app/`**) sigue siendo el ciclo de desarrollo,
+ya sin la caducidad de 7 días.
 
 ## Estructura de `app/src/`
 
