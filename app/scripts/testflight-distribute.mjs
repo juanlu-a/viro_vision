@@ -97,15 +97,26 @@ if (!group) {
 }
 await asc('POST', `/v1/betaGroups/${group.id}/relationships/builds`, { data: [{ type: 'builds', id: build.id }] });
 
-// Beta App Review. Un 409 acá significa "ya estaba enviado": no es error.
+// Beta App Review. Dos respuestas de Apple que NO son fallas de la pipeline:
+//   - 409: el build ya estaba enviado.
+//   - 422 ANOTHER_BUILD_IN_REVIEW: Apple admite un solo build por versión en revisión a la vez
+//     (pasó en el primer run automático, con el build manual del mismo día todavía en revisión).
+//     El build ya quedó en el grupo; se envía a mano —o lo hace el próximo run— cuando el
+//     anterior termine. Fallar acá haría rojo un build que llegó bien.
 try {
   await asc('POST', '/v1/betaAppReviewSubmissions', {
     data: { type: 'betaAppReviewSubmissions', relationships: { build: { data: { type: 'builds', id: build.id } } } },
   });
   console.log('enviado a Beta App Review');
 } catch (err) {
-  if (!(err instanceof AscError && err.status === 409)) throw err;
-  console.log('ya estaba en Beta App Review');
+  const code = err instanceof AscError ? err.body?.errors?.[0]?.code : undefined;
+  if (err instanceof AscError && err.status === 409) {
+    console.log('ya estaba en Beta App Review');
+  } else if (code === 'ENTITY_UNPROCESSABLE.ANOTHER_BUILD_IN_REVIEW') {
+    console.log('⚠ otro build de esta versión está en Beta App Review; este queda en el grupo a la espera de ser enviado.');
+  } else {
+    throw err;
+  }
 }
 
 console.log(`✓ build ${buildNumber} → grupo "${groupName}" · link: ${group.attributes.publicLink}`);
