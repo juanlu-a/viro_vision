@@ -1,0 +1,111 @@
+/**
+ * Después de subir un build (scripts/testflight.sh): esperar a que Apple lo procese, asignarlo a
+ * un grupo de TestFlight y mandarlo a Beta App Review. Es lo que convierte "subí un .ipa" en
+ * "los testers lo tienen".
+ *
+ * Uso:
+ *   node scripts/testflight-distribute.mjs --build-number 202608291230 \
+ *     --group "Testers ViroVision" --notes "Qué cambió en este build"
+ *
+ * Dos grupos, por decisión del 2026-08-29: "Testers ViroVision" recibe lo que se mergea a main
+ * (la versión oficial); "Beta ViroVision" recibe builds disparados a mano desde una rama (una
+ * feature para probar antes de que sea oficial). Los dos son externos con link público — el
+ * usuario no quiere agregar testers a mano — y por eso cada build pasa por Beta App Review: el
+ * primero de cada versión con revisión real, los siguientes se aprueban en minutos.
+ */
+import { readFileSync } from 'node:fs';
+
+import { asc, AscError } from './asc.mjs';
+
+const args = Object.fromEntries(
+  process.argv.slice(2).reduce((acc, a, i, arr) => {
+    if (a.startsWith('--')) acc.push([a.slice(2), arr[i + 1] ?? '']);
+    return acc;
+  }, []),
+);
+const buildNumber = args['build-number'];
+const groupName = args.group;
+const notes = args.notes || `Build ${buildNumber}`;
+if (!buildNumber || !groupName) {
+  console.error('Uso: --build-number N --group "Nombre" [--notes "texto"]');
+  process.exit(2);
+}
+
+const appJson = JSON.parse(readFileSync(new URL('../app.json', import.meta.url)));
+const bundleId = appJson.expo.ios.bundleIdentifier;
+const locale = 'es-MX';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const apps = await asc('GET', `/v1/apps?filter[bundleId]=${bundleId}`);
+const appId = apps.data[0]?.id;
+if (!appId) throw new Error(`No hay app en App Store Connect con bundle ${bundleId}`);
+
+// Apple procesa el build entre 5 y 20 minutos después de subirlo. Hasta que aparece con
+// processingState VALID no se puede asignar a nadie.
+let build = null;
+const deadline = Date.now() + 40 * 60 * 1000;
+while (Date.now() < deadline) {
+  const r = await asc(
+    'GET',
+    `/v1/builds?filter[app]=${appId}&filter[version]=${buildNumber}&fields[builds]=version,processingState,usesNonExemptEncryption`,
+  );
+  build = r.data[0] ?? null;
+  const state = build?.attributes.processingState;
+  console.log(`build ${buildNumber}: ${state ?? 'todavía no aparece'}`);
+  if (state === 'VALID') break;
+  if (state === 'FAILED' || state === 'INVALID') throw new Error(`Apple rechazó el procesamiento: ${state}`);
+  await sleep(60_000);
+}
+if (build?.attributes.processingState !== 'VALID') throw new Error('El build no terminó de procesarse en 40 minutos.');
+
+// app.json ya declara ITSAppUsesNonExemptEncryption=false; esto cubre builds anteriores a eso.
+if (build.attributes.usesNonExemptEncryption == null) {
+  await asc('PATCH', `/v1/builds/${build.id}`, {
+    data: { type: 'builds', id: build.id, attributes: { usesNonExemptEncryption: false } },
+  });
+}
+
+// "Qué probar": lo que ven los testers en TestFlight. Obligatorio para la revisión.
+const locs = await asc('GET', `/v1/builds/${build.id}/betaBuildLocalizations?fields[betaBuildLocalizations]=locale`);
+const existing = locs.data.find((l) => l.attributes.locale === locale);
+if (existing) {
+  await asc('PATCH', `/v1/betaBuildLocalizations/${existing.id}`, {
+    data: { type: 'betaBuildLocalizations', id: existing.id, attributes: { whatsNew: notes } },
+  });
+} else {
+  await asc('POST', '/v1/betaBuildLocalizations', {
+    data: {
+      type: 'betaBuildLocalizations',
+      attributes: { locale, whatsNew: notes },
+      relationships: { build: { data: { type: 'builds', id: build.id } } },
+    },
+  });
+}
+
+// El grupo, creándolo si no existe (externo, con link público).
+const groups = await asc('GET', `/v1/betaGroups?filter[app]=${appId}&fields[betaGroups]=name,publicLink`);
+let group = groups.data.find((g) => g.attributes.name === groupName);
+if (!group) {
+  const created = await asc('POST', '/v1/betaGroups', {
+    data: {
+      type: 'betaGroups',
+      attributes: { name: groupName, publicLinkEnabled: true, publicLinkLimitEnabled: true, publicLinkLimit: 200, feedbackEnabled: true },
+      relationships: { app: { data: { type: 'apps', id: appId } } },
+    },
+  });
+  group = created.data;
+}
+await asc('POST', `/v1/betaGroups/${group.id}/relationships/builds`, { data: [{ type: 'builds', id: build.id }] });
+
+// Beta App Review. Un 409 acá significa "ya estaba enviado": no es error.
+try {
+  await asc('POST', '/v1/betaAppReviewSubmissions', {
+    data: { type: 'betaAppReviewSubmissions', relationships: { build: { data: { type: 'builds', id: build.id } } } },
+  });
+  console.log('enviado a Beta App Review');
+} catch (err) {
+  if (!(err instanceof AscError && err.status === 409)) throw err;
+  console.log('ya estaba en Beta App Review');
+}
+
+console.log(`✓ build ${buildNumber} → grupo "${groupName}" · link: ${group.attributes.publicLink}`);

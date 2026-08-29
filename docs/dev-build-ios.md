@@ -116,6 +116,26 @@ Dos detalles aprendidos en la primera subida (2026-08-29):
   exento): sin eso, cada build queda en TestFlight con "Falta el cumplimiento de exportación" hasta
   que alguien responde la pregunta a mano, y no llega a los testers.
 
+### Automatizado: cada merge a `main` sube un build
+
+`.github/workflows/testflight.yml` corre en un runner macOS de GitHub (gratis: el repo es público)
+y hace lo mismo que el script, más la distribución (`scripts/testflight-distribute.mjs`: espera el
+procesamiento de Apple, carga "qué probar", asigna el build al grupo y lo envía a Beta App Review).
+
+| Disparador | Grupo de TestFlight | Link |
+|---|---|---|
+| push a `main` (cambios en `app/`) | **Testers ViroVision** — la versión oficial | <https://testflight.apple.com/join/jbE7GDqV> |
+| *Actions → TestFlight → Run workflow* eligiendo una rama | **Beta ViroVision** — una feature para probar antes de que sea oficial | <https://testflight.apple.com/join/puuNhKb3> |
+
+Los dos grupos son externos con link público (nadie agrega testers a mano), por lo que cada build
+pasa por Beta App Review: el primero de cada versión con revisión real (~1 día), los siguientes se
+aprueban en minutos. Un build tarda ~30 min de runner + 5–15 de procesamiento de Apple.
+
+Secrets del repo: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (el contenido del `.p8`, rol
+Administración), `EXPO_PUBLIC_GEMINI_API_KEY`; variables: `EXPO_PUBLIC_ONDEVICE_SPIKE`,
+`EXPO_PUBLIC_SIMULATE_DEVICE` — espejo del `.env` local, para que el build de CI sea el mismo que
+el del Mac.
+
 ### Testers (App Store Connect → la app → TestFlight)
 
 | | Internos | Externos |

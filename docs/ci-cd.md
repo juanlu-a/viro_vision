@@ -8,6 +8,7 @@ all changes land via pull request.
 | Workflow | File | Trigger | Does |
 |----------|------|---------|------|
 | **CI** | `.github/workflows/ci.yml` | PRs to `main`, pushes to feature branches | `npm ci` (install), lint, typecheck, test, then bundle the app for iOS + Android (build check) and upload the bundle artifact. |
+| **TestFlight** | `.github/workflows/testflight.yml` | push to `main` (changes under `app/`), manual from any branch | macOS runner: prebuild → archive → upload to App Store Connect → assign to a TestFlight group and submit to Beta App Review. `main` → *Testers ViroVision*; manual → *Beta ViroVision*. See [`dev-build-ios.md`](dev-build-ios.md). |
 | **EAS Update (preview)** | `.github/workflows/eas-update.yml` | push to `main`, manual | Publishes an OTA **EAS Update** to the `preview` branch so main can be previewed as an update group. |
 | **EAS Build (iOS)** | `.github/workflows/eas-build-ios.yml` | manual (`workflow_dispatch`) | Starts a native **iOS build** on EAS Build (cloud). Manual because it uses build credits + Apple credentials. |
 
@@ -20,12 +21,12 @@ and are skipped (not failed) until EAS is set up — so nothing blocks merging b
 - Require the **CI** status checks to pass: _Lint · Typecheck · Test_ and _Bundle (build check)_.
 - (Optional) require branches to be up to date before merging.
 
-## TestFlight (no CI)
+## TestFlight
 
-Distribution to testers goes through **TestFlight uploaded from Xcode** (`app/scripts/testflight.sh`,
-see [`dev-build-ios.md`](dev-build-ios.md)). It runs on a Mac with the Apple account, on purpose: no
-third-party build service and no Apple credentials in GitHub. The EAS workflows below stay gated
-and optional for a future in which someone without a Mac needs to build.
+Distribution to testers goes through **TestFlight uploaded with Xcode tooling** — locally
+(`npm run ios:testflight`) or from the `TestFlight` workflow on every merge to `main`. No
+third-party build service: the App Store Connect API key lives in repo secrets and Xcode's cloud
+signing does the rest. The EAS workflows below stay gated and optional.
 
 ## Enabling the EAS workflows (optional)
 

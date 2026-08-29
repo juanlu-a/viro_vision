@@ -1,0 +1,83 @@
+name: TestFlight
+
+# Sube un build a TestFlight desde un runner macOS de GitHub (gratis: el repo es público).
+#
+# Dos disparadores, dos grupos (decisión del 2026-08-29):
+#   - push a main            → grupo "Testers ViroVision": la versión oficial, para todos.
+#   - manual desde una rama  → grupo "Beta ViroVision": una feature para probar antes de que sea
+#                              oficial. Se elige la rama en "Run workflow".
+#
+# Requiere los secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (API key de App Store Connect con rol
+# Administración: sin eso la firma de distribución falla) y, opcional, EXPO_PUBLIC_GEMINI_API_KEY
+# para que el candidato nube de supermercado (ADR 0006) funcione en el build. Ver docs/dev-build-ios.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/testflight.yml'
+  workflow_dispatch:
+    inputs:
+      group:
+        description: Grupo de TestFlight que recibe el build
+        default: Beta ViroVision
+        type: choice
+        options: [Beta ViroVision, Testers ViroVision]
+      notes:
+        description: Qué probar (lo ven los testers). Vacío = asunto del último commit.
+        default: ''
+        type: string
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: ./app
+
+jobs:
+  testflight:
+    name: Build y subida (${{ github.event_name == 'push' && 'Testers ViroVision' || inputs.group }})
+    runs-on: macos-latest
+    timeout-minutes: 75
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+      # Se inlinean en el bundle JS en el archive (EXPO_PUBLIC_*), igual que el .env local.
+      EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
+      EXPO_PUBLIC_ONDEVICE_SPIKE: ${{ vars.EXPO_PUBLIC_ONDEVICE_SPIKE }}
+      EXPO_PUBLIC_SIMULATE_DEVICE: ${{ vars.EXPO_PUBLIC_SIMULATE_DEVICE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Xcode más nuevo disponible en el runner
+        run: |
+          XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+      - name: Install dependencies
+        run: npm ci
+      - name: API key de App Store Connect
+        run: printf '%s' "$ASC_KEY_P8" > "$ASC_KEY_PATH"
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      - name: Proyecto nativo (prebuild + pods)
+        run: npx expo prebuild --platform ios --no-install && (cd ios && pod install)
+      - name: Número de build
+        run: echo "BUILD_NUMBER=$(date +%Y%m%d%H%M)" >> "$GITHUB_ENV"
+      - name: Archive, export y subida
+        run: bash scripts/testflight.sh
+      - name: Asignar al grupo y enviar a Beta App Review
+        run: |
+          NOTES="${{ inputs.notes }}"
+          if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · rama ${GITHUB_REF_NAME}"; fi
+          node scripts/testflight-distribute.mjs \
+            --build-number "$BUILD_NUMBER" \
+            --group "${{ github.event_name == 'push' && 'Testers ViroVision' || inputs.group }}" \
+            --notes "$NOTES"
