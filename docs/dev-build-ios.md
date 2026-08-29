@@ -72,17 +72,44 @@ npx expo start --dev-client
 Sólo hay que re-instalar (repetir el paso 4) cuando cambian los módulos nativos, cambia `app.json`,
 o cuando la app caduca (ver abajo).
 
-## Límites del provisioning gratuito
+## TestFlight (desde 2026-08: hay Apple Developer Program)
 
-| Límite | Detalle |
-|---|---|
-| **Caducidad a los 7 días** | La app deja de abrir. Se arregla re-corriendo `npx expo run:ios --device`. |
-| Máx. 3 apps por Apple ID | Simultáneamente instaladas con provisioning gratuito. |
-| Sin push notifications, App Groups ni associated domains | **BLE central y cámara sí funcionan** — es lo que ViroVision necesita. |
+El Apple ID del proyecto está inscripto en el **Apple Developer Program** como cuenta **Individual**
+(sirve para ViroVision y para cualquier otra app del mismo ID; el team `VPNXQ8K2P8` se conserva).
+Eso habilita **TestFlight**: builds que duran **90 días**, se instalan desde la app TestFlight sin
+cable ni Mac, y llegan a todo el equipo y a los testers externos (Luciano, UNCU) con un link.
 
-Si la caducidad de 7 días se vuelve molesta, la salida es el **Apple Developer Program** (USD 99/año)
-más un perfil `development-device` en `app/eas.json` **sin** `ios.simulator: true` (los perfiles
-actuales sólo generan builds de simulador).
+El camino es **EAS Build + EAS Submit**, que compila en la nube y gestiona certificados y perfiles
+solo. Los pasos que piden credenciales son interactivos; en una sesión de Claude, con el prefijo `!`:
+
+```bash
+cd app
+npx eas-cli login                                   # cuenta de Expo (una vez)
+npx eas-cli init                                    # crea el proyecto EAS y escribe extra.eas.projectId en app.json (una vez)
+npx eas-cli build --platform ios --profile production   # pide el login de Apple la primera vez; registra el bundle ID y crea la app en App Store Connect si no existe
+npx eas-cli submit --platform ios --latest          # sube el último build a TestFlight
+```
+
+`production` tiene `autoIncrement` con `appVersionSource: remote`: el `buildNumber` lo lleva EAS, no
+`app.json`. `submit.production` ya trae `appleId` y `appleTeamId`; el `ascAppId` se completa la
+primera vez que exista la app en App Store Connect (EAS lo pregunta).
+
+Testers en App Store Connect → TestFlight:
+
+- **Internos** (hasta 100, usuarios de App Store Connect): reciben cada build **sin revisión**,
+  minutos después de subirlo. Es el canal del equipo.
+- **Externos** (hasta 10 000, por link público): el **primer** build de cada versión pasa por *Beta
+  App Review* (~1 día); los siguientes entran solos. Es el canal para la validación con usuarios.
+
+El dev build por cable de arriba sigue siendo el ciclo de desarrollo (Metro, fast refresh); ya no
+caduca a los 7 días. Con `npx eas-cli build --profile development` se obtiene el mismo dev client
+firmado por EAS, instalable en los iPhones registrados con `npx eas-cli device:create`.
+
+### Lo que ya no aplica: límites del provisioning gratuito
+
+Quedan documentados por si alguien clona el repo con un Apple ID sin programa pago: caducidad a los
+7 días (se reinstala con `npx expo run:ios --device`), máximo 3 apps por Apple ID, sin push
+notifications ni App Groups. BLE central y cámara funcionan igual.
 
 ## Android
 

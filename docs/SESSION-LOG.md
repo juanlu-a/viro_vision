@@ -348,6 +348,26 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
   #18) y quedó como regla de la skill + memoria: **todo trabajo nuevo arranca en su feature
   branch, antes del primer edit**.
 
+## 2026-08-29 — Apple Developer Program y el camino a TestFlight
+
+- **El Apple ID del proyecto entró al Apple Developer Program** (cuenta Individual: cubre
+  ViroVision y cualquier otra app del mismo ID; el team `VPNXQ8K2P8` se conserva). Se termina la
+  caducidad de 7 días y los reinstalados por cable para el equipo: el canal pasa a ser
+  **TestFlight** — builds de 90 días, testers internos sin revisión (el equipo) y externos por link
+  (Luciano, UNCU; primer build por Beta App Review).
+- **Repo preparado para EAS Build + Submit**: `eas.json` con `development` en dispositivo (dev
+  client ad-hoc), `development-simulator`, `preview` (simulador) y `production` → store con
+  `autoIncrement`; `submit.production` ya lleva `appleId` y `appleTeamId`. El workflow *EAS Build
+  (iOS)* suma el perfil `development` y un checkbox *submit* que agrega `--auto-submit`.
+  `dev-build-ios.md`, `ci-cd.md`, `PROJECT-STATUS` y la skill actualizados; los límites del
+  provisioning gratuito quedan documentados como historia.
+- **Pendiente interactivo** (pide logins de Expo y Apple): decidir en qué cuenta de Expo vive el
+  proyecto EAS, `eas init`, primer `eas build --profile production`, `eas submit`, y crear la app
+  en App Store Connect. Después, `EXPO_TOKEN` + `EAS_ENABLED=true` para los workflows.
+- Del 23/08 quedó un dev build Release compilado pero sin instalar (el iPhone se bloqueaba a mitad
+  del montaje de la imagen de desarrollo — `kAMDMobileImageMounterDeviceLocked`); con TestFlight
+  deja de importar.
+
 ## Open threads / next
 - **Decidir supermercado**: medir Gemma 3 1B con visión sobre productos reales (el modo ya junta
   evidencia desde la pantalla real); resolver el despliegue de la clave si gana la nube (ADR 0006).

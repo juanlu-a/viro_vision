@@ -7,7 +7,10 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development",
+      "channel": "development"
+    },
+    "development-simulator": {
+      "extends": "development",
       "ios": {
         "simulator": true
       }
@@ -25,6 +28,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "juanlucasabreu@adinet.com.uy",
+        "appleTeamId": "VPNXQ8K2P8"
+      }
+    }
   }
 }

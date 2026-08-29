@@ -98,8 +98,9 @@ tests via `jest-expo`.
 - EAS jobs gated on repo var `EAS_ENABLED=true`; need secret `EXPO_TOKEN`. See `docs/ci-cd.md`.
 - Note: `app/expo-env.d.ts` is committed (un-ignored) so `tsc` resolves Expo ambient types in CI.
 
-**EAS** (`app/eas.json`): development / preview / production profiles bound to update channels;
-preview builds an iOS **simulator** app (no Apple account needed).
+**EAS** (`app/eas.json`): development (dev client en dispositivo) / development-simulator / preview
+(simulador) / production (**TestFlight**) bound to update channels; `submit.production` lleva el
+Apple ID y el team.
 
 **Hardware / ML**: not started (README stubs only).
 
@@ -110,9 +111,10 @@ preview builds an iOS **simulator** app (no Apple account needed).
    and **variable** `EAS_ENABLED=true`. `eas init`/`update:configure` edit `app.json` — fold those in.
 2. **Supabase** (see `docs/supabase.md`): create project → enable **Email** auth → (optional) turn off
    email confirmation for testing → fill `app/.env`. No Google Cloud / OAuth needed.
-3. **iOS en dispositivo — ya funciona gratis**, firmando con un Apple ID personal; ver
-   [`dev-build-ios.md`](dev-build-ios.md). El Apple Developer Program ($99/año) sólo hace falta para
-   escapar de la caducidad de 7 días del provisioning gratuito.
+3. **Apple Developer Program — listo (2026-08, cuenta Individual del Apple ID del proyecto).**
+   Habilita TestFlight; el flujo está en [`dev-build-ios.md`](dev-build-ios.md) y `ci-cd.md`.
+   Falta el primer `eas build --profile production` + `eas submit` (interactivos: piden el login
+   de Apple) y crear la app en App Store Connect.
 
 ## What's next — options (was mid-discussion)
 

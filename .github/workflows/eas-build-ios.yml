@@ -13,7 +13,11 @@ on:
         description: EAS build profile
         default: preview
         type: choice
-        options: [preview, production]
+        options: [development, preview, production]
+      submit:
+        description: Also submit to TestFlight (production only)
+        default: false
+        type: boolean
 
 concurrency:
   group: eas-build-ios
@@ -42,4 +46,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Start iOS build on EAS
-        run: eas build --platform ios --profile ${{ inputs.profile }} --non-interactive --no-wait
+        # --auto-submit uploads to TestFlight when the build finishes, with the Apple credentials
+        # EAS stored at setup (docs/ci-cd.md). Only meaningful for the store profile.
+        run: >
+          eas build --platform ios --profile ${{ inputs.profile }} --non-interactive --no-wait
+          ${{ inputs.submit && inputs.profile == 'production' && '--auto-submit' || '' }}

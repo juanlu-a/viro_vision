@@ -33,9 +33,11 @@ Todo cambio nativo va por `app.json` o por un **config plugin** en `app/plugins/
 `withoutUserScriptSandboxing.js`, que apaga `ENABLE_USER_SCRIPT_SANDBOXING` porque
 `expo-build-properties` no expone esa build setting.
 
-Para correr en el iPhone: `docs/dev-build-ios.md`. El provisioning gratuito **caduca a los 7 días**;
-se reinstala con
-`npx expo run:ios --device "iPhone de Juan" --configuration Release` **desde `app/`**.
+Para correr en el iPhone: `docs/dev-build-ios.md`. Desde 2026-08 hay **Apple Developer Program**
+(cuenta Individual del Apple ID del proyecto), así que el camino para el equipo y los testers es
+**TestFlight** vía EAS (`npx eas-cli build --platform ios --profile production` + `eas submit`); el
+dev build por cable (`npx expo run:ios --device "iPhone de Juan"` **desde `app/`**) sigue siendo el
+ciclo de desarrollo, ya sin la caducidad de 7 días.
 
 ## Estructura de `app/src/`
 
