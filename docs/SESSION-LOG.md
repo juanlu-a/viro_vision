@@ -405,6 +405,12 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
   + typecheck + tests antes de compilar, y los scripts descubren el workspace y el bundle según la
   variante. CI acepta PRs a `staging` y a `main`. Convenciones, skill y memoria pasan de "desde
   `main` al día" a "desde `staging` al día".
+- **Marcha atrás con la app aparte, a tiempo.** Al preguntarnos para qué era el bundle `.beta`
+  quedó claro: sólo para tener β y oficial instaladas a la vez, y con tres devs alcanza con cambiar
+  de build desde TestFlight. Queda **una sola app y dos grupos**: `staging` → grupo **interno**
+  *Equipo ViroVision* (usuarios de App Store Connect, sin revisión, minutos); `main` → grupo
+  externo *Testers ViroVision* con link público. `app.config.js` y el bundle `.beta` quedan
+  reservados, documentados como descartados. "Promover a producción" = PR `staging → main`.
 - **Beta App Review del build 1 (oficial)**: sigue `WAITING_FOR_REVIEW` desde el sábado; vigía
   activo.
 

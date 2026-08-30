@@ -2,12 +2,14 @@ name: TestFlight
 
 # Sube un build a TestFlight desde un runner macOS de GitHub (gratis: el repo es público).
 #
-# Dos ramas, dos apps (decisión del 2026-08-30 — ver docs/dev-build-ios.md):
-#   - push a staging → variante β  (com.virovision.app.beta, "ViroVision β") → grupo "Beta ViroVision"
-#   - push a main    → app oficial (com.virovision.app)                     → grupo "Testers ViroVision"
-#   - manual desde cualquier rama → la variante que se elija (β por defecto).
-# Son apps distintas para Apple a propósito: iOS no instala dos builds del mismo bundle, y el
-# equipo quiere la de staging y la oficial conviviendo en el mismo teléfono.
+# Una sola app, dos grupos de TestFlight (decisión del 2026-08-30 — ver docs/dev-build-ios.md):
+#   - push a staging → grupo INTERNO "Equipo ViroVision": los devs la reciben en minutos, sin
+#                      Beta App Review (son usuarios de App Store Connect).
+#   - push a main    → grupo EXTERNO "Testers ViroVision" con link público (Beta App Review, el
+#                      primero de cada versión). Se llega por el PR de release staging → main.
+#   - manual desde cualquier rama → el destino que se elija (interno por defecto).
+# Se descartó publicar la β como app aparte (bundle .beta): sólo hacía falta para tener las dos
+# instaladas a la vez, y con tres devs alcanza con cambiar de build desde TestFlight.
 #
 # Antes de compilar corre lint + typecheck + tests: un build que llega a los testers tiene que
 # haber pasado por lo mismo que un PR. Requiere los secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8
@@ -20,11 +22,11 @@ on:
       - '.github/workflows/testflight.yml'
   workflow_dispatch:
     inputs:
-      variant:
-        description: Qué app publicar
-        default: beta
+      destino:
+        description: Grupo de TestFlight que recibe el build
+        default: interno
         type: choice
-        options: [beta, oficial]
+        options: [interno, externo]
       notes:
         description: Qué probar (lo ven los testers). Vacío = asunto del último commit.
         default: ''
@@ -39,14 +41,14 @@ defaults:
     working-directory: ./app
 
 env:
-  # app.config.js y los scripts leen APP_VARIANT: 'beta' o vacío (= app oficial). En push lo
-  # decide la rama (sólo main es oficial); en manual, el input. Se calcula una sola vez acá porque
-  # el env de un job no puede leer `env` (GitHub rechaza el workflow al parsearlo — pasó).
-  APP_VARIANT: ${{ ((github.event_name == 'push' && github.ref_name != 'main') || (github.event_name == 'workflow_dispatch' && inputs.variant != 'oficial')) && 'beta' || '' }}
+  # 'interno' (Equipo ViroVision, sin revisión) o 'externo' (Testers ViroVision, link público).
+  # En push lo decide la rama (sólo main es externo); en manual, el input. Se calcula una sola vez
+  # acá porque el env de un job no puede leer `env` (GitHub rechaza el workflow al parsearlo — pasó).
+  DESTINO: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.destino == 'externo')) && 'externo' || 'interno' }}
 
 jobs:
   testflight:
-    name: Build y subida (${{ ((github.event_name == 'push' && github.ref_name != 'main') || (github.event_name == 'workflow_dispatch' && inputs.variant != 'oficial')) && 'ViroVision β' || 'ViroVision' }})
+    name: Build y subida (${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.destino == 'externo')) && 'externo · Testers ViroVision' || 'interno · Equipo ViroVision' }})
     runs-on: macos-latest
     timeout-minutes: 75
     env:
@@ -90,8 +92,7 @@ jobs:
         run: |
           NOTES="${{ inputs.notes }}"
           if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · rama ${GITHUB_REF_NAME}"; fi
-          GROUP="Testers ViroVision"; [ "$APP_VARIANT" = beta ] && GROUP="Beta ViroVision"
+          if [ "$DESTINO" = interno ]; then EXTRA=(--group "Equipo ViroVision" --internal); else EXTRA=(--group "Testers ViroVision"); fi
           node scripts/testflight-distribute.mjs \
             --build-number "$BUILD_NUMBER" \
-            --group "$GROUP" \
-            --notes "$NOTES"
+            --notes "$NOTES" "${EXTRA[@]}"

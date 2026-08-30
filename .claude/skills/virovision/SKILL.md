@@ -95,7 +95,7 @@ documento:
   author only.
 - **Every new piece of work starts on a fresh feature branch, created before the first edit**,
   from an up-to-date `staging` — never commit on `staging`/`main` or on a previous task's branch.
-  PRs target `staging` (ships as ViroVision β); `main` is production, reached only by a
+  PRs target `staging` (ships to the internal TestFlight group); `main` is production, reached only by a
   `staging → main` PR. Details in `references/convenciones.md`.
 
 El resto —formato de commit, nombres de rama, la regla de no apilar PRs, cómo verificar que un

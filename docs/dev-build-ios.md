@@ -116,28 +116,35 @@ Dos detalles aprendidos en la primera subida (2026-08-29):
   exento): sin eso, cada build queda en TestFlight con "Falta el cumplimiento de exportación" hasta
   que alguien responde la pregunta a mano, y no llega a los testers.
 
-### Automatizado: `staging` → ViroVision β, `main` → ViroVision
+### Automatizado: `staging` → prueba interna, `main` → link público
 
 `.github/workflows/testflight.yml` corre en un runner macOS de GitHub (gratis: el repo es público):
 lint + typecheck + tests, prebuild, archive, subida, y la distribución
-(`scripts/testflight-distribute.mjs`: espera el procesamiento de Apple, carga "qué probar", asigna
-el build al grupo y lo envía a Beta App Review).
+(`scripts/testflight-distribute.mjs`: espera el procesamiento de Apple, carga "qué probar", y según
+el destino asigna al grupo y envía a Beta App Review, o no).
 
-Son **dos apps distintas para Apple**, a propósito: iOS no instala dos builds del mismo bundle, y
-el equipo quiere la versión en prueba y la oficial **conviviendo en el mismo teléfono**. La
-variante la produce `app.config.js` con `APP_VARIANT=beta` (bundle `.beta`, nombre "ViroVision β",
-ícono con franja BETA); todo lo demás sale de `app.json`.
+**Una sola app en App Store Connect, dos grupos de TestFlight.** En el teléfono hay un ViroVision;
+la app TestFlight muestra todos los builds a los que uno tiene acceso y se elige cuál instalar.
 
-| Rama | App | Bundle | Grupo de TestFlight (link público) |
-|---|---|---|---|
-| `staging` — donde van todos los PRs | **ViroVision β** | `com.virovision.app.beta` | *Beta ViroVision* (link en App Store Connect → ViroVision Beta → TestFlight) |
-| `main` — producción; se llega por PR `staging → main` | **ViroVision** | `com.virovision.app` | *Testers ViroVision* → <https://testflight.apple.com/join/jbE7GDqV> |
+| Rama | Grupo de TestFlight | Tipo | Revisión de Apple | Quién la recibe |
+|---|---|---|---|---|
+| `staging` — donde van todos los PRs | *Equipo ViroVision* | **interna** | **ninguna**: llega en minutos | los devs (usuarios de App Store Connect) y algún allegado invitado |
+| `main` — producción; se llega por PR `staging → main` (= *promover*) | *Testers ViroVision* | **externa**, link público <https://testflight.apple.com/join/jbE7GDqV> | Beta App Review del primer build de cada versión; los siguientes, minutos | cualquiera con el link |
 
-*Actions → TestFlight → Run workflow* permite además publicar cualquier rama como β (o como
-oficial, si hace falta). Cada build pasa por Beta App Review: el primero de cada versión con
-revisión real (~1 día), los siguientes se aprueban en minutos; Apple admite **un solo build por
-versión en revisión a la vez** (el script lo trata como aviso). Un build tarda ~30 min de runner +
-5–15 de procesamiento de Apple.
+*Actions → TestFlight → Run workflow* permite además publicar cualquier rama al destino que se
+elija. Apple admite **un solo build por versión en revisión a la vez** (el script lo trata como
+aviso). Un build tarda ~30 min de runner + 5–15 de procesamiento de Apple.
+
+Se evaluó publicar la β como **app aparte** (`com.virovision.app.beta`, `app.config.js` con
+`APP_VARIANT=beta`) para tener las dos instaladas a la vez, y se descartó: exige otra ficha en App
+Store Connect y otra revisión, a cambio de algo que tres devs no necesitan. Queda reservado.
+
+**Pruebas internas vs. externas** (Apple): internas = hasta 100 usuarios de App Store Connect,
+nunca pasan por revisión, sin link público; externas = hasta 10 000 personas por link o email,
+Beta App Review del primer build de cada versión. Para sumar un dev (o un allegado) a la prueba
+interna: App Store Connect → Usuarios y acceso → invitarlo (rol *Desarrollador* para devs,
+*Atención al cliente* para un allegado: no ve nada) → TestFlight → grupo *Equipo ViroVision* →
+agregarlo. También se hace por API con `scripts/asc.mjs`.
 
 Si algo llegó a `staging` y no va a producción, se revierte en `staging` con un PR de revert antes
 del release: `staging` es la antesala de `main`, no un cajón de pruebas sueltas.

@@ -112,10 +112,9 @@ opcional — la distribución real va por TestFlight desde Xcode.
    email confirmation for testing → fill `app/.env`. No Google Cloud / OAuth needed.
 3. **Apple Developer Program — listo (2026-08, cuenta Individual del Apple ID del proyecto).**
    **TestFlight funcionando**: app creada en App Store Connect, API key, primer build subido el
-   2026-08-29 y en Beta App Review. Desde 2026-08-30 hay **dos ramas y dos apps**: `staging` →
-   ViroVision β (`com.virovision.app.beta`), `main` → ViroVision oficial; conviven en el teléfono.
-   Links y flujo en [`dev-build-ios.md`](dev-build-ios.md). Pendiente: crear la app *ViroVision
-   Beta* en App Store Connect (solo por web) para el primer build β.
+   2026-08-29 y en Beta App Review. Desde 2026-08-30 hay **dos ramas**: `staging` → grupo interno
+   *Equipo ViroVision* (devs, sin revisión, minutos); `main` → grupo externo *Testers ViroVision*
+   con link público. Una sola app. Flujo en [`dev-build-ios.md`](dev-build-ios.md).
 
 ## What's next — options (was mid-discussion)
 
