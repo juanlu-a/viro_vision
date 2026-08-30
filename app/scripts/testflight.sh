@@ -52,11 +52,19 @@ echo "› Archive (build $BUILD_NUMBER)…"
 # ios/ es un artefacto regenerable, editarlo acá no ensucia el repo.
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "ios/$SCHEME/Info.plist"
 rm -rf "$ARCHIVE"
-xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
+mkdir -p "$BUILD_DIR"
+# El log completo va a archivo y a la pantalla sólo el cierre; si falla, se muestran las últimas
+# líneas ANTES de salir — un `| tail -3` a secas se comió el error real dos veces (2026-08-30).
+if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   COMPILER_INDEX_STORE_ENABLE=NO \
-  -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} archive | tail -3
+  -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} archive > "$BUILD_DIR/xcodebuild-archive.log" 2>&1; then
+  echo "✗ Archive falló; últimas líneas del log:" >&2
+  tail -80 "$BUILD_DIR/xcodebuild-archive.log" >&2
+  exit 65
+fi
+tail -3 "$BUILD_DIR/xcodebuild-archive.log"
 
 # El ExportOptions se genera acá para que 'destination' siga a la presencia de la key.
 PLIST="$BUILD_DIR/ExportOptions.plist"
@@ -76,8 +84,13 @@ PLIST
 
 echo "› Export ($DESTINATION)…"
 rm -rf "$EXPORT_DIR"
-xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportOptionsPlist "$PLIST" \
-  -exportPath "$EXPORT_DIR" -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} | tail -5
+if ! xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportOptionsPlist "$PLIST" \
+  -exportPath "$EXPORT_DIR" -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} > "$BUILD_DIR/xcodebuild-export.log" 2>&1; then
+  echo "✗ Export falló; últimas líneas del log:" >&2
+  tail -80 "$BUILD_DIR/xcodebuild-export.log" >&2
+  exit 70
+fi
+tail -5 "$BUILD_DIR/xcodebuild-export.log"
 
 if [ "$DESTINATION" = upload ]; then
   echo "✓ Build $BUILD_NUMBER subido a App Store Connect. Aparece en TestFlight en unos minutos (procesamiento de Apple)."
