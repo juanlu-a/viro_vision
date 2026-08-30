@@ -16,14 +16,12 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { CloudBenchLab } from '@/features/benchmark/CloudBenchLab';
-import { OnDeviceLab } from '@/features/ondevice/OnDeviceLab';
-import { useLector } from '@/features/reader/useLector';
+import { formatMs } from '@/features/reader/lectura';
 import type { Modo } from '@/features/reader/modes';
+import { useLector } from '@/features/reader/useLector';
 import { strings } from '@/i18n';
-import { isOnDeviceSpikeEnabled } from '@/services/ondevice';
 import { loadUserName } from '@/services/storage/userName';
-import { formatMs, isVisionConfigured } from '@/services/vision';
+import { isVisionConfigured } from '@/services/vision';
 
 const MODO_LABEL: Record<Modo, string> = {
   esperando: strings.reader.modeEsperando,
@@ -89,6 +87,14 @@ export default function HomeScreen() {
           onPress={() => aplicarGesto(enSupermercado ? 'clickLargo' : 'dobleClick')}
           disabled={ocupado || enOmnibus}
         />
+        {/* Sin clave no hay modo supermercado: se dice antes de que el usuario lo descubra
+            eligiendo una foto. El estado nunca se comunica sólo por un botón deshabilitado. */}
+        {!isVisionConfigured && (
+          <ThemedText type="small" themeColor="textSecondary">
+            {r.cloudNotConfigured}
+          </ThemedText>
+        )}
+
         <AccessibleButton
           label={
             state.estado === 'preparing' && state.progreso != null
@@ -119,6 +125,14 @@ export default function HomeScreen() {
             <ThemedText type="code">{state.textoCrudo.slice(0, 200)}</ThemedText>
           </View>
         )}
+        {state.modelo && (
+          <View accessible accessibilityRole="text">
+            <ThemedText type="small" themeColor="textSecondary">
+              {r.modelUsedLabel}
+            </ThemedText>
+            <ThemedText type="code">{state.modelo}</ThemedText>
+          </View>
+        )}
         {state.ms != null && (
           <View accessible accessibilityRole="text">
             <ThemedText type="small" themeColor="textSecondary">
@@ -129,19 +143,6 @@ export default function HomeScreen() {
         )}
       </Card>
 
-      {/* El laboratorio completo del spike, en Inicio a pedido del equipo mientras dure la
-          etapa de prueba: la elección definitiva de supermercado no está tomada (ADR 0006), y
-          compararlo desde la pantalla real es parte del experimento. Gateado por la misma
-          variable de siempre. */}
-      {isOnDeviceSpikeEnabled && <OnDeviceLab />}
-
-      {/* El benchmark de nube cierra el laboratorio: mismo gate de siempre — la clave, no
-          __DEV__, para poder medir en la calle con un build de Release. */}
-      {(__DEV__ || isVisionConfigured) && (
-        <Card>
-          <CloudBenchLab />
-        </Card>
-      )}
     </Screen>
   );
 }

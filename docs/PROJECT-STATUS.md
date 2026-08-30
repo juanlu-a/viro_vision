@@ -83,12 +83,12 @@ tests via `jest-expo`.
 - **Audio routing** to the device earphone = documented TODO in `services/audio/tts.ts`.
 - **Supabase auth** = **archived** (app has no login). The env-gated client (real/stub) + `AuthProvider`
   remain in the repo but are not wired into navigation — available if optional sync is added later.
-- **Cloud-latency benchmark** (thesis instrumentation, NOT the product path): `services/vision/`
-  (proveedores Gemini/Anthropic, lector SSE, schema JSON, estadística) + `features/benchmark/` + la
-  ruta `dev/vision-bench`, enlazada desde Ajustes cuando hay `__DEV__` o una clave cargada. Mide
-  headers / primer byte / primer evento / **primer token (TTFT)** / total, descarta una corrida de
-  calentamiento y reporta mediana y p90.
-- Tests: **65 en 5 suites** (`recognition/format`, `vision/{schema,sse,stats}`, `vision/providers`).
+- **Lector de Inicio por modos (ADR 0006/0007)**: `features/reader/` — modo ómnibus = OCR local
+  (`services/ondevice/ocr.ts`, ExecuTorch), modo supermercado = nube (`services/vision/`:
+  proveedores Gemini/Anthropic, SSE, schema, limitador de cuota). Sin clave o sin internet,
+  supermercado avisa. El laboratorio del spike se retiró (2026-08-30) y vive en la rama
+  `spike/laboratorio-vision-local`.
+- Tests: **121 en 9 suites**.
 
 **CI/CD** (`.github/workflows/`, gated EAS jobs):
 - `ci.yml` — on PRs to main / feature pushes: install → lint → typecheck → test → bundle (iOS+Android

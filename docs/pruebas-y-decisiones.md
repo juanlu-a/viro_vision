@@ -105,8 +105,9 @@ vuelve a esperando. El diagrama de estados canónico está en
 
 ## Pendientes
 
-- Decidir supermercado: medir Gemma 3 1B con visión sobre productos reales; resolver el despliegue
-  de la clave si gana la nube.
+- Supermercado: decidido nube (2026-08-30, ADR 0006 actualización) con selector de modelo; queda
+  medir Gemma 3 1B con visión sobre productos reales como **fallback local**, y resolver el despliegue
+  de la clave en un build distribuible.
 - Validar ADR 0006 y 0007 con el tutor (todo está en Proposed).
 - Armar el dataset de evaluación (captura, etiquetado esperado/obtenido) para ambos casos.
 - Elegir el detector concreto para la TPU (`rfdetr-nano` / `yolo26` / YOLO11-nano) y medirlo sobre

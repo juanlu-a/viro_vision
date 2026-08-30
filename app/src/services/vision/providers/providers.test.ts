@@ -1,4 +1,5 @@
 import { MODEL_PROFILES, findModelProfile } from '../config';
+import { PRODUCTO_PROMPTS, productoSchema } from '../producto';
 import type { BuildRequestInput, ModelProfile } from '../types';
 import { anthropicProvider, geminiProvider } from './index';
 
@@ -15,6 +16,8 @@ function inputFor(model: ModelProfile, overrides: Partial<BuildRequestInput> = {
     effort: 'low' as const,
     imageBase64: 'QUJD',
     mediaType: 'image/jpeg' as const,
+    prompts: PRODUCTO_PROMPTS,
+    schema: productoSchema,
     ...overrides,
   };
 }
@@ -31,13 +34,18 @@ describe('geminiProvider.buildRequest', () => {
     expect(geminiProvider.buildRequest(inputFor(gemini)).body.stream).toBe(true);
   });
 
-  it('pide JSON con el schema de dos campos', () => {
-    const { response_format: format } = geminiProvider.buildRequest(inputFor(gemini)).body as {
-      response_format: { mime_type: string; schema: { required: readonly string[] } };
+  it('pide JSON con el schema y los prompts que recibe, no con uno propio', () => {
+    const body = geminiProvider.buildRequest(inputFor(gemini)).body as {
+      response_format: { mime_type: string; schema: unknown };
+      input: { type: string; text?: string }[];
     };
 
-    expect(format.mime_type).toBe('application/json');
-    expect(format.schema.required).toEqual(['numero', 'nombre']);
+    expect(body.response_format.mime_type).toBe('application/json');
+    expect(body.response_format.schema).toBe(productoSchema);
+    expect(body.input.filter((b) => b.type === 'text').map((b) => b.text)).toEqual([
+      PRODUCTO_PROMPTS.system,
+      PRODUCTO_PROMPTS.user,
+    ]);
   });
 
   it('manda la imagen con su mime type', () => {
@@ -123,6 +131,18 @@ describe('geminiProvider.readEvent', () => {
 });
 
 describe('anthropicProvider.buildRequest', () => {
+  it('usa el schema y los prompts que recibe — el mismo juego que Gemini', () => {
+    const body = anthropicProvider.buildRequest(inputFor(haiku)).body as {
+      output_config: { format: { type: string; schema: unknown } };
+      system: string;
+      messages: { content: { type: string; text?: string }[] }[];
+    };
+
+    expect(body.output_config.format).toEqual({ type: 'json_schema', schema: productoSchema });
+    expect(body.system).toBe(PRODUCTO_PROMPTS.system);
+    expect(body.messages[0].content.find((c) => c.type === 'text')?.text).toBe(PRODUCTO_PROMPTS.user);
+  });
+
   it('en Haiku 4.5 NO manda effort — la API lo rechaza con 400', () => {
     const { output_config: outputConfig } = anthropicProvider.buildRequest(inputFor(haiku)).body as {
       output_config: Record<string, unknown>;

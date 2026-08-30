@@ -1,9 +1,8 @@
 /**
- * Errores tipados de la capa de visión en la nube, compartidos por el benchmark (instrumentación)
- * y por el camino de producto de supermercado (ADR 0006). Viven aparte para que ese camino no
- * tenga que importar el módulo de benchmark, que la regla de frontera reserva a desarrollo.
+ * Errores tipados de la capa de visión en la nube (modo supermercado, ADR 0006).
  *
- * La UI decide qué mensaje mostrar por el TIPO del error, nunca parseando strings.
+ * La UI decide qué mensaje mostrar y qué anunciar por voz por el TIPO del error, nunca parseando
+ * strings — y cuando un error trae un dato accionable (cuánto esperar, qué falló), va como campo.
  */
 
 /** Se lanza cuando el proveedor del modelo elegido no tiene clave (ver app/.env.example). */
@@ -29,8 +28,8 @@ export class VisionHttpError extends Error {
 
 /**
  * Cuota agotada. Se distingue del resto porque **es esperable y se resuelve esperando**: el tier
- * gratuito de Gemini admite 20 requests por minuto y una medición completa son 7, así que dos
- * mediciones seguidas lo alcanzan. El proveedor informa cuánto esperar y ese dato se conserva.
+ * gratuito de Gemini admite 20 requests por minuto por modelo. El proveedor informa cuánto esperar
+ * y ese dato se conserva para decírselo al usuario.
  */
 export class VisionQuotaError extends Error {
   readonly retryAfterSeconds: number;
@@ -49,6 +48,21 @@ export class VisionStreamError extends Error {
   constructor(detail: string) {
     super('VISION_STREAM_ERROR');
     this.name = 'VisionStreamError';
+    this.detail = detail;
+  }
+}
+
+/**
+ * La red falló antes de que el proveedor respondiera (sin señal, DNS, TLS). `expo/fetch` rechaza
+ * con un `TypeError` genérico; envolverlo permite que la UI anuncie "sin conexión" en vez de un
+ * mensaje técnico — y que el modo supermercado degrade a un estado rotulado (ADR 0001).
+ */
+export class VisionNetworkError extends Error {
+  readonly detail: string;
+
+  constructor(detail: string) {
+    super('VISION_NETWORK_ERROR');
+    this.name = 'VisionNetworkError';
     this.detail = detail;
   }
 }

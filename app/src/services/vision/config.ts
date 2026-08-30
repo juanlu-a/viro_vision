@@ -1,17 +1,17 @@
 /**
- * Configuración del benchmark de visión en la nube, leída de env vars públicas
- * (ver app/.env.example). Las EXPO_PUBLIC_* se inlinean en el bundle en tiempo de build:
- * un build de release compilado sin clave no puede recuperarla en runtime.
+ * Configuración de la visión en la nube (modo supermercado, ADR 0006), leída de env vars públicas
+ * (ver app/.env.example). Las EXPO_PUBLIC_* se inlinean en el bundle en tiempo de build: un build
+ * compilado sin clave no puede recuperarla en runtime.
  *
- * Cuando no hay ninguna clave, la pantalla de benchmark se muestra como "no configurada" en vez
- * de romper — mismo patrón que el stub de Supabase.
+ * Cuando no hay ninguna clave, el modo supermercado avisa que no está configurado en vez de
+ * romper — mismo patrón que el stub de Supabase. Cómo despliega la clave un build distribuible
+ * sin credenciales del usuario sigue pendiente en ADR 0006.
  */
 import type { ModelProfile, VisionProviderId } from './types';
 
 /**
- * Gemini es el proveedor primario: tiene tier gratuito sin tarjeta, y sobre todo es de la misma
- * familia que Gemma. Comparar Gemma local contra Gemini en la nube aísla la variable que la tesis
- * quiere medir (dónde corre el modelo) en vez de mezclarla con "además es otro modelo".
+ * Gemini es el proveedor primario: tiene tier gratuito sin tarjeta — la restricción dura de
+ * ADR 0006 es que el modelo sea gratuito para el usuario.
  */
 export const geminiApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 
@@ -21,7 +21,7 @@ export const anthropicApiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 export const isGeminiConfigured = geminiApiKey.length > 0;
 export const isAnthropicConfigured = anthropicApiKey.length > 0;
 
-/** Si no hay ninguna clave, no hay benchmark posible. Gatea la pantalla y el enlace en Ajustes. */
+/** Si no hay ninguna clave, el modo supermercado no puede leer: la UI lo dice en vez de fallar. */
 export const isVisionConfigured = isGeminiConfigured || isAnthropicConfigured;
 
 export function apiKeyFor(provider: VisionProviderId): string {
@@ -40,8 +40,8 @@ export const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages';
 export const ANTHROPIC_VERSION = '2023-06-01';
 
 /**
- * Modelos medibles. El orden importa: el primero configurado es el default, y la prioridad es
- * velocidad sobre precisión.
+ * Modelos que ofrece el selector de Inicio (sólo los de proveedores con clave). El orden es el
+ * del selector.
  */
 export const MODEL_PROFILES: readonly ModelProfile[] = [
   {

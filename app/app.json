@@ -13,7 +13,7 @@
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
         "NSBluetoothPeripheralUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
-        "NSPhotoLibraryUsageDescription": "ViroVision accede a tus fotos para medir cuánto tarda el reconocimiento de ómnibus en la nube. Es una herramienta de desarrollo.",
+        "NSPhotoLibraryUsageDescription": "ViroVision accede a tus fotos para elegir la imagen del cartel de ómnibus o del producto que querés que te lea en voz alta.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -68,7 +68,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "ViroVision accede a tus fotos para medir cuánto tarda el reconocimiento de ómnibus en la nube. Es una herramienta de desarrollo.",
+          "photosPermission": "ViroVision accede a tus fotos para elegir la imagen del cartel de ómnibus o del producto que querés que te lea en voz alta.",
           "microphonePermission": false
         }
       ],
@@ -126,8 +126,7 @@
             ]
           }
         }
-      ],
-      "react-native-litert-lm"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

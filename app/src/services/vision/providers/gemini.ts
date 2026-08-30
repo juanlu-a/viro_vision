@@ -1,6 +1,6 @@
 /**
- * Proveedor Gemini (Interactions API). Primario del benchmark: tier gratuito sin tarjeta, y de la
- * misma familia que Gemma, así que la comparación local vs. nube cambia una sola variable.
+ * Proveedor Gemini (Interactions API). Primario del modo supermercado: tier gratuito sin tarjeta
+ * (la restricción de gratuidad para el usuario de ADR 0006).
  *
  * Forma verificada CONTRA LA API REAL (agosto 2026), no sólo contra los docs:
  *   POST https://generativelanguage.googleapis.com/v1beta/interactions
@@ -18,13 +18,12 @@
  *   step.delta { delta: { type: 'text', text } }      ← TTFT
  *   step.stop → interaction.completed
  *
- * Que haya un paso de "thought" antes del texto significa que el TTFT de Gemini lo incluye; por
- * eso el benchmark mide por separado el arranque del bloque de texto y el primer token.
+ * Que haya un paso de "thought" antes del texto significa que la primera respuesta visible tarda
+ * lo que tarda el pensamiento; se emite `text-start` aparte para poder distinguirlo.
  *
  * Módulo puro: arma y traduce, no toca la red. Ver providers.test.ts.
  */
 import { GEMINI_INTERACTIONS_URL } from '../config';
-import { busReadingSchema } from '../schema';
 import type {
   BuildRequestInput,
   ProviderEvent,
@@ -32,7 +31,6 @@ import type {
   TokenUsage,
   VisionProvider,
 } from '../types';
-import { SYSTEM_PROMPT, USER_PROMPT } from './prompts';
 
 function buildRequest(input: BuildRequestInput): ProviderRequest {
   return {
@@ -47,14 +45,14 @@ function buildRequest(input: BuildRequestInput): ProviderRequest {
       // La instrucción de sistema va como primer bloque de texto: la Interactions API recibe
       // todo en un único `input`, sin campo `system` separado.
       input: [
-        { type: 'text', text: SYSTEM_PROMPT },
+        { type: 'text', text: input.prompts.system },
         { type: 'image', data: input.imageBase64, mime_type: input.mediaType },
-        { type: 'text', text: USER_PROMPT },
+        { type: 'text', text: input.prompts.user },
       ],
       response_format: {
         type: 'text',
         mime_type: 'application/json',
-        schema: busReadingSchema,
+        schema: input.schema,
       },
     },
   };
