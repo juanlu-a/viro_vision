@@ -86,9 +86,10 @@ tests via `jest-expo`.
 - **Lector de Inicio por modos (ADR 0006/0007)**: `features/reader/` — modo ómnibus = OCR local
   (`services/ondevice/ocr.ts`, ExecuTorch), modo supermercado = nube (`services/vision/`:
   proveedores Gemini/Anthropic, SSE, schema, limitador de cuota). Sin clave o sin internet,
-  supermercado avisa. El laboratorio del spike se retiró (2026-08-30) y vive en la rama
-  `spike/laboratorio-vision-local`.
-- Tests: **121 en 9 suites**.
+  supermercado avisa. El modelo de nube se elige en Inicio (modal accesible, persistido en el
+  teléfono y revalidado contra los disponibles del build). El laboratorio del spike se retiró
+  (2026-08-30) y vive en la rama `spike/laboratorio-vision-local`.
+- Tests: **131 en 11 suites**.
 
 **CI/CD** (`.github/workflows/`, gated EAS jobs):
 - `ci.yml` — on PRs to main / feature pushes: install → lint → typecheck → test → bundle (iOS+Android

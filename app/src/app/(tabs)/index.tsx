@@ -17,11 +17,11 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { formatMs } from '@/features/reader/lectura';
+import { ModelSelector } from '@/features/reader/ModelSelector';
 import type { Modo } from '@/features/reader/modes';
 import { useLector } from '@/features/reader/useLector';
 import { strings } from '@/i18n';
 import { loadUserName } from '@/services/storage/userName';
-import { isVisionConfigured } from '@/services/vision';
 
 const MODO_LABEL: Record<Modo, string> = {
   esperando: strings.reader.modeEsperando,
@@ -38,7 +38,7 @@ const READ_HINT: Record<Modo, string> = {
 export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
-  const { state, aplicarGesto, leer } = useLector();
+  const { state, aplicarGesto, leer, modelo, modelos, elegirModelo } = useLector();
   const [nombre, setNombre] = useState('');
 
   // Alcanza con leerlo al montar: la pestaña de Inicio se monta una vez por sesión y cambiar el
@@ -87,9 +87,12 @@ export default function HomeScreen() {
           onPress={() => aplicarGesto(enSupermercado ? 'clickLargo' : 'dobleClick')}
           disabled={ocupado || enOmnibus}
         />
-        {/* Sin clave no hay modo supermercado: se dice antes de que el usuario lo descubra
-            eligiendo una foto. El estado nunca se comunica sólo por un botón deshabilitado. */}
-        {!isVisionConfigured && (
+        {/* El modelo de nube del modo supermercado, siempre visible (el orden de foco no cambia
+            con el modo). Sin clave no hay selector: se dice antes de que el usuario lo descubra
+            eligiendo una foto — el estado nunca se comunica sólo por un botón deshabilitado. */}
+        {modelo ? (
+          <ModelSelector value={modelo} options={modelos} onChange={elegirModelo} disabled={ocupado} />
+        ) : (
           <ThemedText type="small" themeColor="textSecondary">
             {r.cloudNotConfigured}
           </ThemedText>
