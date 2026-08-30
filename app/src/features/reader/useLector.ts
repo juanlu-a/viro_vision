@@ -1,16 +1,16 @@
 /**
  * El lector de Inicio, por modos de operación (ADR 0007): esperando, ómnibus, supermercado.
  *
- * Reemplaza al selector de "caminos" del spike: los caminos eran la pregunta ("¿cuál sirve?") y
- * los modos son la respuesta de ADR 0006 — cada caso de uso tiene su pipeline. Ómnibus corre
- * SIEMPRE local (OCR): en la calle la latencia manda y la señal no está garantizada. Supermercado
- * usa un LLM con visión, con la elección nube/local todavía abierta: acá conviven los dos
- * candidatos —nube si hay clave, Gemma local si no o como fallback— porque probarlos desde la
- * pantalla real es lo que junta la evidencia que cierra esa decisión.
+ * Cada modo tiene su pipeline (ADR 0006). **Ómnibus corre siempre local**: OCR sobre el banner —
+ * en el producto lo recorta la TPU del dispositivo; hoy, sin hardware, sobre la foto entera — porque
+ * en la calle la latencia manda y la señal no está garantizada. **Supermercado va a la nube**, al
+ * modelo de visión que el usuario eligió en Inicio: está quieto y tolera latencia a cambio de
+ * precisión. Sin internet o sin clave, supermercado **avisa** y no lee: el fallback local para ese
+ * modo sigue pendiente (ADR 0006, actualización 2026-08-30).
  *
- * Cuando exista hardware, el modo lo fija el botón físico del dispositivo y esta pantalla sólo
- * lo refleja (ADR 0007); mientras tanto los botones de la app aplican los MISMOS gestos a la
- * misma máquina de estados (`modes.ts`).
+ * Cuando exista hardware, el modo lo fija el botón físico del dispositivo y esta pantalla sólo lo
+ * refleja (ADR 0007); mientras tanto los botones de la app aplican los MISMOS gestos a la misma
+ * máquina de estados (`modes.ts`).
  *
  * Cada transición de modo y cada resultado se **anuncian por voz**: es una app para personas que
  * no ven la pantalla, y el texto en pantalla es el registro, no la interfaz.
@@ -20,30 +20,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { announce } from '@/features/audio/announcer';
 import { adivinarLectura, frasearLectura, frasearProducto } from '@/features/reader/lectura';
+import type { BusReading } from '@/features/reader/lectura';
 import { transicionar } from '@/features/reader/modes';
 import type { Gesto, Modo } from '@/features/reader/modes';
+import { useModeloSupermercado } from '@/features/reader/useModeloSupermercado';
 import { strings } from '@/i18n';
+import { cargarOcr, leerImagen, liberarOcr, ocrCargado } from '@/services/ondevice';
 import {
-  cargarOcr,
-  etCargado,
-  etCargar,
-  etGenerarConImagen,
-  etLiberar,
-  etReiniciarConversacion,
-  leerImagen,
-  liberarOcr,
-  ocrCargado,
-} from '@/services/ondevice';
-import {
-  PRODUCTO_JSON_SHAPE_PROMPT,
-  PRODUCTO_SYSTEM_PROMPT,
-  PRODUCTO_USER_PROMPT,
+  VisionNetworkError,
+  VisionNotConfiguredError,
   VisionQuotaError,
-  isGeminiConfigured,
-  parseProductoLeido,
   reconocerProducto,
 } from '@/services/vision';
-import type { BusReading, ProductoLeido } from '@/services/vision';
+import type { ProductoLeido } from '@/services/vision';
 
 const t = strings.reader;
 
@@ -57,13 +46,15 @@ export interface LectorState {
   modo: Modo;
   estado: 'idle' | 'preparing' | 'reading';
   mensaje: string;
-  /** Fracción 0–1 si el modo está descargando su modelo. */
+  /** Fracción 0–1 mientras el OCR descarga su modelo la primera vez. */
   progreso: number | null;
   lectura: BusReading | null;
   producto: ProductoLeido | null;
   /** Texto de respaldo cuando no hubo lectura estructurada (p. ej. las detecciones del OCR). */
   textoCrudo: string | null;
   ms: number | null;
+  /** Qué modelo de nube respondió, para mostrarlo junto al resultado. */
+  modelo: string | null;
 }
 
 const inicial: LectorState = {
@@ -75,23 +66,30 @@ const inicial: LectorState = {
   producto: null,
   textoCrudo: null,
   ms: null,
+  modelo: null,
 };
 
-const PROMPT_PRODUCTO_LOCAL = `${PRODUCTO_SYSTEM_PROMPT}\n\n${PRODUCTO_USER_PROMPT}\n\n${PRODUCTO_JSON_SHAPE_PROMPT}`;
+/** Qué le decimos al usuario cuando la nube falla. Por tipo de error, nunca parseando strings. */
+function mensajeDeErrorNube(err: unknown): string {
+  if (err instanceof VisionNotConfiguredError) return t.cloudNotConfigured;
+  if (err instanceof VisionNetworkError) return t.cloudUnavailable;
+  if (err instanceof VisionQuotaError) return `${t.quotaExhausted} ${err.retryAfterSeconds} s.`;
+  return `${t.cloudFailed} (${err instanceof Error ? err.message : String(err)})`;
+}
 
 export function useLector() {
   const [state, setState] = useState<LectorState>(inicial);
   const ref = useRef(inicial);
   const vivo = useRef(true);
+  const { modelo, modelos, elegir: elegirModelo } = useModeloSupermercado();
 
   useEffect(() => {
     vivo.current = true;
     return () => {
       vivo.current = false;
-      // Inicio es la pantalla que siempre está montada, pero por higiene: si el árbol se va,
-      // no dejamos gigabytes mapeados.
+      // Inicio es la pantalla que siempre está montada, pero por higiene: si el árbol se va, no
+      // dejamos el modelo del OCR mapeado.
       liberarOcr();
-      etLiberar();
     };
   }, []);
 
@@ -102,8 +100,7 @@ export function useLector() {
 
   /**
    * Aplica un gesto del botón (el de la app hoy; el del dispositivo cuando exista) a la máquina
-   * de ADR 0007. ADR 0007: cada transición se anuncia por audio — el usuario no tiene otro
-   * indicador de estado.
+   * de ADR 0007. Cada transición se anuncia por audio: el usuario no tiene otro indicador de estado.
    */
   const aplicarGesto = useCallback(
     (gesto: Gesto) => {
@@ -115,6 +112,7 @@ export function useLector() {
         producto: null,
         textoCrudo: null,
         ms: null,
+        modelo: null,
         mensaje: '',
       });
       announce(ANUNCIO_MODO[siguiente]);
@@ -143,68 +141,40 @@ export function useLector() {
     [update],
   );
 
-  /** El candidato local de supermercado: Gemma multimodal vía ExecuTorch, mismo prompt que la nube. */
-  const leerProductoLocal = useCallback(
-    async (uri: string): Promise<{ producto: ProductoLeido | null; crudo: string | null; ms: number }> => {
-      if (!etCargado()) {
-        update({ estado: 'preparing', mensaje: t.preparingBig, progreso: 0 });
-        await etCargar((p) => update({ progreso: p }));
-        update({ estado: 'reading', mensaje: t.reading, progreso: null });
-      }
-      etReiniciarConversacion();
-      const r = await etGenerarConImagen(PROMPT_PRODUCTO_LOCAL, uri);
-      return { producto: parseProductoLeido(r.texto), crudo: r.texto || null, ms: r.totalMs };
-    },
-    [update],
-  );
-
   /**
-   * Modo supermercado: LLM con visión, decisión nube/local abierta (ADR 0006). Con clave, va a
-   * la nube; sin clave, al candidato local. Si la nube falla con el modelo local ya cargado, se
-   * degrada a él avisando (ADR 0001: perder conectividad puede costar precisión, nunca la
-   * función). La cuota agotada NO degrada: se resuelve esperando, y el tiempo que pide el
-   * proveedor se le dice al usuario — ese campo existe para ser leído.
+   * Modo supermercado: el modelo de visión en la nube que eligió el usuario. Sin clave o sin red,
+   * avisa (por tipo de error) y no lee; la cuota agotada dice cuánto esperar — ese campo existe
+   * para ser leído.
    */
   const leerSupermercado = useCallback(
     async (asset: ImagePicker.ImagePickerAsset) => {
+      const model = modelo;
+      if (!model || !asset.base64) {
+        announce(t.cloudNotConfigured);
+        update({ estado: 'idle', progreso: null, mensaje: t.cloudNotConfigured });
+        return;
+      }
       update({ estado: 'reading', mensaje: t.reading, progreso: null });
 
-      let resultado: { producto: ProductoLeido | null; crudo: string | null; ms: number };
-      let aviso = '';
-
-      if (isGeminiConfigured && asset.base64) {
-        try {
-          const r = await reconocerProducto({
-            imageBase64: asset.base64,
-            mediaType: asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg',
-          });
-          resultado = { producto: r.producto, crudo: r.texto || null, ms: r.ms };
-        } catch (err) {
-          if (err instanceof VisionQuotaError) {
-            const mensaje = `${t.quotaExhausted} ${err.retryAfterSeconds} s.`;
-            announce(mensaje);
-            update({ estado: 'idle', progreso: null, mensaje });
-            return;
-          }
-          if (!etCargado()) throw err;
-          resultado = await leerProductoLocal(asset.uri);
-          aviso = ` ${t.fellBackToLocal}`;
-        }
-      } else {
-        resultado = await leerProductoLocal(asset.uri);
+      try {
+        const r = await reconocerProducto({
+          model,
+          imageBase64: asset.base64,
+          mediaType: asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg',
+        });
+        const crudo = r.texto || null;
+        const dicho = frasearProducto(r.producto, crudo);
+        announce(dicho);
+        update({ estado: 'idle', producto: r.producto, textoCrudo: crudo, ms: r.ms, modelo: r.model, mensaje: dicho });
+      } catch (err) {
+        const mensaje = mensajeDeErrorNube(err);
+        announce(mensaje);
+        update({ estado: 'idle', progreso: null, mensaje });
       }
-
-      const dicho = frasearProducto(resultado.producto, resultado.crudo);
-      announce(dicho);
-      update({
-        estado: 'idle',
-        producto: resultado.producto,
-        textoCrudo: resultado.crudo,
-        ms: resultado.ms,
-        mensaje: `${dicho}${aviso}`,
-      });
     },
-    [leerProductoLocal, update],
+    // El modelo entra por dependencia: cambiar de modelo recrea el callback, que es exactamente
+    // lo que queremos — la próxima lectura usa el elegido.
+    [modelo, update],
   );
 
   const leer = useCallback(async () => {
@@ -214,9 +184,9 @@ export function useLector() {
     const foto = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,
-      // El base64 sólo hace falta si la foto puede viajar a la nube; pedirlo siempre copia
-      // megabytes al puente JS sin necesidad.
-      base64: modo === 'supermercado' && isGeminiConfigured,
+      // El base64 sólo hace falta si la foto viaja a la nube; pedirlo siempre copia megabytes al
+      // puente JS sin necesidad.
+      base64: modo === 'supermercado',
     });
     if (foto.canceled || !foto.assets?.[0]) return;
     const asset = foto.assets[0];
@@ -234,5 +204,5 @@ export function useLector() {
     }
   }, [leerOmnibus, leerSupermercado, update]);
 
-  return { state, aplicarGesto, leer };
+  return { state, aplicarGesto, leer, modelo, modelos, elegirModelo };
 }

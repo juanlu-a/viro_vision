@@ -75,15 +75,13 @@ audio. Diagrama canónico en `docs/architecture/README.md`.
 
 ## Decisiones sin ADR, pero vigentes
 
-**Gemini por sobre Anthropic en el benchmark.** No es una preferencia técnica: es que tiene tier
-gratuito, y que es de la **misma familia que Gemma**, así que los números son más comparables contra
-lo que después va a correr local. Anthropic exige billing. El modelo por defecto es
-`gemini-flash-lite-latest`, el más rápido — la prioridad declarada es **velocidad sobre precisión**,
-porque la tarea es leer dos campos de un cartel.
+**Gemini por sobre Anthropic en el modo supermercado.** No es una preferencia técnica: tiene tier
+gratuito, y la restricción dura de ADR 0006 es que el modelo sea gratuito para el usuario. Anthropic
+exige billing y aparece en el selector sólo si el build trae su clave. El modelo por defecto es
+`gemini-3.6-flash` (Flash, no Lite): en supermercado la complejidad manda sobre la latencia.
 
 **La cuota se respeta antes de pedir.** 20 requests por minuto **por modelo** en el tier gratuito.
-Hay un limitador de ventana móvil que espera con aviso; y espera **antes** de arrancar el
-cronómetro, para no contaminar la latencia medida.
+Hay un limitador de ventana móvil que espera con aviso, en vez de fallar y reintentar.
 
 **El verde es el primario, y el manual v1.0 lo confirmó.** Durante un tiempo fue una desviación
 deliberada de la app respecto del manual (que asignaba ese rol al azul). En la v1.0 el manual cambió
@@ -93,10 +91,10 @@ y ahora coinciden.
 `#1FB57A` da 6.39:1 con texto azul profundo encima, pero 2.44:1 como color de texto. En modo oscuro
 coinciden. Todo el detalle, con las mediciones, en la skill `virovision-marca`.
 
-**La medición se toma en un solo lugar.** Los timestamps del benchmark se toman en `benchmark.ts` y
-sólo ahí, para que los proveedores sean comparables por construcción. Si cada proveedor midiera por
-su cuenta, los números dejarían de ser comparables sin que nadie lo note — que es exactamente el
-error que arruinaría el experimento.
+**Prompt y schema únicos por tarea, fuera del proveedor.** `BuildRequestInput.prompts`/`schema` los
+pasa el caso de uso; el proveedor sólo los coloca. Si cada proveedor tuviera su prompt, elegir otro
+modelo en el selector cambiaría también la pregunta y la comparación mediría prompts, no modelos.
+(Heredado del benchmark del spike, donde el principio era el mismo con los timestamps.)
 
 ## Restricciones externas que condicionan el plan
 

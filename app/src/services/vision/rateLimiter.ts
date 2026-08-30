@@ -2,12 +2,12 @@
  * Limitador de tasa por modelo, con ventana móvil.
  *
  * El tier gratuito de Gemini admite 20 requests por minuto **por modelo**. Reaccionar al error de
- * cuota funciona pero es una mala experiencia: la medición se frena 30–60 s sin aviso previo.
- * Acá el límite se respeta *antes* de pedir, así que en el peor caso la app espera un rato con un
- * mensaje claro y nunca falla.
+ * cuota funciona pero es una mala experiencia: el modo supermercado se frena 30–60 s sin aviso
+ * previo. Acá el límite se respeta *antes* de pedir, así que en el peor caso la app espera un
+ * rato con un mensaje claro y nunca falla.
  *
  * Usa `Date.now()` a propósito, no `performance.now()`: la ventana de cuota es tiempo de reloj del
- * lado del servidor, no una duración medida. Es la única parte del benchmark donde corresponde.
+ * lado del servidor, no una duración medida.
  */
 
 /** Ventana de la cuota. */

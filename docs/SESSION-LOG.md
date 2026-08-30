@@ -429,9 +429,45 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - Quedó también un **prompt reutilizable** del flujo TestFlight (interno/externo, un build por
   grupo, trampas de permisos y del parser de GitHub) para replicarlo en otro proyecto.
 
+## 2026-08-30 (cont.) — Cierre del spike: un solo runtime, supermercado en la nube
+
+- **Decisión**: ómnibus = OCR local sobre el banner que YOLO recorta en la placa (nada más en el
+  camino local); supermercado = **nube**, con selector de modelo en Inicio; sin internet o sin clave,
+  supermercado **avisa** — excepción acotada a ADR 0001, escrita en ADR 0006 (actualización
+  2026-08-30); el fallback local (Gemma 3 1B) queda pendiente de evaluar.
+- **El laboratorio del spike se retiró de la app** (LiteRT-LM, Gemma multimodal por ExecuTorch,
+  benchmark de nube, sonda de runtime): fuera `features/ondevice`, `features/benchmark`,
+  `services/ondevice/{config,probe,runner,executorchLlm}`, `services/vision/{benchmark,stats}`,
+  los prompts/schema de ómnibus en la capa de nube, las secciones i18n, el plugin y las dependencias
+  `react-native-litert-lm`, `react-native-nitro-modules`, `expo-document-picker`. **Queda un solo
+  runtime nativo**: ExecuTorch, sólo OCR. `expo-file-system` se conserva: lo importa el resource
+  fetcher del OCR. Antes de borrar, el código quedó preservado en la rama
+  `spike/laboratorio-vision-local`, el tag `spike-laboratorio-vision-local-2026-08-30` y el PR draft
+  #33 "[NO MERGEAR]".
+- **Capa de nube reorientada al producto**: `BuildRequestInput` recibe `prompts` y `schema` (el
+  caso de uso los pasa; el proveedor sólo los coloca), `buildProductoRequest` delega en el proveedor
+  del modelo, `reconocerProducto` acepta `model` y tira `VisionNetworkError` cuando la red falla; el
+  lector anuncia por tipo de error. La regla de lint deja de restringir `services/ondevice` (OCR es
+  camino de producto) y explica la frontera con ADR 0001 + 0006.
+- Ramas alineadas: release `staging → main` (#32) con la pipeline de Android.
+
+## 2026-08-30 (cont.) — Selector de modelo para supermercado
+
+- **El modelo de nube se elige en Inicio**: `ModelSelector` (modal calcado del selector de tema:
+  disparador `button` cuya etiqueta dice qué modelo rige, menú `radiogroup` con `checked`),
+  controlado por props para que el hook se testee sin UI. La preferencia se guarda en el teléfono
+  (`visionModelPreference`, AsyncStorage) y se **revalida** contra los modelos disponibles del
+  build (`resolveProductoModel`): un id guardado de un proveedor sin clave cae al default
+  (`gemini-3.6-flash` — Flash, no Lite) en vez de fallar en cada lectura. Sin ninguna clave, el
+  selector no aparece y el modo avisa.
+- `reconocerProducto` recibe el modelo elegido; mismo prompt y schema para todos los proveedores
+  (test lo fija: si divergieran, el selector compararía prompts y no modelos). 131 tests en 11
+  suites; primer test de la base sobre AsyncStorage, con el mock oficial.
+
 ## Open threads / next
-- **Decidir supermercado**: medir Gemma 3 1B con visión sobre productos reales (el modo ya junta
-  evidencia desde la pantalla real); resolver el despliegue de la clave si gana la nube (ADR 0006).
+- **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales para
+  cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30); resolver el despliegue de la clave en un
+  build distribuible.
 - **Validar ADR 0006 y 0007 con el tutor** — todo quedó en Proposed.
 - Armar el **dataset de evaluación** (captura + etiquetado esperado/obtenido) para ambos casos.
 - Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico

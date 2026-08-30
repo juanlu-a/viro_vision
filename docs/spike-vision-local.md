@@ -56,10 +56,21 @@ local queda como término de comparación en el informe; la nube como acelerador
 La pregunta de alcance del ADR 0004 (¿Gemma multimodal reemplaza a YOLO+OCR?) ahora tiene evidencia:
 **hoy, en este hardware, no** — 6,4 s contra fracciones de segundo, y sin coordenadas para priorizar.
 
+## Nota de cierre (2026-08-30)
+
+El laboratorio se **retiró de la app** (rama `staging`): queda **un solo runtime nativo**, ExecuTorch,
+y sólo para el OCR del modo ómnibus; LiteRT-LM y el Gemma multimodal se desinstalaron
+(`react-native-litert-lm`, `react-native-nitro-modules`, `expo-document-picker`), y el benchmark de
+nube también, porque el modo supermercado ya usa la nube como camino de producto con selector de
+modelo (ADR 0006, actualización 2026-08-30). El código completo del laboratorio sigue disponible en
+la rama `spike/laboratorio-vision-local`, el tag `spike-laboratorio-vision-local-2026-08-30` y el PR
+draft "[NO MERGEAR]" #33; el índice y la receta para revivirlo están en
+[`spike-laboratorio-referencia.md`](spike-laboratorio-referencia.md) (en esa rama).
+
 ## Pendientes
 
-- Reportar el bug de visión a `react-native-litert-lm` con el caso reproducible.
-- Decidir runtime único: hoy conviven LiteRT-LM y ExecuTorch en el binario (~86 MB extra).
+- Reportar el bug de visión a `react-native-litert-lm` con el caso reproducible (desde la rama).
+- ~~Decidir runtime único~~ → resuelto el 2026-08-30: queda ExecuTorch (OCR).
 - Anotado: el mínimo de iOS subió a **17.0** (lo exige el podspec de ExecuTorch).
 - La cuenta paga de Apple quedó **desacoplada de esto**: sirve para distribuir la app al equipo,
   no hace falta para la visión local.

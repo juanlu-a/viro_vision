@@ -12,4 +12,4 @@ export function getProvider(id: VisionProviderId): VisionProvider {
 }
 
 export { anthropicProvider, geminiProvider };
-export { JSON_SHAPE_PROMPT, SYSTEM_PROMPT, USER_PROMPT } from './prompts';
+export { PRODUCTO_SYSTEM_PROMPT, PRODUCTO_USER_PROMPT } from './prompts';

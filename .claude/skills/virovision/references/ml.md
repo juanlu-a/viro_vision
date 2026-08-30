@@ -31,15 +31,18 @@ Local inference is the **guaranteed fallback**, so essential recognition works *
 - **Buses (latency rules) → fully local:** detection on the **Coral TPU** (pretrained, see above)
   → banner crop → **OCR (CRAFT + CRNN, Spanish, ~250 MB)** on the crop, via **ExecuTorch** on the
   phone (or on the TPU if it fits). No LLM in this path.
-- **Supermarket (complexity rules) → vision LLM, choice PENDING:** **Gemma 3 1B local (~700 MB,
-  via ExecuTorch — NOT the 3 GB multimodal)** vs. **Gemini Flash in the cloud**. Hard constraint:
-  the model must be **free for the user** — requiring their own account/credentials breaks
-  accessibility. What unblocks it: measuring Gemma 3 1B *with vision* on real products.
+- **Supermarket (complexity rules) → vision LLM in the cloud (decided 2026-08-30):** Gemini Flash
+  by default, model selectable in the app (Anthropic if the build carries a key). Hard constraint:
+  the model must be **free for the user**. Without internet or key the mode *says so* — the **local
+  fallback is still pending**: measuring **Gemma 3 1B (~700 MB, NOT the 3 GB multimodal)** *with
+  vision* on real products. Until then this is a documented, scoped exception to ADR 0001.
 
 **LiteRT-LM is no longer the primary path** (superseding what ADR 0004 originally proposed): the
 2026-08 spike showed its vision path is broken on iOS (library bug, isolated with evidence), while
 the same model works via **ExecuTorch** — but the 3 GB multimodal VLM takes ~6.4 s total, too slow
-for buses. It remains a comparison term in the report. See
+for buses. It remains a comparison term in the report. The lab code was retired from the app on
+2026-08-30 (one runtime left: ExecuTorch for OCR) and preserved in branch
+`spike/laboratorio-vision-local`. See
 [`docs/spike-vision-local.md`](../../../../docs/spike-vision-local.md) and
 [`docs/pruebas-y-decisiones.md`](../../../../docs/pruebas-y-decisiones.md).
 

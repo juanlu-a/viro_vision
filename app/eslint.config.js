@@ -3,14 +3,15 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 
 /**
- * Las fronteras del ADR 0001, forzadas por el linter.
+ * La frontera de ADR 0001 + ADR 0006, forzada por el linter.
  *
- * El camino cámara → detección/OCR → anuncio tiene que funcionar sin internet y sin depender de
- * experimentos a medio validar. Eso estaba escrito como comentario en cada módulo, y un comentario
- * no frena a nadie: alcanza con que alguien importe el módulo equivocado un martes a la noche.
+ * El camino cámara → detección/OCR → anuncio tiene que funcionar sin internet. Eso estaba escrito
+ * como comentario en cada módulo, y un comentario no frena a nadie: alcanza con que alguien importe
+ * el módulo equivocado un martes a la noche.
  *
- * `services/vision/` es instrumentación contra la nube; `services/ondevice/` es el spike de
- * inferencia local (ADR 0004). Ninguno de los dos puede aparecer en el camino de reconocimiento.
+ * `services/vision/` es la nube: sólo la usa el modo supermercado, desde `features/reader/`. El
+ * OCR de `services/ondevice/` ya NO está restringido: desde ADR 0006 es el camino de producto del
+ * modo ómnibus (antes era un spike y también estaba acá).
  */
 const FRONTERA_ADR_0001 = {
   files: ['src/features/recognition/**', 'src/features/audio/**'],
@@ -22,12 +23,7 @@ const FRONTERA_ADR_0001 = {
           {
             group: ['@/services/vision', '@/services/vision/*', '**/services/vision/*'],
             message:
-              'ADR 0001: el benchmark de nube es instrumentación de desarrollo y no puede estar en el camino de reconocimiento, que debe funcionar sin internet.',
-          },
-          {
-            group: ['@/services/ondevice', '@/services/ondevice/*', '**/services/ondevice/*'],
-            message:
-              'ADR 0001/0004: el runtime local todavía es un spike sin validar. No puede estar en el camino de reconocimiento hasta que se decida lo contrario en un ADR.',
+              'ADR 0001 + ADR 0006: la nube sólo se usa en el modo supermercado, desde features/reader. El camino de reconocimiento y el anuncio tienen que funcionar sin internet.',
           },
         ],
       },

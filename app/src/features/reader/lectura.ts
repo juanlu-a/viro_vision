@@ -6,9 +6,27 @@
  * lectura.test.ts.
  */
 import { strings } from '@/i18n';
-import type { BusReading, ProductoLeido } from '@/services/vision';
+import type { ProductoLeido } from '@/services/vision';
 
 const t = strings.reader;
+
+/**
+ * Lo que el anuncio de ómnibus necesita: número de línea y destino. Vive acá y no en la capa de
+ * nube porque el camino de ómnibus es local (ADR 0006) y no debe importar nada de `services/vision`.
+ */
+export interface BusReading {
+  /** Número de línea del cartel frontal (ej. "116"), o null si no se pudo leer. */
+  numero: string | null;
+  /** Nombre / destino de la línea (ej. "Plaza Independencia"), o null. */
+  nombre: string | null;
+}
+
+/** Duración legible para la fila "Tiempo" del resultado. Guion cuando no hubo medición. */
+export function formatMs(value: number): string {
+  if (!Number.isFinite(value)) return '—';
+  if (value >= 1000) return `${(value / 1000).toFixed(2)} s`;
+  return `${Math.round(value)} ms`;
+}
 
 /** Con 2-4 dígitos y confianza razonable, es candidata a número de línea. */
 export function adivinarLectura(textos: { text: string; score: number }[]): BusReading {

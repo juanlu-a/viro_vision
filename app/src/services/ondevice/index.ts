@@ -1,43 +1,10 @@
 /**
- * Superficie pública del spike de inferencia local (ADR 0004).
+ * Camino local del modo ómnibus (ADR 0006): OCR sobre el banner del ómnibus.
  *
- * REGLA DE FRONTERA (ADR 0001, nota 2026-08-10): instrumentación de desarrollo. Está prohibido
- * importar esto desde `features/recognition/` o `features/audio/` — el camino cámara →
- * detección/OCR → anuncio tiene que funcionar sin depender de un experimento a medio validar.
+ * En el producto, la TPU del dispositivo detecta el ómnibus y manda a la app sólo el recorte del
+ * banner (número y destino); acá se lee. Hoy, sin hardware, la app recibe la foto entera desde
+ * la fototeca — por eso la heurística de `features/reader/lectura.ts` todavía filtra candidatos.
+ * Nada de esto toca la red: es el camino que ADR 0001 exige que funcione sin internet.
  */
-export {
-  CONFIGURACIONES,
-  CONTEXTOS,
-  GEMMA_4_E2B_BYTES,
-  GEMMA_4_E2B_URL,
-  isOnDeviceSpikeEnabled,
-  MODELOS_REMOTOS,
-  MAX_CONTEXT_TOKENS,
-} from './config';
-export { sondearRuntime } from './probe';
-export type { ModeloRemoto } from './config';
-export type { EstimacionPorBackend, ResultadoSonda } from './probe';
-export {
-  cargarModelo,
-  descargarModelo,
-  descargarModeloRemoto,
-  adoptarModelo,
-  diagnosticar,
-  espacioLibre,
-  limpiarCopias,
-  tamanoModelosGuardados,
-  generarConImagen,
-  generarTexto,
-  modeloCargado,
-} from './runner';
-export type { CargaResultado, Diagnostico, GeneracionResultado } from './runner';
 export { cargarOcr, leerImagen, liberarOcr, ocrCargado } from './ocr';
 export type { LecturaOcr } from './ocr';
-export {
-  etCargado,
-  etCargar,
-  etGenerarConImagen,
-  etLiberar,
-  etReiniciarConversacion,
-} from './executorchLlm';
-export type { EtCargaResultado, EtGeneracionResultado } from './executorchLlm';
