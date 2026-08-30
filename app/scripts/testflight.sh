@@ -9,7 +9,6 @@
 #
 # Uso, desde app/:
 #   npm run ios:testflight                       # archive + export del .ipa (sin subir)
-#   APP_VARIANT=beta npm run ios:testflight      # la variante β (otra app: com.virovision.app.beta)
 #   ASC_KEY_ID=… ASC_ISSUER_ID=… ASC_KEY_PATH=…/AuthKey_XXXX.p8 npm run ios:testflight
 #                                                # archive + subida directa a App Store Connect
 #
@@ -36,7 +35,7 @@ EXPORT_DIR="$BUILD_DIR/export"
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 
 if [ -z "$WORKSPACE" ] || [ ! -d "$WORKSPACE" ]; then
-  echo "No hay ios/*.xcworkspace: corré primero 'npx expo prebuild -p ios' (con APP_VARIANT=beta para la β)." >&2
+  echo "No hay ios/*.xcworkspace: corré primero 'npx expo prebuild -p ios'." >&2
   exit 1
 fi
 
