@@ -55,10 +55,19 @@ rm -rf "$ARCHIVE"
 mkdir -p "$BUILD_DIR"
 # El log completo va a archivo y a la pantalla sólo el cierre; si falla, se muestran las últimas
 # líneas ANTES de salir — un `| tail -3` a secas se comió el error real dos veces (2026-08-30).
+# Firmar el archive DIRECTO con distribución cloud ("Apple Distribution", una sola, reusable):
+# con la firma de desarrollo por defecto, cada runner efímero creaba un certificado de desarrollo
+# nuevo hasta chocar con el tope de la cuenta de Apple ("maximum number of certificates",
+# 2026-08-30 — hubo que revocar 16). Sólo aplica con API key (CI); en el Mac se firma como siempre.
+DIST=()
+if [ "${#AUTH[@]}" -gt 0 ]; then
+  DIST=(CODE_SIGN_IDENTITY="Apple Distribution")
+fi
 if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   COMPILER_INDEX_STORE_ENABLE=NO \
+  ${DIST[@]+"${DIST[@]}"} \
   -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} archive > "$BUILD_DIR/xcodebuild-archive.log" 2>&1; then
   echo "✗ Archive falló; últimas líneas del log:" >&2
   tail -80 "$BUILD_DIR/xcodebuild-archive.log" >&2
