@@ -39,17 +39,17 @@ defaults:
     working-directory: ./app
 
 env:
-  # 'beta' u 'oficial'. En push lo decide la rama; en manual, el input.
-  VARIANT: ${{ github.event_name == 'push' && (github.ref_name == 'main' && 'oficial' || 'beta') || inputs.variant }}
+  # app.config.js y los scripts leen APP_VARIANT: 'beta' o vacío (= app oficial). En push lo
+  # decide la rama (sólo main es oficial); en manual, el input. Se calcula una sola vez acá porque
+  # el env de un job no puede leer `env` (GitHub rechaza el workflow al parsearlo — pasó).
+  APP_VARIANT: ${{ ((github.event_name == 'push' && github.ref_name != 'main') || (github.event_name == 'workflow_dispatch' && inputs.variant != 'oficial')) && 'beta' || '' }}
 
 jobs:
   testflight:
-    name: Build y subida (${{ github.event_name == 'push' && (github.ref_name == 'main' && 'oficial' || 'beta') || inputs.variant }})
+    name: Build y subida (${{ ((github.event_name == 'push' && github.ref_name != 'main') || (github.event_name == 'workflow_dispatch' && inputs.variant != 'oficial')) && 'ViroVision β' || 'ViroVision' }})
     runs-on: macos-latest
     timeout-minutes: 75
     env:
-      # app.config.js y los scripts leen APP_VARIANT; vacío = app oficial.
-      APP_VARIANT: ${{ env.VARIANT == 'beta' && 'beta' || '' }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       # Se inlinean en el bundle JS en el archive (EXPO_PUBLIC_*), igual que el .env local.
