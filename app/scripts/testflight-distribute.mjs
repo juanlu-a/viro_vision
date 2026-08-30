@@ -5,24 +5,31 @@
  *
  * Uso:
  *   node scripts/testflight-distribute.mjs --build-number 202608291230 \
- *     --group "Testers ViroVision" --notes "Qué cambió en este build"
+ *     --group "Testers ViroVision" --notes "Qué cambió en este build"          # grupo externo
+ *   node scripts/testflight-distribute.mjs --build-number … --group "Equipo ViroVision" --internal
  *
- * Dos apps, por decisión del 2026-08-30: `staging` publica la variante β (otro bundle, para que
- * conviva con la oficial en el mismo teléfono) y `main` la oficial. Cada una tiene su grupo
- * externo con link público — el usuario no quiere agregar testers a mano — y por eso cada build
- * pasa por Beta App Review: el primero de cada versión con revisión real, los siguientes se
- * aprueban en minutos. `APP_VARIANT=beta` elige la app; el grupo lo pasa el workflow.
+ * Dos apps, dos tipos de prueba (decisión del 2026-08-30):
+ *   - `staging` → variante β (otro bundle, para que conviva con la oficial en el teléfono) → grupo
+ *     **interno** (`--internal`): sus testers son usuarios de App Store Connect (los devs), reciben
+ *     cada build en minutos y **sin Beta App Review**. Con `hasAccessToAllBuilds` Apple les da
+ *     todo build procesado, así que no hay que asignar ni enviar nada.
+ *   - `main` → app oficial → grupo **externo** con link público — nadie agrega testers a mano — y
+ *     por eso cada build pasa por Beta App Review: el primero de cada versión con revisión real,
+ *     los siguientes se aprueban en minutos.
+ * `APP_VARIANT=beta` elige la app; el grupo y el tipo los pasa el workflow.
  */
 import { readFileSync } from 'node:fs';
 
 import { asc, AscError } from './asc.mjs';
 
+const FLAGS = new Set(['internal']);
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, arr) => {
-    if (a.startsWith('--')) acc.push([a.slice(2), arr[i + 1] ?? '']);
+    if (a.startsWith('--')) acc.push([a.slice(2), FLAGS.has(a.slice(2)) ? 'true' : (arr[i + 1] ?? '')]);
     return acc;
   }, []),
 );
+const internal = args.internal === 'true';
 const buildNumber = args['build-number'];
 const groupName = args.group;
 const notes = args.notes || `Build ${buildNumber}`;
@@ -83,20 +90,31 @@ if (existing) {
   });
 }
 
-// El grupo, creándolo si no existe (externo, con link público).
-const groups = await asc('GET', `/v1/betaGroups?filter[app]=${appId}&fields[betaGroups]=name,publicLink`);
+// El grupo, creándolo si no existe: interno con acceso automático a todos los builds, o externo
+// con link público.
+const groups = await asc(
+  'GET',
+  `/v1/betaGroups?filter[app]=${appId}&fields[betaGroups]=name,publicLink,isInternalGroup,hasAccessToAllBuilds`,
+);
 let group = groups.data.find((g) => g.attributes.name === groupName);
 if (!group) {
+  const attributes = internal
+    ? { name: groupName, isInternalGroup: true, hasAccessToAllBuilds: true, feedbackEnabled: true }
+    : { name: groupName, publicLinkEnabled: true, publicLinkLimitEnabled: true, publicLinkLimit: 200, feedbackEnabled: true };
   const created = await asc('POST', '/v1/betaGroups', {
-    data: {
-      type: 'betaGroups',
-      attributes: { name: groupName, publicLinkEnabled: true, publicLinkLimitEnabled: true, publicLinkLimit: 200, feedbackEnabled: true },
-      relationships: { app: { data: { type: 'apps', id: appId } } },
-    },
+    data: { type: 'betaGroups', attributes, relationships: { app: { data: { type: 'apps', id: appId } } } },
   });
   group = created.data;
 }
-await asc('POST', `/v1/betaGroups/${group.id}/relationships/builds`, { data: [{ type: 'builds', id: build.id }] });
+if (!group.attributes.hasAccessToAllBuilds) {
+  await asc('POST', `/v1/betaGroups/${group.id}/relationships/builds`, { data: [{ type: 'builds', id: build.id }] });
+}
+
+if (internal) {
+  // Testers internos: sin revisión de Apple. TestFlight les avisa solo.
+  console.log(`✓ build ${buildNumber} → grupo interno "${groupName}" (sin revisión; llega en minutos)`);
+  process.exit(0);
+}
 
 // Beta App Review. Dos respuestas de Apple que NO son fallas de la pipeline:
 //   - 409: el build ya estaba enviado.

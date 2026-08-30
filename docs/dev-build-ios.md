@@ -128,16 +128,22 @@ el equipo quiere la versión en prueba y la oficial **conviviendo en el mismo te
 variante la produce `app.config.js` con `APP_VARIANT=beta` (bundle `.beta`, nombre "ViroVision β",
 ícono con franja BETA); todo lo demás sale de `app.json`.
 
-| Rama | App | Bundle | Grupo de TestFlight (link público) |
-|---|---|---|---|
-| `staging` — donde van todos los PRs | **ViroVision β** | `com.virovision.app.beta` | *Beta ViroVision* (link en App Store Connect → ViroVision Beta → TestFlight) |
-| `main` — producción; se llega por PR `staging → main` | **ViroVision** | `com.virovision.app` | *Testers ViroVision* → <https://testflight.apple.com/join/jbE7GDqV> |
+| Rama | App | Bundle | Tipo de prueba | Quién la recibe |
+|---|---|---|---|---|
+| `staging` — donde van todos los PRs | **ViroVision β** | `com.virovision.app.beta` | **interna**, grupo *Equipo ViroVision* — **sin revisión de Apple**, llega en minutos | los devs (usuarios de App Store Connect) |
+| `main` — producción; se llega por PR `staging → main` (= *promover*) | **ViroVision** | `com.virovision.app` | **externa**, grupo *Testers ViroVision* con link público → <https://testflight.apple.com/join/jbE7GDqV> | cualquiera con el link |
 
 *Actions → TestFlight → Run workflow* permite además publicar cualquier rama como β (o como
-oficial, si hace falta). Cada build pasa por Beta App Review: el primero de cada versión con
+oficial, si hace falta). Sólo la oficial pasa por Beta App Review: el primero de cada versión con
 revisión real (~1 día), los siguientes se aprueban en minutos; Apple admite **un solo build por
 versión en revisión a la vez** (el script lo trata como aviso). Un build tarda ~30 min de runner +
 5–15 de procesamiento de Apple.
+
+**Pruebas internas vs. externas** (Apple): internas = hasta 100 usuarios de App Store Connect,
+nunca pasan por revisión, sin link público; externas = hasta 10 000 personas por link o email,
+Beta App Review del primer build de cada versión. Para sumar un dev a la β: App Store Connect →
+Usuarios y acceso → invitarlo (rol *Desarrollador* alcanza) → TestFlight de ViroVision Beta →
+grupo *Equipo ViroVision* → agregarlo.
 
 Si algo llegó a `staging` y no va a producción, se revierte en `staging` con un PR de revert antes
 del release: `staging` es la antesala de `main`, no un cajón de pruebas sueltas.
