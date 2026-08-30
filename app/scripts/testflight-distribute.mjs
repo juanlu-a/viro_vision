@@ -10,8 +10,11 @@
  *
  * Una app, dos grupos (decisión del 2026-08-30):
  *   - `staging` → grupo **interno** (`--internal`): sus testers son usuarios de App Store Connect
- *     (los devs), reciben cada build en minutos y **sin Beta App Review**. Con
- *     `hasAccessToAllBuilds` Apple les da todo build procesado: no hay que asignar ni enviar nada.
+ *     (los devs), reciben cada build en minutos y **sin Beta App Review**.
+ * Cada grupo muestra **un solo build** (pedido del equipo: "no quiero ver tres builds"): al asignar
+ * el nuevo se quitan los anteriores del grupo. En el externo se conservan además el último
+ * aprobado (para que el link no quede vacío mientras Apple revisa) y cualquier build en revisión
+ * (quitarlo a mitad de revisión confunde a Apple y a nosotros).
  *   - `main` → grupo **externo** con link público — nadie agrega testers a mano — y por eso cada
  *     build pasa por Beta App Review: el primero de cada versión con revisión real, los siguientes
  *     se aprueban en minutos.
@@ -98,8 +101,10 @@ const groups = await asc(
 );
 let group = groups.data.find((g) => g.attributes.name === groupName);
 if (!group) {
+  // hasAccessToAllBuilds en false a propósito (y no se puede cambiar después: hay que recrear el
+  // grupo): con true, los testers ven todos los builds y el grupo deja de mostrar "el" beta.
   const attributes = internal
-    ? { name: groupName, isInternalGroup: true, hasAccessToAllBuilds: true, feedbackEnabled: true }
+    ? { name: groupName, isInternalGroup: true, hasAccessToAllBuilds: false, feedbackEnabled: true }
     : { name: groupName, publicLinkEnabled: true, publicLinkLimitEnabled: true, publicLinkLimit: 200, feedbackEnabled: true };
   const created = await asc('POST', '/v1/betaGroups', {
     data: { type: 'betaGroups', attributes, relationships: { app: { data: { type: 'apps', id: appId } } } },
@@ -108,6 +113,29 @@ if (!group) {
 }
 if (!group.attributes.hasAccessToAllBuilds) {
   await asc('POST', `/v1/betaGroups/${group.id}/relationships/builds`, { data: [{ type: 'builds', id: build.id }] });
+}
+
+// Un solo build visible por grupo (ver el encabezado).
+const inGroup = (await asc('GET', `/v1/betaGroups/${group.id}/relationships/builds`)).data.filter((b) => b.id !== build.id);
+const keep = new Set();
+if (!internal && inGroup.length) {
+  const states = await asc(
+    'GET',
+    `/v1/builds?filter[app]=${appId}&fields[builds]=version,uploadedDate&include=betaAppReviewSubmission&fields[betaAppReviewSubmissions]=betaReviewState&sort=-uploadedDate&limit=50`,
+  );
+  const stateOf = Object.fromEntries((states.included ?? []).map((s) => [s.id, s.attributes.betaReviewState]));
+  const ordered = states.data.filter((b) => inGroup.some((g) => g.id === b.id));
+  const lastApproved = ordered.find((b) => stateOf[b.relationships?.betaAppReviewSubmission?.data?.id] === 'APPROVED');
+  if (lastApproved) keep.add(lastApproved.id);
+  for (const b of ordered) {
+    const st = stateOf[b.relationships?.betaAppReviewSubmission?.data?.id];
+    if (st === 'WAITING_FOR_REVIEW' || st === 'IN_REVIEW') keep.add(b.id);
+  }
+}
+const toRemove = inGroup.filter((b) => !keep.has(b.id));
+if (toRemove.length) {
+  await asc('DELETE', `/v1/betaGroups/${group.id}/relationships/builds`, { data: toRemove });
+  console.log(`quitados del grupo ${toRemove.length} build(s) anteriores`);
 }
 
 if (internal) {
