@@ -469,7 +469,7 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - **`CLAUDE.md` en la raíz** (PR #37): toda sesión nueva de agente arranca leyendo el contexto
   mínimo y la orden de invocar la skill `virovision`. `convenciones.md` ganó la tabla "Cómo se
   libera" y corrigió el chequeo de squash (apuntaba a `main`; es `staging`).
-- **Saga de la firma en CI**, destrabada en cuatro pasos con moraleja:
+- **Saga de la firma en CI**, destrabada en cinco pasos con moraleja:
   1. Los builds de `staging` morían a los 30 s con exit 65 **sin causa visible**: el script tiraba
      la salida de xcodebuild (`| tail -3`). Fix: log completo a `build/xcodebuild-*.log` y las
      últimas 80 líneas al fallar (PR #38). *Un pipe a tail no es un log.*
@@ -480,8 +480,18 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
      rechaza como conflicto con la firma automática (PR #39, revertido en el paso 4).
   4. Camino estándar de CI: **archive sin firmar** (`CODE_SIGNING_ALLOWED=NO`, sólo con API key
      presente) y la firma completa la hace el export con la **distribución cloud** — una sola,
-     reusable entre runners (PR #40). Al cierre de la sesión, el build de validación estaba
-     corriendo; si fallara, el plan B es un certificado de desarrollo persistente como secret.
+     reusable entre runners (PR #40). El build de validación falló — y destapó el paso 5.
+  5. Un archive sin firmar **no registra equipo**, y `exportArchive` con firma automática lo
+     deduce del archive: `error: exportArchive No Team Found in Archive`. Fix: el
+     `ExportOptions.plist` declara `teamID`, leído del `pbxproj` que genera el prebuild
+     (`plugins/withDevelopmentTeam.js`) para que el ID siga viviendo en un solo lugar (PR #42).
+     Con eso, **primer run verde de `staging`** (33334223960): archive sin firmar, export firmado
+     con la distribución cloud, build en el grupo interno *Equipo ViroVision*.
+- Nota de infraestructura: a mitad de la continuación, macOS **revocó el acceso TCC de la sesión
+  de agente a `~/Documents`** (EPERM en toda lectura, incluso para las herramientas de archivo).
+  Este cierre se escribió vía la API de GitHub, y el monitor de Beta App Review pasó a correr
+  desde un tmp con `asc.mjs` bajado del repo (es público y sin dependencias). Si vuelve a pasar:
+  re-otorgar en Ajustes → Privacidad y seguridad → Archivos y carpetas.
 - El build **oficial** del release (202608301933, post-limpieza del spike) subió bien y quedó en el
   grupo *Testers ViroVision*, a la espera de que Apple libere la Beta App Review del build 1.
 
@@ -494,7 +504,6 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
   abierto del camino de bondis).
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
-- **Validar el fix de firma en CI** (PR #40): que el build β de `staging` llegue al grupo interno.
 - **Beta App Review del build 1 (oficial)**: `WAITING_FOR_REVIEW` desde el 2026-08-29; al aprobar,
   el link público queda vivo y hay que enviar a revisión los builds que esperan (o lo hace el
   próximo run).
