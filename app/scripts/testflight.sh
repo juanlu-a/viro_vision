@@ -77,6 +77,16 @@ if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release
 fi
 tail -3 "$BUILD_DIR/xcodebuild-archive.log"
 
+# Con el archive sin firmar (camino CI), exportArchive no puede deducir el equipo del archive y
+# falla con "No Team Found in Archive" (run del 2026-08-30): hay que declararlo en el
+# ExportOptions. Se lee del pbxproj —lo fija plugins/withDevelopmentTeam.js en el prebuild— para
+# que el ID viva en un solo lugar. En el Mac el archive va firmado y el teamID coincide: es inocuo.
+TEAM_ID=$(sed -n 's/.*DEVELOPMENT_TEAM = \([A-Z0-9]*\);.*/\1/p' "ios/$SCHEME.xcodeproj/project.pbxproj" | head -1)
+if [ -z "$TEAM_ID" ]; then
+  echo "No hay DEVELOPMENT_TEAM en el pbxproj: el prebuild no corrió plugins/withDevelopmentTeam.js." >&2
+  exit 64
+fi
+
 # El ExportOptions se genera acá para que 'destination' siga a la presencia de la key.
 PLIST="$BUILD_DIR/ExportOptions.plist"
 cat > "$PLIST" <<PLIST
@@ -87,6 +97,7 @@ cat > "$PLIST" <<PLIST
   <key>method</key><string>app-store-connect</string>
   <key>destination</key><string>$DESTINATION</string>
   <key>signingStyle</key><string>automatic</string>
+  <key>teamID</key><string>$TEAM_ID</string>
   <key>uploadSymbols</key><true/>
   <key>manageAppVersionAndBuildNumber</key><false/>
 </dict>
