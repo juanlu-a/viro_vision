@@ -1,0 +1,90 @@
+name: Google Play
+
+# Sube un .aab a Google Play desde un runner Linux (gratis: el repo es público). Espejo del
+# workflow TestFlight para el dev del equipo con Android:
+#   - push a staging → pista "internal": testers por email, sin revisión de Google, minutos.
+#   - push a main    → pista "alpha" (closed testing): link de opt-in; la primera release pasa por
+#                      revisión de Google.
+#   - manual desde cualquier rama → la pista que se elija.
+#
+# Gateado por la variable PLAY_ENABLED=true: hasta que exista la cuenta de Google Play y la
+# service account, el job se salta (no falla). Secrets: PLAY_UPLOAD_KEYSTORE_B64 (el .p12 de la
+# upload key en base64), PLAY_UPLOAD_KEYSTORE_PASSWORD, PLAY_SERVICE_ACCOUNT_JSON.
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'app/**'
+      - '.github/workflows/android-play.yml'
+  workflow_dispatch:
+    inputs:
+      pista:
+        description: Pista de Google Play que recibe el build
+        default: internal
+        type: choice
+        options: [internal, alpha]
+      notes:
+        description: Notas de la versión (las ven los testers). Vacío = asunto del último commit.
+        default: ''
+        type: string
+
+concurrency:
+  group: play-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: ./app
+
+env:
+  # Mismo cálculo y misma trampa que en testflight.yml: una sola vez, a nivel workflow.
+  PISTA: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.pista == 'alpha')) && 'alpha' || 'internal' }}
+
+jobs:
+  play:
+    name: Build y subida (${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.pista == 'alpha')) && 'alpha · closed testing' || 'internal testing' }})
+    if: ${{ vars.PLAY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
+      EXPO_PUBLIC_ONDEVICE_SPIKE: ${{ vars.EXPO_PUBLIC_ONDEVICE_SPIKE }}
+      EXPO_PUBLIC_SIMULATE_DEVICE: ${{ vars.EXPO_PUBLIC_SIMULATE_DEVICE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint · Typecheck · Test
+        run: npm run lint && npm run typecheck && npm test
+      - name: Credenciales (upload key y service account)
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.p12"
+          printf '%s' "$SA_JSON" > "$RUNNER_TEMP/play-sa.json"
+          echo "PLAY_KEYSTORE=$RUNNER_TEMP/upload.p12" >> "$GITHUB_ENV"
+          echo "PLAY_SA_PATH=$RUNNER_TEMP/play-sa.json" >> "$GITHUB_ENV"
+        env:
+          KEYSTORE_B64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}
+          SA_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+      - name: Build .aab firmado
+        run: bash scripts/play.sh
+        env:
+          PLAY_KEYSTORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+      - name: Subir a Google Play
+        run: |
+          NOTES="${{ inputs.notes }}"
+          if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · rama ${GITHUB_REF_NAME}"; fi
+          node scripts/gplay.mjs --aab android/app/build/outputs/bundle/release/app-release.aab --track "$PISTA" --notes "$NOTES"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: app/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 7

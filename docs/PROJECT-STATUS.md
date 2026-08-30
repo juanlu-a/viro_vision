@@ -115,6 +115,10 @@ opcional — la distribución real va por TestFlight desde Xcode.
    2026-08-29 y en Beta App Review. Desde 2026-08-30 hay **dos ramas**: `staging` → grupo interno
    *Equipo ViroVision* (devs, sin revisión, minutos); `main` → grupo externo *Testers ViroVision*
    con link público. Una sola app. Flujo en [`dev-build-ios.md`](dev-build-ios.md).
+4. **Android / Google Play — en curso (2026-08-30)**: upload key generada, scripts y workflow
+   listos y gateados con `PLAY_ENABLED`. Falta la cuenta de Google Play Console (USD 25),
+   crear la app, la service account y la primera subida manual. Ver
+   [`android-play.md`](android-play.md).
 
 ## What's next — options (was mid-discussion)
 
