@@ -414,6 +414,21 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - **Beta App Review del build 1 (oficial)**: sigue `WAITING_FOR_REVIEW` desde el sábado; vigía
   activo.
 
+## 2026-08-30 (cont.) — Android por Google Play, mismo patrón
+
+- **Francisco tiene Android**, así que el camino de TestFlight se espeja: `staging` → *internal
+  testing* (sin revisión, minutos), `main` → *closed testing* con link de opt-in. Google Play
+  Console cuesta USD 25 una sola vez; la restricción de 12 testers × 14 días sólo aplica a
+  producción.
+- **Sin Java en el Mac**: la upload key se generó con `openssl` como PKCS12 (Gradle la acepta;
+  válida hasta 2056) y el build corre sólo en el runner Linux. `scripts/play.sh` inyecta la firma
+  por `android.injected.signing.*` (sin tocar build.gradle) y fija `versionCode` = minutos desde
+  1970; `scripts/gplay.mjs` sube por la Google Play Developer API con service account (JWT RS256
+  en `node:crypto`, sin dependencias). Workflow `android-play.yml` gateado con `PLAY_ENABLED`
+  hasta que exista la cuenta.
+- Quedó también un **prompt reutilizable** del flujo TestFlight (interno/externo, un build por
+  grupo, trampas de permisos y del parser de GitHub) para replicarlo en otro proyecto.
+
 ## Open threads / next
 - **Decidir supermercado**: medir Gemma 3 1B con visión sobre productos reales (el modo ya junta
   evidencia desde la pantalla real); resolver el despliegue de la clave si gana la nube (ADR 0006).
