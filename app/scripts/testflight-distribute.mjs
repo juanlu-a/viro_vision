@@ -8,15 +8,15 @@
  *     --group "Testers ViroVision" --notes "Qué cambió en este build"          # grupo externo
  *   node scripts/testflight-distribute.mjs --build-number … --group "Equipo ViroVision" --internal
  *
- * Dos apps, dos tipos de prueba (decisión del 2026-08-30):
- *   - `staging` → variante β (otro bundle, para que conviva con la oficial en el teléfono) → grupo
- *     **interno** (`--internal`): sus testers son usuarios de App Store Connect (los devs), reciben
- *     cada build en minutos y **sin Beta App Review**. Con `hasAccessToAllBuilds` Apple les da
- *     todo build procesado, así que no hay que asignar ni enviar nada.
- *   - `main` → app oficial → grupo **externo** con link público — nadie agrega testers a mano — y
- *     por eso cada build pasa por Beta App Review: el primero de cada versión con revisión real,
- *     los siguientes se aprueban en minutos.
- * `APP_VARIANT=beta` elige la app; el grupo y el tipo los pasa el workflow.
+ * Una app, dos grupos (decisión del 2026-08-30):
+ *   - `staging` → grupo **interno** (`--internal`): sus testers son usuarios de App Store Connect
+ *     (los devs), reciben cada build en minutos y **sin Beta App Review**. Con
+ *     `hasAccessToAllBuilds` Apple les da todo build procesado: no hay que asignar ni enviar nada.
+ *   - `main` → grupo **externo** con link público — nadie agrega testers a mano — y por eso cada
+ *     build pasa por Beta App Review: el primero de cada versión con revisión real, los siguientes
+ *     se aprueban en minutos.
+ * El grupo y el tipo los pasa el workflow. `APP_VARIANT=beta` (app.config.js) queda reservado para
+ * publicar una β como app aparte si algún día hace falta; hoy no se usa.
  */
 import { readFileSync } from 'node:fs';
 

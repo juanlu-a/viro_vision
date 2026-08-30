@@ -35,8 +35,8 @@ Todo cambio nativo va por `app.json` o por un **config plugin** en `app/plugins/
 
 Para correr en el iPhone: `docs/dev-build-ios.md`. Desde 2026-08 hay **Apple Developer Program**
 (cuenta Individual del Apple ID del proyecto), así que el camino para el equipo y los testers es
-**TestFlight**: cada merge a `staging` publica **ViroVision β** y cada merge a `main` la oficial,
-las dos instalables a la vez (workflow `testflight.yml`; a mano, `npm run ios:testflight`); el dev build por cable
+**TestFlight**: cada merge a `staging` llega al grupo interno del equipo (sin revisión, minutos) y
+cada merge a `main` al grupo externo con link público (workflow `testflight.yml`; a mano, `npm run ios:testflight`); el dev build por cable
 (`npx expo run:ios --device "iPhone de Juan"` **desde `app/`**) sigue siendo el ciclo de desarrollo,
 ya sin la caducidad de 7 días.
 
