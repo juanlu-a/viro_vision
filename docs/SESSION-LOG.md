@@ -389,6 +389,25 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - Se descartó EAS para esto (PR #21 cerrado, PR #22 mergeado): TestFlight es de Apple y Xcode
   hace todo; EAS sumaba cuenta, servicio y cupo sin necesidad.
 
+## 2026-08-30 — Dos ramas, dos apps: `staging` → ViroVision β, `main` → oficial
+
+- **Decisión de release process**, después de darle vueltas a tres modelos (main→beta +
+  promover; probar desde el PR; rama staging): el equipo quiere **la versión en prueba y la
+  oficial instaladas a la vez** en el teléfono, y eso fija el diseño — iOS no instala dos builds
+  del mismo bundle, así que la β es **otra app para Apple**: `com.virovision.app.beta`,
+  "ViroVision β", ícono con franja BETA (`app.config.js` con `APP_VARIANT=beta`, todo lo demás
+  heredado de `app.json`). Bundle ID registrado por API; la app β en App Store Connect la crea el
+  usuario (Apple no lo permite por API).
+- **Ramas**: `staging` pasa a ser la rama por defecto — todos los PRs van ahí y cada merge publica
+  la β; `main` es producción y sólo recibe PRs `staging → main` (el release), que publican la
+  oficial. Lo que no va a producción se revierte en `staging` con un PR de revert, no a mano.
+- **Pipeline**: `testflight.yml` resuelve la variante por rama (o por input en manual), corre lint
+  + typecheck + tests antes de compilar, y los scripts descubren el workspace y el bundle según la
+  variante. CI acepta PRs a `staging` y a `main`. Convenciones, skill y memoria pasan de "desde
+  `main` al día" a "desde `staging` al día".
+- **Beta App Review del build 1 (oficial)**: sigue `WAITING_FOR_REVIEW` desde el sábado; vigía
+  activo.
+
 ## Open threads / next
 - **Decidir supermercado**: medir Gemma 3 1B con visión sobre productos reales (el modo ya junta
   evidencia desde la pantalla real); resolver el despliegue de la clave si gana la nube (ADR 0006).

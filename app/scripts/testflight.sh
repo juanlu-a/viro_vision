@@ -9,6 +9,7 @@
 #
 # Uso, desde app/:
 #   npm run ios:testflight                       # archive + export del .ipa (sin subir)
+#   APP_VARIANT=beta npm run ios:testflight      # la variante β (otra app: com.virovision.app.beta)
 #   ASC_KEY_ID=… ASC_ISSUER_ID=… ASC_KEY_PATH=…/AuthKey_XXXX.p8 npm run ios:testflight
 #                                                # archive + subida directa a App Store Connect
 #
@@ -24,16 +25,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-WORKSPACE=ios/ViroVision.xcworkspace
-SCHEME=ViroVision
+# El proyecto nativo lo genera expo prebuild a partir del nombre de la app, que en la variante
+# beta es otro (app.config.js): se descubre en vez de asumirlo.
+WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -1 || true)
+SCHEME=$(basename "${WORKSPACE:-ViroVision.xcworkspace}" .xcworkspace)
 BUILD_DIR=build
 ARCHIVE="$BUILD_DIR/ViroVision.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
 # Sobreescribible desde CI, que lo necesita después para asignar el build a su grupo.
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 
-if [ ! -d "$WORKSPACE" ]; then
-  echo "No existe $WORKSPACE: corré primero 'npx expo prebuild -p ios'." >&2
+if [ -z "$WORKSPACE" ] || [ ! -d "$WORKSPACE" ]; then
+  echo "No hay ios/*.xcworkspace: corré primero 'npx expo prebuild -p ios' (con APP_VARIANT=beta para la β)." >&2
   exit 1
 fi
 
@@ -48,7 +51,7 @@ echo "› Archive (build $BUILD_NUMBER)…"
 # Expo escribe CFBundleVersion como literal en Info.plist (no como $(CURRENT_PROJECT_VERSION)), así
 # que pasar la build setting a xcodebuild no alcanza — medido: la primera subida salió como "1".
 # ios/ es un artefacto regenerable, editarlo acá no ensucia el repo.
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" ios/ViroVision/Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "ios/$SCHEME/Info.plist"
 rm -rf "$ARCHIVE"
 xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \

@@ -1,14 +1,14 @@
 # CI/CD
 
-GitHub Actions pipeline for the ViroVision app. `main` is the protected, only-environment branch;
-all changes land via pull request.
+GitHub Actions pipeline for the ViroVision app. Two long-lived branches: `staging` (default; every
+PR lands here and ships as ViroVision β) and `main` (production; reached by a `staging → main` PR).
 
 ## Workflows
 
 | Workflow | File | Trigger | Does |
 |----------|------|---------|------|
 | **CI** | `.github/workflows/ci.yml` | PRs to `main`, pushes to feature branches | `npm ci` (install), lint, typecheck, test, then bundle the app for iOS + Android (build check) and upload the bundle artifact. |
-| **TestFlight** | `.github/workflows/testflight.yml` | push to `main` (changes under `app/`), manual from any branch | macOS runner: prebuild → archive → upload to App Store Connect → assign to a TestFlight group and submit to Beta App Review. `main` → *Testers ViroVision*; manual → *Beta ViroVision*. See [`dev-build-ios.md`](dev-build-ios.md). |
+| **TestFlight** | `.github/workflows/testflight.yml` | push to `staging` or `main` (changes under `app/`), manual from any branch | macOS runner: lint/typecheck/test → prebuild → archive → upload → assign to a TestFlight group and submit to Beta App Review. `staging` → **ViroVision β** (`com.virovision.app.beta`); `main` → **ViroVision**. See [`dev-build-ios.md`](dev-build-ios.md). |
 | **EAS Update (preview)** | `.github/workflows/eas-update.yml` | push to `main`, manual | Publishes an OTA **EAS Update** to the `preview` branch so main can be previewed as an update group. |
 | **EAS Build (iOS)** | `.github/workflows/eas-build-ios.yml` | manual (`workflow_dispatch`) | Starts a native **iOS build** on EAS Build (cloud). Manual because it uses build credits + Apple credentials. |
 

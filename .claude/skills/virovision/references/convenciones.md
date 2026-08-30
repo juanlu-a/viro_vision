@@ -35,7 +35,8 @@ Todo cambio nativo va por `app.json` o por un **config plugin** en `app/plugins/
 
 Para correr en el iPhone: `docs/dev-build-ios.md`. Desde 2026-08 hay **Apple Developer Program**
 (cuenta Individual del Apple ID del proyecto), así que el camino para el equipo y los testers es
-**TestFlight desde Xcode** (`npm run ios:testflight`, sin EAS ni terceros); el dev build por cable
+**TestFlight**: cada merge a `staging` publica **ViroVision β** y cada merge a `main` la oficial,
+las dos instalables a la vez (workflow `testflight.yml`; a mano, `npm run ios:testflight`); el dev build por cable
 (`npx expo run:ios --device "iPhone de Juan"` **desde `app/`**) sigue siendo el ciclo de desarrollo,
 ya sin la caducidad de 7 días.
 
@@ -148,8 +149,9 @@ Trampas ya pisadas, que no hay que repetir:
 ## Git
 
 - **Todo trabajo nuevo empieza creando su feature branch, antes del primer edit.** Desde un
-  `main` al día (`git fetch` + rama desde `origin/main`), nunca sobre `main` directo ni sobre la
-  rama de la sesión anterior. Al arrancar una sesión: `git branch --show-current`; si la rama
+  `staging` al día (`git fetch` + rama desde `origin/staging`), nunca sobre `staging`/`main`
+  directo ni sobre la rama de la sesión anterior. **Los PRs van a `staging`** (rama por defecto);
+  `main` es producción y sólo recibe PRs `staging → main` (= release). Desde 2026-08-30. Al arrancar una sesión: `git branch --show-current`; si la rama
   actual es de otro tema, primero se le abre PR (o se descarta a conciencia) y recién después se
   crea la rama nueva. La lección viene de dos ramas que quedaron huérfanas sin PR
   (`feat/lector-en-inicio`, `docs/decisiones-equipo-2026-08`) mientras los ADRs ya referenciaban
@@ -157,9 +159,9 @@ Trampas ya pisadas, que no hay que repetir:
 - **Conventional Commits con scope**, asunto en español: `fix(vision):`, `feat(marca):`,
   `docs:`. El cuerpo explica **el razonamiento**, no el diff — se lee dentro de seis meses.
 - **Nunca agregues un trailer de co-autoría de IA.** Los commits son del autor humano.
-- **Una rama por cambio, desde un `main` al día. Sin apilar PRs.** La lección viene de los PRs #1–#4.
-  Si hay dos temas, son dos ramas en secuencia: se mergea la primera, se actualiza `main`, se crea
-  la segunda.
+- **Una rama por cambio, desde un `staging` al día. Sin apilar PRs.** La lección viene de los PRs
+  #1–#4. Si hay dos temas, son dos ramas en secuencia: se mergea la primera, se actualiza
+  `staging`, se crea la segunda.
 - Nombres: `feat/…`, `fix/…`, `docs/…`, `spike/…`, kebab-case.
 - El PR usa `.github/pull_request_template.md`, **incluido el checkbox de accesibilidad** — no es
   decorativo.

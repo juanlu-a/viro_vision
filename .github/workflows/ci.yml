@@ -1,12 +1,12 @@
 name: CI
 
-# Quality gates for every pull request into main and every push to a feature branch.
-# Pushes to main are handled by the EAS deploy workflow instead (this repo merges via PR).
+# Quality gates for every pull request into staging or main and every push to a feature branch.
+# Pushes to staging/main are handled by the TestFlight workflow (which re-runs these gates).
 on:
   pull_request:
-    branches: [main]
+    branches: [main, staging]
   push:
-    branches-ignore: [main]
+    branches-ignore: [main, staging]
 
 concurrency:
   group: ci-${{ github.ref }}

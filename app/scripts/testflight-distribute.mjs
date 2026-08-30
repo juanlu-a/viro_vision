@@ -7,11 +7,11 @@
  *   node scripts/testflight-distribute.mjs --build-number 202608291230 \
  *     --group "Testers ViroVision" --notes "Qué cambió en este build"
  *
- * Dos grupos, por decisión del 2026-08-29: "Testers ViroVision" recibe lo que se mergea a main
- * (la versión oficial); "Beta ViroVision" recibe builds disparados a mano desde una rama (una
- * feature para probar antes de que sea oficial). Los dos son externos con link público — el
- * usuario no quiere agregar testers a mano — y por eso cada build pasa por Beta App Review: el
- * primero de cada versión con revisión real, los siguientes se aprueban en minutos.
+ * Dos apps, por decisión del 2026-08-30: `staging` publica la variante β (otro bundle, para que
+ * conviva con la oficial en el mismo teléfono) y `main` la oficial. Cada una tiene su grupo
+ * externo con link público — el usuario no quiere agregar testers a mano — y por eso cada build
+ * pasa por Beta App Review: el primero de cada versión con revisión real, los siguientes se
+ * aprueban en minutos. `APP_VARIANT=beta` elige la app; el grupo lo pasa el workflow.
  */
 import { readFileSync } from 'node:fs';
 
@@ -32,7 +32,8 @@ if (!buildNumber || !groupName) {
 }
 
 const appJson = JSON.parse(readFileSync(new URL('../app.json', import.meta.url)));
-const bundleId = appJson.expo.ios.bundleIdentifier;
+// Espejo de app.config.js: la variante beta es otra app en App Store Connect.
+const bundleId = appJson.expo.ios.bundleIdentifier + (process.env.APP_VARIANT === 'beta' ? '.beta' : '');
 const locale = 'es-MX';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
