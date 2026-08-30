@@ -2,27 +2,29 @@ name: TestFlight
 
 # Sube un build a TestFlight desde un runner macOS de GitHub (gratis: el repo es público).
 #
-# Dos disparadores, dos grupos (decisión del 2026-08-29):
-#   - push a main            → grupo "Testers ViroVision": la versión oficial, para todos.
-#   - manual desde una rama  → grupo "Beta ViroVision": una feature para probar antes de que sea
-#                              oficial. Se elige la rama en "Run workflow".
+# Dos ramas, dos apps (decisión del 2026-08-30 — ver docs/dev-build-ios.md):
+#   - push a staging → variante β  (com.virovision.app.beta, "ViroVision β") → grupo "Beta ViroVision"
+#   - push a main    → app oficial (com.virovision.app)                     → grupo "Testers ViroVision"
+#   - manual desde cualquier rama → la variante que se elija (β por defecto).
+# Son apps distintas para Apple a propósito: iOS no instala dos builds del mismo bundle, y el
+# equipo quiere la de staging y la oficial conviviendo en el mismo teléfono.
 #
-# Requiere los secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (API key de App Store Connect con rol
-# Administración: sin eso la firma de distribución falla) y, opcional, EXPO_PUBLIC_GEMINI_API_KEY
-# para que el candidato nube de supermercado (ADR 0006) funcione en el build. Ver docs/dev-build-ios.md.
+# Antes de compilar corre lint + typecheck + tests: un build que llega a los testers tiene que
+# haber pasado por lo mismo que un PR. Requiere los secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8
+# (API key de App Store Connect con rol Administración) y, opcional, EXPO_PUBLIC_GEMINI_API_KEY.
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'app/**'
       - '.github/workflows/testflight.yml'
   workflow_dispatch:
     inputs:
-      group:
-        description: Grupo de TestFlight que recibe el build
-        default: Beta ViroVision
+      variant:
+        description: Qué app publicar
+        default: beta
         type: choice
-        options: [Beta ViroVision, Testers ViroVision]
+        options: [beta, oficial]
       notes:
         description: Qué probar (lo ven los testers). Vacío = asunto del último commit.
         default: ''
@@ -36,12 +38,18 @@ defaults:
   run:
     working-directory: ./app
 
+env:
+  # 'beta' u 'oficial'. En push lo decide la rama; en manual, el input.
+  VARIANT: ${{ github.event_name == 'push' && (github.ref_name == 'main' && 'oficial' || 'beta') || inputs.variant }}
+
 jobs:
   testflight:
-    name: Build y subida (${{ github.event_name == 'push' && 'Testers ViroVision' || inputs.group }})
+    name: Build y subida (${{ github.event_name == 'push' && (github.ref_name == 'main' && 'oficial' || 'beta') || inputs.variant }})
     runs-on: macos-latest
     timeout-minutes: 75
     env:
+      # app.config.js y los scripts leen APP_VARIANT; vacío = app oficial.
+      APP_VARIANT: ${{ env.VARIANT == 'beta' && 'beta' || '' }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       # Se inlinean en el bundle JS en el archive (EXPO_PUBLIC_*), igual que el .env local.
@@ -62,6 +70,8 @@ jobs:
           xcodebuild -version
       - name: Install dependencies
         run: npm ci
+      - name: Lint · Typecheck · Test
+        run: npm run lint && npm run typecheck && npm test
       - name: API key de App Store Connect
         # ASC_KEY_PATH se fija acá y no en el env del job: el contexto `runner` no existe a nivel
         # de job y GitHub rechaza el workflow entero al parsearlo (primer run, 2026-08-29).
@@ -80,7 +90,8 @@ jobs:
         run: |
           NOTES="${{ inputs.notes }}"
           if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · rama ${GITHUB_REF_NAME}"; fi
+          GROUP="Testers ViroVision"; [ "$APP_VARIANT" = beta ] && GROUP="Beta ViroVision"
           node scripts/testflight-distribute.mjs \
             --build-number "$BUILD_NUMBER" \
-            --group "${{ github.event_name == 'push' && 'Testers ViroVision' || inputs.group }}" \
+            --group "$GROUP" \
             --notes "$NOTES"
