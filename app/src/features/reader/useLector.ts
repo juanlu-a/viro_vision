@@ -23,13 +23,13 @@ import { adivinarLectura, frasearLectura, frasearProducto } from '@/features/rea
 import type { BusReading } from '@/features/reader/lectura';
 import { transicionar } from '@/features/reader/modes';
 import type { Gesto, Modo } from '@/features/reader/modes';
+import { useModeloSupermercado } from '@/features/reader/useModeloSupermercado';
 import { strings } from '@/i18n';
 import { cargarOcr, leerImagen, liberarOcr, ocrCargado } from '@/services/ondevice';
 import {
   VisionNetworkError,
   VisionNotConfiguredError,
   VisionQuotaError,
-  isVisionConfigured,
   reconocerProducto,
 } from '@/services/vision';
 import type { ProductoLeido } from '@/services/vision';
@@ -81,6 +81,7 @@ export function useLector() {
   const [state, setState] = useState<LectorState>(inicial);
   const ref = useRef(inicial);
   const vivo = useRef(true);
+  const { modelo, modelos, elegir: elegirModelo } = useModeloSupermercado();
 
   useEffect(() => {
     vivo.current = true;
@@ -147,7 +148,8 @@ export function useLector() {
    */
   const leerSupermercado = useCallback(
     async (asset: ImagePicker.ImagePickerAsset) => {
-      if (!isVisionConfigured || !asset.base64) {
+      const model = modelo;
+      if (!model || !asset.base64) {
         announce(t.cloudNotConfigured);
         update({ estado: 'idle', progreso: null, mensaje: t.cloudNotConfigured });
         return;
@@ -156,6 +158,7 @@ export function useLector() {
 
       try {
         const r = await reconocerProducto({
+          model,
           imageBase64: asset.base64,
           mediaType: asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg',
         });
@@ -169,7 +172,9 @@ export function useLector() {
         update({ estado: 'idle', progreso: null, mensaje });
       }
     },
-    [update],
+    // El modelo entra por dependencia: cambiar de modelo recrea el callback, que es exactamente
+    // lo que queremos — la próxima lectura usa el elegido.
+    [modelo, update],
   );
 
   const leer = useCallback(async () => {
@@ -199,5 +204,5 @@ export function useLector() {
     }
   }, [leerOmnibus, leerSupermercado, update]);
 
-  return { state, aplicarGesto, leer };
+  return { state, aplicarGesto, leer, modelo, modelos, elegirModelo };
 }

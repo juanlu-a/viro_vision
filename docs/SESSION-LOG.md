@@ -451,12 +451,23 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
   camino de producto) y explica la frontera con ADR 0001 + 0006.
 - Ramas alineadas: release `staging → main` (#32) con la pipeline de Android.
 
+## 2026-08-30 (cont.) — Selector de modelo para supermercado
+
+- **El modelo de nube se elige en Inicio**: `ModelSelector` (modal calcado del selector de tema:
+  disparador `button` cuya etiqueta dice qué modelo rige, menú `radiogroup` con `checked`),
+  controlado por props para que el hook se testee sin UI. La preferencia se guarda en el teléfono
+  (`visionModelPreference`, AsyncStorage) y se **revalida** contra los modelos disponibles del
+  build (`resolveProductoModel`): un id guardado de un proveedor sin clave cae al default
+  (`gemini-3.6-flash` — Flash, no Lite) en vez de fallar en cada lectura. Sin ninguna clave, el
+  selector no aparece y el modo avisa.
+- `reconocerProducto` recibe el modelo elegido; mismo prompt y schema para todos los proveedores
+  (test lo fija: si divergieran, el selector compararía prompts y no modelos). 131 tests en 11
+  suites; primer test de la base sobre AsyncStorage, con el mock oficial.
+
 ## Open threads / next
 - **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales para
   cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30); resolver el despliegue de la clave en un
   build distribuible.
-- **Selector de modelo de nube en Inicio** (PR C del plan del 2026-08-30): preferencia persistida,
-  modal accesible, `reconocerProducto` con el modelo elegido.
 - **Validar ADR 0006 y 0007 con el tutor** — todo quedó en Proposed.
 - Armar el **dataset de evaluación** (captura + etiquetado esperado/obtenido) para ambos casos.
 - Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
