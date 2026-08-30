@@ -66,10 +66,11 @@ Cuando hay varias implementaciones intercambiables. `types.ts` define el contrat
 
 Es el rasgo más distintivo de esta base y **hay que sostenerlo**. Un comentario que dice lo que el
 código ya dice es ruido; los de acá citan el ADR, la cláusula WCAG, la medición o el fallo concreto
-que el código previene. Ejemplo real (`services/vision/benchmark.ts`):
+que el código previene. Ejemplo real (`services/vision/types.ts`, sobre `BuildRequestInput.prompts`):
 
-> *Es agnóstico del proveedor: los timestamps se toman acá y sólo acá, así que los números de Gemini
-> y de Anthropic son comparables por construcción.*
+> *Viven fuera del proveedor a propósito: si cada proveedor tuviera su prompt, cambiar de modelo en
+> el selector cambiaría también la pregunta, y la comparación entre modelos dejaría de medir el
+> modelo.*
 
 Si al escribir un comentario no podés nombrar la consecuencia de no tenerlo, probablemente no hace
 falta.
@@ -79,8 +80,9 @@ falta.
 Un módulo que **no debe ser llamado desde cierto camino** lleva un comentario que lo dice, cita el
 ADR y explica la consecuencia. Dos vivos:
 
-- `services/vision/benchmark.ts` — *REGLA DE FRONTERA (ADR 0001, nota 2026-08-10)*: instrumentación
-  de desarrollo, nunca desde cámara → detección/OCR → anuncio.
+- `services/vision/reconocerProducto.ts` — *REGLA DE FRONTERA (ADR 0001 + ADR 0006)*: la nube sólo
+  desde el modo supermercado; nunca desde el camino de ómnibus, que corre local. El linter lo fuerza
+  (`eslint.config.js`).
 - `services/supabase/client.ts` — *BOUNDARY RULE (ADR 0001 + 0002)*: la cuenta online no puede estar
   en el camino de reconocimiento.
 

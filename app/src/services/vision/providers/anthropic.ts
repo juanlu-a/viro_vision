@@ -1,13 +1,12 @@
 /**
- * Proveedor Anthropic (Messages API). Secundario: requiere crédito con tarjeta, así que queda
- * disponible para contrastar contra otra familia de modelos cuando haya clave.
+ * Proveedor Anthropic (Messages API). Secundario: requiere crédito con tarjeta (no cumple solo la
+ * gratuidad de ADR 0006), así que aparece en el selector de modelo únicamente si el build trae
+ * su clave — sirve para contrastar contra otra familia de modelos.
  *
  * Módulo puro: arma y traduce, no toca la red. Ver anthropic.test.ts.
  */
 import { ANTHROPIC_MESSAGES_URL, ANTHROPIC_VERSION } from '../config';
-import { busReadingSchema } from '../schema';
 import type { BuildRequestInput, ProviderEvent, ProviderRequest, VisionProvider } from '../types';
-import { SYSTEM_PROMPT, USER_PROMPT } from './prompts';
 
 /**
  * Reglas que este armado respeta — la API responde **400**, no ignora, un parámetro que el modelo
@@ -20,7 +19,7 @@ import { SYSTEM_PROMPT, USER_PROMPT } from './prompts';
  */
 function buildRequest(input: BuildRequestInput): ProviderRequest {
   const outputConfig: Record<string, unknown> = {
-    format: { type: 'json_schema', schema: busReadingSchema },
+    format: { type: 'json_schema', schema: input.schema },
   };
   if (input.model.supportsEffort) {
     outputConfig.effort = input.effort;
@@ -31,7 +30,7 @@ function buildRequest(input: BuildRequestInput): ProviderRequest {
     max_tokens: input.maxTokens,
     stream: true,
     output_config: outputConfig,
-    system: SYSTEM_PROMPT,
+    system: input.prompts.system,
     messages: [
       {
         role: 'user',
@@ -40,7 +39,7 @@ function buildRequest(input: BuildRequestInput): ProviderRequest {
             type: 'image',
             source: { type: 'base64', media_type: input.mediaType, data: input.imageBase64 },
           },
-          { type: 'text', text: USER_PROMPT },
+          { type: 'text', text: input.prompts.user },
         ],
       },
     ],

@@ -1,28 +1,32 @@
 /**
- * Lectura de producto de supermercado: tipo, schema y armado del request del candidato nube
- * (ADR 0006). Módulo puro: sin red, sin estado. Ver producto.test.ts; la llamada de red vive en
+ * Lectura de producto de supermercado: tipo, schema, prompts y armado del request (ADR 0006).
+ * Módulo puro: sin red, sin estado. Ver producto.test.ts; la llamada de red vive en
  * reconocerProducto.ts.
  *
- * A diferencia del benchmark, esto NO es instrumentación: desde ADR 0006 la nube es candidata
- * real del camino de supermercado — el usuario está quieto y tolera latencia a cambio de
- * precisión. La decisión (Gemma 3 1B local vs. Gemini Flash) sigue abierta; mientras tanto los
- * dos candidatos comparten prompt y forma de respuesta para que la comparación mida el modelo.
+ * Desde el 2026-08-30 la nube ES el camino de supermercado (el usuario está quieto y tolera
+ * latencia a cambio de precisión); el modelo lo elige el usuario en Inicio. Prompt y schema son
+ * únicos para todos los proveedores: así cambiar de modelo compara modelos, no preguntas.
  */
-import { MODEL_PROFILES, GEMINI_INTERACTIONS_URL } from './config';
+import { MODEL_PROFILES } from './config';
+import { getProvider } from './providers';
 import { PRODUCTO_SYSTEM_PROMPT, PRODUCTO_USER_PROMPT } from './providers/prompts';
 import { parseJsonRecord } from './schema';
-import type { ModelProfile, ProviderRequest } from './types';
+import type { ModelProfile, ProviderRequest, TaskPrompts } from './types';
 
 /**
- * Como `BusReading`: sólo lo que el anuncio de voz necesita. `producto` es qué es y su marca;
- * `detalle` la variedad/sabor/presentación (el objetivo opcional de OCR de etiqueta cabe acá).
+ * Sólo lo que el anuncio de voz necesita. `producto` es qué es y su marca; `detalle` la
+ * variedad/sabor/presentación (el objetivo opcional de OCR de etiqueta cabe acá).
  */
 export interface ProductoLeido {
   producto: string | null;
   detalle: string | null;
 }
 
-/** Mismas restricciones que busReadingSchema: required completo, sin additionalProperties. */
+/**
+ * Schema para structured outputs. Restricciones que exigen las dos APIs: `required` completo,
+ * `additionalProperties: false`, sin `minLength` ni restricciones numéricas.
+ * Ambos campos admiten null: un envase ilegible tiene que poder decirlo, no inventar.
+ */
 export const productoSchema = {
   type: 'object',
   properties: {
@@ -32,6 +36,11 @@ export const productoSchema = {
   required: ['producto', 'detalle'],
   additionalProperties: false,
 } as const;
+
+export const PRODUCTO_PROMPTS: TaskPrompts = {
+  system: PRODUCTO_SYSTEM_PROMPT,
+  user: PRODUCTO_USER_PROMPT,
+};
 
 function isStringOrNull(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
@@ -49,38 +58,35 @@ export function parseProductoLeido(text: string): ProductoLeido | null {
 }
 
 /**
- * Flash y no Flash Lite: en supermercado la complejidad manda sobre la latencia (ADR 0006), y
- * al ser otro model id la cuota del tier gratuito es independiente de la del benchmark.
+ * Flash y no Flash Lite: en supermercado la complejidad manda sobre la latencia (ADR 0006). Es el
+ * default cuando el usuario no eligió nada; con la clave de Gemini presente siempre está disponible.
  */
-export const PRODUCTO_MODEL: ModelProfile = MODEL_PROFILES.find(
-  (profile) => profile.provider === 'gemini' && profile.id.includes('flash') && !profile.id.includes('lite'),
-) ?? MODEL_PROFILES[0];
+export const DEFAULT_PRODUCTO_MODEL_ID = 'gemini-3.6-flash';
 
-/** Arma el request a Gemini para leer un producto. Mismo transporte que el resto (SSE). */
+/** El default resuelto contra el registro, para no repetir el `find` en cada consumidor. */
+export const PRODUCTO_MODEL: ModelProfile =
+  MODEL_PROFILES.find((profile) => profile.id === DEFAULT_PRODUCTO_MODEL_ID) ?? MODEL_PROFILES[0];
+
+/**
+ * Arma el request de lectura de producto para el modelo dado, delegando en su proveedor.
+ * `thinking: 'off'` aunque el modelo soporte adaptativo: la respuesta son dos campos y en el tier
+ * gratuito el razonamiento multiplica tokens y latencia. Si la precisión no alcanza, es una perilla.
+ */
 export function buildProductoRequest(input: {
+  model: ModelProfile;
   apiKey: string;
   imageBase64: string;
   mediaType: 'image/jpeg' | 'image/png';
 }): ProviderRequest {
-  return {
-    url: GEMINI_INTERACTIONS_URL,
-    headers: {
-      'content-type': 'application/json',
-      'x-goog-api-key': input.apiKey,
-    },
-    body: {
-      model: PRODUCTO_MODEL.id,
-      stream: true,
-      input: [
-        { type: 'text', text: PRODUCTO_SYSTEM_PROMPT },
-        { type: 'image', data: input.imageBase64, mime_type: input.mediaType },
-        { type: 'text', text: PRODUCTO_USER_PROMPT },
-      ],
-      response_format: {
-        type: 'text',
-        mime_type: 'application/json',
-        schema: productoSchema,
-      },
-    },
-  };
+  return getProvider(input.model.provider).buildRequest({
+    model: input.model,
+    apiKey: input.apiKey,
+    maxTokens: input.model.maxTokens,
+    thinking: 'off',
+    effort: 'low',
+    imageBase64: input.imageBase64,
+    mediaType: input.mediaType,
+    prompts: PRODUCTO_PROMPTS,
+    schema: productoSchema,
+  });
 }

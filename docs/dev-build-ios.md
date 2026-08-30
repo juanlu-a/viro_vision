@@ -150,9 +150,9 @@ Si algo llegó a `staging` y no va a producción, se revierte en `staging` con u
 del release: `staging` es la antesala de `main`, no un cajón de pruebas sueltas.
 
 Secrets del repo: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (el contenido del `.p8`, rol
-Administración), `EXPO_PUBLIC_GEMINI_API_KEY`; variables: `EXPO_PUBLIC_ONDEVICE_SPIKE`,
-`EXPO_PUBLIC_SIMULATE_DEVICE` — espejo del `.env` local, para que el build de CI sea el mismo que
-el del Mac.
+Administración), `EXPO_PUBLIC_GEMINI_API_KEY`, `EXPO_PUBLIC_ANTHROPIC_API_KEY` (opcional);
+variable: `EXPO_PUBLIC_SIMULATE_DEVICE` — espejo del `.env` local, para que el build de CI sea el
+mismo que el del Mac.
 
 ### Testers (App Store Connect → la app → TestFlight)
 

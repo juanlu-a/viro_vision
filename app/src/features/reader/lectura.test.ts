@@ -4,7 +4,7 @@
  * Los casos vienen de fallos reales del spike (la matrícula como candidato, textos de baja
  * confianza) — ver docs/spike-vision-local.md.
  */
-import { adivinarLectura, frasearLectura, frasearProducto } from './lectura';
+import { adivinarLectura, formatMs, frasearLectura, frasearProducto } from './lectura';
 import { strings } from '@/i18n';
 
 describe('adivinarLectura', () => {
@@ -64,5 +64,19 @@ describe('frasearProducto', () => {
 
   it('sin nada legible, lo dice — no inventa', () => {
     expect(frasearProducto(null, null)).toBe(strings.reader.nothingReadProduct);
+  });
+});
+
+describe('formatMs', () => {
+  it('muestra milisegundos redondeados por debajo del segundo', () => {
+    expect(formatMs(842.4)).toBe('842 ms');
+  });
+
+  it('pasa a segundos a partir de 1000 ms', () => {
+    expect(formatMs(2530)).toBe('2.53 s');
+  });
+
+  it('muestra un guion cuando no hubo medición', () => {
+    expect(formatMs(NaN)).toBe('—');
   });
 });

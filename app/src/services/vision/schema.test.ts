@@ -1,41 +1,26 @@
-import { parseBusReading } from './schema';
+/**
+ * Existe porque la voz depende de esto: si el parser rechaza un JSON válido, el usuario escucha
+ * el texto crudo en vez del producto; si acepta basura, escucha basura. Los casos vienen de
+ * respuestas reales: bloques ```json, truncamiento por max_tokens, texto vacío.
+ */
+import { parseJsonRecord } from './schema';
 
-describe('parseBusReading', () => {
-  it('parsea una lectura válida', () => {
-    const reading = parseBusReading('{"numero":"116","nombre":"Plaza Independencia"}');
-
-    expect(reading).toEqual({ numero: '116', nombre: 'Plaza Independencia' });
-  });
-
-  it('acepta ambos campos nulos cuando el cartel no se pudo leer', () => {
-    const reading = parseBusReading('{"numero":null,"nombre":null}');
-
-    expect(reading).toEqual({ numero: null, nombre: null });
-  });
-
-  it('acepta un campo nulo y el otro leído', () => {
-    expect(parseBusReading('{"numero":"174","nombre":null}')?.numero).toBe('174');
+describe('parseJsonRecord', () => {
+  it('parsea un objeto JSON plano', () => {
+    expect(parseJsonRecord('{"producto":"Yerba","detalle":null}')).toEqual({ producto: 'Yerba', detalle: null });
   });
 
   it('tolera que el modelo envuelva el JSON en un bloque de código', () => {
-    const reading = parseBusReading('```json\n{"numero":"174","nombre":"Plaza Americana"}\n```');
-
-    expect(reading?.numero).toBe('174');
+    expect(parseJsonRecord('```json\n{"producto":"Arroz"}\n```')).toEqual({ producto: 'Arroz' });
   });
 
   it('devuelve null ante JSON truncado (por ejemplo stop_reason max_tokens)', () => {
-    expect(parseBusReading('{"numero":"116","nombre":"Plaza Inde')).toBeNull();
+    expect(parseJsonRecord('{"producto":"Arro')).toBeNull();
   });
 
-  it('devuelve null si falta un campo requerido', () => {
-    expect(parseBusReading('{"numero":"116"}')).toBeNull();
-  });
-
-  it('devuelve null si un campo no es string ni null', () => {
-    expect(parseBusReading('{"numero":116,"nombre":"X"}')).toBeNull();
-  });
-
-  it('devuelve null ante texto vacío', () => {
-    expect(parseBusReading('   ')).toBeNull();
+  it('devuelve null si no es un objeto (array, número, texto vacío)', () => {
+    expect(parseJsonRecord('[1,2]')).toBeNull();
+    expect(parseJsonRecord('42')).toBeNull();
+    expect(parseJsonRecord('   ')).toBeNull();
   });
 });

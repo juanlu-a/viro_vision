@@ -1,8 +1,9 @@
 /**
  * OCR local: detecta regiones de texto en una foto y las lee.
  *
- * REGLA DE FRONTERA (ADR 0001): instrumentación de desarrollo mientras dure el spike. Cuando se
- * decida promoverlo al camino de reconocimiento, hay que sacarlo de acá y de la regla de lint.
+ * Camino de producto del modo ómnibus desde ADR 0006 (2026-08-22): la TPU del dispositivo detecta
+ * el ómnibus y recorta el banner; la app lee el recorte con esto. Lo que el spike validó como
+ * "lo único de lo local que funciona sin descargar gigabytes" es hoy el camino primario.
  *
  * **Por qué OCR y no un modelo de visión generalista.** Leer "183 · Punta Carretas" de un cartel es
  * literalmente la tarea para la que existe un OCR. Un VLM hace eso *además* de describir la escena

@@ -31,9 +31,14 @@ exchange for precision. Three constraints survive the amendment and are not nego
    ADR 0001 exists to prevent, and the differentiator vs. Seeing AI / Lookout / OrCam.
 3. **Latency-critical cases (bus lines) stay local by default.**
 
-The cloud benchmark under `app/src/services/vision/` is **development instrumentation only** and
-carries a boundary comment saying so: it must never be called from the camera → detection/OCR →
-announcement path. See `references/convenciones.md` for the boundary-rule convention.
+`app/src/services/vision/` is the **supermarket cloud path** (ADR 0006): the user picks the model in
+Inicio; without a key or without internet the mode *says so* and does not read — an explicit,
+temporary exception to constraint 2, scoped to the supermarket mode (ADR 0006, 2026-08-30 update;
+the local fallback — Gemma 3 1B — is still to be evaluated). It must never be called from the bus
+path, which runs local (OCR on the TPU-cropped banner); the linter enforces it. Since 2026-08-30
+the app ships **one native runtime** (ExecuTorch, OCR only): the local-vision spike lab (LiteRT-LM,
+Gemma multimodal, cloud latency benchmark) was retired from the app and preserved in branch
+`spike/laboratorio-vision-local` (draft PR "[NO MERGEAR]").
 
 ## Tooling
 - **React Native via Expo** with a **custom dev client** (not Expo Go alone — native modules like

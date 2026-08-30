@@ -98,12 +98,25 @@ roadmap cambia de "entrenar" a "evaluar".
   todavía — el spike midió el teléfono. Es el riesgo técnico principal del camino de bondis.
 - La decisión de supermercado queda abierta; hasta cerrarla conviven dos candidatos en el plan.
 
+## Actualización 2026-08-30 — supermercado va a la nube; el fallback local queda pendiente
+
+El equipo decidió que el camino de supermercado **es la nube**, con el modelo elegible por el
+usuario en Inicio (Gemini Flash por defecto; Anthropic si el build trae su clave). Sin internet o
+sin clave, el modo **avisa y no lee**. Esto es una **excepción explícita y acotada a la restricción
+2 de ADR 0001** ("nube sin fallback local, prohibido"): aplica sólo al modo supermercado, está
+rotulada en la UI, y se cierra evaluando **Gemma 3 1B con visión** sobre productos reales como
+fallback local. El modo ómnibus no cambia: local siempre.
+
+Consecuencia en el código: el laboratorio del spike (LiteRT-LM, Gemma multimodal por ExecuTorch,
+benchmark de nube) se retiró de la app y quedó preservado en la rama `spike/laboratorio-vision-local`.
+Queda **un solo runtime nativo** (ExecuTorch, sólo OCR).
+
 ## Implicaciones para el código actual
 
-- El lector de Inicio (`app/src/features/reader/`) ya tiene los tres caminos del spike; los modos
-  del producto se disparan desde el hardware ([ADR 0007](0007-botones-fisicos-modos-de-operacion.md)).
-- Conviven dos runtimes nativos en el binario (~86 MB extra); al cerrar supermercado se decide
-  cuál queda (pendiente heredado del spike).
+- El lector de Inicio (`app/src/features/reader/`) implementa los dos modos; los modos del producto
+  se disparan desde el hardware ([ADR 0007](0007-botones-fisicos-modos-de-operacion.md)).
+- Un solo runtime nativo en el binario (ExecuTorch, OCR); el pendiente "cuál queda" se cerró el
+  2026-08-30.
 - `ml/` deja de planificar entrenamiento: su trabajo pasa a ser el dataset de evaluación y el
   export del detector a la TPU.
 

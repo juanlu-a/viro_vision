@@ -56,7 +56,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       # Se inlinean en el bundle JS en el archive (EXPO_PUBLIC_*), igual que el .env local.
       EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
-      EXPO_PUBLIC_ONDEVICE_SPIKE: ${{ vars.EXPO_PUBLIC_ONDEVICE_SPIKE }}
+      EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
       EXPO_PUBLIC_SIMULATE_DEVICE: ${{ vars.EXPO_PUBLIC_SIMULATE_DEVICE }}
     steps:
       - uses: actions/checkout@v4

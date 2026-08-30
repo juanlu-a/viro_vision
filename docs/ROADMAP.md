@@ -38,7 +38,7 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
   (iOS `NSLocalNetworkUsageDescription`/`NSBonjourServices`; Android WiFi + `NEARBY_WIFI_DEVICES`) +
   camera (via `expo-camera` when A5 nears). ✅ iOS `bundleIdentifier` / Android `package` fijados en
   `com.virovision.app` (2026-08-10 — ver `dev-build-ios.md`); `expo-image-picker` ya trae
-  `NSPhotoLibraryUsageDescription` para el benchmark.
+  `NSPhotoLibraryUsageDescription` (elegir la foto a leer).
 - **A3 · Navigation + core screens** ✅ *(done — no login)* — iOS bottom tabs (Inicio / Dispositivo /
   Ajustes), app opens directly (no login gate — see ADR 0002 update). Home / Dispositivo / Ajustes
   rebuilt on the design system. (Real Settings model backed by `services/storage` still pending.)
