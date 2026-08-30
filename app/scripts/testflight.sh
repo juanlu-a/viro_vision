@@ -55,13 +55,15 @@ rm -rf "$ARCHIVE"
 mkdir -p "$BUILD_DIR"
 # El log completo va a archivo y a la pantalla sólo el cierre; si falla, se muestran las últimas
 # líneas ANTES de salir — un `| tail -3` a secas se comió el error real dos veces (2026-08-30).
-# Firmar el archive DIRECTO con distribución cloud ("Apple Distribution", una sola, reusable):
-# con la firma de desarrollo por defecto, cada runner efímero creaba un certificado de desarrollo
-# nuevo hasta chocar con el tope de la cuenta de Apple ("maximum number of certificates",
-# 2026-08-30 — hubo que revocar 16). Sólo aplica con API key (CI); en el Mac se firma como siempre.
+# En CI el archive va SIN firmar y firma el export (que usa la distribución cloud, una sola y
+# reusable). El porqué, aprendido a golpes el 2026-08-30: la firma automática de archive usa
+# identidad de desarrollo, y en un runner efímero eso creaba un certificado de desarrollo nuevo por
+# corrida hasta el tope de la cuenta ("maximum number of certificates"; hubo que revocar 16);
+# forzar CODE_SIGN_IDENTITY="Apple Distribution" tampoco sirve — Xcode lo rechaza como conflicto
+# con la firma automática. Sólo aplica con API key; en el Mac se firma como siempre.
 DIST=()
 if [ "${#AUTH[@]}" -gt 0 ]; then
-  DIST=(CODE_SIGN_IDENTITY="Apple Distribution")
+  DIST=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
 fi
 if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
