@@ -464,6 +464,40 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
   (test lo fija: si divergieran, el selector compararía prompts y no modelos). 131 tests en 11
   suites; primer test de la base sobre AsyncStorage, con el mock oficial.
 
+## 2026-08-30 (cont. 2) — Tipo + marca, Flash Lite por defecto, y limpieza de UI
+
+- **La lectura de supermercado devuelve `tipo`, `marca` y `detalle` en campos separados**, donde
+  antes `producto` mezclaba qué es con de quién es. El motivo no es de modelado: para quien no ve,
+  el tipo decide si el producto sirve y la marca sólo cuál de los que sirven, así que separados el
+  anuncio puede decir uno aunque el otro no se lea, en vez de perder los dos por un campo que el
+  modelo no pudo completar entero. La frase queda "arroz Saman, Blue Patna 1 kg" — lo que más
+  discrimina, adelante. Prompt, schema, parser y `frasearProducto` actualizados en bloque.
+- **Se midió la latencia real de los Gemini de visión** (foto de un paquete de arroz, contra la API
+  real, no contra los docs): `gemini-3.5-flash-lite` **2-3 s**, `gemini-3.5-flash` **17-30 s**,
+  `gemini-3.6-flash` —el default hasta hoy— **34-47 s**, `gemini-3.7-flash` timeout / alta demanda.
+  Los tres acertaron tipo, marca y detalle, así que la latencia del grande no compraba nada. El
+  default pasa a `gemini-3.5-flash-lite` y el selector ofrece **sólo los dos Flash Lite** (el fijado
+  y el alias `-latest`): ofrecer un modelo de medio minuto sólo invita a elegirlo.
+  **Reserva metodológica**: sostener pedidos satura el tier gratuito y a partir de la tercera lectura
+  seguida cualquier modelo salta a 20-80 s — eso es la cuota, no el modelo. El orden relativo entre
+  modelos se sostuvo en todas las tandas; las cifras de arriba son de las corridas espaciadas.
+- **Bug encontrado y corregido: el proveedor de Gemini ignoraba el `thinking: 'off'` que recibía.**
+  Probando contra la API: `thinking_config`, `thinking_budget`, `reasoning` y `effort` dan 400
+  ("Unknown parameter"); el único que existe es `generation_config.thinking_level`, con
+  `minimal | low | medium | high`. Ya se manda, junto con `max_output_tokens`. `minimal` lo aceptan
+  los Flash Lite y lo **rechazan** los Flash grandes (exigen `low`) — anotado donde hace falta, por
+  si alguno vuelve al registro.
+- **UI, a pedido del usuario**: se fue el saludo "Hola, <nombre>" del subtítulo de Inicio (nadie lo
+  había pedido) y, con él, el campo "Tu nombre" de Ajustes y `services/storage/userName.ts`, que
+  existían sólo para alimentarlo. También se fueron el párrafo explicativo de la tarjeta de
+  reconocimiento y la tarjeta "Acerca de" de Ajustes.
+- **El selector de modelo ahora aparece sólo con el modo supermercado activo**, justo debajo del
+  botón que lo habilita: es el único modo que va a la nube, y así el foco de VoiceOver lo encuentra
+  en el elemento siguiente. Antes estaba siempre visible para que el orden de foco no cambiara con
+  el modo; se cambió a conciencia.
+- ADR 0006 lleva una actualización *bis* con la medición y el cambio de default; el índice de
+  decisiones de la skill quedó alineado. 138 tests en 11 suites, lint y typecheck en verde.
+
 ## Open threads / next
 - **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales para
   cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30); resolver el despliegue de la clave en un
