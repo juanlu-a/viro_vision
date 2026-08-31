@@ -17,8 +17,6 @@ export const es = {
   },
   reader: {
     section: 'Reconocimiento',
-    intro:
-      'Activá un modo y elegí una foto para probarlo. En el producto final los modos los activa el botón físico del dispositivo; esta pantalla es su versión de desarrollo.',
     modeLabel: 'Modo actual',
     modeEsperando: 'Esperando',
     modeOmnibus: 'Modo ómnibus',
@@ -69,7 +67,6 @@ export const es = {
     useProductDesc: 'Identifica productos de la canasta básica.',
     testAudioButton: 'Probar audio',
     testAudioHint: 'Reproduce un mensaje de prueba para verificar la salida de voz.',
-    greeting: 'Hola',
     testAudioPhrase: 'Hola, soy ViroVision. La salida de audio funciona correctamente.',
   },
   connect: {
@@ -96,15 +93,10 @@ export const es = {
     appearanceHint: 'Elegí el tema de la aplicación.',
     themeSystem: 'Según el sistema',
     themeLight: 'Claro',
-    nameSection: 'Tu nombre',
-    nameLabel: 'Nombre',
-    nameHint: 'Opcional. Se usa solo para saludarte en Inicio; se guarda en el teléfono.',
-    namePlaceholder: 'Sin nombre',
     themeDark: 'Oscuro',
     themeSystemHint: 'Sigue la configuración de tu teléfono.',
     themeLightHint: 'Fondo claro con texto azul profundo.',
     themeDarkHint: 'Fondo azul profundo con texto claro.',
-    about: 'Acerca de',
   },
   auth: {
     loading: 'Cargando sesión…',

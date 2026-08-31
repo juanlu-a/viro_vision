@@ -1,18 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { announce } from '@/features/audio/announcer';
 import { ThemeSelector } from '@/features/theme/ThemeSelector';
 import { strings } from '@/i18n';
 import { useTheme } from '@/hooks/use-theme';
-import { loadUserName, saveUserName } from '@/services/storage/userName';
 
 function FeatureRow({
   icon,
@@ -49,11 +46,6 @@ function FeatureRow({
 
 export default function SettingsScreen() {
   const t = strings.settings;
-  const [nombre, setNombre] = useState('');
-
-  useEffect(() => {
-    loadUserName().then(setNombre);
-  }, []);
 
   return (
     <Screen scroll>
@@ -64,25 +56,6 @@ export default function SettingsScreen() {
           {t.appearance.toUpperCase()}
         </ThemedText>
         <ThemeSelector />
-      </Card>
-
-      <Card>
-        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {t.nameSection.toUpperCase()}
-        </ThemedText>
-        {/* Se guarda al escribir, sin botón: un "Guardar" es un paso más para recorrer con el
-            lector de pantalla y no protege nada — el dato es un saludo. */}
-        <TextField
-          label={t.nameLabel}
-          hint={t.nameHint}
-          placeholder={t.namePlaceholder}
-          value={nombre}
-          autoComplete="name"
-          onChangeText={(v) => {
-            setNombre(v);
-            void saveUserName(v);
-          }}
-        />
       </Card>
 
       <Card>
@@ -101,18 +74,6 @@ export default function SettingsScreen() {
           variant="secondary"
           onPress={() => announce(strings.home.testAudioPhrase)}
         />
-      </Card>
-
-      <Card>
-        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {t.about.toUpperCase()}
-        </ThemedText>
-        <ThemedText type="default" className="font-sans-bold">
-          {strings.app.name}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {strings.app.tagline}
-        </ThemedText>
       </Card>
 
     </Screen>
