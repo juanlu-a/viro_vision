@@ -78,7 +78,20 @@ audio. Diagrama canónico en `docs/architecture/README.md`.
 **Gemini por sobre Anthropic en el modo supermercado.** No es una preferencia técnica: tiene tier
 gratuito, y la restricción dura de ADR 0006 es que el modelo sea gratuito para el usuario. Anthropic
 exige billing y aparece en el selector sólo si el build trae su clave. El modelo por defecto es
-`gemini-3.6-flash` (Flash, no Lite): en supermercado la complejidad manda sobre la latencia.
+`gemini-3.5-flash-lite`, y el selector ofrece **sólo Flash Lite**: medido contra la API real
+(30/08/2026) el Lite responde en 2-3 s y los Flash grandes en 17-47 s, con el mismo acierto — la
+latencia manda también en supermercado. Ojo al re-medir: sostener pedidos satura el tier gratuito y
+todo salta a 20-80 s; hay que espaciar las corridas. Ver la actualización *bis* de ADR 0006.
+
+**El razonamiento de Gemini se apaga por `generation_config.thinking_level`.** La Interactions API
+rechaza con 400 `thinking_config`, `thinking_budget`, `reasoning` y `effort`; ese es el único
+parámetro que existe, y acepta `minimal | low | medium | high`. `minimal` sirve en los Flash Lite y
+da 400 en los Flash grandes, que exigen al menos `low`. Sin mandarlo, el modelo piensa por defecto y
+la lectura pasa de segundos a decenas de segundos.
+
+**La lectura de producto son tres campos separados: `tipo`, `marca`, `detalle`.** No un `producto`
+que mezcle qué es y de quién es: el tipo decide si el producto sirve y la marca sólo cuál de los que
+sirven, y separados el anuncio puede decir uno aunque el otro no se lea.
 
 **La cuota se respeta antes de pedir.** 20 requests por minuto **por modelo** en el tier gratuito.
 Hay un limitador de ventana móvil que espera con aviso, en vez de fallar y reintentar.

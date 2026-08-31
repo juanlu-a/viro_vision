@@ -46,11 +46,19 @@ export function frasearLectura(lectura: BusReading | null, crudo: string | null)
   return t.nothingRead;
 }
 
-/** La frase que se anuncia en modo supermercado. */
+/**
+ * La frase que se anuncia en modo supermercado: tipo, marca y recién después el detalle.
+ *
+ * El orden no es cosmético. Quien no ve escucha la frase entera antes de poder decidir, así que
+ * adelante va lo que más discrimina: "arroz Saman, Blue Patna 1 kg" y no "Blue Patna 1 kg, arroz".
+ * Cada campo puede faltar por separado (el modelo devuelve null lo que no lee), y decir dos de tres
+ * sigue siendo útil — por eso se arma con los que haya en vez de exigirlos todos. El texto crudo es
+ * el respaldo, nunca el silencio.
+ */
 export function frasearProducto(producto: ProductoLeido | null, crudo: string | null): string {
-  if (producto?.producto && producto?.detalle) return `${producto.producto}, ${producto.detalle}`;
-  if (producto?.producto) return producto.producto;
-  if (producto?.detalle) return producto.detalle;
+  const cabeza = [producto?.tipo, producto?.marca].filter(Boolean).join(' ');
+  const partes = [cabeza, producto?.detalle].filter(Boolean);
+  if (partes.length > 0) return partes.join(', ');
   if (crudo) return crudo;
   return t.nothingReadProduct;
 }

@@ -101,7 +101,8 @@ roadmap cambia de "entrenar" a "evaluar".
 ## Actualización 2026-08-30 — supermercado va a la nube; el fallback local queda pendiente
 
 El equipo decidió que el camino de supermercado **es la nube**, con el modelo elegible por el
-usuario en Inicio (Gemini Flash por defecto; Anthropic si el build trae su clave). Sin internet o
+usuario en Inicio (Gemini Flash por defecto —corregido a Flash Lite en la actualización *bis* de
+más abajo—; Anthropic si el build trae su clave). Sin internet o
 sin clave, el modo **avisa y no lee**. Esto es una **excepción explícita y acotada a la restricción
 2 de ADR 0001** ("nube sin fallback local, prohibido"): aplica sólo al modo supermercado, está
 rotulada en la UI, y se cierra evaluando **Gemma 3 1B con visión** sobre productos reales como
@@ -110,6 +111,37 @@ fallback local. El modo ómnibus no cambia: local siempre.
 Consecuencia en el código: el laboratorio del spike (LiteRT-LM, Gemma multimodal por ExecuTorch,
 benchmark de nube) se retiró de la app y quedó preservado en la rama `spike/laboratorio-vision-local`.
 Queda **un solo runtime nativo** (ExecuTorch, sólo OCR).
+
+## Actualización 2026-08-30 (bis) — el default pasa a Flash Lite y la lectura devuelve tipo + marca
+
+Dos cambios sobre la actualización de arriba, ambos con medición contra la API real detrás.
+
+**El default deja de ser Flash y pasa a Flash Lite.** Con la cuota fresca y una foto de un paquete
+de arroz, `gemini-3.5-flash-lite` responde en **2-3 s**, `gemini-3.5-flash` en **17-30 s** y
+`gemini-3.6-flash` —que era el default— en **34-47 s**. La brecha es el paso de razonamiento: los
+Flash grandes piensan aunque la respuesta sean tres campos cortos. El Lite acertó tipo, marca y
+detalle en todas las corridas, así que la latencia del grande no compraba precisión. El selector de
+Inicio pasa a ofrecer **sólo los dos Flash Lite** (el fijado y el alias `-latest`): un modelo que
+tarda medio minuto en decir "arroz Saman" no es una opción para alguien parado frente a la góndola,
+y ofrecerlo sólo invita a elegirlo. Los de Anthropic siguen apareciendo únicamente si el build trae
+su clave.
+
+Reserva metodológica, para quien re-mida: **sostener pedidos satura el tier gratuito** y a partir de
+la tercera lectura seguida cualquier modelo salta a 20-80 s. Eso es la cuota, no el modelo; las
+comparaciones válidas son con las corridas espaciadas. El orden relativo entre modelos se sostuvo en
+todas las tandas.
+
+Además se encontró que el proveedor de Gemini **ignoraba** el `thinking: 'off'` que recibía: la
+Interactions API no acepta `thinking_config`, `thinking_budget`, `reasoning` ni `effort` (400,
+"Unknown parameter"); el único parámetro que existe es `generation_config.thinking_level`, con
+valores `minimal | low | medium | high`. Ya se manda. Ojo: `minimal` lo aceptan los Flash Lite pero
+los Flash grandes lo **rechazan** con 400 y exigen al menos `low`.
+
+**La lectura devuelve `tipo`, `marca` y `detalle` en campos separados**, donde antes `producto`
+mezclaba qué es y de quién es. Son dos datos con prioridades distintas para quien no ve: el tipo
+decide si el producto sirve, la marca sólo cuál de los que sirven. Separados, el anuncio puede decir
+el tipo aunque la marca no se lea (y al revés) en vez de perder los dos por un campo que el modelo
+no pudo completar entero. La frase hablada queda "arroz Saman, Blue Patna 1 kg".
 
 ## Implicaciones para el código actual
 

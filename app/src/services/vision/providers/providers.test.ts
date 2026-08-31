@@ -3,7 +3,7 @@ import { PRODUCTO_PROMPTS, productoSchema } from '../producto';
 import type { BuildRequestInput, ModelProfile } from '../types';
 import { anthropicProvider, geminiProvider } from './index';
 
-const gemini = findModelProfile('gemini-3.6-flash');
+const gemini = findModelProfile('gemini-3.5-flash-lite');
 const haiku = findModelProfile('claude-haiku-4-5');
 const opus = findModelProfile('claude-opus-5');
 
@@ -46,6 +46,24 @@ describe('geminiProvider.buildRequest', () => {
       PRODUCTO_PROMPTS.system,
       PRODUCTO_PROMPTS.user,
     ]);
+  });
+
+  it('apaga el pensamiento: sin thinking_level la lectura pasa de 2-3 s a decenas de segundos', () => {
+    const { generation_config: gc } = geminiProvider.buildRequest(inputFor(gemini)).body as {
+      generation_config: { thinking_level: string; max_output_tokens: number };
+    };
+
+    // 'minimal' es el piso que aceptan los Flash Lite; los Flash grandes lo rechazan con 400.
+    expect(gc.thinking_level).toBe('minimal');
+    expect(gc.max_output_tokens).toBe(gemini.maxTokens);
+  });
+
+  it('con thinking adaptativo manda el effort como nivel, no un valor inventado', () => {
+    const { generation_config: gc } = geminiProvider.buildRequest(
+      inputFor(gemini, { thinking: 'adaptive', effort: 'medium' }),
+    ).body as { generation_config: { thinking_level: string } };
+
+    expect(gc.thinking_level).toBe('medium');
   });
 
   it('manda la imagen con su mime type', () => {
@@ -231,6 +249,16 @@ describe('registro de modelos', () => {
 
   it('el primer modelo del registro es de Gemini — el gratuito y de la familia de Gemma', () => {
     expect(MODEL_PROFILES[0].provider).toBe('gemini');
+  });
+
+  it('de Gemini sólo hay Flash Lite: los Flash grandes miden 17-47 s por lectura', () => {
+    // Si alguien vuelve a agregar un Flash grande, este test cae y hay que revisar dos cosas: la
+    // latencia (medición del 30/08/2026, ver config.ts) y el piso de thinking_level, que en esos
+    // modelos no es 'minimal' sino 'low' — mandarles 'minimal' es un 400.
+    const gemini = MODEL_PROFILES.filter((profile) => profile.provider === 'gemini');
+
+    expect(gemini.length).toBeGreaterThan(0);
+    for (const profile of gemini) expect(profile.id).toContain('lite');
   });
 });
 

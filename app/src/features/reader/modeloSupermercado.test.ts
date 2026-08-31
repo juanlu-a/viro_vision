@@ -8,19 +8,24 @@ import { DEFAULT_PRODUCTO_MODEL_ID, MODEL_PROFILES } from '@/services/vision';
 
 const gemini = MODEL_PROFILES.filter((m) => m.provider === 'gemini');
 const haiku = MODEL_PROFILES.find((m) => m.id === 'claude-haiku-4-5')!;
-const flash = MODEL_PROFILES.find((m) => m.id === DEFAULT_PRODUCTO_MODEL_ID)!;
+const porDefecto = MODEL_PROFILES.find((m) => m.id === DEFAULT_PRODUCTO_MODEL_ID)!;
 
 describe('resolveProductoModel', () => {
   it('respeta el guardado si está disponible', () => {
     expect(resolveProductoModel('gemini-flash-lite-latest', gemini)?.id).toBe('gemini-flash-lite-latest');
   });
 
+  it('cae al default si el guardado ya no está en el registro (modelo retirado)', () => {
+    // gemini-3.6-flash era el default hasta la medición de latencia del 30/08/2026.
+    expect(resolveProductoModel('gemini-3.6-flash', gemini)?.id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
+  });
+
   it('cae al default si el guardado es de un proveedor sin clave en este build', () => {
     expect(resolveProductoModel('claude-haiku-4-5', gemini)?.id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
   });
 
-  it('sin nada guardado, elige el default (Flash, no Lite)', () => {
-    expect(resolveProductoModel(null, gemini)).toBe(flash);
+  it('sin nada guardado, elige el default (el Flash Lite fijado)', () => {
+    expect(resolveProductoModel(null, gemini)).toBe(porDefecto);
   });
 
   it('si el default no está disponible, elige el primero que sí', () => {
@@ -28,6 +33,6 @@ describe('resolveProductoModel', () => {
   });
 
   it('sin modelos disponibles devuelve null: el modo avisa, no adivina', () => {
-    expect(resolveProductoModel('gemini-3.6-flash', [])).toBeNull();
+    expect(resolveProductoModel('gemini-3.5-flash-lite', [])).toBeNull();
   });
 });
