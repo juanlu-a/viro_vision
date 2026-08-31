@@ -14,26 +14,34 @@ import { parseJsonRecord } from './schema';
 import type { ModelProfile, ProviderRequest, TaskPrompts } from './types';
 
 /**
- * Sólo lo que el anuncio de voz necesita. `producto` es qué es y su marca; `detalle` la
- * variedad/sabor/presentación (el objetivo opcional de OCR de etiqueta cabe acá).
+ * Sólo lo que el anuncio de voz necesita, en tres campos SEPARADOS: `tipo` es qué es (arroz,
+ * harina, fideos…), `marca` de quién es, y `detalle` la variedad/sabor/presentación (el objetivo
+ * opcional de OCR de etiqueta cabe acá).
+ *
+ * Tipo y marca están separados y no en un solo nombre porque son dos datos con prioridades
+ * distintas para quien no ve: el tipo es lo que decide si el producto sirve, la marca sólo cuál de
+ * los que sirven. Separados, el anuncio puede decir el tipo aunque la marca no se lea (y al revés),
+ * en vez de perder los dos por un campo que el modelo no pudo completar entero.
  */
 export interface ProductoLeido {
-  producto: string | null;
+  tipo: string | null;
+  marca: string | null;
   detalle: string | null;
 }
 
 /**
  * Schema para structured outputs. Restricciones que exigen las dos APIs: `required` completo,
  * `additionalProperties: false`, sin `minLength` ni restricciones numéricas.
- * Ambos campos admiten null: un envase ilegible tiene que poder decirlo, no inventar.
+ * Los tres campos admiten null: un envase ilegible tiene que poder decirlo, no inventar.
  */
 export const productoSchema = {
   type: 'object',
   properties: {
-    producto: { type: ['string', 'null'] },
+    tipo: { type: ['string', 'null'] },
+    marca: { type: ['string', 'null'] },
     detalle: { type: ['string', 'null'] },
   },
-  required: ['producto', 'detalle'],
+  required: ['tipo', 'marca', 'detalle'],
   additionalProperties: false,
 } as const;
 
@@ -51,17 +59,21 @@ export function parseProductoLeido(text: string): ProductoLeido | null {
   const candidate = parseJsonRecord(text);
   if (!candidate) return null;
 
-  if (!isStringOrNull(candidate.producto)) return null;
+  if (!isStringOrNull(candidate.tipo)) return null;
+  if (!isStringOrNull(candidate.marca)) return null;
   if (!isStringOrNull(candidate.detalle)) return null;
 
-  return { producto: candidate.producto, detalle: candidate.detalle };
+  return { tipo: candidate.tipo, marca: candidate.marca, detalle: candidate.detalle };
 }
 
 /**
- * Flash y no Flash Lite: en supermercado la complejidad manda sobre la latencia (ADR 0006). Es el
- * default cuando el usuario no eligió nada; con la clave de Gemini presente siempre está disponible.
+ * Flash Lite y no Flash: contra la API real el Lite responde en 2-3 s y el Flash entre 17 y 47 s,
+ * con el mismo acierto de tipo, marca y detalle (medición del 30/08/2026 y sus reservas, en
+ * `config.ts`). La latencia manda también en supermercado — antes el default era
+ * `gemini-3.6-flash`, el más lento de todos los medidos. Es el default cuando el usuario no eligió
+ * nada; con la clave de Gemini presente siempre está disponible.
  */
-export const DEFAULT_PRODUCTO_MODEL_ID = 'gemini-3.6-flash';
+export const DEFAULT_PRODUCTO_MODEL_ID = 'gemini-3.5-flash-lite';
 
 /** El default resuelto contra el registro, para no repetir el `find` en cada consumidor. */
 export const PRODUCTO_MODEL: ModelProfile =
@@ -69,8 +81,9 @@ export const PRODUCTO_MODEL: ModelProfile =
 
 /**
  * Arma el request de lectura de producto para el modelo dado, delegando en su proveedor.
- * `thinking: 'off'` aunque el modelo soporte adaptativo: la respuesta son dos campos y en el tier
- * gratuito el razonamiento multiplica tokens y latencia. Si la precisión no alcanza, es una perilla.
+ * `thinking: 'off'` aunque el modelo soporte adaptativo: la respuesta son tres campos cortos y en
+ * el tier gratuito el razonamiento multiplica tokens y latencia. Si la precisión no alcanza, es
+ * una perilla.
  */
 export function buildProductoRequest(input: {
   model: ModelProfile;

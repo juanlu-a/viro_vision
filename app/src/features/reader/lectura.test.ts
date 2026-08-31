@@ -50,15 +50,33 @@ describe('frasearLectura', () => {
 });
 
 describe('frasearProducto', () => {
-  it('producto y detalle juntos cuando están los dos', () => {
-    expect(frasearProducto({ producto: 'Arroz Blue Patna', detalle: '1 kg' }, null)).toBe(
-      'Arroz Blue Patna, 1 kg',
+  it('dice tipo, marca y detalle en ese orden: adelante lo que más discrimina', () => {
+    expect(
+      frasearProducto({ tipo: 'arroz', marca: 'Saman', detalle: 'Blue Patna 1 kg' }, null),
+    ).toBe('arroz Saman, Blue Patna 1 kg');
+  });
+
+  it('sin detalle dice tipo y marca', () => {
+    expect(frasearProducto({ tipo: 'yerba', marca: 'Canarias', detalle: null }, null)).toBe(
+      'yerba Canarias',
     );
   });
 
-  it('sólo el producto si no hay detalle', () => {
-    expect(frasearProducto({ producto: 'Yerba Canarias', detalle: null }, null)).toBe(
-      'Yerba Canarias',
+  it('con la marca ilegible igual dice el tipo: es el dato que decide si el producto sirve', () => {
+    expect(frasearProducto({ tipo: 'fideos', marca: null, detalle: '500 g' }, null)).toBe(
+      'fideos, 500 g',
+    );
+  });
+
+  it('con el tipo ilegible igual dice la marca — cada campo cae por separado', () => {
+    expect(frasearProducto({ tipo: null, marca: 'Conaprole', detalle: null }, null)).toBe(
+      'Conaprole',
+    );
+  });
+
+  it('sin nada legible cae al texto crudo antes que al silencio', () => {
+    expect(frasearProducto({ tipo: null, marca: null, detalle: null }, 'SAMAN 1 kg')).toBe(
+      'SAMAN 1 kg',
     );
   });
 
