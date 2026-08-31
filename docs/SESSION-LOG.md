@@ -464,6 +464,37 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
   (test lo fija: si divergieran, el selector compararía prompts y no modelos). 131 tests en 11
   suites; primer test de la base sobre AsyncStorage, con el mock oficial.
 
+## 2026-08-30 (cont.) — CLAUDE.md, y la saga de la firma en CI
+
+- **`CLAUDE.md` en la raíz** (PR #37): toda sesión nueva de agente arranca leyendo el contexto
+  mínimo y la orden de invocar la skill `virovision`. `convenciones.md` ganó la tabla "Cómo se
+  libera" y corrigió el chequeo de squash (apuntaba a `main`; es `staging`).
+- **Saga de la firma en CI**, destrabada en cinco pasos con moraleja:
+  1. Los builds de `staging` morían a los 30 s con exit 65 **sin causa visible**: el script tiraba
+     la salida de xcodebuild (`| tail -3`). Fix: log completo a `build/xcodebuild-*.log` y las
+     últimas 80 líneas al fallar (PR #38). *Un pipe a tail no es un log.*
+  2. Causa real: **cada runner efímero creaba un certificado de desarrollo nuevo** al archivar con
+     firma automática, hasta el tope de la cuenta de Apple ("maximum number of certificates").
+     Se revocaron por API los 16 "Created via API"; el del Mac ("Juan Abreu") quedó.
+  3. Forzar `CODE_SIGN_IDENTITY="Apple Distribution"` en el archive **no** es la salida: Xcode lo
+     rechaza como conflicto con la firma automática (PR #39, revertido en el paso 4).
+  4. Camino estándar de CI: **archive sin firmar** (`CODE_SIGNING_ALLOWED=NO`, sólo con API key
+     presente) y la firma completa la hace el export con la **distribución cloud** — una sola,
+     reusable entre runners (PR #40). El build de validación falló — y destapó el paso 5.
+  5. Un archive sin firmar **no registra equipo**, y `exportArchive` con firma automática lo
+     deduce del archive: `error: exportArchive No Team Found in Archive`. Fix: el
+     `ExportOptions.plist` declara `teamID`, leído del `pbxproj` que genera el prebuild
+     (`plugins/withDevelopmentTeam.js`) para que el ID siga viviendo en un solo lugar (PR #42).
+     Con eso, **primer run verde de `staging`** (33334223960): archive sin firmar, export firmado
+     con la distribución cloud, build en el grupo interno *Equipo ViroVision*.
+- Nota de infraestructura: a mitad de la continuación, macOS **revocó el acceso TCC de la sesión
+  de agente a `~/Documents`** (EPERM en toda lectura, incluso para las herramientas de archivo).
+  Este cierre se escribió vía la API de GitHub, y el monitor de Beta App Review pasó a correr
+  desde un tmp con `asc.mjs` bajado del repo (es público y sin dependencias). Si vuelve a pasar:
+  re-otorgar en Ajustes → Privacidad y seguridad → Archivos y carpetas.
+- El build **oficial** del release (202608301933, post-limpieza del spike) subió bien y quedó en el
+  grupo *Testers ViroVision*, a la espera de que Apple libere la Beta App Review del build 1.
+
 ## 2026-08-30 (cont. 2) — Tipo + marca, Flash Lite por defecto, y limpieza de UI
 
 - **La lectura de supermercado devuelve `tipo`, `marca` y `detalle` en campos separados**, donde
@@ -507,6 +538,12 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
   abierto del camino de bondis).
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
-- Pending interactive setup: **Supabase** project + `app/.env`; **EAS** `login`/`init` + `EXPO_TOKEN` +
-  `EAS_ENABLED`; **Apple** Developer account (para escapar de la caducidad de 7 días). See
-  `PROJECT-STATUS.md`.
+- **Beta App Review del build 1 (oficial)**: `WAITING_FOR_REVIEW` desde el 2026-08-29; al aprobar,
+  el link público queda vivo y hay que enviar a revisión los builds que esperan (o lo hace el
+  próximo run).
+- **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; después: crear
+  la app (package `com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`),
+  `PLAY_ENABLED=true` y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
+- **Sumar a Magalí a TestFlight** (grupo interno) cuando pase su email; Francisco espera el canal
+  Android.
+- Pending interactive setup: **Supabase** project + `app/.env`. See `PROJECT-STATUS.md`.
