@@ -54,6 +54,19 @@ function buildRequest(input: BuildRequestInput): ProviderRequest {
         mime_type: 'application/json',
         schema: input.schema,
       },
+      // Sin esto, Gemini piensa por defecto y la lectura pasa de ~3 s a decenas de segundos: el
+      // paso de 'thought' de arriba es el que se come el TTFT. La forma también está verificada
+      // contra la API real — `thinking_config`, `thinking_budget`, `reasoning` y `effort` dan 400
+      // ("Unknown parameter"); el único que existe es `generation_config.thinking_level`, y sólo
+      // acepta 'minimal' | 'low' | 'medium' | 'high'.
+      //
+      // `minimal` es el piso y lo aceptan los Flash Lite, que son los únicos Gemini del registro.
+      // OJO: los Flash grandes (3.6, 3.7, flash-latest) lo RECHAZAN con 400 y exigen al menos
+      // 'low' — si alguna vez vuelve uno al registro, hay que mapear su piso, no copiar esta línea.
+      generation_config: {
+        thinking_level: input.thinking === 'off' ? 'minimal' : input.effort,
+        max_output_tokens: input.maxTokens,
+      },
     },
   };
 }

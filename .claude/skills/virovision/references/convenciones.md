@@ -172,12 +172,24 @@ Trampas ya pisadas, que no hay que repetir:
 
 ### Verificar que un merge no perdió nada
 
-`main` mergea con **squash**, así que las ramas viejas quedan divergentes aunque el contenido esté.
-Para confirmar que una rama ya está íntegra en `main`, el chequeo es el contenido, no la historia:
+`staging` mergea con **squash**, así que las ramas viejas quedan divergentes aunque el contenido
+esté. Para confirmar que una rama ya está íntegra, el chequeo es el contenido, no la historia:
 
 ```sh
-git diff origin/main <rama-vieja>   # vacío = todo el contenido está en main
+git diff origin/staging <rama-vieja>   # vacío = todo el contenido está en staging
 ```
+
+### Cómo se libera (resumen; el detalle en `docs/dev-build-ios.md` y `docs/android-play.md`)
+
+| Evento | Efecto |
+|---|---|
+| merge a `staging` (cambios en `app/`) | build de TestFlight al grupo **interno** *Equipo ViroVision* (devs, sin revisión, minutos) y — cuando `PLAY_ENABLED=true` — `.aab` a *internal testing* de Google Play |
+| PR `staging → main` mergeado (= release) | build al grupo **externo** *Testers ViroVision*, link público <https://testflight.apple.com/join/jbE7GDqV> (Beta App Review del 1.er build de cada versión) |
+| *Actions → TestFlight / Google Play → Run workflow* | publicar cualquier rama al destino que se elija |
+
+Cada grupo de TestFlight muestra **un solo build** (el último; el externo conserva además el último
+aprobado). Un build tarda ~30 min de runner + procesamiento de la tienda. Lo que no va a producción
+se **revierte en `staging` con un PR de revert** antes del release.
 
 ## Qué documento actualizar
 

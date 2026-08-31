@@ -464,6 +464,71 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
   (test lo fija: si divergieran, el selector compararía prompts y no modelos). 131 tests en 11
   suites; primer test de la base sobre AsyncStorage, con el mock oficial.
 
+## 2026-08-30 (cont.) — CLAUDE.md, y la saga de la firma en CI
+
+- **`CLAUDE.md` en la raíz** (PR #37): toda sesión nueva de agente arranca leyendo el contexto
+  mínimo y la orden de invocar la skill `virovision`. `convenciones.md` ganó la tabla "Cómo se
+  libera" y corrigió el chequeo de squash (apuntaba a `main`; es `staging`).
+- **Saga de la firma en CI**, destrabada en cinco pasos con moraleja:
+  1. Los builds de `staging` morían a los 30 s con exit 65 **sin causa visible**: el script tiraba
+     la salida de xcodebuild (`| tail -3`). Fix: log completo a `build/xcodebuild-*.log` y las
+     últimas 80 líneas al fallar (PR #38). *Un pipe a tail no es un log.*
+  2. Causa real: **cada runner efímero creaba un certificado de desarrollo nuevo** al archivar con
+     firma automática, hasta el tope de la cuenta de Apple ("maximum number of certificates").
+     Se revocaron por API los 16 "Created via API"; el del Mac ("Juan Abreu") quedó.
+  3. Forzar `CODE_SIGN_IDENTITY="Apple Distribution"` en el archive **no** es la salida: Xcode lo
+     rechaza como conflicto con la firma automática (PR #39, revertido en el paso 4).
+  4. Camino estándar de CI: **archive sin firmar** (`CODE_SIGNING_ALLOWED=NO`, sólo con API key
+     presente) y la firma completa la hace el export con la **distribución cloud** — una sola,
+     reusable entre runners (PR #40). El build de validación falló — y destapó el paso 5.
+  5. Un archive sin firmar **no registra equipo**, y `exportArchive` con firma automática lo
+     deduce del archive: `error: exportArchive No Team Found in Archive`. Fix: el
+     `ExportOptions.plist` declara `teamID`, leído del `pbxproj` que genera el prebuild
+     (`plugins/withDevelopmentTeam.js`) para que el ID siga viviendo en un solo lugar (PR #42).
+     Con eso, **primer run verde de `staging`** (33334223960): archive sin firmar, export firmado
+     con la distribución cloud, build en el grupo interno *Equipo ViroVision*.
+- Nota de infraestructura: a mitad de la continuación, macOS **revocó el acceso TCC de la sesión
+  de agente a `~/Documents`** (EPERM en toda lectura, incluso para las herramientas de archivo).
+  Este cierre se escribió vía la API de GitHub, y el monitor de Beta App Review pasó a correr
+  desde un tmp con `asc.mjs` bajado del repo (es público y sin dependencias). Si vuelve a pasar:
+  re-otorgar en Ajustes → Privacidad y seguridad → Archivos y carpetas.
+- El build **oficial** del release (202608301933, post-limpieza del spike) subió bien y quedó en el
+  grupo *Testers ViroVision*, a la espera de que Apple libere la Beta App Review del build 1.
+
+## 2026-08-30 (cont. 2) — Tipo + marca, Flash Lite por defecto, y limpieza de UI
+
+- **La lectura de supermercado devuelve `tipo`, `marca` y `detalle` en campos separados**, donde
+  antes `producto` mezclaba qué es con de quién es. El motivo no es de modelado: para quien no ve,
+  el tipo decide si el producto sirve y la marca sólo cuál de los que sirven, así que separados el
+  anuncio puede decir uno aunque el otro no se lea, en vez de perder los dos por un campo que el
+  modelo no pudo completar entero. La frase queda "arroz Saman, Blue Patna 1 kg" — lo que más
+  discrimina, adelante. Prompt, schema, parser y `frasearProducto` actualizados en bloque.
+- **Se midió la latencia real de los Gemini de visión** (foto de un paquete de arroz, contra la API
+  real, no contra los docs): `gemini-3.5-flash-lite` **2-3 s**, `gemini-3.5-flash` **17-30 s**,
+  `gemini-3.6-flash` —el default hasta hoy— **34-47 s**, `gemini-3.7-flash` timeout / alta demanda.
+  Los tres acertaron tipo, marca y detalle, así que la latencia del grande no compraba nada. El
+  default pasa a `gemini-3.5-flash-lite` y el selector ofrece **sólo los dos Flash Lite** (el fijado
+  y el alias `-latest`): ofrecer un modelo de medio minuto sólo invita a elegirlo.
+  **Reserva metodológica**: sostener pedidos satura el tier gratuito y a partir de la tercera lectura
+  seguida cualquier modelo salta a 20-80 s — eso es la cuota, no el modelo. El orden relativo entre
+  modelos se sostuvo en todas las tandas; las cifras de arriba son de las corridas espaciadas.
+- **Bug encontrado y corregido: el proveedor de Gemini ignoraba el `thinking: 'off'` que recibía.**
+  Probando contra la API: `thinking_config`, `thinking_budget`, `reasoning` y `effort` dan 400
+  ("Unknown parameter"); el único que existe es `generation_config.thinking_level`, con
+  `minimal | low | medium | high`. Ya se manda, junto con `max_output_tokens`. `minimal` lo aceptan
+  los Flash Lite y lo **rechazan** los Flash grandes (exigen `low`) — anotado donde hace falta, por
+  si alguno vuelve al registro.
+- **UI, a pedido del usuario**: se fue el saludo "Hola, <nombre>" del subtítulo de Inicio (nadie lo
+  había pedido) y, con él, el campo "Tu nombre" de Ajustes y `services/storage/userName.ts`, que
+  existían sólo para alimentarlo. También se fueron el párrafo explicativo de la tarjeta de
+  reconocimiento y la tarjeta "Acerca de" de Ajustes.
+- **El selector de modelo ahora aparece sólo con el modo supermercado activo**, justo debajo del
+  botón que lo habilita: es el único modo que va a la nube, y así el foco de VoiceOver lo encuentra
+  en el elemento siguiente. Antes estaba siempre visible para que el orden de foco no cambiara con
+  el modo; se cambió a conciencia.
+- ADR 0006 lleva una actualización *bis* con la medición y el cambio de default; el índice de
+  decisiones de la skill quedó alineado. 138 tests en 11 suites, lint y typecheck en verde.
+
 ## Open threads / next
 - **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales para
   cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30); resolver el despliegue de la clave en un
@@ -473,6 +538,12 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
   abierto del camino de bondis).
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
-- Pending interactive setup: **Supabase** project + `app/.env`; **EAS** `login`/`init` + `EXPO_TOKEN` +
-  `EAS_ENABLED`; **Apple** Developer account (para escapar de la caducidad de 7 días). See
-  `PROJECT-STATUS.md`.
+- **Beta App Review del build 1 (oficial)**: `WAITING_FOR_REVIEW` desde el 2026-08-29; al aprobar,
+  el link público queda vivo y hay que enviar a revisión los builds que esperan (o lo hace el
+  próximo run).
+- **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; después: crear
+  la app (package `com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`),
+  `PLAY_ENABLED=true` y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
+- **Sumar a Magalí a TestFlight** (grupo interno) cuando pase su email; Francisco espera el canal
+  Android.
+- Pending interactive setup: **Supabase** project + `app/.env`. See `PROJECT-STATUS.md`.
