@@ -143,6 +143,54 @@ decide si el producto sirve, la marca sólo cuál de los que sirven. Separados, 
 el tipo aunque la marca no se lea (y al revés) en vez de perder los dos por un campo que el modelo
 no pudo completar entero. La frase hablada queda "arroz Saman, Blue Patna 1 kg".
 
+## Actualización 2026-09-01 — cae la gratuidad como restricción, y el selector pasa a cinco modelos
+
+**Qué cambia.** La decisión original ponía como restricción dura que el modelo fuera **gratuito**,
+y eso, en la práctica, dejaba el selector reducido a Gemini. Se levanta: el proyecto **paga** para
+poder comparar los modelos más rápidos del mercado, que es exactamente lo que la tesis necesita
+medir. Lo que **no** cambia es la gratuidad **para el usuario final**: pedirle credenciales propias
+a una persona ciega sigue descartado, y por eso la clave pasa a vivir en un proxy propio
+([ADR 0008](0008-proxy-propio-para-claves-de-nube.md)), que es lo que cierra el pendiente (b) de la
+actualización del 30/08.
+
+**Los cinco modelos, elegidos por latencia.** El criterio no cambió desde la medición del 30/08: el
+usuario está parado frente a la góndola, y un modelo que tarda medio minuto en decir "arroz Saman"
+no es una opción aunque acierte.
+
+| # | Proveedor | Modelo | Por qué |
+|---|---|---|---|
+| 1 | Google | `gemini-3.5-flash-lite` | El default. 2-3 s medidos contra la API real, acierto pleno en las corridas del 30/08, y tier gratuito. |
+| 2 | OpenAI | `gpt-5.6-luna` | El escalón más chico y barato de la familia vigente (≈USD 0,20/1,20 por MTok), con visión, structured outputs y streaming. La comparación obvia contra Gemini. |
+| 3 | Anthropic | `claude-haiku-4-5` | Ya estaba en el registro esperando clave. Tercera familia, para que la comparación no sea entre dos. |
+| 4 | Groq | `qwen/qwen3.6-27b` | El caso interesante del experimento: no es otro modelo grande sino **otro tipo de hardware** (LPU, 500+ tok/s). Si un modelo abierto de 27B sobre silicio dedicado le gana en latencia a los propietarios, eso es un resultado que la tesis quiere reportar. ⚠️ Groq lo sirve como *preview*: hay que medirlo antes de darlo por bueno. |
+| 5 | Arnaldo Castro | Gemma / Qwen-VL sobre vLLM | **Sólo documentado**, sin implementar: no hay endpoint todavía. Ver [ADR 0008](0008-proxy-propio-para-claves-de-nube.md). |
+
+**Un solo módulo cubre tres de los cinco.** OpenAI, Groq y un vLLM propio hablan el mismo dialecto
+(`/v1/chat/completions`, `response_format: {type: 'json_schema'}`, deltas en
+`choices[0].delta.content`). Se escribe un `providers/openaiCompatible.ts` parametrizado por base
+URL, en vez de tres proveedores casi idénticos.
+
+**Qué sale del selector, y por qué.** El registro tenía además `gemini-flash-lite-latest` (el alias
+que Google mueve solo) y `claude-opus-5` (como techo de precisión). Con los cinco de arriba el
+selector quedaría en siete opciones, y **un `radiogroup` de siete recorrido con VoiceOver frente a
+una góndola es peor producto que uno de cinco**: cada opción de más es un swipe más entre la
+persona y la lectura. La accesibilidad es el criterio de diseño, también cuando el que sobra es un
+control técnicamente útil. Si en algún momento hace falta el techo de precisión para el informe,
+`claude-opus-5` vuelve con una línea — pero al banco de pruebas, no al selector del usuario.
+
+**La entrada del flujo, mientras no haya hardware.** El diagrama acordado
+([`documents/logicas-casos-de-uso.pdf`](../../../documents/logicas-casos-de-uso.pdf), transcrito en
+[`docs/architecture/README.md`](../README.md#flujos-por-caso-de-uso)) pone la captura en la placa
+del dispositivo. Como el hardware no existe, **la cámara del teléfono ocupa ese lugar**: la app saca
+la foto y el resto del flujo es idéntico. Hasta ahora la app abría la **fototeca**, que servía para
+probar pero no era el flujo; la fototeca queda igual como segunda acción, porque es lo que permite
+pasarle **la misma foto** a los cinco modelos y que la comparación mida modelos y no fotos.
+
+**El camino de ómnibus queda en stand by.** Los dos casos del diagrama (modelo parcial o completo
+sobre la Raspi) quedan dibujados y versionados, sin implementar: elegir entre ellos exige tener el
+hardware para medirlos, y hasta entonces la app sostiene el camino local (OCR sobre la foto) que
+los dos comparten.
+
 ## Implicaciones para el código actual
 
 - El lector de Inicio (`app/src/features/reader/`) implementa los dos modos; los modos del producto

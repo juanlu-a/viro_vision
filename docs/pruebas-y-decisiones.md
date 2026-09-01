@@ -53,7 +53,7 @@ Esto redefine el rol de la TPU: de "correr los modelos completos" a **preprocesa
 de bondis**. El riesgo técnico principal es que el rendimiento de la detección sobre la Coral TPU
 de la RPi Zero 2 W todavía no está medido — el spike midió el teléfono.
 
-## Decisión 2 — Supermercado: LLM con visión, elección PENDIENTE ([ADR 0006](architecture/adr/0006-pipelines-por-caso-de-uso.md))
+## Decisión 2 — Supermercado: LLM con visión en la nube, modelo elegible ([ADR 0006](architecture/adr/0006-pipelines-por-caso-de-uso.md))
 
 **La complejidad manda**: distinguir productos de canasta básica es una tarea donde un LLM con
 visión aporta de verdad, y el usuario quieto en la góndola tolera una latencia que la parada de
@@ -68,9 +68,22 @@ visión aporta de verdad, y el usuario quieto en la góndola tolera una latencia
 | Gratuidad | ✅ Gratis siempre | ⚠️ Tier gratuito con cuota (20 req/min por modelo) |
 
 **Restricción dura: gratuito para el usuario.** Exigirle una cuenta y credenciales propias rompe
-la accesibilidad que es la razón de ser del producto. Lo que destraba la decisión: medir Gemma 3
-1B **con visión** sobre productos reales, y resolver cómo un build distribuible usa la nube sin
-credenciales del usuario. Si gana la nube, lo local queda de fallback (ADR 0001).
+la accesibilidad que es la razón de ser del producto.
+
+**Resuelto el 2026-08-30: gana la nube.** La comparación de arriba quedó decidida a favor de la
+columna derecha, con una excepción explícita y acotada a la restricción 2 de ADR 0001: hoy el modo
+supermercado **no tiene fallback local**, y sin internet o sin clave **avisa** en vez de leer. Lo
+local sigue siendo el objetivo —medir Gemma 3 1B con visión sobre productos reales es lo que cierra
+la excepción— pero dejó de bloquear el desarrollo del modo.
+
+**Ampliado el 2026-09-01: cinco modelos, y la clave sale del bundle.** La gratuidad deja de ser
+restricción *para el proyecto* (se paga para poder comparar) y sigue siéndolo *para el usuario*. El
+selector ofrece cinco modelos elegidos por latencia — `gemini-3.5-flash-lite`, `gpt-5.6-luna`,
+`claude-haiku-4-5`, `qwen/qwen3.6-27b` sobre Groq, y la opción de hostear en Arnaldo Castro, sólo
+documentada. Las claves pasan a un proxy propio en Supabase
+([ADR 0008](architecture/adr/0008-proxy-propio-para-claves-de-nube.md)), que es lo que destraba
+poder pagar sin repartir la tarjeta en cada `.ipa`. **Ésta es la corrida que alimenta el dataset de
+evaluación de abajo**: la misma foto contra los cinco, tiempo y acierto por modelo.
 
 ## Cómo vamos a medir: dataset de evaluación
 
@@ -100,14 +113,15 @@ vuelve a esperando. El diagrama de estados canónico está en
 |---|---|
 | Lo local primero, nube solo como acelerador | [ADR 0001](architecture/adr/0001-offline-first-on-device-inference.md) (enmendado 2026-08-10) |
 | El runtime único deja de existir; LiteRT-LM deja de ser el camino | [ADR 0004](architecture/adr/0004-on-device-inference-runtime.md) (actualizaciones 2026-08-13 y 2026-08-22) |
-| Bondis local con TPU preprocesadora; supermercado LLM (pendiente); dataset de evaluación | [ADR 0006](architecture/adr/0006-pipelines-por-caso-de-uso.md) |
+| Bondis local con TPU preprocesadora; supermercado LLM en la nube con modelo elegible; dataset de evaluación | [ADR 0006](architecture/adr/0006-pipelines-por-caso-de-uso.md) (actualizaciones 2026-08-30 y 2026-09-01) |
+| Las claves de nube salen del bundle a un proxy propio en Supabase | [ADR 0008](architecture/adr/0008-proxy-propio-para-claves-de-nube.md) |
 | Botones físicos y modos de operación | [ADR 0007](architecture/adr/0007-botones-fisicos-modos-de-operacion.md) |
 
 ## Pendientes
 
-- Supermercado: decidido nube (2026-08-30, ADR 0006 actualización) con selector de modelo; queda
-  medir Gemma 3 1B con visión sobre productos reales como **fallback local**, y resolver el despliegue
-  de la clave en un build distribuible.
+- Supermercado: **fallback local** sin resolver — queda medir Gemma 3 1B con visión sobre productos
+  reales. Es lo único que cierra la excepción a ADR 0001. (El despliegue de la clave dejó de ser un
+  pendiente el 2026-09-01: lo resuelve el proxy de ADR 0008.)
 - Validar ADR 0006 y 0007 con el tutor (todo está en Proposed).
 - Armar el dataset de evaluación (captura, etiquetado esperado/obtenido) para ambos casos.
 - Elegir el detector concreto para la TPU (`rfdetr-nano` / `yolo26` / YOLO11-nano) y medirlo sobre
