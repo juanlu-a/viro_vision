@@ -529,6 +529,37 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - ADR 0006 lleva una actualización *bis* con la medición y el cambio de default; el índice de
   decisiones de la skill quedó alineado. 138 tests en 11 suites, lint y typecheck en verde.
 
+## 2026-08-31 → 2026-09-01 — el link público quedó vivo (y el fantasma del build 1)
+
+Sesión de operaciones sobre TestFlight, casi toda desde monitores en background:
+
+- **El link público está VIVO.** El release del PR #44 (build 202608312029) pasó Beta App Review el
+  2026-08-31: lo envió el propio workflow de `main`, como estaba diseñado. Cualquiera con
+  <https://testflight.apple.com/join/jbE7GDqV> instala el release. Con esto el flujo quedó probado
+  punta a punta: merge a `staging` → grupo interno en minutos; PR `staging → main` → revisión →
+  link público.
+- **El fantasma del build 1.** El build 1 (el primero, el del build number roto) fue expirado en
+  App Store Connect con su Beta App Review pendiente. Eso canceló la revisión, pero el slot de "un
+  build por versión en revisión" quedó ocupado por un fantasma durante horas: la API de lectura
+  mostraba **cero** submissions en toda la app mientras `POST /v1/betaAppReviewSubmissions`
+  respondía `ANOTHER_BUILD_IN_REVIEW`; dos reenvíos del release anterior (202608301933) llegaron a
+  verse `WAITING_FOR_REVIEW` y se evaporaron. Moraleja doble, ahora en `dev-build-ios.md`: no
+  expirar un build con revisión pendiente, y consultar el estado **por build**
+  (`GET /v1/builds/{id}/betaAppReviewSubmission`) porque el listado con `include` miente mientras
+  el backend de Apple converge.
+- Quedó una submission `WAITING_FOR_REVIEW` huérfana sobre el build viejo 202608301933: la creó el
+  monitor de reintento cuando el slot se liberó, antes de enterarse de que el release nuevo ya
+  estaba aprobado. Es inocua; si molesta en ASC, se expira ese build (ya superado).
+- **TCC, cuarta vez** (18/07, 10/08, 21/08 y ahora): macOS revocó el acceso a `~/Documents` a mitad
+  de sesión. Mismo fix de siempre: Full Disk Access + reiniciar la sesión. Mientras tanto se
+  trabajó igual: el cierre anterior se escribió vía la API de GitHub y los monitores corrieron
+  desde un tmp con `asc.mjs` bajado del repo (es público y no tiene dependencias).
+- **Ciclo de la knowledgebase, ahora explícito en `CLAUDE.md`** (pedido del usuario para no repetir
+  contexto entre sesiones): al abrir, invocar la skill `virovision`; al cerrar cada sesión o
+  ticket, actualizar SESSION-LOG (siempre), PROJECT-STATUS (si cambió el estado), la skill (si
+  cambió cómo se trabaja) y ADRs (si hubo decisión). También quedó escrito que el grupo interno de
+  TestFlight no tiene link compartible (convenciones + PROJECT-STATUS).
+
 ## Open threads / next
 - **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales para
   cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30); resolver el despliegue de la clave en un
@@ -538,9 +569,6 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
   abierto del camino de bondis).
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
-- **Beta App Review del build 1 (oficial)**: `WAITING_FOR_REVIEW` desde el 2026-08-29; al aprobar,
-  el link público queda vivo y hay que enviar a revisión los builds que esperan (o lo hace el
-  próximo run).
 - **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; después: crear
   la app (package `com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`),
   `PLAY_ENABLED=true` y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).

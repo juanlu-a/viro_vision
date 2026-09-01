@@ -112,10 +112,12 @@ opcional — la distribución real va por TestFlight desde Xcode.
 2. **Supabase** (see `docs/supabase.md`): create project → enable **Email** auth → (optional) turn off
    email confirmation for testing → fill `app/.env`. No Google Cloud / OAuth needed.
 3. **Apple Developer Program — listo (2026-08, cuenta Individual del Apple ID del proyecto).**
-   **TestFlight funcionando**: app creada en App Store Connect, API key, primer build subido el
-   2026-08-29 y en Beta App Review. Desde 2026-08-30 hay **dos ramas**: `staging` → grupo interno
-   *Equipo ViroVision* (devs, sin revisión, minutos); `main` → grupo externo *Testers ViroVision*
-   con link público. Una sola app. Flujo en [`dev-build-ios.md`](dev-build-ios.md).
+   **TestFlight funcionando punta a punta (2026-08-31)**: `staging` → grupo interno *Equipo
+   ViroVision* (devs, sin revisión, llega en minutos); PR `staging → main` (= release) → grupo
+   externo *Testers ViroVision*. La Beta App Review del release del PR #44 fue **aprobada** y el
+   **link público está vivo**: <https://testflight.apple.com/join/jbE7GDqV> (el grupo interno no
+   tiene link: sus testers son usuarios de App Store Connect). Una sola app. Flujo en
+   [`dev-build-ios.md`](dev-build-ios.md).
 4. **Android / Google Play — en curso (2026-08-30)**: upload key generada, scripts y workflow
    listos y gateados con `PLAY_ENABLED`. Falta la cuenta de Google Play Console (USD 25),
    crear la app, la service account y la primera subida manual. Ver

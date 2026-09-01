@@ -4,8 +4,8 @@ App de asistencia para personas ciegas o con baja visión (tesis, Montevideo 202
 líneas de ómnibus y productos de supermercado y lo dice en voz alta. Tres pilares: `app/`
 (React Native/Expo), `hardware/` (RPi + Coral TPU), `ml/` (detección/OCR/datasets).
 
-**Antes de trabajar, invocá la skill `virovision`** (SKILL.md + `references/convenciones.md`):
-ahí viven el contexto completo, las decisiones (ADRs) y las convenciones. Para cualquier cosa
+**Lo primero al abrir una sesión en este proyecto, siempre: invocá la skill `virovision`**
+(SKILL.md + `references/convenciones.md`): ahí viven el contexto completo, las decisiones (ADRs) y las convenciones. Para cualquier cosa
 visual, la skill `virovision-marca`. Esto no es opcional: la base tiene reglas que no se deducen
 del código.
 
@@ -21,4 +21,7 @@ Reglas duras que aplican desde el primer minuto:
 - **La accesibilidad es EL criterio de diseño**, no una capa: la voz es la interfaz. Offline-first:
   el modo ómnibus (OCR local) tiene que funcionar sin internet (ADR 0001/0006).
 - Verificación mínima antes de un PR: `cd app && npm run lint && npm run typecheck && npm test`.
-- Al cerrar la sesión, anotá qué se hizo y por qué en `docs/SESSION-LOG.md`.
+- **Al cerrar cada sesión o ticket, actualizá la knowledgebase**: `docs/SESSION-LOG.md` siempre
+  (qué se hizo y por qué; los pendientes al final); `docs/PROJECT-STATUS.md` si cambió el estado
+  vigente; la skill `virovision` si cambió cómo se trabaja; un ADR si hubo una decisión. La tabla
+  completa vive en `references/convenciones.md` ("Qué documento actualizar").
