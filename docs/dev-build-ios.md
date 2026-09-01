@@ -135,6 +135,14 @@ la app TestFlight muestra todos los builds a los que uno tiene acceso y se elige
 elija. Apple admite **un solo build por versión en revisión a la vez** (el script lo trata como
 aviso). Un build tarda ~30 min de runner + 5–15 de procesamiento de Apple.
 
+⚠️ **No expirar un build con Beta App Review pendiente.** Cancela la revisión, pero el slot de
+"un build por versión en revisión" queda ocupado por un fantasma durante horas: pasó el 2026-08-31
+con el build 1 — la API de lectura mostraba **cero** submissions en toda la app y
+`POST /v1/betaAppReviewSubmissions` seguía respondiendo `ANOTHER_BUILD_IN_REVIEW`, y dos reenvíos
+llegaron a verse `WAITING_FOR_REVIEW` y se evaporaron. El estado real se consulta **por build**
+(`GET /v1/builds/{id}/betaAppReviewSubmission`); el listado de builds con `include` puede mentir
+mientras el backend de Apple converge.
+
 Se evaluó publicar la β como **app aparte** (`com.virovision.app.beta`, `app.config.js` con
 `APP_VARIANT=beta`) para tener las dos instaladas a la vez, y se descartó: exige otra ficha en App
 Store Connect y otra revisión, a cambio de algo que tres devs no necesitan. Queda reservado.

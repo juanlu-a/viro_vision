@@ -188,7 +188,9 @@ git diff origin/staging <rama-vieja>   # vacío = todo el contenido está en sta
 | *Actions → TestFlight / Google Play → Run workflow* | publicar cualquier rama al destino que se elija |
 
 Cada grupo de TestFlight muestra **un solo build** (el último; el externo conserva además el último
-aprobado). Un build tarda ~30 min de runner + procesamiento de la tienda. Lo que no va a producción
+aprobado). El grupo interno **no tiene link para compartir** (regla de Apple): sus testers son
+usuarios de App Store Connect, se invitan en ASC y TestFlight les avisa solo; el link compartible
+es el del grupo externo, <https://testflight.apple.com/join/jbE7GDqV>. Un build tarda ~30 min de runner + procesamiento de la tienda. Lo que no va a producción
 se **revierte en `staging` con un PR de revert** antes del release.
 
 ## Qué documento actualizar
