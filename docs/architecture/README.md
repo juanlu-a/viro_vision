@@ -7,7 +7,8 @@ System architecture, component and data-flow diagrams, and Architecture Decision
   channel (A2DP/HFP or wired) for the recognition TTS to the device earphone.
 - **Recognition data flow** — per use case since [ADR 0006](adr/0006-pipelines-por-caso-de-uso.md):
   buses = on-device detection (Coral TPU) → banner crop → OCR → announcement; supermarket =
-  vision LLM (local small model or cloud, pending) → announcement.
+  cloud vision LLM chosen by the user → announcement (decided 2026-08-30; the local fallback is
+  still open). Los tres flujos, dibujados, en [Flujos por caso de uso](#flujos-por-caso-de-uso).
 - **ADRs** — see [`adr/`](adr/) for the full index (0001 offline-first, 0002 Supabase,
   0004 on-device runtime, 0006 pipelines por caso de uso, 0007 botones físicos y modos).
   To backfill: RPi Zero 2 W + Coral TPU, React Native (Expo), on-device vs. offload-to-phone.
@@ -31,7 +32,7 @@ stateDiagram-v2
     ModoOmnibus : Modo detección de ómnibus
     ModoOmnibus : detección en TPU → recorte del banner → OCR
     ModoSupermercado : Modo supermercado
-    ModoSupermercado : LLM con visión (local chico o nube, pendiente)
+    ModoSupermercado : LLM con visión en la nube, modelo elegible
 
     ModoOmnibus --> ModoOmnibus : sin click largo
     ModoSupermercado --> ModoSupermercado : sin click largo
@@ -42,3 +43,86 @@ stateDiagram-v2
 
 En reposo el dispositivo está **conectado y esperando**: ni captura ni anuncia. Cada transición de
 modo se anuncia por audio — el usuario no tiene otro indicador de estado.
+
+## Flujos por caso de uso
+
+Transcripción de [`documents/logicas-casos-de-uso.pdf`](../../documents/logicas-casos-de-uso.pdf),
+el diagrama dibujado a mano en el que se acordaron los tres flujos. Están acá en mermaid y no como
+imagen porque así se versionan como texto, se leen en un diff y GitHub los renderiza; el PDF queda
+como registro de la fuente.
+
+En los tres, el **audio siempre sale por el parlante del dispositivo**: el usuario tiene las manos
+libres y no mira el teléfono. Lo que cambia entre casos es **dónde corre cada modelo** y, por lo
+tanto, qué viaja por el enlace.
+
+### Caso ómnibus A — modelo parcial en la Raspi
+
+La TPU hace de **preprocesadora**: detecta el ómnibus y recorta el banner, y por el enlace viaja
+el **recorte**, no el frame entero. El OCR corre en el teléfono.
+
+```mermaid
+flowchart LR
+    subgraph HW["Dispositivo (RPi + Coral TPU)"]
+        direction TB
+        CAM["Cámara"] --> YOLO["Detección<br/>(modelo en la TPU)"]
+        SPK["Parlante"]
+    end
+
+    subgraph PHONE["Smartphone"]
+        direction TB
+        OCR["OCR local"] --> JSON["{ numero: 456,<br/>destino: … }"]
+    end
+
+    YOLO -->|"BLE + WiFi<br/>recorte del banner"| OCR
+    JSON -->|"BLE + WiFi<br/>audio"| SPK
+```
+
+### Caso ómnibus B — modelo completo en la Raspi
+
+Todo en el dispositivo: no hay enlace en el camino de reconocimiento, y el teléfono no participa.
+Es el caso que mejor cumple ADR 0001, y el que más exige del hardware.
+
+```mermaid
+flowchart LR
+    subgraph HW["Dispositivo (RPi + Coral TPU)"]
+        direction LR
+        CAM["Cámara"] --> YOLO["Detección<br/>(modelo en la TPU)"]
+        YOLO --> OCR["OCR"]
+        OCR --> JSON["{ numero: 456,<br/>destino: … }"]
+        JSON --> SPK["Parlante"]
+    end
+```
+
+### Caso supermercado — modelo en la nube
+
+El dispositivo sólo captura y transmite; el reconocimiento lo hace un **LLM con visión** al que
+llama la app. Es el único camino que sale a internet (ADR 0001 enmendado + ADR 0006): el usuario
+está quieto frente a la góndola y tolera latencia a cambio de precisión.
+
+**Mientras no haya hardware, la cámara del teléfono ocupa el lugar de la placa** y el anuncio sale
+por el parlante del teléfono — el resto del flujo es idéntico, y por eso se puede desarrollar y
+evaluar hoy.
+
+```mermaid
+flowchart LR
+    subgraph HW["Dispositivo (RPi)"]
+        direction TB
+        CAM["Cámara"] --> PLACA["Placa<br/>(captura, sin inferencia)"]
+        SPK["Parlante"]
+    end
+
+    subgraph PHONE["Smartphone"]
+        direction TB
+        CALL["Llamada al modelo<br/>elegido en Inicio"] --> JSON["{ tipo: macarrones,<br/>marca: Adria,<br/>detalle: … }"]
+    end
+
+    CLOUD["LLM con visión<br/>en la nube"]
+
+    PLACA -->|"BLE + WiFi<br/>foto"| CALL
+    CALL <-->|"HTTPS"| CLOUD
+    JSON -->|"BLE + WiFi<br/>audio"| SPK
+```
+
+> **Estado (2026-09-01).** El caso supermercado es el que está en desarrollo. Los dos casos de
+> ómnibus quedaron **en stand by**: la app implementa hoy el camino local (OCR sobre la foto) que
+> ambos comparten, y elegir entre A y B depende de tener el hardware para medirlos.
