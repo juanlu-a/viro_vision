@@ -8,6 +8,10 @@
  * precisión. Sin internet o sin clave, supermercado **avisa** y no lee: el fallback local para ese
  * modo sigue pendiente (ADR 0006, actualización 2026-08-30).
  *
+ * La imagen entra por la **cámara del teléfono**, que ocupa el lugar de la placa del dispositivo
+ * mientras no hay hardware. La fototeca queda como segunda fuente para poder pasarle la misma foto
+ * a varios modelos y que la comparación mida modelos y no fotos.
+ *
  * Cuando exista hardware, el modo lo fija el botón físico del dispositivo y esta pantalla sólo lo
  * refleja (ADR 0007); mientras tanto los botones de la app aplican los MISMOS gestos a la misma
  * máquina de estados (`modes.ts`).
@@ -15,7 +19,6 @@
  * Cada transición de modo y cada resultado se **anuncian por voz**: es una app para personas que
  * no ven la pantalla, y el texto en pantalla es el registro, no la interfaz.
  */
-import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { announce } from '@/features/audio/announcer';
@@ -25,6 +28,13 @@ import { transicionar } from '@/features/reader/modes';
 import type { Gesto, Modo } from '@/features/reader/modes';
 import { useModeloSupermercado } from '@/features/reader/useModeloSupermercado';
 import { strings } from '@/i18n';
+import {
+  CameraPermissionError,
+  ImagenIlegibleError,
+  capturarFoto,
+  prepararParaLaNube,
+} from '@/services/camera';
+import type { FotoCapturada, FuenteDeImagen } from '@/services/camera';
 import { cargarOcr, leerImagen, liberarOcr, ocrCargado } from '@/services/ondevice';
 import {
   VisionNetworkError,
@@ -69,8 +79,18 @@ const inicial: LectorState = {
   modelo: null,
 };
 
-/** Qué le decimos al usuario cuando la nube falla. Por tipo de error, nunca parseando strings. */
-function mensajeDeErrorNube(err: unknown): string {
+/**
+ * Qué le decimos al usuario cuando algo falla. **Por tipo de error, nunca parseando strings** —
+ * y cuando el error trae un dato accionable (cuánto esperar, si el permiso se puede volver a
+ * pedir), se usa: para eso viaja como campo de la clase.
+ */
+function mensajeDeError(err: unknown): string {
+  if (err instanceof CameraPermissionError) {
+    // El consejo cambia según si iOS va a volver a preguntar: decirle "aceptá el permiso" a quien
+    // ya no va a ver el diálogo lo deja esperando un cartel que no aparece.
+    return err.canAskAgain ? t.cameraDenied : t.cameraDeniedForever;
+  }
+  if (err instanceof ImagenIlegibleError) return t.imageUnreadable;
   if (err instanceof VisionNotConfiguredError) return t.cloudNotConfigured;
   if (err instanceof VisionNetworkError) return t.cloudUnavailable;
   if (err instanceof VisionQuotaError) return `${t.quotaExhausted} ${err.retryAfterSeconds} s.`;
@@ -147,9 +167,9 @@ export function useLector() {
    * para ser leído.
    */
   const leerSupermercado = useCallback(
-    async (asset: ImagePicker.ImagePickerAsset) => {
+    async (foto: FotoCapturada) => {
       const model = modelo;
-      if (!model || !asset.base64) {
+      if (!model) {
         announce(t.cloudNotConfigured);
         update({ estado: 'idle', progreso: null, mensaje: t.cloudNotConfigured });
         return;
@@ -157,17 +177,16 @@ export function useLector() {
       update({ estado: 'reading', mensaje: t.reading, progreso: null });
 
       try {
-        const r = await reconocerProducto({
-          model,
-          imageBase64: asset.base64,
-          mediaType: asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg',
-        });
+        // El achique va acá y no en la captura: es el único modo que sube la imagen, y en ómnibus
+        // reescalar sólo le sacaría píxeles al OCR sin ganar nada.
+        const imagen = await prepararParaLaNube(foto);
+        const r = await reconocerProducto({ model, ...imagen });
         const crudo = r.texto || null;
         const dicho = frasearProducto(r.producto, crudo);
         announce(dicho);
         update({ estado: 'idle', producto: r.producto, textoCrudo: crudo, ms: r.ms, modelo: r.model, mensaje: dicho });
       } catch (err) {
-        const mensaje = mensajeDeErrorNube(err);
+        const mensaje = mensajeDeError(err);
         announce(mensaje);
         update({ estado: 'idle', progreso: null, mensaje });
       }
@@ -177,32 +196,39 @@ export function useLector() {
     [modelo, update],
   );
 
-  const leer = useCallback(async () => {
-    const { modo } = ref.current;
-    if (modo === 'esperando') return; // en reposo no se captura ni se anuncia (ADR 0007)
+  const leer = useCallback(
+    async (fuente: FuenteDeImagen) => {
+      const { modo } = ref.current;
+      if (modo === 'esperando') return; // en reposo no se captura ni se anuncia (ADR 0007)
 
-    const foto = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-      // El base64 sólo hace falta si la foto viaja a la nube; pedirlo siempre copia megabytes al
-      // puente JS sin necesidad.
-      base64: modo === 'supermercado',
-    });
-    if (foto.canceled || !foto.assets?.[0]) return;
-    const asset = foto.assets[0];
-
-    try {
-      if (modo === 'omnibus') {
-        await leerOmnibus(asset.uri);
-      } else {
-        await leerSupermercado(asset);
+      let foto: FotoCapturada | null;
+      try {
+        foto = await capturarFoto(fuente);
+      } catch (err) {
+        // El permiso denegado se anuncia con su propio consejo. Sin esto el botón no hace nada
+        // visible y quien no ve la pantalla no tiene forma de saber por qué.
+        const mensaje = mensajeDeError(err);
+        announce(mensaje);
+        update({ estado: 'idle', progreso: null, mensaje });
+        return;
       }
-    } catch (err) {
-      const mensaje = `${t.error}: ${err instanceof Error ? err.message : String(err)}`;
-      announce(t.error);
-      update({ estado: 'idle', progreso: null, mensaje });
-    }
-  }, [leerOmnibus, leerSupermercado, update]);
+      // Cancelar no es un error: no se anuncia ni deja mensaje. El usuario ya sabe que canceló.
+      if (!foto) return;
+
+      try {
+        if (modo === 'omnibus') {
+          await leerOmnibus(foto.uri);
+        } else {
+          await leerSupermercado(foto);
+        }
+      } catch (err) {
+        const mensaje = `${t.error}: ${err instanceof Error ? err.message : String(err)}`;
+        announce(t.error);
+        update({ estado: 'idle', progreso: null, mensaje });
+      }
+    },
+    [leerOmnibus, leerSupermercado, update],
+  );
 
   return { state, aplicarGesto, leer, modelo, modelos, elegirModelo };
 }
