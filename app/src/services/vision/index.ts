@@ -26,6 +26,7 @@ export { reconocerProducto } from './reconocerProducto';
 export type { ReconocimientoProducto } from './reconocerProducto';
 export {
   MODEL_PROFILES,
+  PERFILES_RETIRADOS,
   availableModels,
   defaultModel,
   findModelProfile,

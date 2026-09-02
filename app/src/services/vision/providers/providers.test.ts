@@ -1,10 +1,17 @@
-import { MODEL_PROFILES, findModelProfile } from '../config';
-import { PRODUCTO_PROMPTS, productoSchema } from '../producto';
+import { MODEL_PROFILES, PERFILES_RETIRADOS, findModelProfile } from '../config';
+import { DEFAULT_PRODUCTO_MODEL_ID, PRODUCTO_PROMPTS, productoSchema } from '../producto';
 import type { BuildRequestInput, ModelProfile } from '../types';
 import { anthropicProvider, geminiProvider, getProvider, groqProvider, openaiProvider } from './index';
 
-const gemini = findModelProfile('gemini-3.5-flash-lite');
-const haiku = findModelProfile('claude-haiku-4-5');
+/**
+ * Gemini y Anthropic salieron del selector el 2026-09-02, pero sus módulos de proveedor siguen en
+ * el binario y hay que seguir testeándolos: el día que uno vuelva, vuelve por su perfil, no por
+ * código nuevo. Los perfiles se toman de `PERFILES_RETIRADOS` y no de `findModelProfile`, que a
+ * propósito NO busca ahí — un id retirado tiene que caer al default.
+ */
+const retirado = (id: string) => PERFILES_RETIRADOS.find((p) => p.id === id)!;
+const gemini = retirado('gemini-3.5-flash-lite');
+const haiku = retirado('claude-haiku-4-5');
 /**
  * Perfil sintético, no del registro: `claude-opus-5` salió del selector el 2026-09-01 (ADR 0006),
  * pero las dos ramas de capacidad del proveedor —mandar `effort` y mandar `thinking`— siguen
@@ -12,7 +19,7 @@ const haiku = findModelProfile('claude-haiku-4-5');
  * romperse cada vez que cambia la lista, que es una razón ajena a lo que el test verifica.
  */
 const conThinking: ModelProfile = {
-  ...findModelProfile('claude-haiku-4-5'),
+  ...retirado('claude-haiku-4-5'),
   id: 'modelo-con-thinking',
   supportsEffort: true,
   supportsAdaptiveThinking: true,
@@ -270,18 +277,27 @@ describe('registro de modelos', () => {
     expect(new Set(proveedores).size).toBe(proveedores.length);
   });
 
-  it('el primer modelo del registro es de Gemini — el gratuito y de la familia de Gemma', () => {
-    expect(MODEL_PROFILES[0].provider).toBe('gemini');
+  it('el primero del selector es el default', () => {
+    // Sin preferencia guardada la app usa DEFAULT_PRODUCTO_MODEL_ID, y el selector muestra el
+    // primero como marcado. Si dejaran de coincidir, el usuario vería marcado un modelo distinto
+    // del que efectivamente lee — un estado comunicado mal, que es lo peor que puede pasar en una
+    // interfaz que se recorre a ciegas.
+    expect(MODEL_PROFILES[0].id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
   });
 
-  it('de Gemini sólo hay Flash Lite: los Flash grandes miden 17-47 s por lectura', () => {
-    // Si alguien vuelve a agregar un Flash grande, este test cae y hay que revisar dos cosas: la
-    // latencia (medición del 30/08/2026, ver config.ts) y el piso de thinking_level, que en esos
-    // modelos no es 'minimal' sino 'low' — mandarles 'minimal' es un 400.
-    const gemini = MODEL_PROFILES.filter((profile) => profile.provider === 'gemini');
+  it('ningún perfil retirado sigue en el selector', () => {
+    // Las dos listas son disjuntas por definición. Si alguien devuelve un modelo al selector
+    // copiando su perfil en vez de moverlo, quedan dos fuentes que se desincronizan.
+    const enSelector = new Set(MODEL_PROFILES.map((p) => p.id));
+    for (const retirado of PERFILES_RETIRADOS) expect(enSelector.has(retirado.id)).toBe(false);
+  });
 
-    expect(gemini.length).toBeGreaterThan(0);
-    for (const profile of gemini) expect(profile.id).toContain('lite');
+  it('los perfiles retirados siguen apuntando a un proveedor implementado', () => {
+    // Es lo que hace verdadera la promesa de que volver a ofrecerlos es mover una entrada. Si
+    // alguien borra un módulo de proveedor, este test cae antes que la promesa.
+    for (const perfil of PERFILES_RETIRADOS) {
+      expect(getProvider(perfil.provider).id).toBe(perfil.provider);
+    }
   });
 });
 

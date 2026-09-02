@@ -212,38 +212,56 @@ sobre la Raspi) quedan dibujados y versionados, sin implementar: elegir entre el
 hardware para medirlos, y hasta entonces la app sostiene el camino local (OCR sobre la foto) que
 los dos comparten.
 
-## Actualización 2026-09-02 — verificado contra las APIs reales, y dos cosas salieron al revés
+## Actualización 2026-09-02 — medido contra las APIs reales; el selector queda en dos modelos
 
-Los proveedores nuevos se escribieron contra los docs porque no había claves. Con las claves, se
-midió con **el código de la app** contra las APIs reales. Números completos en
-[`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md); acá lo que cambia decisiones.
+Los proveedores nuevos se habían escrito contra los docs porque no había claves. Con las claves, se
+midió con **el código de la app** contra las APIs reales: cinco corridas espaciadas por modelo,
+mismo prompt y mismo schema. Números, método y limitaciones en
+[`docs/mediciones/2026-09-02-modelos-supermercado.md`](../../mediciones/2026-09-02-modelos-supermercado.md);
+el análisis en [`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md).
 
-**Los tres andan y los tres aciertan** tipo, marca y detalle en todas las corridas. En esta tarea la
-precisión no separa a los modelos: separa la latencia y la cuota.
+**Qué cambia**: el selector pasa a ofrecer **`gpt-5.6-luna` (default) y `qwen/qwen3.8-27b`**.
+`gemini-3.5-flash-lite`, que era el default, sale.
 
-**El orden de latencia no es el que suponía el registro.** Groq ~1 s, OpenAI ~1,7 s, Gemini 3,1-11,2
-s. El default sigue siendo Gemini —es el único gratuito sin tarjeta y con cuota holgada— pero **es
-el más lento de los tres y el más variable**, y eso contradice el criterio con el que se armó el
-selector. Queda como decisión abierta.
+| Modelo | Mediana | Rango | Dispersión | Acierto | Cuota |
+|---|---|---|---|---|---|
+| `qwen/qwen3.8-27b` | 846 ms | 764-1087 ms | 1,4× | 5/5 | ~4 lecturas/min |
+| `gpt-5.6-luna` | 1668 ms | 1410-2490 ms | 1,8× | 5/5 | holgada |
+| `gemini-3.5-flash-lite` | 10 649 ms | 2820-32 586 ms | 11,6× | 5/5 | 20/min |
 
-**El más rápido tiene la cuota más apretada.** El tier gratuito de Groq limita por *tokens* por
-minuto (8000 TPM) y una foto cuesta ~1974 tokens fijos, así que son **~4 lecturas por minuto**.
-Achicar la imagen no lo baja: Groq cobra la imagen a tarifa fija. Para alguien recorriendo una
-góndola eso pesa más que 700 ms.
+**La precisión no separó a los modelos** (15/15 corridas correctas), con la salvedad de que la
+imagen era sintética y de alto contraste. Lo que separa es la latencia y, dentro de ella, **la
+dispersión**: Gemini va de 2,8 a 32,6 s con la cuota fresca. Para quien espera el audio frente a la
+góndola, un modelo que a veces tarda medio minuto es peor que uno que siempre tarda dos.
 
-**Apagar el razonamiento no compra latencia acá.** La justificación estaba extrapolada de Gemini y
-no se sostiene sobre `gpt-5.6-luna`: `none`, `medium` y el default dan lo mismo, con los mismos
-tokens de salida. Se sigue mandando `none` por intención y porque es gratis, no por los segundos.
+Esto **corrige la medición del 30/08**, que dio 2-3 s para Gemini con menos muestras: los extremos
+de ahora la contienen, así que aquella campaña cayó en el extremo bueno. Lección metodológica que
+vale para el resto de la tesis: **cinco corridas y no una, y reportar el rango, no el mejor número**.
 
-**La documentación de Groq no lista sus valores reales**: documenta `reasoning_effort: none |
-default` y `low` devolvió 200.
+**El default no es el más rápido, a propósito.** Groq gana por 800 ms pero su cuota gratuita limita
+por *tokens* por minuto (~4 lecturas), y alguien recorriendo una góndola hace del orden de 2 a 4. Un
+default que choca el límite a la cuarta lectura es peor producto que uno 800 ms más lento. Groq
+queda como segunda opción, que es donde su perfil sirve.
 
-**Y apareció un defecto**: la cuota no siempre llega como evento SSE — Groq la devuelve como HTTP
-429 antes de abrir el stream, y por ese camino la UI decía "la nube no respondió" en vez de "cuota
-agotada, reintentá en N s". Corregido.
+**Qué pasa con la gratuidad.** La restricción de este ADR —gratuito **para el usuario**— se sigue
+cumpliendo: paga el proyecto (mil lecturas cuestan menos de USD 0,50) y el usuario no pone
+credenciales. Lo que ya no hay es un default con tier gratuito; el camino gratis existe y es Groq.
 
-Sigue **sin verificar** el proveedor de Anthropic (`claude-haiku-4-5`): requiere tarjeta y no hay
-clave.
+**Los modelos retirados no se borran.** Viven en `PERFILES_RETIRADOS` con la medición que los
+descartó, y sus proveedores siguen implementados y testeados: volver a ofrecer uno es mover una
+entrada de lista. `gemini-3.5-flash-lite` conserva la mejor cuota de las tres y la peor latencia, así
+que si algún día la cuota pesara más que el tiempo, es el candidato.
+
+**El techo de 1024 px se mantiene, por otro motivo del que estaba escrito.** Se midió: los tokens
+escalan con el tamaño pero la latencia no (a esta escala la dominan el modelo y la red). El techo
+baja el costo a la mitad y el tráfico, no los segundos.
+
+**Tres defectos que sólo aparecieron midiendo**, ninguno con error visible: la cuota de Groq llega
+como HTTP 429 y no como evento SSE (la UI decía "la nube no respondió" en vez de "cuota agotada");
+el tope del limitador para Groq estaba en 25/min cuando su límite es por tokens (~4); y apagar el
+razonamiento no compra latencia fuera de Gemini, donde sí está medido. Todos corregidos.
+
+Sigue **sin verificar** `claude-haiku-4-5`: requiere tarjeta y no hay clave.
 
 ## Implicaciones para el código actual
 

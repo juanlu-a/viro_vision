@@ -108,16 +108,13 @@ Las defensas reales: allowlist de hosts (sin ella es un SSRF que regala la clave
 
 ## Decisiones sin ADR, pero vigentes
 
-**Gemini es el default, pero ya no el único.** Desde el 2026-09-01 el selector ofrece cinco modelos
-de proveedores distintos (ver ADR 0006). Gemini sigue de default por ser el único con tier gratuito
-sin tarjeta, y el modelo es `gemini-3.5-flash-lite`: medido contra la API real (30/08/2026) responde
-en 2-3 s contra 17-47 s de los Flash grandes, con el mismo acierto — la latencia manda también en
-supermercado. Ojo al re-medir: sostener pedidos satura el tier gratuito y todo salta a 20-80 s; hay
-que espaciar las corridas.
+**Ojo al medir cualquier cosa contra estas APIs: hay que espaciar las corridas.** Sostener pedidos
+satura el tier gratuito de Gemini y manda cualquier modelo a decenas de segundos, y el de Groq
+limita por tokens por minuto. Sin espaciar, la medición mide la cuota y no el modelo.
 
 **Un modelo por proveedor, y el selector no crece.** Cada opción de más en un radiogroup recorrido
-con VoiceOver es un swipe más entre la persona y la lectura. Hay un test que **falla** si alguien
-agrega dos modelos del mismo proveedor: la decisión hay que rediscutirla, no ajustarla.
+con VoiceOver es un swipe más entre la persona y la lectura. Hay tests que **fallan** si alguien
+agrega dos modelos del mismo proveedor o devuelve un perfil retirado copiándolo en vez de moverlo.
 
 **El razonamiento se apaga siempre, pero sólo en Gemini eso compra latencia.** Medido el
 2026-09-02: en Gemini no apagarlo lleva la lectura de 3 s a decenas de segundos
@@ -128,10 +125,23 @@ campos cortos. Se manda `'none'` igual por intención y porque es gratis, no por
 no lista sus valores reales**: documenta `none|default` y `low` devolvió 200 — otra razón para
 verificar contra la API y no contra los docs.
 
-**Medición del 2026-09-02** (misma foto, mismo prompt, corridas espaciadas): Groq ~1 s, OpenAI
-~1,7 s, Gemini 3,1-11,2 s. Los tres aciertan tipo, marca y detalle. Gemini sigue de default por
-gratuidad y cuota holgada, pero **es el más lento y el más variable**, lo que contradice el criterio
-con el que se armó el selector — decisión abierta.
+**El selector son DOS modelos, y el default no es el más rápido.** Medido el 2026-09-02 (5 corridas
+espaciadas, código de la app contra las APIs reales): `qwen/qwen3.8-27b` mediana 846 ms,
+`gpt-5.6-luna` 1668 ms, `gemini-3.5-flash-lite` 10 649 ms con rango 2820-32 586 ms. **La precisión no
+separó a los modelos** (15/15 correctas); separa la latencia y sobre todo la **dispersión**. Gemini
+salió del selector por eso. El default es Luna y no Groq porque la cuota gratuita de Groq limita por
+*tokens* por minuto (~4 lecturas) y alguien recorriendo una góndola hace 2-4: un default que choca
+el límite a la cuarta lectura es peor que uno 800 ms más lento. Ver
+`docs/mediciones/2026-09-02-modelos-supermercado.md`.
+
+**Los modelos retirados viven en `PERFILES_RETIRADOS`, no se borran.** Con la medición que los
+descartó, y con sus proveedores implementados y testeados: volver a ofrecer uno es mover una entrada
+de lista, no reescribir código.
+
+**Cinco corridas y no una, y se reporta el rango.** La medición del 30/08 dio 2-3 s para Gemini; la
+del 02/09, con más muestras, dio 2820-32 586 ms. Los extremos contienen aquel número: la campaña
+vieja cayó en el extremo bueno y se reportó como si fuera el comportamiento. Aplica a todo lo que se
+mida en esta tesis.
 
 **De Groq va el Qwen 3.8 y no el 3.6, aunque el 3.6 sea más rápido en el papel.** El 3.6 sólo admite
 `json_object`, que deja los nombres de campo a criterio del modelo; el 3.8 admite `json_schema` con

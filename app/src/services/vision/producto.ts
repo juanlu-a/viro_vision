@@ -67,13 +67,20 @@ export function parseProductoLeido(text: string): ProductoLeido | null {
 }
 
 /**
- * Flash Lite y no Flash: contra la API real el Lite responde en 2-3 s y el Flash entre 17 y 47 s,
- * con el mismo acierto de tipo, marca y detalle (medición del 30/08/2026 y sus reservas, en
- * `config.ts`). La latencia manda también en supermercado — antes el default era
- * `gemini-3.6-flash`, el más lento de todos los medidos. Es el default cuando el usuario no eligió
- * nada; con la clave de Gemini presente siempre está disponible.
+ * El default cuando el usuario no eligió nada.
+ *
+ * No es el más rápido de los medidos —lo es `qwen/qwen3.8-27b`, casi el doble— sino **el más rápido
+ * que aguanta un recorrido de góndola**: la cuota gratuita de Groq son ~4 lecturas por minuto y
+ * alguien eligiendo productos hace del orden de 2 a 4. Un default que choca el límite a la cuarta
+ * lectura es peor producto que uno 800 ms más lento.
+ *
+ * Antes era `gemini-3.5-flash-lite`. Cambió el 2026-09-02 con la medición contra las APIs reales:
+ * Gemini dio mediana 10 649 ms con un rango de 2820 a 32 586 ms, y lo que descarta no es la mediana
+ * sino la dispersión — para quien espera el audio, un modelo que a veces tarda medio minuto es peor
+ * que uno que siempre tarda menos de dos segundos. Ver
+ * `docs/mediciones/2026-09-02-modelos-supermercado.md`.
  */
-export const DEFAULT_PRODUCTO_MODEL_ID = 'gemini-3.5-flash-lite';
+export const DEFAULT_PRODUCTO_MODEL_ID = 'gpt-5.6-luna';
 
 /** El default resuelto contra el registro, para no repetir el `find` en cada consumidor. */
 export const PRODUCTO_MODEL: ModelProfile =

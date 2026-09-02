@@ -85,57 +85,89 @@ documentada. Las claves pasan a un proxy propio en Supabase
 poder pagar sin repartir la tarjeta en cada `.ipa`. **Ésta es la corrida que alimenta el dataset de
 evaluación de abajo**: la misma foto contra los cinco, tiempo y acierto por modelo.
 
-### Medición contra las APIs reales (2026-09-02)
+### Qué modelo corre, y por qué (medición del 2026-09-02)
 
-Primera corrida de los tres proveedores configurados contra la API real, con **el código de la app**
-(no una réplica): una foto sintética de un paquete de arroz Saman, 768×1024, el mismo prompt y el
-mismo schema para todos. Tres corridas espaciadas 9 s por modelo.
+Números completos, método y limitaciones en
+[`mediciones/2026-09-02-modelos-supermercado.md`](mediciones/2026-09-02-modelos-supermercado.md).
+Acá va lo que decide.
 
-| Modelo | Corrida 1 | Corrida 2 | Corrida 3 | Acierto |
-|---|---|---|---|---|
-| `gemini-3.5-flash-lite` | 7623 ms | 11 182 ms | 3131 ms | 3/3 campos, 3/3 corridas |
-| `gpt-5.6-luna` | 2097 ms | 1537 ms | 1729 ms | 3/3 campos, 3/3 corridas |
-| `qwen/qwen3.8-27b` (Groq) | 946 ms | 1034 ms | **429 cuota** | 3/3 campos, 2/2 corridas |
+Se midieron los tres proveedores con clave **contra sus APIs reales y con el código de la app**,
+cinco corridas espaciadas por modelo, mismo prompt y mismo schema.
 
-**Los tres aciertan tipo, marca y detalle.** La precisión no separa a estos modelos en esta tarea;
-lo que los separa es la latencia y la cuota.
+| Modelo | Mediana | Rango | Dispersión | Acierto | Cuota | Costo |
+|---|---|---|---|---|---|---|
+| `qwen/qwen3.8-27b` (Groq) | **846 ms** | 764-1087 ms | 1,4× | 5/5 | **~4 lecturas/min** | gratis |
+| `gpt-5.6-luna` (OpenAI) | 1668 ms | 1410-2490 ms | 1,8× | 5/5 | holgada | USD 0,0003 |
+| `gemini-3.5-flash-lite` | 10 649 ms | 2820-32 586 ms | **11,6×** | 5/5 | 20/min | gratis |
 
-**Groq es el más rápido, y por lejos** — ~1 s contra 1,7 s de OpenAI y 3-11 s de Gemini. La
-hipótesis de meter "otro hardware" en la comparación en vez de otro modelo grande (las LPU) dio
-resultado y es reportable.
+**La precisión no separó a los modelos: 15/15 corridas correctas en los tres campos.** Con la
+salvedad de que la imagen es sintética y de alto contraste — el mejor caso posible. Lo que muestra
+es que ninguno falla en lo fácil, no que sean equivalentes en lo difícil.
 
-**Gemini resultó mucho más variable de lo medido el 30/08** (3,1 a 11,2 s, con la cuota fresca y
-corridas espaciadas), cuando aquella medición había dado 2-3 s. La diferencia no está explicada: la
-foto de ahora es sintética y más grande. Hay que re-medirla con fotos reales antes de sacar
-conclusiones para el informe.
+**Lo que separa es la latencia, y dentro de la latencia, la dispersión.** Gemini tiene una mediana
+6,4 veces peor que OpenAI y, sobre todo, un rango que va de 2,8 a 32,6 segundos con la cuota fresca
+y las corridas espaciadas. Para una persona parada frente a la góndola esperando escuchar qué
+agarró, un modelo que a veces tarda medio minuto es peor que uno que siempre tarda dos segundos.
 
-**El más rápido tiene la cuota más apretada, y eso es un resultado en sí.** El tier gratuito de Groq
-limita por **tokens** por minuto, no por requests: 8000 TPM, y una foto cuesta ~1974 tokens de
-entrada — Groq cobra la imagen a tarifa fija, así que achicarla no lo baja. Son **~4 lecturas por
-minuto**, y la tercera seguida ya devolvió 429. Gemini tolera 20/min. Para alguien recorriendo una
-góndola eso importa más que 700 ms de diferencia.
+Esto **corrige la medición del 30/08**, que había dado 2-3 s para Gemini con menos muestras: los dos
+extremos de ahora contienen aquel número, así que lo más probable es que aquella campaña haya caído
+en el extremo bueno. Es la lección metodológica: **cinco corridas y no una, y reportar el rango**.
 
-**Costo de OpenAI**: 1138 tokens de entrada + 35 de salida por lectura ≈ **USD 0,0003**. Mil
-lecturas cuestan menos de USD 0,50.
+**Decisión: el selector ofrece `gpt-5.6-luna` (default) y `qwen/qwen3.8-27b`.** Gemini sale.
 
-#### Dos cosas que la medición corrigió, y que estaban escritas al revés
+- **El default no es el más rápido**, y eso es a propósito. Groq gana por 800 ms, pero su cuota
+  gratuita limita por *tokens* por minuto (8000 TPM, ~1974 por foto a tarifa plana) = **unas 4
+  lecturas por minuto**, y alguien recorriendo una góndola hace del orden de 2 a 4. Un default que
+  choca el límite a la cuarta lectura es peor producto que uno 800 ms más lento.
+- **Groq queda como la segunda opción**, que es donde su perfil sirve: la lectura más rápida
+  disponible, gratis, para quien haga lecturas espaciadas o quiera evitar el costo.
+- **El costo del default es despreciable a la escala de la tesis**: mil lecturas cuestan menos de
+  USD 0,50. La restricción de ADR 0006 —gratuito **para el usuario**— se sigue cumpliendo: paga el
+  proyecto, y el usuario no pone credenciales.
+- **Son dos y no más** porque el selector se recorre con VoiceOver y cada opción de más es un swipe
+  entre la persona y la lectura.
+- Los perfiles retirados viven en `PERFILES_RETIRADOS` y sus proveedores siguen implementados y
+  testeados: volver a ofrecer uno es mover una entrada, no escribir código.
 
-1. **Apagar el razonamiento no compra latencia en estos modelos.** El código lo justificaba
-   extrapolando de Gemini, donde no apagarlo lleva la lectura de 3 s a decenas de segundos. Sobre
-   `gpt-5.6-luna` no pasa: `none` da 1,5-2,1 s, `medium` da 1,5 s, y no mandar nada (default
-   `medium`) da 2,0 s — con los mismos 35 tokens de salida en los tres casos. Se sigue mandando
-   `none` porque es la intención correcta y es gratis, pero la justificación era falsa.
-2. **La documentación de Groq no lista sus valores reales.** Documenta `reasoning_effort:
-   none | default`; `low` respondió **200**.
+### El techo de resolución: correcto, pero por otro motivo del que estaba escrito
 
-#### Un defecto encontrado midiendo
+La app achica la foto a 1024 px de lado mayor antes de subirla, y el código lo justificaba por
+latencia. Se midió sobre `gpt-5.6-luna` con cuatro tamaños:
 
-La cuota **no siempre llega como evento SSE**. Groq devuelve **HTTP 429 con cuerpo JSON** antes de
-abrir el stream, y por ese camino la app lanzaba `VisionHttpError`, que la UI no distingue: el
-usuario escuchaba "La nube no respondió" en vez de "Cuota agotada, reintentá en N s" — con el dato
-de cuánto esperar llegando en el cuerpo y nadie leyéndolo. Es el mismo tipo de bug que los errores
-tipados de esta base existen para evitar, repetido en otro camino. Corregido con
-`services/vision/httpError.ts`.
+| Lado mayor | Tokens de entrada | Mediana | Acierto |
+|---|---|---|---|
+| 1536 px | 2290 | 1331 ms | 3/3 |
+| **1024 px** | **1138** | 1532 ms | 3/3 |
+| 640 px | 577 | 1984 ms | 3/3 |
+| 384 px | 346 | 1121 ms | 3/3 |
+
+**Los tokens escalan con el tamaño; la latencia, no.** Los tokens se duplican a cada escalón, pero
+las medianas no ordenan — 640 px salió más lento que 1536 px. A esta escala la latencia la domina el
+modelo y la red, y el ruido entre corridas (±800 ms) tapa cualquier diferencia. El techo se mantiene
+porque **baja el costo a la mitad** y el tráfico en una conexión de supermercado, no porque compre
+segundos.
+
+El acierto se sostiene hasta 384 px, pero sobre una imagen sintética con texto de 90 px de alto.
+Una góndola real tiene el peso neto en cuerpo 8 y reflejo en el envase — y el objetivo opcional de
+OCR de etiqueta vive justamente en esa letra chica. Bajar el techo exige medirlo con fotos reales.
+
+### Tres defectos que sólo aparecieron midiendo contra la API real
+
+Ninguno daba error visible, que es por qué importan.
+
+1. **La cuota no siempre llega como evento SSE.** Groq la devuelve como **HTTP 429** antes de abrir
+   el stream, y por ese camino la app lanzaba `VisionHttpError`: el usuario escuchaba "La nube no
+   respondió" en vez de "Cuota agotada, reintentá en N s", con el dato de cuánto esperar llegando y
+   nadie leyéndolo.
+2. **El tope del limitador para Groq estaba mal por un orden de magnitud**, y hacia el lado
+   peligroso: 25/min, el número de un límite por requests que ese proveedor no tiene. Nunca frenaba.
+3. **Apagar el razonamiento no compra latencia fuera de Gemini.** Estaba justificado por
+   extrapolación; sobre `gpt-5.6-luna` da lo mismo `none`, `medium` o no mandar nada, con idénticos
+   tokens de salida.
+
+Y la documentación de Groq no lista sus valores reales: documenta `reasoning_effort: none | default`
+y `low` respondió 200. Es el argumento de esta base para verificar contra la API y no contra los
+docs, ahora con un tercer caso.
 
 ## Cómo vamos a medir: dataset de evaluación
 
