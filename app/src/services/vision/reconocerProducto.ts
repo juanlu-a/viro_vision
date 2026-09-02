@@ -24,7 +24,7 @@ import {
 import { buildProductoRequest, parseProductoLeido, PRODUCTO_MODEL } from './producto';
 import type { ProductoLeido } from './producto';
 import { getProvider } from './providers';
-import { acquireSlot } from './rateLimiter';
+import { acquireSlot, limitePorMinuto } from './rateLimiter';
 import { readSseStream } from './sse';
 import type { ModelProfile } from './types';
 
@@ -45,6 +45,8 @@ export async function reconocerProducto(options: {
   mediaType: 'image/jpeg' | 'image/png';
   /** Por defecto, el modelo default de producto. Lo fija el selector de Inicio. */
   model?: ModelProfile;
+  /** Se llama si hay que esperar cupo, con los milisegundos estimados, para poder anunciarlo. */
+  onWait?: (waitMs: number) => void;
   signal?: AbortSignal;
 }): Promise<ReconocimientoProducto> {
   const model = options.model ?? PRODUCTO_MODEL;
@@ -59,9 +61,16 @@ export async function reconocerProducto(options: {
   });
   const payloadJson = JSON.stringify(request.body);
 
-  // La cuota se respeta ANTES de enviar: el tier gratuito es la restricción dura de gratuidad de
-  // ADR 0006, y agotarlo frena el modo entero.
-  await acquireSlot(model.id, { signal: options.signal });
+  // La cuota se respeta ANTES de enviar: agotarla frena el modo entero. El tope es el del
+  // proveedor del modelo elegido, no uno global — ver `limitePorMinuto`.
+  //
+  // `onWait` existe para que la espera se pueda anunciar: quedarse callado mientras la app duerme
+  // hasta un minuto es indistinguible de estar colgada para alguien que no ve la pantalla.
+  await acquireSlot(model.id, {
+    signal: options.signal,
+    maxPerWindow: limitePorMinuto(model.provider),
+    onWait: options.onWait,
+  });
   if (options.signal?.aborted) throw new VisionStreamError('cancelado');
 
   const t0 = performance.now();

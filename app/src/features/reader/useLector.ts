@@ -180,7 +180,18 @@ export function useLector() {
         // El achique va acá y no en la captura: es el único modo que sube la imagen, y en ómnibus
         // reescalar sólo le sacaría píxeles al OCR sin ganar nada.
         const imagen = await prepararParaLaNube(foto);
-        const r = await reconocerProducto({ model, ...imagen });
+        const r = await reconocerProducto({
+          model,
+          ...imagen,
+          // La espera por cuota se anuncia. El limitador ya la manejaba, pero en silencio: para
+          // quien no ve la pantalla, una app que duerme hasta un minuto es indistinguible de una
+          // app colgada. El callback existía desde el principio y no lo llamaba nadie.
+          onWait: (waitMs) => {
+            const aviso = `${t.waitingSlot} ${Math.ceil(waitMs / 1000)} s.`;
+            announce(aviso);
+            update({ mensaje: aviso });
+          },
+        });
         const crudo = r.texto || null;
         const dicho = frasearProducto(r.producto, crudo);
         announce(dicho);
