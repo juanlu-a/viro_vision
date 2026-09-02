@@ -85,6 +85,58 @@ documentada. Las claves pasan a un proxy propio en Supabase
 poder pagar sin repartir la tarjeta en cada `.ipa`. **Ésta es la corrida que alimenta el dataset de
 evaluación de abajo**: la misma foto contra los cinco, tiempo y acierto por modelo.
 
+### Medición contra las APIs reales (2026-09-02)
+
+Primera corrida de los tres proveedores configurados contra la API real, con **el código de la app**
+(no una réplica): una foto sintética de un paquete de arroz Saman, 768×1024, el mismo prompt y el
+mismo schema para todos. Tres corridas espaciadas 9 s por modelo.
+
+| Modelo | Corrida 1 | Corrida 2 | Corrida 3 | Acierto |
+|---|---|---|---|---|
+| `gemini-3.5-flash-lite` | 7623 ms | 11 182 ms | 3131 ms | 3/3 campos, 3/3 corridas |
+| `gpt-5.6-luna` | 2097 ms | 1537 ms | 1729 ms | 3/3 campos, 3/3 corridas |
+| `qwen/qwen3.8-27b` (Groq) | 946 ms | 1034 ms | **429 cuota** | 3/3 campos, 2/2 corridas |
+
+**Los tres aciertan tipo, marca y detalle.** La precisión no separa a estos modelos en esta tarea;
+lo que los separa es la latencia y la cuota.
+
+**Groq es el más rápido, y por lejos** — ~1 s contra 1,7 s de OpenAI y 3-11 s de Gemini. La
+hipótesis de meter "otro hardware" en la comparación en vez de otro modelo grande (las LPU) dio
+resultado y es reportable.
+
+**Gemini resultó mucho más variable de lo medido el 30/08** (3,1 a 11,2 s, con la cuota fresca y
+corridas espaciadas), cuando aquella medición había dado 2-3 s. La diferencia no está explicada: la
+foto de ahora es sintética y más grande. Hay que re-medirla con fotos reales antes de sacar
+conclusiones para el informe.
+
+**El más rápido tiene la cuota más apretada, y eso es un resultado en sí.** El tier gratuito de Groq
+limita por **tokens** por minuto, no por requests: 8000 TPM, y una foto cuesta ~1974 tokens de
+entrada — Groq cobra la imagen a tarifa fija, así que achicarla no lo baja. Son **~4 lecturas por
+minuto**, y la tercera seguida ya devolvió 429. Gemini tolera 20/min. Para alguien recorriendo una
+góndola eso importa más que 700 ms de diferencia.
+
+**Costo de OpenAI**: 1138 tokens de entrada + 35 de salida por lectura ≈ **USD 0,0003**. Mil
+lecturas cuestan menos de USD 0,50.
+
+#### Dos cosas que la medición corrigió, y que estaban escritas al revés
+
+1. **Apagar el razonamiento no compra latencia en estos modelos.** El código lo justificaba
+   extrapolando de Gemini, donde no apagarlo lleva la lectura de 3 s a decenas de segundos. Sobre
+   `gpt-5.6-luna` no pasa: `none` da 1,5-2,1 s, `medium` da 1,5 s, y no mandar nada (default
+   `medium`) da 2,0 s — con los mismos 35 tokens de salida en los tres casos. Se sigue mandando
+   `none` porque es la intención correcta y es gratis, pero la justificación era falsa.
+2. **La documentación de Groq no lista sus valores reales.** Documenta `reasoning_effort:
+   none | default`; `low` respondió **200**.
+
+#### Un defecto encontrado midiendo
+
+La cuota **no siempre llega como evento SSE**. Groq devuelve **HTTP 429 con cuerpo JSON** antes de
+abrir el stream, y por ese camino la app lanzaba `VisionHttpError`, que la UI no distingue: el
+usuario escuchaba "La nube no respondió" en vez de "Cuota agotada, reintentá en N s" — con el dato
+de cuánto esperar llegando en el cuerpo y nadie leyéndolo. Es el mismo tipo de bug que los errores
+tipados de esta base existen para evitar, repetido en otro camino. Corregido con
+`services/vision/httpError.ts`.
+
 ## Cómo vamos a medir: dataset de evaluación
 
 Para ambos casos se genera un **dataset de evaluación** — resultado esperado contra obtenido — y

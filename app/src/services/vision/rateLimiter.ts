@@ -29,7 +29,12 @@ const WINDOW_MS = 60_000;
  */
 const LIMITE_POR_PROVEEDOR: Record<VisionProviderId, number> = {
   gemini: 17, // 20/min por modelo en el tier gratuito, medido el 30/08/2026
-  groq: 25, // ~30/min en el tier gratuito; varía por modelo (console.groq.com/settings/limits)
+  // OJO: el tier gratuito de Groq limita por **tokens** por minuto, no por requests. Medido el
+  // 2026-09-02: el límite es 8000 TPM y una foto cuesta ~1974 tokens de entrada (Groq cobra la
+  // imagen a tarifa fija, así que achicarla no lo baja), o sea **~4 lecturas por minuto**. El 25
+  // que había acá era el número de un límite por requests que este proveedor no tiene, y hacía que
+  // el limitador no frenara nunca: la tercera lectura seguida ya daba 429.
+  groq: 3,
   openai: 100, // muy por encima de lo que alguien hace a mano: es freno de emergencia, no cuota
   anthropic: 40,
 };
