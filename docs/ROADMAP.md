@@ -54,9 +54,14 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
   los modelos vienen preentrenados. El trabajo es (a) armar los **datasets de evaluación** (bondis y
   productos): resultado esperado vs. obtenido → **recall, precision, accuracy, F1** — la forma de
   medir precisión del proyecto; (b) elegir el detector para la TPU (`rfdetr-nano` / `yolo26` /
-  YOLO11-nano) y **medirlo sobre la RPi Zero 2 W + Coral** (riesgo técnico abierto); (c) cerrar la
-  decisión de supermercado midiendo **Gemma 3 1B con visión** contra Gemini Flash. Deliverable: el
-  pipeline de bondis exportado + la tabla de métricas.
+  YOLO11-nano) y **medirlo sobre la RPi Zero 2 W + Coral** (riesgo técnico abierto); (c) medir
+  **Gemma 3 1B con visión** como **fallback local** de supermercado — la decisión de qué corre en
+  producción ya está tomada (nube, ADR 0006), lo que falta es cerrar la excepción a ADR 0001.
+  Deliverable: el pipeline de bondis exportado + la tabla de métricas.
+  > **Supermercado ya tiene su protocolo escrito**: pasos 8 y 9 de `docs/qa-modo-supermercado.md`
+  > (la misma foto contra los cinco modelos, anotando `tipo`/`marca`/`detalle` por separado).
+  > **El camino de ómnibus quedó en stand by el 2026-09-01**: elegir entre sus dos variantes
+  > (modelo parcial o completo en la Raspi) exige tener el hardware para medirlas.
   > La pregunta de alcance de ADR 0004 quedó **cerrada por ADR 0006** con la evidencia del spike:
   > el VLM no reemplaza a detección + OCR (6,4 s contra fracciones de segundo, sin coordenadas).
   > Queda como término de comparación en el informe. Validación con el tutor pendiente.

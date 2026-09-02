@@ -52,7 +52,7 @@ final integration, bug-fixing and joint testing).
 |--------|--------|---------|
 | **Mobile app** | `app/` | React Native (Expo). BLE (GATT) data/control link to the device, routing TTS audio to the device's earphone, config, and first-class accessibility. See [references/app.md](references/app.md). |
 | **Hardware / IoT** | `hardware/` | Glasses-mounted camera device: Raspberry Pi Zero 2 W + Coral TPU + Camera Module 3. See [references/hardware.md](references/hardware.md). |
-| **ML / OCR / CV** | `ml/` | Per-use-case pipelines (ADR 0006): buses = pretrained detection on the Coral TPU → banner crop → OCR; supermarket = vision LLM (local small vs. cloud, pending). Evaluation datasets with recall/precision/accuracy/F1. See [references/ml.md](references/ml.md). |
+| **ML / OCR / CV** | `ml/` | Per-use-case pipelines (ADR 0006): buses = pretrained detection on the Coral TPU → banner crop → OCR; supermarket = cloud vision LLM, five models chosen by latency (ADR 0006, updated 2026-09-01); the local fallback is still open. Evaluation datasets with recall/precision/accuracy/F1. See [references/ml.md](references/ml.md). |
 
 Y tres referencias transversales, que aplican al trabajo diario más que cualquier otra cosa de este
 documento:
@@ -78,9 +78,10 @@ documento:
   default. Losing connectivity may cost accuracy or latency, never the recognition or the audio.
   This is still a core differentiator vs. cloud-dependent tools (Seeing AI, Lookout, OrCam).
   There is no single on-device runtime: since **ADR 0006** (2026-08-22) each use case has its own
-  pipeline — buses = local detection (Coral TPU) → banner crop → OCR; supermarket = vision LLM
-  (local small model or cloud, pending). ADR 0004's "Gemma via LiteRT-LM" is no longer the primary
-  path. In the "offload to phone" architecture the model runs **locally on the phone**, not on a
+  pipeline — buses = local detection (Coral TPU) → banner crop → OCR; supermarket = **cloud vision
+  LLM** (decided 2026-08-30), with the local fallback still open. ADR 0004's "Gemma via LiteRT-LM"
+  is no longer the primary path. Since **ADR 0008** (2026-09-01) the cloud keys live in the
+  project's own proxy, not in the app bundle. In the "offload to phone" architecture the model runs **locally on the phone**, not on a
   server.
 - **Low cost, portable.** Hardware and processing choices balance accuracy against cost, size, power
   and feasibility. The device must be cheap and easy to carry.
@@ -106,7 +107,10 @@ no haya dos copias que se desincronicen.
 - `app/` — React Native mobile app (scaffolded with Expo + dev client).
 - `hardware/` — RPi Zero 2 W firmware/scripts, BLE peripheral, 3D casing models.
 - `ml/` — YOLO11 training, OCR, datasets, edge export (TFLite).
-- `docs/` — thesis deliverables, architecture, ADRs.
+- `docs/` — thesis deliverables, architecture, ADRs, and the end-to-end QA checklist
+  (`qa-modo-supermercado.md`).
+- `documents/` — source documents versioned as-is (the hand-drawn use-case diagram).
+- `supabase/` — the cloud-key proxy Edge Function (ADR 0008). Written, not deployed yet.
 
 ## Open / pending items (flagged `PENDIENTE` in the source thesis document)
 These are explicitly incomplete in the thesis and should be treated as open research:
