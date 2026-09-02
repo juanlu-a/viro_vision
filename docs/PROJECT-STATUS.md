@@ -127,6 +127,12 @@ opcional — la distribución real va por TestFlight desde Xcode.
 
 **Hardware / ML**: not started (README stubs only).
 
+## Verificado en dispositivo (2026-09-02)
+
+Build `202609021823` en el grupo interno de TestFlight: **el primero que sale sin ninguna clave de
+proveedor en el binario**. El modo supermercado funciona de punta a punta contra el proxy de
+ADR 0008. Es el cierre práctico del pendiente (b) de ADR 0006.
+
 ## Pending — interactive / account setup (only the user can do)
 
 1. **EAS** (run locally; in a Claude session use `! ` prefix):

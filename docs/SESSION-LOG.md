@@ -770,33 +770,98 @@ estaban escritos **contra los docs**, que es lo contrario del estándar de esta 
   entrada de lista, y hay tests que fallan si alguien lo devuelve copiándolo en vez de moviéndolo o
   si se borra el módulo de un proveedor retirado.
 
+## 2026-09-02 (cont.) — El proxy desplegado, y dos fallos que enseñaron dónde no mirábamos
+
+Segunda mitad del día: PRs **#55** a **#57**. Termina con **el primer build de ViroVision que sale
+sin ninguna clave adentro**, verificado funcionando en el teléfono.
+
+- **Un build salió con el modo supermercado muerto y nadie se enteró.** Al sacar Gemini del
+  selector (#53), el único secret de proveedor del repo dejó de corresponder a un modelo del
+  registro: `availableModels()` quedó en vacío. La app degradó como debía —dijo "no configurado" y
+  el modo ómnibus siguió leyendo— **y ahí está la trampa**: la degradación elegante es correcta en
+  runtime y es un problema en el pipeline. Un build que no puede cumplir la mitad de su función no
+  debería tardar media hora en decirlo, ni exigir que alguien lo abra para descubrirlo.
+
+- **`verificar-claves.mjs` compara lo que efectivamente se desincronizó**: los proveedores que el
+  *registro* ofrece contra las claves que el *entorno* trae. Chequear "¿hay alguna clave?" no habría
+  detectado nada, porque la de Gemini estaba ahí — faltaba una clave de un proveedor *que siguiera
+  en la lista*. Por eso lee `MODEL_PROFILES` y no `PERFILES_RETIRADOS`. Corre antes del build y
+  falla en segundos. **Se verificó reproduciendo el fallo real**: el run del PR #55 falló en ese
+  paso, con el mensaje que nombra el arreglo.
+
+- **La regla que faltaba, escrita**: una clave **gratuita** sin tarjeta puede ir al bundle; una
+  **paga**, no. No es un permiso a medias: el peor caso de que roben una gratuita es que quemen una
+  cuota que se repone sola, y el de una paga es la tarjeta del proyecto. Tratarlas igual sólo
+  lograría que no hubiera modo supermercado en ningún build distribuible hasta que el proxy
+  existiera. Con el proxy activo la regla deja de importar, porque no viaja ninguna.
+
+- **El proyecto de Supabase ya existía**, desde el 18/07, creado para la capa de cuenta de ADR 0002
+  y nunca usado: **0 usuarios, 0 tablas, 0 buckets**. Estaba pausado por inactividad.
+  `PROJECT-STATUS.md` lo daba por inexistente. No hubo nada que borrar; se despausó y se usó para
+  el proxy.
+
+- **El proxy quedó desplegado y verificado con la clave del cliente en vacío**, que es la prueba de
+  que la pone el servidor. Las cuatro guardas responden (destino ajeno 400, proveedor inexistente
+  400, método ≠ POST 405, `http://` sobre host válido 400). El costo es despreciable: Qwen pasa de
+  846 a ~950-1070 ms y Luna se mantiene dentro de su varianza. **Era la apuesta de que fuera un
+  pasamanos y no interpretara la respuesta, y se sostiene.**
+
+- **Riesgo operativo nuevo: el tier gratuito pausa el proyecto** tras una semana sin actividad, y a
+  éste ya le había pasado. Con el proxy en producción y sin claves en el bundle, una pausa deja sin
+  modo supermercado a todos los builds a la vez. Y lo que el usuario escucharía es *"sin conexión a
+  internet"*, que es engañoso: conexión hay, el que no está es el proxy. **Distinguir los dos casos
+  quedó pendiente y ahora pesa más que antes.**
+
+- **Un test mío medía el entorno, no el código.** `sintesis.test.ts` afirmaba "sin proxy sale
+  directo a OpenAI" leyendo el proxy del entorno: pasaba en local —jest no carga `.env`— y falló en
+  el job de publicación, donde la variable sí está. La causa de fondo vale más que el bug: **el CI
+  de PRs corre los tests sin secrets y el workflow de publicación los corre con todos en el `env`
+  del job**. Son dos entornos distintos ejecutando la misma suite, y lo único que evita que eso
+  muerda es que los tests no dependan del ambiente. El proxy pasó a ser inyectable, mismo criterio
+  que el reloj del limitador de cuota, y de paso el test cubre los dos caminos en vez de asumir uno
+  — incluido el que importa: que con proxy **la clave no viaja**.
+
+- **Nota operativa de un error propio**: `supabase projects api-keys` imprime la `service_role` en
+  claro, que es la clave que saltea RLS. No correrlo en un log ni en una sesión compartida. Se
+  resolvió rotando el JWT secret (barato: la app no usa ninguna de las dos claves y el proxy corre
+  con `verify_jwt = false`) y apagando el signup por email, que no usamos y dejaba un endpoint
+  abierto para crear usuarios — verificado desde afuera: `Signups not allowed for this instance`.
+
+- **Verificado en el teléfono.** Build `202609021823`, `VALID` en el grupo interno. El modo
+  supermercado funciona de punta a punta contra el proxy, sin ninguna clave en el binario.
+
 ## Open threads / next
-- **Dataset de evaluación con fotos reales de góndola.** Es lo más valioso que falta: todo lo medido
-  el 2026-09-02 usa una imagen sintética de alto contraste, o sea el piso de dificultad, y los
-  aciertos de ahí **no son la precisión del sistema**. Protocolo escrito en los pasos 8 y 9 de
-  `qa-modo-supermercado.md`.
-- **`claude-haiku-4-5` sigue sin verificar** contra su API: requiere tarjeta y no hay clave.
-- **Desplegar el proxy** (ADR 0008): crear el proyecto Supabase, `supabase secrets set` por
-  proveedor, `functions deploy vision`, y `EXPO_PUBLIC_VISION_PROXY_URL`. Hasta entonces las claves
-  siguen viajando dentro del `.ipa`.
-- **Correr el bloque A del QA en el iPhone**: cámara, permiso denegado y VoiceOver sólo se prueban
-  en device, y necesita rebuild nativo porque cambiaron los permisos.
-- **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales para
-  cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30). El despliegue de la clave dejó de ser
-  pendiente el 2026-09-01: lo resuelve ADR 0008.
-- **Camino de ómnibus en stand by** (decisión del 2026-09-01). Los dos casos del diagrama quedaron
-  en mermaid, versionados, para retomarlos cuando haya hardware con qué medirlos.
-- **Validar ADR 0006 y 0007 con el tutor** — todo quedó en Proposed. Sumar la actualización del
-  2026-09-01 de ADR 0006 (cinco modelos, cae la gratuidad) y ADR 0008.
-- Armar el **dataset de evaluación** (captura + etiquetado esperado/obtenido) para ambos casos. En
-  supermercado el protocolo ya está escrito: pasos 8 y 9 de `docs/qa-modo-supermercado.md`.
-- Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
-  abierto del camino de bondis).
-- Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
-- **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; después: crear
-  la app (package `com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`),
-  `PLAY_ENABLED=true` y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
+
+Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
+
+### Lo más valioso que falta
+- **Dataset de evaluación con fotos reales de góndola.** Todo lo medido el 2026-09-02 usa una imagen
+  sintética de alto contraste: es el piso de dificultad, y **los aciertos de ahí no son la precisión
+  del sistema**. Protocolo escrito en los pasos 8 y 9 de `qa-modo-supermercado.md`.
+- **Validar ADR 0006, 0007 y 0008 con el tutor** — 0006 y 0007 siguen en Proposed.
+
+### Deuda técnica conocida
+- **El error de proxy caído dice "sin conexión a internet"**, que es mentira: conexión hay, el que
+  no está es el proxy. Pesa más desde que el proxy es punto único de falla del modo supermercado.
+  Arreglo chico.
+- **`claude-haiku-4-5` sin verificar** contra su API: requiere tarjeta.
+- **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales, para
+  cerrar la excepción a ADR 0001.
+
+### Operación
+- **El proyecto de Supabase se pausa solo** tras una semana sin actividad, y con el proxy en
+  producción eso deja sin modo supermercado a todos los builds. Usarlo seguido, o **Pro antes de la
+  defensa**.
 - **Sumar a Magalí a TestFlight** (grupo interno) cuando pase su email; Francisco espera el canal
   Android.
-- Pending interactive setup: **Supabase** project + `app/.env`. Desde ADR 0008 ya no es sólo para
-  la cuenta online: el proxy de claves lo necesita. See `PROJECT-STATUS.md`.
+- **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; después: crear
+  la app (`com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`), `PLAY_ENABLED=true`
+  y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
+
+### Bloqueado por hardware
+- **Camino de ómnibus en stand by** (2026-09-01): los dos casos del diagrama están en mermaid, sin
+  implementar. Elegir entre ellos exige hardware con qué medirlos.
+- Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral.
+
+### Suelto
+- Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.

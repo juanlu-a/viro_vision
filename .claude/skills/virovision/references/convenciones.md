@@ -114,6 +114,13 @@ y el detalle quedaba en un campo que nadie miraba.
   deliberados: si algún día pasaran, hay que revisar la decisión.
 - Reloj y esperas **inyectables** en cualquier cosa con tiempo (`now`, `sleep`), o el test tarda un
   minuto real.
+- **Y la configuración de entorno también inyectable, por el mismo motivo.** Un test que lee
+  `process.env` mide dónde corre, no qué hace el código. La suite se ejecuta en **dos entornos
+  distintos**: el CI de PRs corre sin secrets, y los workflows de publicación corren con todos en
+  el `env` del job. Un test de `services/audio/sintesis.ts` que asumía "no hay proxy configurado"
+  pasaba en local —jest no carga `.env`— y **rompió el build de TestFlight** el 2026-09-02. Pasá la
+  URL del proxy, la clave y cualquier bandera como parámetro con default, como ya hacen
+  `resolverTransporte` y el limitador de cuota, y cubrí los dos caminos en vez de asumir uno.
 
 ## i18n
 
