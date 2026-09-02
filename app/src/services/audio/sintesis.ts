@@ -21,7 +21,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 
-import { isProxyConfigured, resolverTransporte } from '@/services/cloud';
+import { isProxyConfigured, proxyUrl, resolverTransporte } from '@/services/cloud';
 import type { CloudRequest } from '@/services/cloud';
 
 import { SintesisNoConfiguradaError, SintesisRemotaError } from './errors';
@@ -56,8 +56,18 @@ const CARPETA = 'lecturas';
  * Sale por el mismo proxy que la lectura de producto (ADR 0008): `/v1/audio/speech` está en
  * `api.openai.com`, que ya está en la allowlist de la función. Validar por host y no por URL exacta
  * es lo que hace que esto no necesite ningún cambio del lado del servidor.
+ *
+ * `apiKey` y `proxy` son inyectables **para que el test no dependa del entorno**, que es la lección
+ * de un fallo real: la versión anterior los leía sólo de `process.env`, y el test que afirmaba
+ * "sin proxy sale directo a OpenAI" pasaba en local —jest no carga `.env`— y fallaba en el job de
+ * publicación, donde la variable del proxy sí está. El test estaba midiendo el ambiente, no el
+ * código. Mismo criterio que el reloj inyectable del limitador de cuota.
  */
-export function construirPedidoDeVoz(texto: string, apiKey: string = openaiApiKey): CloudRequest {
+export function construirPedidoDeVoz(
+  texto: string,
+  apiKey: string = openaiApiKey,
+  proxy: string = proxyUrl,
+): CloudRequest {
   return resolverTransporte(
     {
       url: OPENAI_SPEECH_URL,
@@ -70,6 +80,7 @@ export function construirPedidoDeVoz(texto: string, apiKey: string = openaiApiKe
       },
     },
     'openai',
+    proxy,
   );
 }
 
