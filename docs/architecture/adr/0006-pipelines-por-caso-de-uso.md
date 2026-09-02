@@ -186,6 +186,27 @@ la foto y el resto del flujo es idéntico. Hasta ahora la app abría la **fotote
 probar pero no era el flujo; la fototeca queda igual como segunda acción, porque es lo que permite
 pasarle **la misma foto** a los cinco modelos y que la comparación mida modelos y no fotos.
 
+**La lectura además deja un `.mp3`, apagado por defecto.** En el diagrama acordado el audio sale
+por el parlante del dispositivo, no por el del teléfono. `expo-speech` usa el motor TTS del sistema
+y **no exporta a archivo**, así que el `.mp3` tiene que venir de un TTS de nube: se usa el de OpenAI
+(`gpt-4o-mini-tts`), que devuelve MP3 directo con la clave que el selector ya necesita y sale por el
+mismo proxy — descartados Google Cloud TTS (una clave de AI Studio no tiene esa API habilitada: son
+proyectos distintos) y el TTS nativo de Gemini (devuelve PCM crudo, habría que armar el header WAV a
+mano en React Native).
+
+Va **apagado** detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED` por dos razones que conviene dejar
+escritas. Una: hoy nada consume el archivo —el hardware no existe— y prenderlo sería pagar una
+llamada a la API en cada lectura para producir algo que nadie abre. Dos: cuando el hardware exista,
+puede que no haga falta. Un MP3 de ~3 s a 32 kbps son ~12 KB; por WiFi es nada, por GATT es del
+orden de segundos, y si el transporte termina siendo BLE probablemente convenga que la Raspi haga su
+propio TTS y sólo reciba el JSON. Eso es materia de **ADR 0003**, que está reservado justo para esa
+decisión.
+
+Lo que **no** cambia: el anuncio sigue siendo `expo-speech`, inmediato y sin red. La síntesis del
+archivo se llama **después** de anunciar, sin bloquear, y traga sus errores — si falla, el usuario ya
+escuchó el producto. El linter lo fuerza: `features/audio/` tiene prohibido importar
+`@/services/cloud`, así que el archivo no puede meterse dentro de `announce()`.
+
 **El camino de ómnibus queda en stand by.** Los dos casos del diagrama (modelo parcial o completo
 sobre la Raspi) quedan dibujados y versionados, sin implementar: elegir entre ellos exige tener el
 hardware para medirlos, y hasta entonces la app sostiene el camino local (OCR sobre la foto) que

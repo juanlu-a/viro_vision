@@ -5,6 +5,8 @@
  * eventos SSE a `ProviderEvent`, y el motor (`reconocerProducto`) no sabe con quién habla. Así el
  * selector de modelo de Inicio cambia el modelo sin tocar el camino.
  */
+import type { CloudProviderId, CloudRequest } from '@/services/cloud';
+
 
 /**
  * Modo de razonamiento del modelo.
@@ -54,11 +56,8 @@ export type ProviderEvent =
       retryAfterSeconds?: number;
     };
 
-export interface ProviderRequest {
-  url: string;
-  headers: Record<string, string>;
-  body: Record<string, unknown>;
-}
+/** El mismo pedido HTTP que entiende el transporte de `services/cloud`. */
+export type ProviderRequest = CloudRequest;
 
 /** Qué se le pide al modelo. Un solo juego por tarea, compartido por todos los proveedores. */
 export interface TaskPrompts {
@@ -96,11 +95,14 @@ export interface VisionProvider {
 }
 
 /**
+ * Los proveedores del selector. Es la lista de `services/cloud` y no una propia: son los mismos que
+ * el proxy sabe alcanzar, y tener dos listas sería tener dos que se desincronizan.
+ *
  * `openai` y `groq` comparten implementación (`providers/openaiCompatible.ts`): son el mismo
  * dialecto apuntando a distinta URL. Siguen siendo ids distintos porque tienen clave, cuota y
  * factura separadas.
  */
-export type VisionProviderId = 'gemini' | 'anthropic' | 'openai' | 'groq';
+export type VisionProviderId = CloudProviderId;
 
 export interface ModelProfile {
   provider: VisionProviderId;

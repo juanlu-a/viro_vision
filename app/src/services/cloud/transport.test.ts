@@ -9,9 +9,9 @@
  * desincroniza, el proxy responde 400 y nadie sabe por qué.
  */
 import { resolverTransporte } from './transport';
-import type { ProviderRequest } from './types';
+import type { CloudRequest } from './types';
 
-const directo: ProviderRequest = {
+const directo: CloudRequest = {
   url: 'https://api.openai.com/v1/chat/completions',
   headers: { 'content-type': 'application/json', authorization: 'Bearer sk-secreta' },
   body: { model: 'gpt-5.6-luna', stream: true },
@@ -50,7 +50,7 @@ describe('resolverTransporte', () => {
   it('el proveedor del sobre es el que se le pasa, no el que se adivine de la URL', () => {
     // El servidor cruza los dos: si el sobre dijera un proveedor y la URL fuera de otro host,
     // rechaza. Adivinarlo acá haría que ese cruce nunca pudiera fallar y la guarda sería inútil.
-    const anthropic: ProviderRequest = {
+    const anthropic: CloudRequest = {
       url: 'https://api.anthropic.com/v1/messages',
       headers: { 'x-api-key': 'sk-ant-secreta', 'anthropic-version': '2023-06-01' },
       body: { model: 'claude-haiku-4-5' },

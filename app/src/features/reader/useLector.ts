@@ -28,6 +28,7 @@ import { transicionar } from '@/features/reader/modes';
 import type { Gesto, Modo } from '@/features/reader/modes';
 import { useModeloSupermercado } from '@/features/reader/useModeloSupermercado';
 import { strings } from '@/i18n';
+import { isSintesisHabilitada, sintetizarAArchivo } from '@/services/audio/sintesis';
 import {
   CameraPermissionError,
   ImagenIlegibleError,
@@ -65,6 +66,8 @@ export interface LectorState {
   ms: number | null;
   /** Qué modelo de nube respondió, para mostrarlo junto al resultado. */
   modelo: string | null;
+  /** Ruta del .mp3 de la lectura, cuando la síntesis a archivo está habilitada. */
+  audio: string | null;
 }
 
 const inicial: LectorState = {
@@ -77,6 +80,7 @@ const inicial: LectorState = {
   textoCrudo: null,
   ms: null,
   modelo: null,
+  audio: null,
 };
 
 /**
@@ -95,6 +99,30 @@ function mensajeDeError(err: unknown): string {
   if (err instanceof VisionNetworkError) return t.cloudUnavailable;
   if (err instanceof VisionQuotaError) return `${t.quotaExhausted} ${err.retryAfterSeconds} s.`;
   return `${t.cloudFailed} (${err instanceof Error ? err.message : String(err)})`;
+}
+
+/**
+ * Deja la lectura en un `.mp3`, para el parlante del dispositivo. **Best-effort a propósito**: se
+ * llama DESPUÉS de `announce()` y sin `await` en el camino crítico, y traga cualquier error.
+ *
+ * Si falla, el usuario ya escuchó el producto por el parlante del teléfono. El archivo existe para
+ * un hardware que todavía no existe (ver `services/audio/sintesis.ts`) y no puede degradar lo que
+ * hoy funciona — la accesibilidad es el criterio de diseño, no una capa.
+ *
+ * Vive acá y no dentro de `announce()` a propósito: `features/audio/` tiene prohibido depender de
+ * la red (ADR 0001, forzado por el linter). El anuncio tiene que sonar sin internet; el archivo,
+ * no. Meterlo detrás del anuncio pondría una llamada de red en el camino que ADR 0001 protege.
+ */
+async function guardarAudioDeLaLectura(
+  texto: string,
+  update: (patch: Partial<LectorState>) => void,
+): Promise<void> {
+  if (!isSintesisHabilitada) return;
+  try {
+    update({ audio: await sintetizarAArchivo(texto) });
+  } catch {
+    // Silencio deliberado: nada de lo que el usuario hace depende de esto.
+  }
 }
 
 export function useLector() {
@@ -133,6 +161,7 @@ export function useLector() {
         textoCrudo: null,
         ms: null,
         modelo: null,
+        audio: null,
         mensaje: '',
       });
       announce(ANUNCIO_MODO[siguiente]);
@@ -157,6 +186,7 @@ export function useLector() {
       const dicho = frasearLectura(lectura, crudo);
       announce(dicho);
       update({ estado: 'idle', lectura, textoCrudo: crudo, ms: r.ms, mensaje: dicho });
+      void guardarAudioDeLaLectura(dicho, update);
     },
     [update],
   );
@@ -196,6 +226,7 @@ export function useLector() {
         const dicho = frasearProducto(r.producto, crudo);
         announce(dicho);
         update({ estado: 'idle', producto: r.producto, textoCrudo: crudo, ms: r.ms, modelo: r.model, mensaje: dicho });
+        void guardarAudioDeLaLectura(dicho, update);
       } catch (err) {
         const mensaje = mensajeDeError(err);
         announce(mensaje);

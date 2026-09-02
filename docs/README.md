@@ -4,10 +4,15 @@ Thesis deliverables, architecture and decision records.
 
 ## Contents
 
-- [`architecture/`](architecture/README.md) — el diagrama de modos de operación y el flujo de
-  datos por caso de uso; [`architecture/adr/`](architecture/adr/) tiene los ADRs: 0001
+- [`architecture/`](architecture/README.md) — el diagrama de modos de operación y los tres flujos
+  por caso de uso; [`architecture/adr/`](architecture/adr/) tiene los ADRs: 0001
   offline-first (enmendado), 0002 backend & auth, 0004 runtime de inferencia on-device
-  (actualizado), 0006 pipelines por caso de uso, 0007 botones físicos y modos.
+  (actualizado), 0006 pipelines por caso de uso, 0007 botones físicos y modos, 0008 proxy propio
+  para las claves de nube.
+- [`qa-modo-supermercado.md`](qa-modo-supermercado.md) — cómo probar el modo supermercado de punta
+  a punta. Los pasos 8 y 9 **son** la corrida que alimenta el dataset de evaluación de la tesis.
+- [`../documents/`](../documents/) — los documentos fuente que se versionan tal cual (el diagrama
+  de los tres casos, dibujado a mano).
 - [`supabase.md`](supabase.md) · [`ci-cd.md`](ci-cd.md) — setup del backend y de CI/CD.
 - [`REUNIONES-TUTOR.md`](REUNIONES-TUTOR.md) — registro de reuniones con el director de tesis.
 - [`dev-build-ios.md`](dev-build-ios.md) — correr la app en un iPhone físico (development build).

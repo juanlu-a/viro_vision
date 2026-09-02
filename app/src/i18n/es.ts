@@ -64,6 +64,7 @@ export const es = {
     resultLabel: 'Última lectura',
     rawLabel: 'Texto detectado',
     timeLabel: 'Tiempo',
+    audioLabel: 'Audio guardado',
   },
   home: {
     title: 'ViroVision',

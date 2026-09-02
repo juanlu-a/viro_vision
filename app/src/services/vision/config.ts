@@ -10,6 +10,8 @@
  * Cuando no hay ninguna clave, el modo supermercado avisa que no está configurado en vez de
  * romper — mismo patrón que el stub de Supabase.
  */
+import { isProxyConfigured } from '@/services/cloud';
+
 import type { ModelProfile, VisionProviderId } from './types';
 
 /** Gemini: tier gratuito sin tarjeta (aistudio.google.com). Es el default del modo. */
@@ -24,13 +26,7 @@ export const anthropicApiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 /** Groq: tier gratuito sin tarjeta (console.groq.com). */
 export const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 
-/**
- * El proxy propio (ADR 0008). Cuando está, la app **no lleva ninguna clave**: las guarda el
- * servidor. Es el destino de este camino; el directo de arriba queda para desarrollo local.
- */
-export const visionProxyUrl = process.env.EXPO_PUBLIC_VISION_PROXY_URL ?? '';
 
-export const isProxyConfigured = visionProxyUrl.length > 0;
 
 const API_KEYS: Record<VisionProviderId, string> = {
   gemini: geminiApiKey,
