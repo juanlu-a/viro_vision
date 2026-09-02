@@ -62,6 +62,40 @@ Sin estas tres, un proxy con claves adentro es peor que no tenerlo:
 - **Tope de gasto duro** configurado en la consola de cada proveedor. Es la única red de seguridad
   que no depende de que nuestro código esté bien.
 
+### La regla mientras el proxy no esté: gratuitas sí, pagas no
+
+El proxy es el destino, pero se despliega una vez y el desarrollo sigue mientras tanto. Hasta
+entonces rige esta regla, que no es un permiso a medias sino una distinción de riesgo real:
+
+> **Una clave gratuita sin tarjeta puede ir al bundle. Una clave paga, no.**
+
+El peor caso de que roben una clave de tier gratuito es que quemen una cuota que se repone sola. El
+de una clave paga es la tarjeta del proyecto. No son el mismo riesgo y no merecen la misma cautela;
+tratarlos igual sólo lograría que no haya modo supermercado en ningún build distribuible hasta que
+el proxy exista.
+
+En la práctica: la clave de **Groq** (gratuita, sin tarjeta) puede ser secret del repo y viajar en
+los builds de TestFlight y Play. La de **OpenAI** no se carga como secret hasta que el proxy esté
+desplegado — vive sólo en `app/.env`, que no sale de la máquina del desarrollador. La de **Gemini**
+está en la misma categoría que la de Groq.
+
+Con el proxy activo la regla deja de importar: no viaja ninguna.
+
+### Un build sin ningún modelo tiene que hacer ruido
+
+El 2026-09-02 salió un build a TestFlight con el modo supermercado **muerto**. No fue una fuga: al
+sacar Gemini del selector, el único secret de proveedor que tenía el repo dejó de corresponder a un
+modelo del registro, y `availableModels()` quedó en vacío. La app degradó como debía —dijo "no
+configurado" y el modo ómnibus siguió leyendo— pero **nadie se enteró hasta abrirla**, y el build
+había tardado media hora.
+
+La degradación elegante es correcta en runtime y es una trampa en el pipeline: un build que no puede
+cumplir la mitad de su función no debería tardar treinta minutos en decirlo. `app/scripts/
+verificar-claves.mjs` corre antes del build y falla si los proveedores que el **registro** ofrece no
+tienen clave en el **entorno**. Compara justamente lo que se desincronizó: chequear "hay alguna
+clave" no habría detectado nada, porque la de Gemini estaba ahí — faltaba una clave de un proveedor
+*que siguiera en la lista*.
+
 ### Qué compra el proxy, y qué no
 
 Vale escribirlo sin adornos, porque es fácil creer que resuelve más de lo que resuelve. La app **no
@@ -142,6 +176,8 @@ no escribir un proveedor nuevo.
   hospedada en el mismo proveedor. La regla sigue vigente tal cual está escrita.
 - El `.env.example` y los workflows de CI dejan de necesitar las claves de proveedor cuando el
   proxy esté activo; se mantienen mientras el camino directo siga siendo el de desarrollo.
+- `app/scripts/verificar-claves.mjs` corre en los dos workflows de publicación (`npm run claves`) y
+  falla el job antes del build si no hay ni clave de un proveedor del registro ni proxy.
 
 ## Ver también
 

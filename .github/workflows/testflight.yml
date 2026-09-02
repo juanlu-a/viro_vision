@@ -83,6 +83,11 @@ jobs:
           xcodebuild -version
       - name: Install dependencies
         run: npm ci
+      - name: Verificar que el build lleve algún modelo de nube
+        # Falla ANTES de los 30 minutos de build. Existe porque el 2026-09-02 salió un build con el
+        # modo supermercado muerto: el único secret de proveedor dejó de corresponder a un modelo del
+        # registro y no se supo hasta abrir la app. Ver app/scripts/verificar-claves.mjs.
+        run: npm run claves
       - name: Lint · Typecheck · Test
         run: npm run lint && npm run typecheck && npm test
       - name: API key de App Store Connect

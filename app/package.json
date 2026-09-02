@@ -66,7 +66,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "theme:css": "node ./scripts/generate-theme-css.js",
-    "ios:testflight": "bash ./scripts/testflight.sh"
+    "ios:testflight": "bash ./scripts/testflight.sh",
+    "claves": "node scripts/verificar-claves.mjs"
   },
   "private": true
 }
