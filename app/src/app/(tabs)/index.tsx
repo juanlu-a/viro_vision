@@ -98,9 +98,21 @@ export default function HomeScreen() {
                 : r.readButton
           }
           hint={READ_HINT[state.modo]}
-          onPress={leer}
+          onPress={() => leer('camara')}
           disabled={ocupado || state.modo === 'esperando'}
           loading={ocupado}
+        />
+        {/* La fototeca es la segunda fuente, no la principal: existe para poder pasarle la MISMA
+            foto a varios modelos y que la comparación mida modelos y no fotos (ADR 0006). Va
+            debajo de la acción principal para que el lector de pantalla llegue primero a la que
+            el usuario quiere el 99 % de las veces, y es además la salida cuando el permiso de
+            cámara quedó denegado — por eso no se esconde. */}
+        <AccessibleButton
+          label={r.galleryButton}
+          hint={r.galleryHint}
+          variant="secondary"
+          onPress={() => leer('fototeca')}
+          disabled={ocupado || state.modo === 'esperando'}
         />
 
         {state.mensaje !== '' && (
