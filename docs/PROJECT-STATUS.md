@@ -1,6 +1,6 @@
 # ViroVision — Project status & session handoff
 
-_Living status/continuation doc. Last updated: 2026-09-01._
+_Living status/continuation doc. Last updated: 2026-09-02._
 
 This captures where the project stands so anyone (including a fresh Claude Code session, together with
 the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
@@ -93,7 +93,10 @@ tests via `jest-expo`.
   (`services/ondevice/ocr.ts`, ExecuTorch), modo supermercado = nube (`services/vision/`:
   proveedores Gemini / OpenAI / Anthropic / Groq, SSE, schema, limitador de cuota por proveedor).
   Sin clave o sin internet, supermercado avisa. El modelo se elige en Inicio (modal accesible,
-  persistido y revalidado contra los disponibles del build). El laboratorio del spike se retiró
+  persistido y revalidado contra los disponibles del build). **El selector ofrece dos modelos desde
+  el 2026-09-02**: `gpt-5.6-luna` (default, mediana 1668 ms) y `qwen/qwen3.8-27b` en Groq (846 ms,
+  gratis, pero ~4 lecturas/min). Gemini salió por la medición — rango 2820-32 586 ms. Ver
+  [`docs/mediciones/`](mediciones/README.md). El laboratorio del spike se retiró
   (2026-08-30) y vive en la rama `spike/laboratorio-vision-local`.
 - **Captura por cámara (2026-09-01)**: `services/camera/` — la cámara del teléfono ocupa el lugar de
   la placa del dispositivo mientras no hay hardware. Permiso pedido explícitamente y anunciado por
