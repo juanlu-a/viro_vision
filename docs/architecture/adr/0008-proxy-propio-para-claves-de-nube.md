@@ -1,6 +1,6 @@
 # ADR 0008 — Un proxy propio para las claves de los modelos de nube
 
-- **Status:** Accepted (2026-09-01)
+- **Status:** Accepted (2026-09-01) — **desplegado el 2026-09-02**
 - **Date:** 2026-09-01
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** app, backend, architecture, security
@@ -178,6 +178,54 @@ no escribir un proveedor nuevo.
   proxy esté activo; se mantienen mientras el camino directo siga siendo el de desarrollo.
 - `app/scripts/verificar-claves.mjs` corre en los dos workflows de publicación (`npm run claves`) y
   falla el job antes del build si no hay ni clave de un proveedor del registro ni proxy.
+
+## Estado: desplegado (2026-09-02)
+
+Proyecto `viro_vision` (`oxukvenxiqkjhksgoigq`, us-east-2), que **ya existía desde el 2026-07-18**:
+se había creado para la capa de cuenta de ADR 0002 y nunca se llegó a usar — 0 usuarios, 0 tablas,
+0 buckets. `PROJECT-STATUS.md` lo daba por inexistente y estaba desactualizado.
+
+Cargados `GEMINI_API_KEY`, `OPENAI_API_KEY` y `GROQ_API_KEY` como secrets de la función.
+`ANTHROPIC_API_KEY` queda sin cargar: no hay clave.
+
+Verificado de punta a punta con el código de la app y **la clave del cliente en vacío** — que es la
+prueba de que la pone el servidor:
+
+| | Directo (mediana) | Por el proxy | Costo |
+|---|---|---|---|
+| `gpt-5.6-luna` | 1668 ms | 1654 / 2173 / 2665 ms | dentro de su varianza |
+| `qwen/qwen3.8-27b` | 846 ms | 946 / 1073 ms | ~+150 ms |
+
+**El proxy sale casi gratis**, que era la apuesta de que fuera un pasamanos y no interpretara la
+respuesta.
+
+Las cuatro guardas responden como se esperaba: destino ajeno con proveedor válido → 400; proveedor
+inexistente → 400; método distinto de POST → 405; `http://` sobre un host válido → 400.
+
+`EXPO_PUBLIC_VISION_PROXY_URL` quedó como secret del repo, así que **los builds de TestFlight y Play
+ya no llevan ninguna clave de proveedor**. La regla de "gratuitas sí, pagas no" deja de aplicar en
+la práctica: no viaja ninguna.
+
+### Riesgo operativo: el tier gratuito pausa el proyecto
+
+**Supabase pausa los proyectos free sin actividad por una semana**, y a éste ya le pasó: estaba
+pausado cuando fuimos a desplegar. Si se pausa con el proxy en producción, el modo supermercado se
+cae para todos los builds a la vez — y como no hay clave en el bundle, no hay camino alternativo.
+
+Lo que el usuario escucharía es **"Sin conexión a internet"**, que es engañoso: hay conexión, el que
+no está es el proxy. Distinguir los dos casos es un arreglo chico y pendiente.
+
+Mitigaciones, por orden de esfuerzo: usarlo seguido (cada lectura cuenta como actividad); pasar el
+proyecto a **Pro antes de la defensa**, que es cuando la indisponibilidad sale más cara; o, si hace
+falta un plan B inmediato, quitar `EXPO_PUBLIC_VISION_PROXY_URL` del `.env` local, que devuelve el
+camino directo contra las claves de desarrollo.
+
+### Nota operativa
+
+`supabase projects api-keys` **imprime la `service_role` en claro**. Es la clave que saltea RLS y
+puede todo sobre el proyecto: no correrlo en un log, un CI o una sesión compartida. Ya pasó una vez
+(2026-09-02) y se resolvió rotando el JWT secret, que invalida `anon` y `service_role` — barato
+porque la app no usa ninguna de las dos y el proxy corre con `verify_jwt = false`.
 
 ## Ver también
 

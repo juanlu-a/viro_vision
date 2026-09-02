@@ -80,6 +80,23 @@ rate-limitea o se apaga **en segundos**. Las defensas reales son:
 3. El **tope de gasto** en la consola de cada proveedor. Es la única que no depende de que nuestro
    código esté bien. **Ponelo antes de cargar el primer secret pago.**
 
+## Estado (2026-09-02): desplegado
+
+Proyecto `viro_vision` — ref **`oxukvenxiqkjhksgoigq`**, us-east-2. Función `vision` ACTIVE, con
+`GEMINI_API_KEY`, `OPENAI_API_KEY` y `GROQ_API_KEY` cargadas. `EXPO_PUBLIC_VISION_PROXY_URL` es
+secret del repo, así que **los builds de TestFlight y Play ya no llevan ninguna clave de proveedor**.
+
+El proyecto existía desde el 2026-07-18 (se creó para la capa de cuenta de ADR 0002) y nunca se
+había usado: 0 usuarios, 0 tablas, 0 buckets.
+
+⚠️ **Se pausa solo.** El tier gratuito pausa los proyectos sin actividad por una semana, y a éste ya
+le pasó. Con el proxy en producción y sin claves en el bundle, una pausa deja sin modo supermercado a
+todos los builds a la vez. Ver el riesgo operativo en
+[ADR 0008](architecture/adr/0008-proxy-propio-para-claves-de-nube.md).
+
+⚠️ **`supabase projects api-keys` imprime la `service_role` en claro.** Es la clave que saltea RLS.
+No correrlo en un log, un CI ni una sesión compartida.
+
 ## Despliegue
 
 ```sh

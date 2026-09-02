@@ -21,6 +21,23 @@ import { dirname, join } from 'node:path';
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 const config = readFileSync(join(raiz, 'src/services/vision/config.ts'), 'utf8');
 
+/**
+ * En local, las claves viven en `app/.env` y este script corre con `node`, que no lo carga solo
+ * (Expo sí lo hace para sus propios comandos). Sin esto `npm run claves` diría que faltan claves que
+ * están ahí, y el aviso perdería credibilidad justo donde tiene que servir. En CI el archivo no
+ * existe y las variables vienen del entorno, así que el bloque no hace nada.
+ *
+ * Lo de `process.env` gana: si CI define una variable, no la pisa un .env que se coló en el runner.
+ */
+try {
+  for (const linea of readFileSync(join(raiz, '.env'), 'utf8').split('\n')) {
+    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)$/.exec(linea);
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
+  }
+} catch {
+  // Sin .env: es el caso de CI.
+}
+
 /** Nombre de la env var de cada proveedor. Espeja `apiKeyFor` en config.ts. */
 const CLAVE_DE = {
   gemini: 'EXPO_PUBLIC_GEMINI_API_KEY',
