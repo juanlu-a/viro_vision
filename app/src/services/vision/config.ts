@@ -76,65 +76,104 @@ export const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
  * Los modelos que ofrece el selector de Inicio (sólo los de proveedores con clave). El orden es el
  * del selector.
  *
- * **Están elegidos por latencia, no por capacidad**: el usuario está parado frente a la góndola
- * esperando escuchar qué agarró, y la lectura son tres campos cortos que no necesitan un modelo
- * grande. Por eso van los escalones más chicos de cada familia y ninguno de los grandes.
+ * **Están elegidos por latencia medida, no por capacidad ni por catálogo**: el usuario está parado
+ * frente a la góndola esperando escuchar qué agarró, y la lectura son tres campos cortos que no
+ * necesitan un modelo grande. Los números que sostienen esta lista están en
+ * `docs/mediciones/2026-09-02-modelos-supermercado.md`.
  *
- * Son cinco a propósito y no siete (salieron `gemini-flash-lite-latest` y `claude-opus-5`): el
- * selector es un `radiogroup` que se recorre con VoiceOver, y cada opción de más es un swipe más
- * entre la persona y la lectura (ADR 0006, actualización 2026-09-01). El quinto —el modelo
- * hosteado en Arnaldo Castro— está decidido pero **no implementado**: falta el endpoint (ADR 0008).
+ * **Son dos, y eso es deliberado.** El selector es un `radiogroup` que se recorre con VoiceOver:
+ * cada opción de más es un swipe más entre la persona y la lectura. Dos opciones cubren la elección
+ * real que existe —el equilibrado sin cuota apretada, y el más rápido con cuota apretada— y
+ * cualquier tercera habría que justificarla contra ese costo.
+ *
+ * **Qué salió, y por qué se puede volver.** `gemini-3.5-flash-lite` (el default hasta el
+ * 2026-09-02) salió por la medición: mediana 10 649 ms y rango 2820-32 586 ms, contra 1668 ms del
+ * default actual. `claude-haiku-4-5` salió por no estar verificado y no tener clave;
+ * `gemini-flash-lite-latest` y `claude-opus-5` habían salido el 2026-09-01 por el costo de
+ * accesibilidad de un selector largo. **Los módulos de sus proveedores siguen acá**
+ * (`providers/gemini.ts`, `providers/anthropic.ts`), verificados y con sus hallazgos comentados:
+ * volver a ofrecer uno es agregar su perfil a esta lista, no reescribir código.
+ *
+ * El modelo hosteado en Arnaldo Castro está decidido pero **no implementado**: falta el endpoint
+ * (ADR 0008).
  */
 export const MODEL_PROFILES: readonly ModelProfile[] = [
   {
-    // Default. Medido contra la API real (30/08/2026, foto de un paquete de arroz): con la cuota
-    // fresca responde en 2-3 s, mientras gemini-3.5-flash da 17-30 s y gemini-3.6-flash 34-47 s.
-    // La brecha es el paso de 'thought': los grandes piensan aunque no haga falta para tres campos
-    // cortos. El Lite acertó tipo, marca y detalle en TODAS las corridas, así que la latencia del
-    // grande no compra precisión.
+    // Default desde el 2026-09-02. No es el más rápido —Groq lo es— sino **el más rápido que
+    // aguanta un recorrido de góndola**: la cuota gratuita de Groq son ~4 lecturas por minuto y
+    // alguien eligiendo productos hace del orden de 2 a 4, así que como default chocaría el límite.
     //
-    // Cuidado al re-medir: sostener pedidos satura el tier gratuito y a partir de la tercera
-    // lectura seguida cualquier modelo salta a 20-80 s. Eso es la cuota, no el modelo.
-    provider: 'gemini',
-    id: 'gemini-3.5-flash-lite',
-    label: 'Gemini 3.5 Flash Lite (rápido)',
-    supportsEffort: false,
-    supportsAdaptiveThinking: false,
-    maxTokens: 256,
-  },
-  {
-    // El escalón más chico de la familia vigente de OpenAI. Es un modelo de razonamiento y su
-    // default es `medium`: el proveedor manda `reasoning_effort: 'none'`, sin lo cual pensaría
-    // antes de devolver tres campos y la lectura pasaría a decenas de segundos.
+    // Medido contra la API real (5 corridas, 2026-09-02): mediana 1668 ms, rango 1410-2490 ms, con
+    // acierto de tipo, marca y detalle en todas. Cuesta ~USD 0,0003 por lectura (1138 tokens de
+    // entrada + 35 de salida): mil lecturas, menos de medio dólar.
+    //
+    // Es un modelo de razonamiento y su default es `medium`. Se le manda `reasoning_effort: 'none'`
+    // por intención, no por latencia: la medición mostró que en esta tarea da lo mismo (ver
+    // `providers/openaiCompatible.ts`).
     provider: 'openai',
     id: 'gpt-5.6-luna',
-    label: 'GPT-5.6 Luna (rápido)',
+    label: 'GPT-5.6 Luna (equilibrado)',
     supportsEffort: false,
     supportsAdaptiveThinking: false,
     maxTokens: 256,
   },
   {
-    provider: 'anthropic',
-    id: 'claude-haiku-4-5',
-    label: 'Haiku 4.5 (rápido)',
-    supportsEffort: false,
-    supportsAdaptiveThinking: false,
-    maxTokens: 256,
-  },
-  {
-    // El caso interesante del experimento: no es otro modelo grande sino **otro hardware** (las
-    // LPU de Groq, ~450 tok/s). Si un modelo abierto de 27B sobre silicio dedicado le gana en
-    // latencia a los propietarios, es un resultado que la tesis quiere reportar.
+    // El más rápido de los medidos y el único gratuito sin tarjeta que quedó: mediana 846 ms, rango
+    // 764-1087 ms — la mitad que el default y con menos dispersión. No es el default por la cuota:
+    // el tier gratuito limita por **tokens** por minuto (8000 TPM) y una foto cuesta ~1974 fijos, o
+    // sea ~4 lecturas por minuto. Achicar la imagen no lo baja: Groq la cobra a tarifa plana.
     //
-    // Es el 3.8 y no el 3.6 aun siendo éste más rápido en el papel (500 vs 450 tok/s): el 3.6 sólo
-    // admite `json_object`, que garantiza JSON sintáctico pero deja los nombres de campo a criterio
-    // del modelo, y `parseProductoLeido` rebotaría una lectura correcta por venir como "producto"
-    // en vez de "tipo". El 3.8 admite `json_schema` con `strict`. Sobre una respuesta de ~50 tokens
-    // esos 50 tok/s son centésimas; la garantía de forma vale más. Los dos están en preview en
-    // Groq: hay que medirlo antes de darlo por bueno.
+    // El interés para la tesis no es que sea otro modelo grande sino **otro hardware**: las LPU de
+    // Groq contra las GPU de los propietarios. Que un modelo abierto de 27B les gane por 2x en
+    // latencia es un resultado reportable.
+    //
+    // Es el 3.8 y no el 3.6, aun siendo éste más rápido en el papel (500 contra 450 tok/s): el 3.6
+    // sólo admite `json_object`, que garantiza JSON sintáctico pero deja los nombres de campo a
+    // criterio del modelo, y `parseProductoLeido` rebotaría una lectura correcta por venir como
+    // "producto" en vez de "tipo". El 3.8 admite `json_schema` con `strict`. Ambos están en preview.
     provider: 'groq',
     id: 'qwen/qwen3.8-27b',
-    label: 'Qwen 3.8 27B en Groq (LPU)',
+    label: 'Qwen 3.8 27B en Groq (el más rápido)',
+    supportsEffort: false,
+    supportsAdaptiveThinking: false,
+    maxTokens: 256,
+  },
+];
+
+/**
+ * Perfiles **retirados del selector**, cuyos proveedores siguen implementados y testeados.
+ *
+ * No es código muerto ni nostalgia: `providers/gemini.ts` y `providers/anthropic.ts` siguen en el
+ * binario, con sus hallazgos comentados (el discriminador `event_type` de Gemini, el 400 de
+ * `output_config.effort` en Haiku), y sus tests necesitan un perfil contra el cual armar el
+ * request. Tenerlos acá hace que **volver a ofrecer uno sea mover una entrada a `MODEL_PROFILES`**,
+ * en vez de reescribir un perfil de memoria y perder por el camino la medición que lo describe.
+ *
+ * Deliberadamente **no** los busca `findModelProfile`: un id retirado tiene que caer al default,
+ * que es lo que hace `resolveProductoModel` con la preferencia guardada de alguien que eligió un
+ * modelo que ya no está.
+ */
+export const PERFILES_RETIRADOS: readonly ModelProfile[] = [
+  {
+    // Fue el default hasta el 2026-09-02. Sale por la medición contra la API real: mediana
+    // 10 649 ms con un rango de 2820 a 32 586 ms, contra 1668 ms del default actual. Lo que lo
+    // descarta no es la mediana sino la dispersión — 11,6x entre el mejor y el peor caso, con la
+    // cuota fresca y las corridas espaciadas. Conserva la mejor cuota de las tres (20/min) y la
+    // peor latencia, así que si algún día la cuota pesara más que el tiempo, es el candidato.
+    provider: 'gemini',
+    id: 'gemini-3.5-flash-lite',
+    label: 'Gemini 3.5 Flash Lite',
+    supportsEffort: false,
+    supportsAdaptiveThinking: false,
+    maxTokens: 256,
+  },
+  {
+    // Nunca llegó a verificarse contra su API: requiere tarjeta y no hubo clave. No sale por malo,
+    // sale por desconocido — es la tercera familia de modelos y sigue siendo el término de
+    // comparación que ADR 0006 quería.
+    provider: 'anthropic',
+    id: 'claude-haiku-4-5',
+    label: 'Haiku 4.5',
     supportsEffort: false,
     supportsAdaptiveThinking: false,
     maxTokens: 256,

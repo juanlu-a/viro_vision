@@ -2,11 +2,17 @@
  * Existe porque el selector de modelo de Inicio sólo tiene sentido si TODOS los proveedores reciben
  * el mismo prompt y el mismo schema: si el request de un proveedor se desviara, elegir otro modelo
  * cambiaría la pregunta y la comparación mediría prompts, no modelos — sin que nadie lo note.
- * También fija el default (Flash Lite, no Flash: contra la API real el grande tarda un orden de
- * magnitud más con el mismo acierto — en una app cuya interfaz es la voz eso no es una opción,
- * ADR 0006).
+ * También fija que el default declarado sea el que efectivamente se usa: `PRODUCTO_MODEL` resuelve
+ * el id con un fallback al primero del registro, y ese fallback taparía en silencio un id que ya no
+ * existe — la app leería con un modelo distinto del que dice la constante, y la medición que
+ * justifica el default estaría describiendo a otro (ADR 0006, medición del 2026-09-02).
  */
-import { ANTHROPIC_MESSAGES_URL, GEMINI_INTERACTIONS_URL, findModelProfile } from './config';
+import {
+  ANTHROPIC_MESSAGES_URL,
+  GEMINI_INTERACTIONS_URL,
+  MODEL_PROFILES,
+  PERFILES_RETIRADOS,
+} from './config';
 import {
   DEFAULT_PRODUCTO_MODEL_ID,
   PRODUCTO_MODEL,
@@ -51,8 +57,16 @@ describe('parseProductoLeido', () => {
 describe('buildProductoRequest', () => {
   const input = { apiKey: 'clave-de-prueba', imageBase64: 'aW1hZ2Vu', mediaType: 'image/jpeg' as const };
 
+  /**
+   * Gemini y Anthropic salieron del selector el 2026-09-02, pero sus proveedores siguen en el
+   * binario: lo que estos dos casos verifican no es que el modelo esté ofrecido, es que el prompt y
+   * el schema son los MISMOS para todos los dialectos. Si dejaran de serlo, comparar modelos
+   * mediría prompts.
+   */
+  const retirado = (id: string) => PERFILES_RETIRADOS.find((p) => p.id === id)!;
+
   it('con un modelo Gemini arma el request de la Interactions API con el prompt y el schema de producto', () => {
-    const request = buildProductoRequest({ ...input, model: findModelProfile('gemini-3.5-flash-lite') });
+    const request = buildProductoRequest({ ...input, model: retirado('gemini-3.5-flash-lite') });
     const body = request.body as {
       model: string;
       input: { type: string; text?: string }[];
@@ -69,7 +83,7 @@ describe('buildProductoRequest', () => {
   });
 
   it('con un modelo Anthropic arma el request de la Messages API con el MISMO prompt y schema', () => {
-    const request = buildProductoRequest({ ...input, model: findModelProfile('claude-haiku-4-5') });
+    const request = buildProductoRequest({ ...input, model: retirado('claude-haiku-4-5') });
     const body = request.body as {
       model: string;
       system: string;
@@ -82,10 +96,12 @@ describe('buildProductoRequest', () => {
     expect(body.output_config.format.schema).toBe(productoSchema);
   });
 
-  it('el default es un Gemini Flash Lite: la latencia manda también en supermercado', () => {
+  it('el default resuelto es el que declara DEFAULT_PRODUCTO_MODEL_ID, y está en el selector', () => {
+    // `PRODUCTO_MODEL` resuelve el id contra el registro con un fallback al primero. Si el id
+    // dejara de existir, el fallback lo taparía en silencio y la app leería con otro modelo del que
+    // dice la constante — con la medición que justifica el default apuntando al equivocado.
     expect(PRODUCTO_MODEL.id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
-    expect(PRODUCTO_MODEL.provider).toBe('gemini');
-    expect(PRODUCTO_MODEL.id).toContain('lite');
+    expect(MODEL_PROFILES.some((p) => p.id === DEFAULT_PRODUCTO_MODEL_ID)).toBe(true);
   });
 
   it('el schema de producto cumple lo que exigen ambas APIs', () => {

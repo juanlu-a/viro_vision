@@ -4,41 +4,45 @@
  * VisionNotConfiguredError en cada lectura. La tabla cubre cada caída del resolver.
  */
 import { resolveProductoModel } from './modeloSupermercado';
-import { DEFAULT_PRODUCTO_MODEL_ID, MODEL_PROFILES } from '@/services/vision';
+import { DEFAULT_PRODUCTO_MODEL_ID, MODEL_PROFILES, PERFILES_RETIRADOS } from '@/services/vision';
 
-const gemini = MODEL_PROFILES.filter((m) => m.provider === 'gemini');
-const haiku = MODEL_PROFILES.find((m) => m.id === 'claude-haiku-4-5')!;
-const porDefecto = MODEL_PROFILES.find((m) => m.id === DEFAULT_PRODUCTO_MODEL_ID)!;
-
-/** Un build con las cuatro claves cargadas: el caso en que el usuario sí puede elegir. */
+/** Un build con todas las claves: el caso en que el usuario sí puede elegir. */
 const todos = MODEL_PROFILES;
+const porDefecto = MODEL_PROFILES.find((m) => m.id === DEFAULT_PRODUCTO_MODEL_ID)!;
+/** Un build con la clave de UN solo proveedor: el caso en que no puede. */
+const soloDefault = [porDefecto];
+/** El otro del selector, para el caso en que el default no está disponible. */
+const elOtro = MODEL_PROFILES.find((m) => m.id !== DEFAULT_PRODUCTO_MODEL_ID)!;
+/** Un modelo que existió y ya no se ofrece: el escenario que este resolver existe para cubrir. */
+const retirado = PERFILES_RETIRADOS[0];
 
 describe('resolveProductoModel', () => {
   it('respeta el guardado si está disponible', () => {
     // Lo elegido gana sobre el default: si no, cambiar de modelo en el selector no sobreviviría a
-    // cerrar la app y el usuario volvería a Gemini sin entender por qué.
-    expect(resolveProductoModel('claude-haiku-4-5', todos)?.id).toBe('claude-haiku-4-5');
-    expect(resolveProductoModel('gpt-5.6-luna', todos)?.id).toBe('gpt-5.6-luna');
+    // cerrar la app y el usuario volvería al default sin entender por qué.
+    expect(resolveProductoModel(elOtro.id, todos)?.id).toBe(elOtro.id);
   });
 
   it('cae al default si el guardado ya no está en el registro (modelo retirado)', () => {
-    // gemini-3.6-flash era el default hasta la medición de latencia del 30/08/2026.
-    expect(resolveProductoModel('gemini-3.6-flash', gemini)?.id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
+    // El caso real: `gemini-3.5-flash-lite` fue el default hasta el 2026-09-02 y salió del selector
+    // por la medición de latencia. Quien lo tuviera guardado no puede quedar leyendo con un modelo
+    // que la app ya no ofrece.
+    expect(resolveProductoModel(retirado.id, todos)?.id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
   });
 
   it('cae al default si el guardado es de un proveedor sin clave en este build', () => {
-    expect(resolveProductoModel('claude-haiku-4-5', gemini)?.id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
+    expect(resolveProductoModel(elOtro.id, soloDefault)?.id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
   });
 
-  it('sin nada guardado, elige el default (el Flash Lite fijado)', () => {
-    expect(resolveProductoModel(null, gemini)).toBe(porDefecto);
+  it('sin nada guardado, elige el default', () => {
+    expect(resolveProductoModel(null, todos)).toBe(porDefecto);
   });
 
   it('si el default no está disponible, elige el primero que sí', () => {
-    expect(resolveProductoModel(null, [haiku])).toBe(haiku);
+    expect(resolveProductoModel(null, [elOtro])).toBe(elOtro);
   });
 
   it('sin modelos disponibles devuelve null: el modo avisa, no adivina', () => {
-    expect(resolveProductoModel('gemini-3.5-flash-lite', [])).toBeNull();
+    expect(resolveProductoModel(porDefecto.id, [])).toBeNull();
   });
 });
