@@ -92,7 +92,13 @@ Las claves van a `app/.env` (ver `app/.env.example`). **Nunca a un commit ni a u
 - [ ] Elegir uno, cerrar la app por completo y volver a abrirla → **sigue elegido**. Se persiste.
 - [ ] Con VoiceOver, el selector se anuncia como grupo de radio y dice cuál está marcado.
 
-### 8. Verificar cada proveedor contra la API real ⚠️
+### 8. Verificar cada proveedor contra la API real ✅ *(hecho el 2026-09-02, salvo Anthropic)*
+
+> Los tres proveedores con clave se verificaron contra la API real y **los tres pasan**: responden,
+> devuelven los tres campos y aciertan. Los números y los dos hallazgos que corrigieron el código
+> están en [`pruebas-y-decisiones.md`](pruebas-y-decisiones.md). Queda pendiente sólo
+> `claude-haiku-4-5`, que necesita tarjeta. Lo de abajo se conserva como receta para cuando se
+> agregue un proveedor nuevo.
 
 Los proveedores de OpenAI y Groq están escritos **contra los docs, no contra la API real**. Esta base
 tiene el estándar contrario a propósito: el de Gemini está verificado contra la API, y por eso

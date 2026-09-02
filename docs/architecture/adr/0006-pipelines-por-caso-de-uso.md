@@ -212,6 +212,39 @@ sobre la Raspi) quedan dibujados y versionados, sin implementar: elegir entre el
 hardware para medirlos, y hasta entonces la app sostiene el camino local (OCR sobre la foto) que
 los dos comparten.
 
+## Actualización 2026-09-02 — verificado contra las APIs reales, y dos cosas salieron al revés
+
+Los proveedores nuevos se escribieron contra los docs porque no había claves. Con las claves, se
+midió con **el código de la app** contra las APIs reales. Números completos en
+[`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md); acá lo que cambia decisiones.
+
+**Los tres andan y los tres aciertan** tipo, marca y detalle en todas las corridas. En esta tarea la
+precisión no separa a los modelos: separa la latencia y la cuota.
+
+**El orden de latencia no es el que suponía el registro.** Groq ~1 s, OpenAI ~1,7 s, Gemini 3,1-11,2
+s. El default sigue siendo Gemini —es el único gratuito sin tarjeta y con cuota holgada— pero **es
+el más lento de los tres y el más variable**, y eso contradice el criterio con el que se armó el
+selector. Queda como decisión abierta.
+
+**El más rápido tiene la cuota más apretada.** El tier gratuito de Groq limita por *tokens* por
+minuto (8000 TPM) y una foto cuesta ~1974 tokens fijos, así que son **~4 lecturas por minuto**.
+Achicar la imagen no lo baja: Groq cobra la imagen a tarifa fija. Para alguien recorriendo una
+góndola eso pesa más que 700 ms.
+
+**Apagar el razonamiento no compra latencia acá.** La justificación estaba extrapolada de Gemini y
+no se sostiene sobre `gpt-5.6-luna`: `none`, `medium` y el default dan lo mismo, con los mismos
+tokens de salida. Se sigue mandando `none` por intención y porque es gratis, no por los segundos.
+
+**La documentación de Groq no lista sus valores reales**: documenta `reasoning_effort: none |
+default` y `low` devolvió 200.
+
+**Y apareció un defecto**: la cuota no siempre llega como evento SSE — Groq la devuelve como HTTP
+429 antes de abrir el stream, y por ese camino la UI decía "la nube no respondió" en vez de "cuota
+agotada, reintentá en N s". Corregido.
+
+Sigue **sin verificar** el proveedor de Anthropic (`claude-haiku-4-5`): requiere tarjeta y no hay
+clave.
+
 ## Implicaciones para el código actual
 
 - El lector de Inicio (`app/src/features/reader/`) implementa los dos modos; los modos del producto

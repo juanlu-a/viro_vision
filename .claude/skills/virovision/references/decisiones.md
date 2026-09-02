@@ -119,12 +119,19 @@ que espaciar las corridas.
 con VoiceOver es un swipe más entre la persona y la lectura. Hay un test que **falla** si alguien
 agrega dos modelos del mismo proveedor: la decisión hay que rediscutirla, no ajustarla.
 
-**El razonamiento se apaga SIEMPRE, y el parámetro no es el mismo en cada proveedor.** Es lo que
-decide la latencia del modo, y ya costó descubrirlo dos veces. En Gemini es
-`generation_config.thinking_level`; en OpenAI y Groq es `reasoning_effort`, y `'none'` es el único
-valor que los dos aceptan (OpenAI admite `none|low|medium|high|xhigh|max`, Groq sólo
-`none|default`). `gpt-5.6-luna` razona en `medium` por defecto: sin mandarlo, tres campos cortos
-pasan a decenas de segundos.
+**El razonamiento se apaga siempre, pero sólo en Gemini eso compra latencia.** Medido el
+2026-09-02: en Gemini no apagarlo lleva la lectura de 3 s a decenas de segundos
+(`generation_config.thinking_level`), pero sobre `gpt-5.6-luna` da igual — `none`, `medium` y el
+default rinden lo mismo, con los mismos tokens de salida, porque no gasta razonamiento en tres
+campos cortos. Se manda `'none'` igual por intención y porque es gratis, no por los segundos.
+`'none'` es además el único valor que OpenAI y Groq garantizan los dos. **La documentación de Groq
+no lista sus valores reales**: documenta `none|default` y `low` devolvió 200 — otra razón para
+verificar contra la API y no contra los docs.
+
+**Medición del 2026-09-02** (misma foto, mismo prompt, corridas espaciadas): Groq ~1 s, OpenAI
+~1,7 s, Gemini 3,1-11,2 s. Los tres aciertan tipo, marca y detalle. Gemini sigue de default por
+gratuidad y cuota holgada, pero **es el más lento y el más variable**, lo que contradice el criterio
+con el que se armó el selector — decisión abierta.
 
 **De Groq va el Qwen 3.8 y no el 3.6, aunque el 3.6 sea más rápido en el papel.** El 3.6 sólo admite
 `json_object`, que deja los nombres de campo a criterio del modelo; el 3.8 admite `json_schema` con
@@ -159,10 +166,10 @@ modelo en el selector cambiaría también la pregunta y la comparación mediría
 
 ## Restricciones externas que condicionan el plan
 
-- **Los proveedores de OpenAI y Groq están escritos contra los docs, no contra la API real**
-  (2026-09-01: faltaban las claves). Esta base tiene el estándar contrario a propósito — el de
-  Gemini está verificado contra la API, y por eso encontró que el discriminador es `event_type` y no
-  `type`, algo que los docs no dicen y que descarta todos los eventos **en silencio**. Las cuatro
-  cosas por confirmar están en el paso 8 de `docs/qa-modo-supermercado.md`.
+- **La cuota de Groq es por TOKENS por minuto, no por requests**: 8000 TPM y ~1974 tokens fijos por
+  foto = **~4 lecturas por minuto**. Achicar la imagen no lo baja (Groq cobra la imagen a tarifa
+  fija). Es el modelo más rápido y el de cuota más apretada a la vez.
+- **`claude-haiku-4-5` sigue sin verificar contra la API real**: requiere tarjeta y no hay clave.
+  Los otros tres se verificaron el 2026-09-02.
 - **La RPi Zero 2 W (~0,5 GB) no corre Gemma.** LiteRT-LM sí corre en Raspberry Pi, así que una Pi
   más grande sería opción sin cambiar el stack de software.

@@ -39,6 +39,7 @@ export {
 export { anthropicProvider, geminiProvider, getProvider, groqProvider, openaiProvider } from './providers';
 export { PRODUCTO_SYSTEM_PROMPT, PRODUCTO_USER_PROMPT } from './providers/prompts';
 export { acquireSlot, limitePorMinuto, remainingSlots, resetRateLimiter } from './rateLimiter';
+export { ESPERA_POR_DEFECTO_S, interpretarErrorHttp } from './httpError';
 export { parseJsonRecord } from './schema';
 export type {
   EffortLevel,

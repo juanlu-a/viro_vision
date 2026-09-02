@@ -17,12 +17,12 @@ import { resolverTransporte } from '@/services/cloud';
 
 import { apiKeyFor, isProviderConfigured } from './config';
 import {
-  VisionHttpError,
   VisionNetworkError,
   VisionNotConfiguredError,
   VisionQuotaError,
   VisionStreamError,
 } from './errors';
+import { interpretarErrorHttp } from './httpError';
 import { buildProductoRequest, parseProductoLeido, PRODUCTO_MODEL } from './producto';
 import type { ProductoLeido } from './producto';
 import { getProvider } from './providers';
@@ -96,7 +96,14 @@ export async function reconocerProducto(options: {
   }
 
   if (!response.ok) {
-    throw new VisionHttpError(response.status, await response.text());
+    // La cuota no siempre llega como evento SSE: Groq la devuelve como 429 ANTES de abrir el
+    // stream. Sin este intérprete ese camino lanzaba VisionHttpError y la UI decía "la nube no
+    // respondió" en vez de "cuota agotada, reintentá en N s" (medido el 2026-09-02).
+    throw interpretarErrorHttp(
+      response.status,
+      await response.text(),
+      response.headers.get('retry-after'),
+    );
   }
   if (!response.body) {
     throw new VisionStreamError('La respuesta no trae body legible (¿streaming no soportado?).');

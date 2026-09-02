@@ -22,15 +22,22 @@ import type {
 /**
  * Traduce nuestro `ThinkingMode`/`EffortLevel` al parámetro del dialecto.
  *
- * **Esto es lo que decide la latencia del modo, igual que en Gemini.** `gpt-5.6-luna` es un modelo
- * de razonamiento y su default es `medium`: sin mandar nada, pensaría antes de devolver tres campos
- * cortos y la lectura pasaría de segundos a decenas de segundos. Es exactamente la trampa que en
- * Gemini costó descubrir (ver el comentario de `generation_config.thinking_level` en gemini.ts).
+ * **Medido el 2026-09-02, y el resultado corrige lo que decía este comentario.** Se escribió
+ * asumiendo que acá pasaría lo mismo que en Gemini —donde no apagar el pensamiento lleva la lectura
+ * de 3 s a decenas de segundos— y sobre estos modelos **no pasa**: `gpt-5.6-luna` tarda lo mismo
+ * con `none` (1,5-2,1 s) que con `medium` (1,5 s) que sin mandar nada (2,0 s), y devuelve los
+ * mismos 35 tokens de salida en los tres casos. Sobre una tarea de tres campos cortos no gasta
+ * tokens de razonamiento aunque se lo permitas.
  *
- * OJO al agregar un modelo: el juego de valores NO es el mismo en los dos proveedores. OpenAI
- * acepta `none | low | medium | high | xhigh | max`; Groq, sólo `none | default`. `'none'` es el
- * único que los dos entienden, y es el que usa el modo supermercado. Si alguna vez hace falta
- * pensar, hay que mapear por proveedor, no copiar esta línea.
+ * Se sigue mandando `'none'` igual, por dos motivos que no son la latencia de hoy: es la intención
+ * correcta (no queremos que razone) y es seguro gratis si la tarea crece — el objetivo opcional de
+ * OCR de etiqueta la haría más larga. Lo que se corrige es la **justificación**: acá no compra los
+ * segundos que compra en Gemini.
+ *
+ * OJO al agregar un modelo: los valores válidos difieren por proveedor. OpenAI documenta
+ * `none | low | medium | high | xhigh | max`. Groq documenta sólo `none | default`, **pero aceptó
+ * `low` con 200** en la misma medición — o sea que su documentación no es la lista real. `'none'`
+ * es el único que los dos garantizan, y es el que usa el modo supermercado.
  */
 function reasoningEffort(input: BuildRequestInput): string {
   return input.thinking === 'off' ? 'none' : input.effort;
