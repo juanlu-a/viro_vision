@@ -26,6 +26,7 @@ import type { ProductoLeido } from './producto';
 import { getProvider } from './providers';
 import { acquireSlot, limitePorMinuto } from './rateLimiter';
 import { readSseStream } from './sse';
+import { resolverTransporte } from './transport';
 import type { ModelProfile } from './types';
 
 export interface ReconocimientoProducto {
@@ -53,12 +54,18 @@ export async function reconocerProducto(options: {
   if (!isProviderConfigured(model.provider)) throw new VisionNotConfiguredError();
 
   const provider = getProvider(model.provider);
-  const request = buildProductoRequest({
-    model,
-    apiKey: apiKeyFor(model.provider),
-    imageBase64: options.imageBase64,
-    mediaType: options.mediaType,
-  });
+  // El proveedor arma su request igual que siempre; el transporte decide si sale directo o por el
+  // proxy (ADR 0008). Con proxy, `apiKeyFor` devuelve '' y las cabeceras que la llevarían se
+  // descartan: la clave la pone el servidor.
+  const request = resolverTransporte(
+    buildProductoRequest({
+      model,
+      apiKey: apiKeyFor(model.provider),
+      imageBase64: options.imageBase64,
+      mediaType: options.mediaType,
+    }),
+    model.provider,
+  );
   const payloadJson = JSON.stringify(request.body);
 
   // La cuota se respeta ANTES de enviar: agotarla frena el modo entero. El tope es el del

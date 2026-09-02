@@ -1,0 +1,9 @@
+# Configuración del proyecto Supabase. Ver docs/supabase.md.
+project_id = "virovision"
+
+[functions.vision]
+# El proxy de claves de ADR 0008 NO exige JWT: la app no tiene login (ADR 0002) y la anon key
+# viajaría igual dentro del bundle, así que exigirla sería una indirección y no una defensa.
+# Está aceptado a conciencia en ADR 0008; las defensas reales son el freno por IP de la función y
+# el tope de gasto en la consola de cada proveedor.
+verify_jwt = false
