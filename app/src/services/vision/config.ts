@@ -24,6 +24,14 @@ export const anthropicApiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 /** Groq: tier gratuito sin tarjeta (console.groq.com). */
 export const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 
+/**
+ * El proxy propio (ADR 0008). Cuando está, la app **no lleva ninguna clave**: las guarda el
+ * servidor. Es el destino de este camino; el directo de arriba queda para desarrollo local.
+ */
+export const visionProxyUrl = process.env.EXPO_PUBLIC_VISION_PROXY_URL ?? '';
+
+export const isProxyConfigured = visionProxyUrl.length > 0;
+
 const API_KEYS: Record<VisionProviderId, string> = {
   gemini: geminiApiKey,
   openai: openaiApiKey,
@@ -40,14 +48,21 @@ export function apiKeyFor(provider: VisionProviderId): string {
   return API_KEYS[provider];
 }
 
+/**
+ * Con el proxy activo, **todos** los proveedores están disponibles aunque el build no traiga
+ * ninguna clave: precisamente porque las tiene el servidor. Sin esto, un build correcto —el que
+ * queremos distribuir— mostraría el modo supermercado como "no configurado".
+ *
+ * Que el servidor tenga o no el secret de un proveedor concreto no se puede saber desde acá; si le
+ * falta, la función responde 503 nombrando el secret que falta.
+ */
 export function isProviderConfigured(provider: VisionProviderId): boolean {
-  return apiKeyFor(provider).length > 0;
+  return isProxyConfigured || apiKeyFor(provider).length > 0;
 }
 
-/** Si no hay ninguna clave, el modo supermercado no puede leer: la UI lo dice en vez de fallar. */
-export const isVisionConfigured = (Object.keys(API_KEYS) as VisionProviderId[]).some(
-  isProviderConfigured,
-);
+/** Sin proxy y sin ninguna clave, el modo supermercado no puede leer: la UI lo dice en vez de fallar. */
+export const isVisionConfigured =
+  isProxyConfigured || (Object.keys(API_KEYS) as VisionProviderId[]).some(isProviderConfigured);
 
 export const GEMINI_INTERACTIONS_URL =
   'https://generativelanguage.googleapis.com/v1beta/interactions';
