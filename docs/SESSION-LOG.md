@@ -560,12 +560,158 @@ Sesión de operaciones sobre TestFlight, casi toda desde monitores en background
   cambió cómo se trabaja) y ADRs (si hubo decisión). También quedó escrito que el grupo interno de
   TestFlight no tiene link compartible (convenciones + PROJECT-STATUS).
 
+## 2026-09-01 — El modo supermercado, entero: cámara, cinco modelos y un proxy propio
+
+Punto de partida: un diagrama dibujado por el equipo (`documents/logicas-casos-de-uso.pdf`) con
+tres flujos — dos variantes del caso ómnibus según cuánto modelo corre en la Raspi, y el caso
+supermercado contra un modelo en la nube. **El camino de ómnibus queda en stand by** por decisión
+del equipo: elegir entre sus dos variantes exige tener el hardware para medirlas. La sesión fue
+sobre supermercado, que era el que estaba a medio hacer.
+
+Cinco PRs en secuencia, todos con CI verde: **#46** (docs), **#47** (cámara), **#48** (modelos),
+**#49** (proxy), **#50** (audio + QA).
+
+- **El diagrama se versiona dos veces, a propósito.** El PDF en `documents/` —carpeta nueva— es el
+  registro de qué se acordó; la transcripción a mermaid en `docs/architecture/README.md` es la
+  fuente canónica, porque se lee en un diff y GitHub la renderiza. El `documents/README.md` dice
+  cuál manda si difieren, que es el costo de tener dos copias.
+
+- **La app abría la fototeca, no la cámara.** Servía para probar pero no era el flujo: en el
+  diagrama la foto la saca la placa del dispositivo. Sin hardware, la cámara del teléfono ocupa ese
+  lugar y el resto del camino es idéntico. Se usa la cámara del sistema vía `expo-image-picker` y
+  no una vista propia con `expo-camera`: la UI nativa ya está resuelta para VoiceOver, y la
+  convención prefiere componente estándar bien anotado sobre UI dibujada a mano. La fototeca **no
+  se fue**: baja a acción secundaria porque es lo que permite pasarle la MISMA foto a varios
+  modelos —si no, la comparación mide fotos y no modelos— y es la salida cuando el permiso de
+  cámara quedó denegado.
+
+- **El permiso se pide explícitamente**, en vez de dejar que `launchCameraAsync` falle solo. Sin
+  eso el botón no hacía nada visible y quien no ve la pantalla no tenía forma de saber por qué. El
+  error tipado lleva `canAskAgain` porque **cambia el consejo**: decirle "aceptá el permiso" a
+  quien iOS ya no le va a mostrar el diálogo lo deja esperando un cartel que no aparece.
+
+- **La foto se subía entera.** ~4000 px y varios MB de base64 cruzando el puente JS, la red y los
+  tokens de entrada — tres veces latencia para alguien parado frente a la góndola. Ahora se achica
+  a 1024 px de lado mayor. El detalle que importa: se restringe el lado **mayor** y no el ancho,
+  porque un envase en la góndola es vertical y fijar el ancho dejaba el alto en ~1365 px, que era
+  justo lo que se quería evitar. Y el base64 se pide **después** del achique, no antes.
+
+- **Cae la gratuidad como restricción del proyecto** (sigue vigente para el usuario final). El
+  selector pasa a cinco modelos elegidos por latencia: `gemini-3.5-flash-lite` (default),
+  `gpt-5.6-luna`, `claude-haiku-4-5`, `qwen/qwen3.8-27b` sobre Groq, y el modelo hosteado en
+  Arnaldo Castro, **documentado y sin implementar** porque no hay endpoint.
+
+- **Un módulo cubre dos proveedores.** OpenAI, Groq y cualquier vLLM hablan el mismo dialecto, así
+  que `providers/openaiCompatible.ts` se parametriza por URL. Es también por qué sumar el endpoint
+  de Arnaldo Castro va a ser configuración y no código.
+
+- **El razonamiento, de nuevo.** `gpt-5.6-luna` razona en `medium` por defecto: sin
+  `reasoning_effort: 'none'`, tres campos cortos se pagarían como decenas de segundos — la misma
+  trampa que en Gemini con `thinking_level`. Quedó anotado que los valores **no** coinciden entre
+  proveedores (OpenAI acepta `none|low|medium|high|xhigh|max`, Groq sólo `none|default`) para que
+  nadie copie la línea a un modelo que la rechace.
+
+- **De Groq va el Qwen 3.8 y no el 3.6, aun siendo el 3.6 más rápido** (500 contra 450 tok/s). El
+  3.6 sólo admite `json_object`, que garantiza JSON sintáctico pero deja los nombres de campo a
+  criterio del modelo: `parseProductoLeido` rebotaría una lectura correcta por venir como
+  "producto" en vez de "tipo". El 3.8 admite `json_schema` con `strict`. Sobre ~50 tokens de
+  respuesta, 50 tok/s son centésimas; la garantía de forma vale más.
+
+- **Salen `gemini-flash-lite-latest` y `claude-opus-5` del selector.** Con los nuevos serían siete
+  opciones en un radiogroup que se recorre con VoiceOver, y cada opción de más es un swipe más
+  entre la persona y la lectura. Hay un test que **falla** si alguien vuelve a poner dos modelos
+  del mismo proveedor: la decisión hay que rediscutirla, no ajustarla.
+
+- **El limitador de cuota imponía el tier gratuito de Gemini a todos.** Pasa a ser por proveedor;
+  en los pagos el número alto es deliberado, porque ahí deja de ser la pared del tier gratuito y
+  pasa a ser un freno contra un bucle que queme crédito. De paso apareció un bug latente: el
+  callback `onWait` existía desde el principio y **no lo llamaba nadie**, así que la app podía
+  dormir hasta un minuto en silencio — para quien no ve la pantalla, indistinguible de estar
+  colgada. Ahora se anuncia.
+
+- **ADR 0008: un proxy propio, y por qué Supabase.** `EXPO_PUBLIC_*` no es una variable de entorno
+  que el binario lea al arrancar: es una constante compilada dentro del `.ipa`, y un `strings` la
+  devuelve. Con el tier gratuito era una molestia; con link público de TestFlight vivo y modelos
+  pagos, es la tarjeta del proyecto. El ADR compara las cinco opciones evaluadas —Supabase Edge
+  Function, Cloudflare Workers, AWS Lambda, VM self-hosted, seguir sin proxy— con el veredicto de
+  cada una. Gana Supabase por encaje, no por ser la mejor herramienta: ya es el backend declarado
+  (ADR 0002) y ya es dependencia, así que no suma una cuenta más que mantener; Cloudflare es
+  técnicamente mejor proxy pero su ventaja (cold start de decenas de ms) es ruido frente a los 2-3
+  s del modelo; Lambda es desproporcionado para reenviar un POST. **Cierra el pendiente (b) de ADR
+  0006**, abierto desde el 30/08.
+
+- **El proxy es tonto a propósito**, y eso es la decisión, no un atajo. Recibe el cuerpo que el
+  módulo del cliente ya armó, le pone la clave y devuelve el body upstream sin tocarlo. Así la
+  lógica de proveedor no se duplica del lado del servidor y agregar un modelo sigue siendo un
+  cambio en la app. Y reenviar sin leer no es sólo simplicidad: leer para reemitir obligaría a
+  duplicar el parseo de eventos de cada proveedor **y mataría el streaming**.
+
+- **La guarda central es la allowlist por host.** Un proxy que reenvía a la URL que le pasen le
+  entrega la clave al primero que pida un redirect a su propio servidor. Se valida por host y no
+  por URL exacta para que el path lo siga eligiendo el módulo del cliente — y eso resultó tener un
+  rédito que no estaba planeado: la síntesis de voz del PR #50 pasa por el mismo proxy **sin tocar
+  el servidor**, porque `/v1/audio/speech` está en `api.openai.com`, que ya estaba en la tabla.
+
+- **Queda escrito qué compra el proxy y qué no**, en el código y en el ADR, porque es fácil creer
+  que resuelve más de lo que resuelve. No está autenticado: la app no tiene login y la anon key
+  viajaría igual en el bundle, así que exigirla sería una indirección, no una defensa. El endpoint
+  **es abusable**. Lo que cambia es el modo de falla: la clave se rota o se corta en segundos en
+  vez de exigir publicar una versión y esperar revisión de tienda. Las defensas reales son la
+  allowlist, el freno por IP —un badén y no una pared, porque cada isolate cuenta lo suyo— y el
+  tope de gasto en cada proveedor.
+
+- **El archivo de audio se construyó pero salió apagado**, y vale registrar la objeción porque es
+  una decisión sobre la feature tal como estaba pedida: hoy nada lo consume —el hardware no
+  existe— así que prenderlo es pagar una llamada al TTS por cada lectura para producir algo que
+  nadie abre; y cuando el hardware exista puede que no haga falta, porque un MP3 de ~3 s son ~12
+  KB, que por WiFi es nada pero por GATT es del orden de segundos, y quizá convenga que la Raspi
+  haga su propio TTS y sólo reciba el JSON — que es exactamente lo que **ADR 0003** tiene
+  reservado. Se prende con `EXPO_PUBLIC_AUDIO_FILE_ENABLED=1`.
+
+- **Se descartaron dos TTS antes de elegir el tercero.** Google Cloud TTS: una clave de AI Studio
+  no tiene esa API habilitada (son proyectos distintos), así que la clave que ya teníamos no
+  servía. TTS nativo de Gemini: devuelve **PCM crudo**, no MP3, y habría que armar el header WAV a
+  mano en React Native. Queda `gpt-4o-mini-tts`, que devuelve MP3 directo con la clave que el
+  selector ya necesita.
+
+- **El anuncio no puede depender de la red, y ahora el linter también lo dice.** La síntesis se
+  llama **después** de `announce()`, sin `await` en el camino crítico, y traga sus errores: si
+  falla, el usuario ya escuchó el producto. `features/audio/` pasa a tener prohibido importar
+  `@/services/cloud` además de `@/services/vision`, por el mismo motivo de ADR 0001. El transporte
+  se movió de `services/vision/` a `services/cloud/`: no es de visión, y hacer que
+  `services/audio` dependiera de `services/vision` habría sido una dependencia inventada entre dos
+  cosas que sólo comparten el transporte.
+
+- **`docs/qa-modo-supermercado.md`**: 12 bloques partidos por qué necesita cada uno, porque buena
+  parte se prueba hoy con la clave de Gemini y el resto depende de cosas que se hacen una vez. Los
+  pasos 8 y 9 no son sólo QA: son la corrida que alimenta el **dataset de evaluación** de la tesis
+  (la misma foto contra los cuatro modelos, desde la fototeca, anotando `tipo`/`marca`/`detalle`
+  por separado).
+
+- **Deuda consciente, anotada en el paso 8 del QA**: los proveedores de OpenAI y Groq están
+  escritos **contra los docs, no contra la API real**, porque no hay claves todavía. Esta base
+  tiene el estándar contrario a propósito — el de Gemini está verificado contra la API, y por eso
+  encontró que el discriminador es `event_type` y no `type`, algo que los docs no dicen y que
+  descarta todos los eventos en silencio. Hay cuatro cosas concretas por confirmar.
+
 ## Open threads / next
+- **Claves de OpenAI y Groq** en `app/.env`, para verificar los proveedores nuevos contra la API
+  real (paso 8 de `qa-modo-supermercado.md`). Groq es gratis y sin tarjeta; en OpenAI, **el tope de
+  gasto va antes que la clave**.
+- **Desplegar el proxy** (ADR 0008): crear el proyecto Supabase, `supabase secrets set` por
+  proveedor, `functions deploy vision`, y `EXPO_PUBLIC_VISION_PROXY_URL`. Hasta entonces las claves
+  siguen viajando dentro del `.ipa`.
+- **Correr el bloque A del QA en el iPhone**: cámara, permiso denegado y VoiceOver sólo se prueban
+  en device, y necesita rebuild nativo porque cambiaron los permisos.
 - **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales para
-  cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30); resolver el despliegue de la clave en un
-  build distribuible.
-- **Validar ADR 0006 y 0007 con el tutor** — todo quedó en Proposed.
-- Armar el **dataset de evaluación** (captura + etiquetado esperado/obtenido) para ambos casos.
+  cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30). El despliegue de la clave dejó de ser
+  pendiente el 2026-09-01: lo resuelve ADR 0008.
+- **Camino de ómnibus en stand by** (decisión del 2026-09-01). Los dos casos del diagrama quedaron
+  en mermaid, versionados, para retomarlos cuando haya hardware con qué medirlos.
+- **Validar ADR 0006 y 0007 con el tutor** — todo quedó en Proposed. Sumar la actualización del
+  2026-09-01 de ADR 0006 (cinco modelos, cae la gratuidad) y ADR 0008.
+- Armar el **dataset de evaluación** (captura + etiquetado esperado/obtenido) para ambos casos. En
+  supermercado el protocolo ya está escrito: pasos 8 y 9 de `docs/qa-modo-supermercado.md`.
 - Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
   abierto del camino de bondis).
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
@@ -574,4 +720,5 @@ Sesión de operaciones sobre TestFlight, casi toda desde monitores en background
   `PLAY_ENABLED=true` y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 - **Sumar a Magalí a TestFlight** (grupo interno) cuando pase su email; Francisco espera el canal
   Android.
-- Pending interactive setup: **Supabase** project + `app/.env`. See `PROJECT-STATUS.md`.
+- Pending interactive setup: **Supabase** project + `app/.env`. Desde ADR 0008 ya no es sólo para
+  la cuenta online: el proxy de claves lo necesita. See `PROJECT-STATUS.md`.

@@ -1,6 +1,6 @@
 # ViroVision — Project status & session handoff
 
-_Living status/continuation doc. Last updated: 2026-08-22._
+_Living status/continuation doc. Last updated: 2026-09-01._
 
 This captures where the project stands so anyone (including a fresh Claude Code session, together with
 the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
@@ -53,12 +53,18 @@ docs/       thesis deliverables, ADRs, this file
   proponía Gemma vía LiteRT-LM; el spike mostró que su visión está rota en iOS y que el VLM por
   ExecuTorch funciona pero tarda 6,4 s. La pregunta del runtime se resuelve **por caso de uso** →
   ADR 0006.
-- **ADR 0006 — Pipelines por caso de uso** *(Proposed 2026-08-22, a validar con tutor)*: **bondis
-  = local** (detección preentrenada en la Coral TPU → recorte del banner → OCR; la TPU pasa a
-  **preprocesadora**); **supermercado = LLM con visión, pendiente** (Gemma 3 1B local vs. Gemini
-  Flash nube; restricción dura: gratuito para el usuario). La precisión se mide con **datasets de
-  evaluación** (recall / precision / accuracy / F1) — nada se entrena. Ver
+- **ADR 0006 — Pipelines por caso de uso** *(Proposed 2026-08-22, a validar con tutor; actualizado
+  2026-08-30 y 2026-09-01)*: **bondis = local** (detección preentrenada en la Coral TPU → recorte
+  del banner → OCR; la TPU pasa a **preprocesadora**); **supermercado = LLM con visión en la nube**,
+  con **cinco modelos elegidos por latencia** en el selector. Cae la gratuidad como restricción del
+  proyecto (se paga para poder comparar) y sigue vigente para el usuario final. La precisión se mide
+  con **datasets de evaluación** (recall / precision / accuracy / F1) — nada se entrena. Ver
   `docs/pruebas-y-decisiones.md`.
+- **ADR 0008 — Proxy propio para las claves de nube** *(Accepted 2026-09-01)*: `EXPO_PUBLIC_*` se
+  compila dentro del `.ipa`, así que las claves salen a una **Supabase Edge Function** que las
+  inyecta del lado del servidor. Cierra el pendiente (b) de ADR 0006. El ADR compara las cinco
+  opciones evaluadas y deja escrito qué compra el proxy y qué no (el endpoint sigue siendo abusable;
+  lo que cambia es poder rotar o cortar en segundos).
 - **ADR 0007 — Botones físicos y modos** *(Proposed 2026-08-22)*: 1 click = modo ómnibus, 2 clicks
   = modo supermercado, click largo = esperando. Nunca audio no solicitado. Diagrama canónico en
   `docs/architecture/README.md`.
@@ -85,11 +91,22 @@ tests via `jest-expo`.
   remain in the repo but are not wired into navigation — available if optional sync is added later.
 - **Lector de Inicio por modos (ADR 0006/0007)**: `features/reader/` — modo ómnibus = OCR local
   (`services/ondevice/ocr.ts`, ExecuTorch), modo supermercado = nube (`services/vision/`:
-  proveedores Gemini/Anthropic, SSE, schema, limitador de cuota). Sin clave o sin internet,
-  supermercado avisa. El modelo de nube se elige en Inicio (modal accesible, persistido en el
-  teléfono y revalidado contra los disponibles del build). El laboratorio del spike se retiró
+  proveedores Gemini / OpenAI / Anthropic / Groq, SSE, schema, limitador de cuota por proveedor).
+  Sin clave o sin internet, supermercado avisa. El modelo se elige en Inicio (modal accesible,
+  persistido y revalidado contra los disponibles del build). El laboratorio del spike se retiró
   (2026-08-30) y vive en la rama `spike/laboratorio-vision-local`.
-- Tests: **131 en 11 suites**.
+- **Captura por cámara (2026-09-01)**: `services/camera/` — la cámara del teléfono ocupa el lugar de
+  la placa del dispositivo mientras no hay hardware. Permiso pedido explícitamente y anunciado por
+  voz; la foto se achica a 1024 px de lado mayor antes de subirla. La fototeca queda como segunda
+  fuente, para pasarle la misma foto a varios modelos (dataset de evaluación).
+- **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
+  + `services/cloud/`. Se activa con `EXPO_PUBLIC_VISION_PROXY_URL`; sin esa variable el camino
+  directo de desarrollo sigue igual. **Escrito y sin desplegar**: falta crear el proyecto Supabase.
+- **Audio a archivo (apagado)**: `services/audio/sintesis.ts` deja un `.mp3` por lectura para el
+  parlante del dispositivo. Detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED` porque hoy nada lo consume.
+- **QA**: `docs/qa-modo-supermercado.md` — checklist de punta a punta, partido por qué necesita cada
+  bloque. Los pasos 8 y 9 son la corrida del dataset de evaluación.
+- Tests: **169 en 14 suites**.
 
 **CI/CD** (`.github/workflows/`, gated EAS jobs):
 - `ci.yml` — on PRs to main / feature pushes: install → lint → typecheck → test → bundle (iOS+Android

@@ -53,7 +53,7 @@ comparación en el informe.
 
 Buena parte ya está implementada (tokens, `theme.test.ts`, tipografía de marca); falta escribirla.
 
-### ADR 0006 — Pipelines por caso de uso · **Proposed (2026-08-22) — a validar con tutor**
+### ADR 0006 — Pipelines por caso de uso · **Proposed (2026-08-22) — a validar con tutor; actualizado 2026-08-30 y 2026-09-01**
 
 **Qué cambió**: deja de haber un runtime único (lo que buscaba ADR 0004). Cada caso de uso tiene su
 pipeline. **Bondis = local** (la latencia manda): detección **preentrenada en la Coral TPU** del
@@ -65,6 +65,15 @@ propias rompe la accesibilidad). La precisión del proyecto se mide con **datase
 (esperado vs. obtenido → recall, precision, accuracy, F1) — de evaluación, no de entrenamiento: la
 tarea B1 cambia de "entrenar" a "evaluar". Ver `docs/pruebas-y-decisiones.md`.
 
+**Qué cambió el 2026-09-01**: cae la gratuidad como restricción **del proyecto** (se paga para poder
+comparar) y sigue vigente **para el usuario final**. El selector pasa a **cinco modelos elegidos por
+latencia**, uno por proveedor: `gemini-3.5-flash-lite` (default), `gpt-5.6-luna`, `claude-haiku-4-5`,
+`qwen/qwen3.8-27b` sobre Groq, y el hosteado en Arnaldo Castro —documentado, sin endpoint todavía—.
+Salen `gemini-flash-lite-latest` y `claude-opus-5`: siete opciones en un radiogroup recorrido con
+VoiceOver frente a una góndola es peor producto que cinco. La **cámara del teléfono** ocupa el lugar
+de la placa mientras no hay hardware, y la lectura además puede dejar un `.mp3` (apagado por
+defecto). El **camino de ómnibus queda en stand by**.
+
 ### ADR 0007 — Botones físicos y modos de operación · **Proposed (2026-08-22) — a validar con tutor**
 
 **Qué cambió**: hasta ahora no había ninguna interfaz de entrada física especificada. El
@@ -73,15 +82,54 @@ audio no solicitado. Desde *esperando*: 1 click = modo ómnibus (pipeline local)
 supermercado (pipeline LLM), click largo = volver a esperando. Cada transición se anuncia por
 audio. Diagrama canónico en `docs/architecture/README.md`.
 
+### ADR 0008 — Proxy propio para las claves de nube · **Accepted (2026-09-01)**
+
+**Qué cambió**: las claves dejan de viajar en el bundle. `EXPO_PUBLIC_*` no es una variable de
+entorno que el binario lea al arrancar, es una **constante compilada dentro del `.ipa`**; con link
+público de TestFlight vivo y modelos pagos, eso es la tarjeta del proyecto. Van a una **Supabase
+Edge Function** que las inyecta del lado del servidor. Cierra el pendiente (b) de ADR 0006.
+
+Elegida por **encaje, no por ser la mejor herramienta**: Supabase ya es el backend declarado (ADR
+0002) y ya es dependencia, así que no suma una cuenta más que mantener. Cloudflare Workers es
+técnicamente mejor proxy de streaming, pero su ventaja (cold start de decenas de ms) es ruido frente
+a los 2-3 s del modelo; AWS Lambda es desproporcionado para reenviar un POST. La comparación de las
+cinco opciones evaluadas está en el ADR.
+
+**Es un proxy tonto a propósito**: reenvía el cuerpo que el cliente ya armó, sin leerlo. Leerlo para
+reemitirlo duplicaría el parseo de eventos de cada proveedor y mataría el streaming.
+
+**Lo que compra y lo que no**, porque es fácil creer que resuelve más: no está autenticado (la app
+no tiene login y la anon key viajaría igual), así que el endpoint **es abusable**. Lo que cambia es
+el modo de falla — la clave se rota o se corta en segundos en vez de exigir publicar una versión.
+Las defensas reales: allowlist de hosts (sin ella es un SSRF que regala la clave), freno por IP y
+**tope de gasto** en cada proveedor.
+
+**Estado: escrito, sin desplegar.** Falta crear el proyecto Supabase.
+
 ## Decisiones sin ADR, pero vigentes
 
-**Gemini por sobre Anthropic en el modo supermercado.** No es una preferencia técnica: tiene tier
-gratuito, y la restricción dura de ADR 0006 es que el modelo sea gratuito para el usuario. Anthropic
-exige billing y aparece en el selector sólo si el build trae su clave. El modelo por defecto es
-`gemini-3.5-flash-lite`, y el selector ofrece **sólo Flash Lite**: medido contra la API real
-(30/08/2026) el Lite responde en 2-3 s y los Flash grandes en 17-47 s, con el mismo acierto — la
-latencia manda también en supermercado. Ojo al re-medir: sostener pedidos satura el tier gratuito y
-todo salta a 20-80 s; hay que espaciar las corridas. Ver la actualización *bis* de ADR 0006.
+**Gemini es el default, pero ya no el único.** Desde el 2026-09-01 el selector ofrece cinco modelos
+de proveedores distintos (ver ADR 0006). Gemini sigue de default por ser el único con tier gratuito
+sin tarjeta, y el modelo es `gemini-3.5-flash-lite`: medido contra la API real (30/08/2026) responde
+en 2-3 s contra 17-47 s de los Flash grandes, con el mismo acierto — la latencia manda también en
+supermercado. Ojo al re-medir: sostener pedidos satura el tier gratuito y todo salta a 20-80 s; hay
+que espaciar las corridas.
+
+**Un modelo por proveedor, y el selector no crece.** Cada opción de más en un radiogroup recorrido
+con VoiceOver es un swipe más entre la persona y la lectura. Hay un test que **falla** si alguien
+agrega dos modelos del mismo proveedor: la decisión hay que rediscutirla, no ajustarla.
+
+**El razonamiento se apaga SIEMPRE, y el parámetro no es el mismo en cada proveedor.** Es lo que
+decide la latencia del modo, y ya costó descubrirlo dos veces. En Gemini es
+`generation_config.thinking_level`; en OpenAI y Groq es `reasoning_effort`, y `'none'` es el único
+valor que los dos aceptan (OpenAI admite `none|low|medium|high|xhigh|max`, Groq sólo
+`none|default`). `gpt-5.6-luna` razona en `medium` por defecto: sin mandarlo, tres campos cortos
+pasan a decenas de segundos.
+
+**De Groq va el Qwen 3.8 y no el 3.6, aunque el 3.6 sea más rápido en el papel.** El 3.6 sólo admite
+`json_object`, que deja los nombres de campo a criterio del modelo; el 3.8 admite `json_schema` con
+`strict`. Sobre ~50 tokens de respuesta esos 50 tok/s son centésimas — la garantía de forma vale
+más.
 
 **El razonamiento de Gemini se apaga por `generation_config.thinking_level`.** La Interactions API
 rechaza con 400 `thinking_config`, `thinking_budget`, `reasoning` y `effort`; ese es el único
@@ -111,8 +159,10 @@ modelo en el selector cambiaría también la pregunta y la comparación mediría
 
 ## Restricciones externas que condicionan el plan
 
-- **Provisioning gratuito de Apple**: la app caduca a los 7 días y sólo se instala enchufando el
-  teléfono a esta Mac. Distribuir a los compañeros de tesis requiere cuenta paga (USD 99/año) o ir
-  por Android.
+- **Los proveedores de OpenAI y Groq están escritos contra los docs, no contra la API real**
+  (2026-09-01: faltaban las claves). Esta base tiene el estándar contrario a propósito — el de
+  Gemini está verificado contra la API, y por eso encontró que el discriminador es `event_type` y no
+  `type`, algo que los docs no dicen y que descarta todos los eventos **en silencio**. Las cuatro
+  cosas por confirmar están en el paso 8 de `docs/qa-modo-supermercado.md`.
 - **La RPi Zero 2 W (~0,5 GB) no corre Gemma.** LiteRT-LM sí corre en Raspberry Pi, así que una Pi
   más grande sería opción sin cambiar el stack de software.
