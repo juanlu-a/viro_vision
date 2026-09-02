@@ -103,8 +103,11 @@ tests via `jest-expo`.
   voz; la foto se achica a 1024 px de lado mayor antes de subirla. La fototeca queda como segunda
   fuente, para pasarle la misma foto a varios modelos (dataset de evaluación).
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
-  + `services/cloud/`. Se activa con `EXPO_PUBLIC_VISION_PROXY_URL`; sin esa variable el camino
-  directo de desarrollo sigue igual. **Escrito y sin desplegar**: falta crear el proyecto Supabase.
+  + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
+  (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a
+  punta con la clave del cliente en vacío. `EXPO_PUBLIC_VISION_PROXY_URL` es secret del repo: **los
+  builds ya no llevan ninguna clave de proveedor**. Sin esa variable el camino directo de desarrollo
+  sigue igual. ⚠️ El tier gratuito pausa el proyecto por inactividad — ver el riesgo en ADR 0008.
 - **Audio a archivo (apagado)**: `services/audio/sintesis.ts` deja un `.mp3` por lectura para el
   parlante del dispositivo. Detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED` porque hoy nada lo consume.
 - **QA**: `docs/qa-modo-supermercado.md` — checklist de punta a punta, partido por qué necesita cada
@@ -129,8 +132,11 @@ opcional — la distribución real va por TestFlight desde Xcode.
 1. **EAS** (run locally; in a Claude session use `! ` prefix):
    `cd app && eas login && eas init && eas update:configure`, then add repo **secret** `EXPO_TOKEN`
    and **variable** `EAS_ENABLED=true`. `eas init`/`update:configure` edit `app.json` — fold those in.
-2. **Supabase** (see `docs/supabase.md`): create project → enable **Email** auth → (optional) turn off
-   email confirmation for testing → fill `app/.env`. No Google Cloud / OAuth needed.
+2. **Supabase — hecho (2026-09-02).** El proyecto existía desde el 18/07 y estaba pausado y vacío
+   (0 usuarios, 0 tablas, 0 buckets); se despausó y se usó para desplegar el **proxy de claves**
+   (ADR 0008), que es para lo que sirve hoy — la capa de cuenta de ADR 0002 sigue archivada y la app
+   no tiene login. Pendiente menor, dos toggles del dashboard: **rotar el JWT secret** y **apagar el
+   signup por email**, que no usamos y deja un endpoint abierto para crear usuarios.
 3. **Apple Developer Program — listo (2026-08, cuenta Individual del Apple ID del proyecto).**
    **TestFlight funcionando punta a punta (2026-08-31)**: `staging` → grupo interno *Equipo
    ViroVision* (devs, sin revisión, llega en minutos); PR `staging → main` (= release) → grupo

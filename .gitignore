@@ -36,3 +36,6 @@ ml/**/*.weights
 
 # --- Logs ---
 *.log
+
+# Artefactos locales de la CLI de Supabase (el proyecto vinculado, tokens de sesión)
+supabase/.temp/
