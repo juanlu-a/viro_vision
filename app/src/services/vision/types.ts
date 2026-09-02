@@ -95,7 +95,12 @@ export interface VisionProvider {
   readEvent(payload: Record<string, unknown>): ProviderEvent | null;
 }
 
-export type VisionProviderId = 'gemini' | 'anthropic';
+/**
+ * `openai` y `groq` comparten implementación (`providers/openaiCompatible.ts`): son el mismo
+ * dialecto apuntando a distinta URL. Siguen siendo ids distintos porque tienen clave, cuota y
+ * factura separadas.
+ */
+export type VisionProviderId = 'gemini' | 'anthropic' | 'openai' | 'groq';
 
 export interface ModelProfile {
   provider: VisionProviderId;

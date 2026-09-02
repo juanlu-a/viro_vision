@@ -52,6 +52,7 @@ export const es = {
     nothingReadProduct: 'No pude identificar el producto. Probá con una foto más de cerca.',
     error: 'No se pudo leer',
     quotaExhausted: 'Cuota de la nube agotada. Reintentá en',
+    waitingSlot: 'Esperando cupo del modelo. Sigo en',
     cloudNotConfigured:
       'El modo supermercado usa un modelo en la nube y este build no tiene ninguna clave configurada. Podés seguir usando el modo ómnibus.',
     cloudUnavailable: 'Sin conexión a internet. El modo supermercado necesita internet; probá de nuevo cuando tengas señal.',

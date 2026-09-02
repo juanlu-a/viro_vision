@@ -10,9 +10,15 @@ const gemini = MODEL_PROFILES.filter((m) => m.provider === 'gemini');
 const haiku = MODEL_PROFILES.find((m) => m.id === 'claude-haiku-4-5')!;
 const porDefecto = MODEL_PROFILES.find((m) => m.id === DEFAULT_PRODUCTO_MODEL_ID)!;
 
+/** Un build con las cuatro claves cargadas: el caso en que el usuario sí puede elegir. */
+const todos = MODEL_PROFILES;
+
 describe('resolveProductoModel', () => {
   it('respeta el guardado si está disponible', () => {
-    expect(resolveProductoModel('gemini-flash-lite-latest', gemini)?.id).toBe('gemini-flash-lite-latest');
+    // Lo elegido gana sobre el default: si no, cambiar de modelo en el selector no sobreviviría a
+    // cerrar la app y el usuario volvería a Gemini sin entender por qué.
+    expect(resolveProductoModel('claude-haiku-4-5', todos)?.id).toBe('claude-haiku-4-5');
+    expect(resolveProductoModel('gpt-5.6-luna', todos)?.id).toBe('gpt-5.6-luna');
   });
 
   it('cae al default si el guardado ya no está en el registro (modelo retirado)', () => {

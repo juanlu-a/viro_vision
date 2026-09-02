@@ -47,8 +47,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      # Una clave por proveedor del selector (ADR 0006). Las que falten simplemente dejan a su
+      # modelo fuera del selector en ese build; no rompen nada. OJO: quedan legibles dentro del
+      # .ipa/.apk hasta que el proxy de ADR 0008 esté desplegado.
       EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
+      EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
       EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
+      EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
       EXPO_PUBLIC_SIMULATE_DEVICE: ${{ vars.EXPO_PUBLIC_SIMULATE_DEVICE }}
     steps:
       - uses: actions/checkout@v4

@@ -1,11 +1,22 @@
 import { MODEL_PROFILES, findModelProfile } from '../config';
 import { PRODUCTO_PROMPTS, productoSchema } from '../producto';
 import type { BuildRequestInput, ModelProfile } from '../types';
-import { anthropicProvider, geminiProvider } from './index';
+import { anthropicProvider, geminiProvider, getProvider, groqProvider, openaiProvider } from './index';
 
 const gemini = findModelProfile('gemini-3.5-flash-lite');
 const haiku = findModelProfile('claude-haiku-4-5');
-const opus = findModelProfile('claude-opus-5');
+/**
+ * Perfil sintético, no del registro: `claude-opus-5` salió del selector el 2026-09-01 (ADR 0006),
+ * pero las dos ramas de capacidad del proveedor —mandar `effort` y mandar `thinking`— siguen
+ * existiendo en el código y hay que cubrirlas. Atarlas a un modelo concreto del registro las hacía
+ * romperse cada vez que cambia la lista, que es una razón ajena a lo que el test verifica.
+ */
+const conThinking: ModelProfile = {
+  ...findModelProfile('claude-haiku-4-5'),
+  id: 'modelo-con-thinking',
+  supportsEffort: true,
+  supportsAdaptiveThinking: true,
+};
 
 function inputFor(model: ModelProfile, overrides: Partial<BuildRequestInput> = {}) {
   return {
@@ -179,8 +190,8 @@ describe('anthropicProvider.buildRequest', () => {
     expect(body).not.toHaveProperty('thinking');
   });
 
-  it('en Opus 5 sí manda effort y thinking', () => {
-    const body = anthropicProvider.buildRequest(inputFor(opus, { thinking: 'adaptive' })).body as {
+  it('en un modelo que los soporta sí manda effort y thinking', () => {
+    const body = anthropicProvider.buildRequest(inputFor(conThinking, { thinking: 'adaptive' })).body as {
       output_config: { effort: string };
       thinking: unknown;
     };
@@ -241,10 +252,22 @@ describe('anthropicProvider.readEvent', () => {
 });
 
 describe('registro de modelos', () => {
-  it('cada perfil apunta a un proveedor existente', () => {
+  it('cada perfil apunta a un proveedor con implementación', () => {
     for (const profile of MODEL_PROFILES) {
-      expect(['gemini', 'anthropic']).toContain(profile.provider);
+      expect(getProvider(profile.provider)).toBeDefined();
+      expect(getProvider(profile.provider).id).toBe(profile.provider);
     }
+  });
+
+  it('no ofrece dos modelos del mismo proveedor', () => {
+    // El selector es un radiogroup que se recorre con VoiceOver: cada opción de más es un swipe
+    // más entre la persona y la lectura, y dos escalones de la misma familia no aportan una
+    // comparación distinta. Por eso salieron `gemini-flash-lite-latest` y `claude-opus-5`
+    // (ADR 0006, actualización 2026-09-01). Si este test cae, la decisión hay que rediscutirla,
+    // no ajustarla.
+    const proveedores = MODEL_PROFILES.map((profile) => profile.provider);
+
+    expect(new Set(proveedores).size).toBe(proveedores.length);
   });
 
   it('el primer modelo del registro es de Gemini — el gratuito y de la familia de Gemma', () => {
@@ -297,5 +320,133 @@ describe('error de cuota de Gemini', () => {
     });
 
     expect(event).toMatchObject({ kind: 'error', retryAfterSeconds: undefined });
+  });
+});
+
+/**
+ * El dialecto de OpenAI cubre DOS proveedores del selector (OpenAI y Groq) y, el día que haya
+ * endpoint, el modelo que hosteemos nosotros (ADR 0008). Un error acá rompe la mitad del selector
+ * de una vez, así que se testea la forma que la API rechaza con 400 y la que devuelve texto vacío
+ * en silencio — que es la falla cara, porque no se ve.
+ */
+describe('proveedores de dialecto OpenAI (buildRequest)', () => {
+  const luna = findModelProfile('gpt-5.6-luna');
+  const qwen = findModelProfile('qwen/qwen3.8-27b');
+
+  it('OpenAI y Groq son el mismo dialecto apuntando a distinta URL', () => {
+    const deOpenai = openaiProvider.buildRequest(inputFor(luna));
+    const deGroq = groqProvider.buildRequest(inputFor(qwen));
+
+    expect(deOpenai.url).toContain('api.openai.com');
+    expect(deGroq.url).toContain('api.groq.com');
+    // Misma forma de cuerpo: si dejan de coincidir, dejaron de ser el mismo proveedor.
+    expect(Object.keys(deOpenai.body).sort()).toEqual(Object.keys(deGroq.body).sort());
+  });
+
+  it('apaga el razonamiento — es lo que decide la latencia del modo', () => {
+    // `gpt-5.6-luna` razona en `medium` por defecto: sin esto, tres campos cortos se pagarían como
+    // decenas de segundos. Es la misma trampa que en Gemini con `thinking_level`.
+    expect(openaiProvider.buildRequest(inputFor(luna)).body.reasoning_effort).toBe('none');
+    expect(groqProvider.buildRequest(inputFor(qwen)).body.reasoning_effort).toBe('none');
+  });
+
+  it('pasa la clave como Bearer, no por query string', () => {
+    const request = openaiProvider.buildRequest(inputFor(luna));
+
+    expect(request.headers.authorization).toBe('Bearer clave-de-prueba');
+    expect(request.url).not.toContain('clave-de-prueba');
+  });
+
+  it('usa max_completion_tokens: max_tokens está deprecado y los modelos de razonamiento lo rechazan', () => {
+    const body = openaiProvider.buildRequest(inputFor(luna)).body;
+
+    expect(body.max_completion_tokens).toBe(luna.maxTokens);
+    expect(body).not.toHaveProperty('max_tokens');
+  });
+
+  it('pide el schema con strict, no json_object', () => {
+    // `json_object` sólo garantiza JSON sintáctico: los nombres de campo quedan a criterio del
+    // modelo, y `parseProductoLeido` rebotaría una lectura correcta por venir como "producto" en
+    // vez de "tipo". `strict` hace decodificación restringida: no *puede* devolver otra forma.
+    const { response_format: rf } = openaiProvider.buildRequest(inputFor(luna)).body as {
+      response_format: { type: string; json_schema: { schema: unknown; strict: boolean } };
+    };
+
+    expect(rf.type).toBe('json_schema');
+    expect(rf.json_schema.strict).toBe(true);
+    expect(rf.json_schema.schema).toBe(productoSchema);
+  });
+
+  it('manda la imagen como data URI con su mime type, y usa los prompts que recibe', () => {
+    const { messages } = openaiProvider.buildRequest(inputFor(luna, { mediaType: 'image/png' }))
+      .body as {
+      messages: { role: string; content: string | { type: string; text?: string; image_url?: { url: string } }[] }[];
+    };
+
+    expect(messages[0]).toEqual({ role: 'system', content: PRODUCTO_PROMPTS.system });
+    const partes = messages[1].content as { type: string; text?: string; image_url?: { url: string } }[];
+    expect(partes[0].image_url?.url).toBe('data:image/png;base64,QUJD');
+    expect(partes[1].text).toBe(PRODUCTO_PROMPTS.user);
+  });
+
+  it('pide el uso de tokens en el stream: sin stream_options no llega en ningún evento', () => {
+    expect(openaiProvider.buildRequest(inputFor(luna)).body.stream).toBe(true);
+    expect(openaiProvider.buildRequest(inputFor(luna)).body.stream_options).toEqual({
+      include_usage: true,
+    });
+  });
+});
+
+describe('proveedores de dialecto OpenAI (readEvent)', () => {
+  it('lee el texto incremental del delta', () => {
+    expect(
+      openaiProvider.readEvent({ choices: [{ index: 0, delta: { content: '{"tipo"' } }] }),
+    ).toEqual({ kind: 'text', text: '{"tipo"' });
+  });
+
+  it('trata el primer delta (sólo role) como arranque del texto, no como texto vacío', () => {
+    expect(
+      openaiProvider.readEvent({ choices: [{ index: 0, delta: { role: 'assistant' } }] }),
+    ).toEqual({ kind: 'text-start' });
+  });
+
+  it('cierra en finish_reason', () => {
+    expect(
+      openaiProvider.readEvent({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }),
+    ).toMatchObject({ kind: 'stop', stopReason: 'stop' });
+  });
+
+  it('lee el uso del frame final, que viene con choices vacío', () => {
+    // Es el frame que habilita `stream_options.include_usage`. Si se descartara por no tener
+    // choices, el uso de tokens quedaría siempre en cero sin que nada falle a la vista.
+    expect(
+      openaiProvider.readEvent({ choices: [], usage: { prompt_tokens: 1200, completion_tokens: 42 } }),
+    ).toEqual({ kind: 'stop', usage: { input_tokens: 1200, output_tokens: 42 } });
+  });
+
+  it('normaliza el error de cuota al código que el motor ya entiende, con los segundos del mensaje', () => {
+    // Aprovechar el dato que da la API evita inventar un backoff arbitrario — mismo criterio que
+    // con el "Please retry in 29.2s" de Gemini.
+    const event = groqProvider.readEvent({
+      error: {
+        code: 'rate_limit_exceeded',
+        message: 'Rate limit reached for qwen/qwen3.8-27b. Please try again in 1.5s.',
+      },
+    });
+
+    expect(event).toMatchObject({ kind: 'error', code: 'quota_exceeded', retryAfterSeconds: 2 });
+  });
+
+  it('reporta el resto de los errores sin marcarlos como cuota', () => {
+    const event = openaiProvider.readEvent({
+      error: { code: 'invalid_request_error', message: 'Unsupported parameter' },
+    });
+
+    expect(event).toMatchObject({ kind: 'error', code: 'invalid_request_error' });
+    expect(event).not.toMatchObject({ code: 'quota_exceeded' });
+  });
+
+  it('ignora los frames que no traen nada en vez de romper', () => {
+    expect(openaiProvider.readEvent({ id: 'chatcmpl-1', object: 'chat.completion.chunk' })).toBeNull();
   });
 });

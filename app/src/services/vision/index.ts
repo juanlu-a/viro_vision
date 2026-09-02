@@ -1,10 +1,10 @@
 /**
  * Visión en la nube: el camino del modo supermercado (ADR 0006).
  *
- * Gemini es el proveedor primario (tier gratuito: la restricción de gratuidad de ADR 0006);
- * Anthropic aparece en el selector sólo si el build trae su clave. El camino de ómnibus NO importa
- * nada de acá: corre local (OCR sobre el banner recortado por la TPU) porque la latencia manda.
- * Único punto de import: `@/services/vision`.
+ * Cinco modelos elegidos por latencia, de cuatro proveedores; cada uno aparece en el selector de
+ * Inicio sólo si el build trae su clave, y Gemini es el default por ser el único gratuito sin
+ * tarjeta. El camino de ómnibus NO importa nada de acá: corre local (OCR sobre el banner recortado
+ * por la TPU) porque la latencia manda. Único punto de import: `@/services/vision`.
  */
 export {
   VisionHttpError,
@@ -31,12 +31,14 @@ export {
   findModelProfile,
   isAnthropicConfigured,
   isGeminiConfigured,
+  isGroqConfigured,
+  isOpenaiConfigured,
   isProviderConfigured,
   isVisionConfigured,
 } from './config';
-export { anthropicProvider, geminiProvider, getProvider } from './providers';
+export { anthropicProvider, geminiProvider, getProvider, groqProvider, openaiProvider } from './providers';
 export { PRODUCTO_SYSTEM_PROMPT, PRODUCTO_USER_PROMPT } from './providers/prompts';
-export { acquireSlot, remainingSlots, resetRateLimiter } from './rateLimiter';
+export { acquireSlot, limitePorMinuto, remainingSlots, resetRateLimiter } from './rateLimiter';
 export { parseJsonRecord } from './schema';
 export type {
   EffortLevel,

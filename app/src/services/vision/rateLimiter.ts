@@ -9,15 +9,38 @@
  * Usa `Date.now()` a propósito, no `performance.now()`: la ventana de cuota es tiempo de reloj del
  * lado del servidor, no una duración medida.
  */
+import type { VisionProviderId } from './types';
 
 /** Ventana de la cuota. */
 const WINDOW_MS = 60_000;
 
 /**
- * Tope propio, deliberadamente por debajo de los 20 reales. El margen cubre los requests que el
- * servidor ya contó pero nosotros no (un reintento suyo, una corrida abortada a mitad de vuelo).
+ * Tope por minuto y por modelo, **según el proveedor**.
+ *
+ * Antes había un solo número, 17, calibrado al tier gratuito de Gemini. Imponérselo a un proveedor
+ * pago desperdicia justamente la razón de haberlo pagado: le pone el techo del más restringido al
+ * que no lo tiene.
+ *
+ * Los dos gratuitos llevan margen sobre el límite real, para cubrir los requests que el servidor
+ * ya contó y nosotros no (un reintento suyo, una corrida abortada a mitad de vuelo). Los pagos
+ * llevan un número alto a propósito: ahí el limitador **deja de ser la pared del tier gratuito y
+ * pasa a ser un tope de seguridad** contra un bucle desbocado que queme crédito. El límite real de
+ * una cuenta paga depende de su tier y no lo podemos saber desde acá.
  */
-const MAX_PER_WINDOW = 17;
+const LIMITE_POR_PROVEEDOR: Record<VisionProviderId, number> = {
+  gemini: 17, // 20/min por modelo en el tier gratuito, medido el 30/08/2026
+  groq: 25, // ~30/min en el tier gratuito; varía por modelo (console.groq.com/settings/limits)
+  openai: 100, // muy por encima de lo que alguien hace a mano: es freno de emergencia, no cuota
+  anthropic: 40,
+};
+
+/** El tope por defecto si no se dice otra cosa: el más restrictivo, que nunca rompe. */
+const MAX_PER_WINDOW = LIMITE_POR_PROVEEDOR.gemini;
+
+/** Cuántas lecturas por minuto tolera un proveedor. Lo pasa `reconocerProducto` al pedir cupo. */
+export function limitePorMinuto(provider: VisionProviderId): number {
+  return LIMITE_POR_PROVEEDOR[provider];
+}
 
 /** Marcas de tiempo de los envíos recientes, por modelo: cada modelo tiene su propia cuota. */
 const sends = new Map<string, number[]>();
