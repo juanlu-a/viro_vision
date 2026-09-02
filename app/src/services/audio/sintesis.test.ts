@@ -6,12 +6,21 @@
  * impedir, sin ningún síntoma. La segunda: pasarse de los 4096 caracteres que la API acepta es un
  * 400 que deja al usuario sin archivo, y el texto de una lectura de producto es corto hoy pero el
  * detalle de etiqueta (objetivo opcional de la tesis) puede crecer.
+ *
+ * **Cada caso pasa el proxy explícitamente y ninguno lee el entorno.** La versión anterior asumía
+ * que no había proxy configurado: pasaba en local, donde jest no carga `.env`, y fallaba en el job
+ * de publicación, donde la variable sí está. Un test que cambia de resultado según dónde corre no
+ * está verificando el código.
  */
 import { construirPedidoDeVoz, MAX_CARACTERES, nombreDeArchivo } from './sintesis';
 
+/** Sin proxy: el camino directo, el de desarrollo local. */
+const DIRECTO = '';
+const PROXY = 'https://proyecto.supabase.co/functions/v1/vision';
+
 describe('construirPedidoDeVoz', () => {
   it('pide MP3 al modelo de voz, con el texto como input', () => {
-    const body = construirPedidoDeVoz('arroz Saman, Blue Patna 1 kg', 'sk-secreta').body as {
+    const body = construirPedidoDeVoz('arroz Saman, Blue Patna 1 kg', 'sk-secreta', DIRECTO).body as {
       model: string;
       input: string;
       response_format: string;
@@ -26,25 +35,30 @@ describe('construirPedidoDeVoz', () => {
 
   it('trunca al tope de la API en vez de comerse un 400', () => {
     const largo = 'a'.repeat(MAX_CARACTERES + 500);
-    const { input } = construirPedidoDeVoz(largo, 'sk-secreta').body as { input: string };
+    const { input } = construirPedidoDeVoz(largo, 'sk-secreta', DIRECTO).body as { input: string };
 
     expect(input).toHaveLength(MAX_CARACTERES);
   });
 
-  it('sin proxy configurado sale directo a OpenAI', () => {
-    // Es el camino de desarrollo: en los tests no hay EXPO_PUBLIC_VISION_PROXY_URL.
-    const pedido = construirPedidoDeVoz('hola', 'sk-secreta');
+  it('sin proxy sale directo a OpenAI, con la clave en el header', () => {
+    const pedido = construirPedidoDeVoz('hola', 'sk-secreta', DIRECTO);
 
     expect(pedido.url).toBe('https://api.openai.com/v1/audio/speech');
     expect(pedido.headers.authorization).toBe('Bearer sk-secreta');
   });
 
-  it('el pedido pasa por el transporte, que es lo que saca la clave cuando hay proxy', () => {
-    // Se verifica la forma que el transporte produce, no el transporte en sí (eso lo cubre
-    // cloud/transport.test.ts): si algún día alguien arma el fetch a mano acá, este test cae.
-    const pedido = construirPedidoDeVoz('hola', 'sk-secreta');
+  it('con proxy, la clave NO viaja', () => {
+    // Es el punto entero de ADR 0008, y la forma de romperlo no falla a la vista: si el pedido
+    // dejara de pasar por el transporte, la síntesis andaría igual de bien mientras la clave sale
+    // del teléfono. La voz sale por el mismo proxy que la lectura de producto.
+    const pedido = construirPedidoDeVoz('hola', 'sk-secreta', PROXY);
 
-    expect(Object.keys(pedido)).toEqual(expect.arrayContaining(['url', 'headers', 'body']));
+    expect(pedido.url).toBe(PROXY);
+    expect(JSON.stringify(pedido)).not.toContain('sk-secreta');
+    expect(pedido.body).toMatchObject({
+      provider: 'openai',
+      url: 'https://api.openai.com/v1/audio/speech',
+    });
   });
 });
 
