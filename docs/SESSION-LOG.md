@@ -694,10 +694,88 @@ Cinco PRs en secuencia, todos con CI verde: **#46** (docs), **#47** (cámara), *
   encontró que el discriminador es `event_type` y no `type`, algo que los docs no dicen y que
   descarta todos los eventos en silencio. Hay cuatro cosas concretas por confirmar.
 
+## 2026-09-02 — Medir cambió dos decisiones (y encontró tres bugs que no se veían)
+
+Con las claves de OpenAI y Groq cargadas, se saldó la deuda del PR #48: los proveedores nuevos
+estaban escritos **contra los docs**, que es lo contrario del estándar de esta base. Dos PRs:
+**#52** (los arreglos) y **#53** (el selector nuevo y la documentación).
+
+- **El arnés usa el código de la app, no una réplica.** Importa `buildProductoRequest`,
+  `readEvent` y `parseProductoLeido` de `services/vision/` y sólo reemplaza el transporte
+  (`node:https`, porque el `fetch` global de jest-expo está mockeado y devolvía respuestas vacías
+  en 1 ms). Una réplica mide la réplica; lo único que detecta que un proveedor no se comporta como
+  su documentación es ejercitar el código que va a correr.
+
+- **Los tres proveedores andan y los tres aciertan**: 15/15 corridas con `tipo`, `marca` y
+  `detalle` correctos. La precisión **no** separó a los modelos en esta tarea. Con la salvedad
+  grande de que la imagen es sintética y de alto contraste — el mejor caso posible.
+
+- **Lo que separa es la dispersión, no la mediana.** `qwen/qwen3.8-27b` 846 ms (rango 764-1087),
+  `gpt-5.6-luna` 1668 ms (1410-2490), `gemini-3.5-flash-lite` 10 649 ms (**2820-32 586**). Once
+  veces y media entre el mejor y el peor caso de Gemini, con la cuota fresca y las corridas
+  espaciadas. En una app cuya interfaz es la voz la varianza pesa más que la media: el usuario no ve
+  una barra de progreso y no puede distinguir "está pensando" de "se colgó". Gemini sale del
+  selector.
+
+- **La medición del 30/08 estaba mal reportada, y es la lección metodológica de la sesión.** Había
+  dado 2-3 s para Gemini; los extremos de ahora contienen ese número, así que con pocas muestras
+  cayó en el extremo bueno y se reportó como si fuera el comportamiento. Queda escrito en la skill
+  porque aplica a todo lo que se mida en esta tesis: **cinco corridas y no una, y se reporta el
+  rango, no el mejor número.**
+
+- **El default es Luna y no Groq, aunque Groq gane por 800 ms.** La cuota gratuita de Groq limita
+  por **tokens** por minuto (8000 TPM, ~1974 por foto a tarifa plana) = ~4 lecturas, y alguien
+  recorriendo una góndola hace 2-4. Un default que choca el límite a la cuarta lectura es peor
+  producto que uno 800 ms más lento. Groq queda de segunda opción, que es donde su perfil rinde.
+
+- **La gratuidad de ADR 0006 se sigue cumpliendo, que es lo que importa**: es gratuito *para el
+  usuario*. Paga el proyecto y mil lecturas cuestan menos de USD 0,50. Lo que ya no hay es un
+  default con tier gratuito; el camino gratis existe y es Groq.
+
+- **Tres bugs que sólo aparecen midiendo, ninguno con error visible.** (1) La cuota **no siempre
+  llega como evento SSE**: Groq la devuelve como HTTP 429 antes de abrir el stream, y por ese
+  camino la app lanzaba `VisionHttpError` — el usuario escuchaba "La nube no respondió" en vez de
+  "Cuota agotada, reintentá en N s", con el dato de cuánto esperar llegando y nadie leyéndolo. Es
+  el mismo bug que los errores tipados de esta base existen para evitar, repetido en otro camino.
+  (2) El tope del limitador para Groq estaba en 25/min, el número de un límite por requests que ese
+  proveedor **no tiene**: nunca frenaba, y la tercera lectura seguida daba 429 — pasó en vivo
+  durante la campaña. (3) Apagar el razonamiento **no compra latencia fuera de Gemini**.
+
+- **Una justificación mía era falsa, y quedó corregida en el código.** El comentario de
+  `reasoning_effort` decía que sin apagar el razonamiento la lectura pasaría a decenas de segundos.
+  Eso está medido y es cierto **en Gemini**; acá lo extrapolé. Sobre `gpt-5.6-luna` da igual `none`
+  (1,5-2,1 s), `medium` (1,5 s) o no mandar nada (2,0 s), con los mismos 35 tokens de salida: no
+  gasta razonamiento en tres campos cortos. Se sigue mandando `none` por intención y porque es
+  gratis, pero el comentario ahora dice la razón verdadera.
+
+- **La documentación de Groq tampoco lista sus valores reales**: documenta
+  `reasoning_effort: none | default` y `low` respondió 200. Tercer caso que respalda la regla de
+  verificar contra la API.
+
+- **El techo de 1024 px es correcto, pero no por lo que estaba escrito.** Se midió con cuatro
+  tamaños sobre Luna: los tokens de entrada escalan (346 → 577 → 1138 → 2290) pero las medianas de
+  tiempo **no ordenan** — 640 px salió más lento que 1536 px. A esta escala la latencia la dominan
+  el modelo y la red, y el ruido entre corridas (±800 ms) tapa la diferencia. El techo se mantiene
+  porque baja el costo a la mitad y el tráfico, no porque compre segundos.
+
+- **`docs/mediciones/`, carpeta nueva.** Los datos crudos y el método, un archivo por campaña, con
+  una regla escrita: **una campaña no se edita después de corrida; si se vuelve a medir, es un
+  archivo nuevo.** Los números viejos son el registro de qué se sabía cuándo, y borrarlos hace que
+  las decisiones tomadas con ellos parezcan arbitrarias. El análisis y la decisión siguen en
+  `pruebas-y-decisiones.md`, que es el borrador de la sección de la tesis, y linkean los datos en
+  vez de duplicarlos.
+
+- **Los modelos retirados no se borran**: viven en `PERFILES_RETIRADOS` con la medición que los
+  descartó, y sus proveedores siguen implementados y testeados. Volver a ofrecer uno es mover una
+  entrada de lista, y hay tests que fallan si alguien lo devuelve copiándolo en vez de moviéndolo o
+  si se borra el módulo de un proveedor retirado.
+
 ## Open threads / next
-- **Claves de OpenAI y Groq** en `app/.env`, para verificar los proveedores nuevos contra la API
-  real (paso 8 de `qa-modo-supermercado.md`). Groq es gratis y sin tarjeta; en OpenAI, **el tope de
-  gasto va antes que la clave**.
+- **Dataset de evaluación con fotos reales de góndola.** Es lo más valioso que falta: todo lo medido
+  el 2026-09-02 usa una imagen sintética de alto contraste, o sea el piso de dificultad, y los
+  aciertos de ahí **no son la precisión del sistema**. Protocolo escrito en los pasos 8 y 9 de
+  `qa-modo-supermercado.md`.
+- **`claude-haiku-4-5` sigue sin verificar** contra su API: requiere tarjeta y no hay clave.
 - **Desplegar el proxy** (ADR 0008): crear el proyecto Supabase, `supabase secrets set` por
   proveedor, `functions deploy vision`, y `EXPO_PUBLIC_VISION_PROXY_URL`. Hasta entonces las claves
   siguen viajando dentro del `.ipa`.
