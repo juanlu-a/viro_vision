@@ -13,6 +13,8 @@
  */
 import { fetch } from 'expo/fetch';
 
+import { resolverTransporte } from '@/services/cloud';
+
 import { apiKeyFor, isProviderConfigured } from './config';
 import {
   VisionHttpError,
@@ -26,7 +28,6 @@ import type { ProductoLeido } from './producto';
 import { getProvider } from './providers';
 import { acquireSlot, limitePorMinuto } from './rateLimiter';
 import { readSseStream } from './sse';
-import { resolverTransporte } from './transport';
 import type { ModelProfile } from './types';
 
 export interface ReconocimientoProducto {

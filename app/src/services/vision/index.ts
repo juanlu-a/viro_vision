@@ -34,15 +34,12 @@ export {
   isGroqConfigured,
   isOpenaiConfigured,
   isProviderConfigured,
-  isProxyConfigured,
   isVisionConfigured,
-  visionProxyUrl,
 } from './config';
 export { anthropicProvider, geminiProvider, getProvider, groqProvider, openaiProvider } from './providers';
 export { PRODUCTO_SYSTEM_PROMPT, PRODUCTO_USER_PROMPT } from './providers/prompts';
 export { acquireSlot, limitePorMinuto, remainingSlots, resetRateLimiter } from './rateLimiter';
 export { parseJsonRecord } from './schema';
-export { resolverTransporte } from './transport';
 export type {
   EffortLevel,
   ModelProfile,

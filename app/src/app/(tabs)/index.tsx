@@ -147,6 +147,17 @@ export default function HomeScreen() {
             <ThemedText type="code">{formatMs(state.ms)}</ThemedText>
           </View>
         )}
+        {/* Sólo aparece con la síntesis a archivo habilitada, que está apagada por defecto. Es la
+            única forma de comprobar que el .mp3 se escribió sin reproducirlo — reproducirlo diría
+            la lectura dos veces. */}
+        {state.audio && (
+          <View accessible accessibilityRole="text">
+            <ThemedText type="small" themeColor="textSecondary">
+              {r.audioLabel}
+            </ThemedText>
+            <ThemedText type="code">{state.audio}</ThemedText>
+          </View>
+        )}
       </Card>
 
     </Screen>

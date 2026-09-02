@@ -57,6 +57,9 @@ jobs:
       # Con el proxy desplegado (ADR 0008) las cuatro claves de arriba dejan de hacer falta acá:
       # las guarda el servidor y el build sale sin ninguna. Ver docs/supabase.md.
       EXPO_PUBLIC_VISION_PROXY_URL: ${{ secrets.EXPO_PUBLIC_VISION_PROXY_URL }}
+      # Apagado salvo que el secret exista y valga 1: el .mp3 por lectura cuesta una llamada al TTS
+      # y hoy no lo consume nadie (ver app/.env.example).
+      EXPO_PUBLIC_AUDIO_FILE_ENABLED: ${{ secrets.EXPO_PUBLIC_AUDIO_FILE_ENABLED }}
       EXPO_PUBLIC_SIMULATE_DEVICE: ${{ vars.EXPO_PUBLIC_SIMULATE_DEVICE }}
     steps:
       - uses: actions/checkout@v4

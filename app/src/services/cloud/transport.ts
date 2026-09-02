@@ -13,8 +13,8 @@
  *
  * Módulo puro: decide una URL y un sobre, no toca la red. Ver transport.test.ts.
  */
-import { visionProxyUrl } from './config';
-import type { ProviderRequest, VisionProviderId } from './types';
+import { proxyUrl as proxyPorDefecto } from './config';
+import type { CloudProviderId, CloudRequest } from './types';
 
 /**
  * Reescribe el request hacia el proxy, o lo deja pasar si no hay proxy configurado.
@@ -30,10 +30,10 @@ import type { ProviderRequest, VisionProviderId } from './types';
  * modelo no obligue a redesplegar la función.
  */
 export function resolverTransporte(
-  request: ProviderRequest,
-  provider: VisionProviderId,
-  proxyUrl: string = visionProxyUrl,
-): ProviderRequest {
+  request: CloudRequest,
+  provider: CloudProviderId,
+  proxyUrl: string = proxyPorDefecto,
+): CloudRequest {
   if (proxyUrl === '') return request;
 
   return {
