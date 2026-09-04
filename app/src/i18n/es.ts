@@ -88,13 +88,22 @@ export const es = {
     disconnectButton: 'Desconectar',
     disconnectHint: 'Corta la conexión con el dispositivo.',
     deviceSection: 'Dispositivo conectado',
-    deviceSimulated: 'Datos simulados: el enlace Bluetooth todavía no está implementado.',
+    deviceSimulated: 'Datos simulados: no hay un dispositivo real conectado.',
     deviceNameLabel: 'Nombre',
     deviceUnnamed: 'Sin nombre',
     batteryLabel: 'Batería',
     batteryUnknown: 'todavía sin informar',
     batteryLow: 'batería baja',
     firmwareLabel: 'Firmware',
+    measureButton: 'Medir transferencia',
+    measureHint:
+      'Pide a la placa 53 kilobytes, lo que pesa una foto, y mide cuánto tardan en llegar por Bluetooth. El resultado se anuncia en voz alta.',
+    measuring: 'Midiendo… puede tardar unos segundos.',
+    measureResult:
+      '{kb} kilobytes en {segundos} segundos: {kbps} kilobytes por segundo, en {chunks} paquetes de {chunk} bytes.',
+    measureFailed: 'No se pudo medir. Probá de nuevo.',
+    measureIncomplete: 'La medición quedó incompleta: faltaron {faltantes} paquetes.',
+    measureSection: 'Última medición',
   },
   settings: {
     title: 'Ajustes',
@@ -134,8 +143,9 @@ export const es = {
     connecting: 'Conectando…',
     connected: 'Conectado',
     error: 'Error de conexión',
-    // Honest placeholder until the BLE/GATT layer is implemented.
-    unavailable: 'La conexión Bluetooth aún no está implementada.',
+    notFound: 'No encontré el dispositivo. Fijate que esté prendido y cerca.',
+    // Expo Go y web no tienen el módulo nativo de Bluetooth; el cliente real necesita un development build.
+    unavailable: 'Este build no tiene Bluetooth. Hace falta un development build.',
   },
 } as const;
 
