@@ -4,7 +4,7 @@
  * Cada modo tiene su pipeline (ADR 0006). **Ómnibus corre siempre local**: OCR sobre el banner —
  * en el producto lo recorta la TPU del dispositivo; hoy, sin hardware, sobre la foto entera — porque
  * en la calle la latencia manda y la señal no está garantizada. **Supermercado va a la nube**, al
- * modelo de visión que el usuario eligió en Inicio: está quieto y tolera latencia a cambio de
+ * modelo de visión que el usuario eligió en Ajustes: está quieto y tolera latencia a cambio de
  * precisión. Sin internet o sin clave, supermercado **avisa** y no lee: el fallback local para ese
  * modo sigue pendiente (ADR 0006, actualización 2026-08-30).
  *
@@ -26,7 +26,7 @@ import { adivinarLectura, frasearLectura, frasearProducto } from '@/features/rea
 import type { BusReading } from '@/features/reader/lectura';
 import { transicionar } from '@/features/reader/modes';
 import type { Gesto, Modo } from '@/features/reader/modes';
-import { useModeloSupermercado } from '@/features/reader/useModeloSupermercado';
+import { useModeloSupermercado } from '@/features/reader/ModeloSupermercadoProvider';
 import { strings } from '@/i18n';
 import { isSintesisHabilitada, sintetizarAArchivo } from '@/services/audio/sintesis';
 import {
@@ -129,7 +129,7 @@ export function useLector() {
   const [state, setState] = useState<LectorState>(inicial);
   const ref = useRef(inicial);
   const vivo = useRef(true);
-  const { modelo, modelos, elegir: elegirModelo } = useModeloSupermercado();
+  const { modelo } = useModeloSupermercado();
 
   useEffect(() => {
     vivo.current = true;
@@ -272,5 +272,5 @@ export function useLector() {
     [leerOmnibus, leerSupermercado, update],
   );
 
-  return { state, aplicarGesto, leer, modelo, modelos, elegirModelo };
+  return { state, aplicarGesto, leer, modelo };
 }

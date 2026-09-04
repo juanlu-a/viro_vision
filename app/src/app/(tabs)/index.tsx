@@ -16,7 +16,6 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { formatMs } from '@/features/reader/lectura';
-import { ModelSelector } from '@/features/reader/ModelSelector';
 import type { Modo } from '@/features/reader/modes';
 import { useLector } from '@/features/reader/useLector';
 import { strings } from '@/i18n';
@@ -36,7 +35,7 @@ const READ_HINT: Record<Modo, string> = {
 export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
-  const { state, aplicarGesto, leer, modelo, modelos, elegirModelo } = useLector();
+  const { state, aplicarGesto, leer, modelo } = useLector();
 
   const ocupado = state.estado !== 'idle';
   const enOmnibus = state.modo === 'omnibus';
@@ -74,20 +73,15 @@ export default function HomeScreen() {
           onPress={() => aplicarGesto(enSupermercado ? 'clickLargo' : 'dobleClick')}
           disabled={ocupado || enOmnibus}
         />
-        {/* El modelo de nube pertenece al modo supermercado y sólo aparece con ese modo activo:
-            es el único que va a la nube (ADR 0006), y en los otros modos el control no hace nada.
-            Aparece justo debajo del botón que lo habilita, así el foco de VoiceOver lo encuentra
-            en el siguiente elemento tras activar el modo. Sin clave no hay selector: se dice acá
-            en vez de dejar que el usuario lo descubra recién al elegir una foto — el estado nunca
-            se comunica sólo por un control ausente. */}
-        {enSupermercado &&
-          (modelo ? (
-            <ModelSelector value={modelo} options={modelos} onChange={elegirModelo} disabled={ocupado} />
-          ) : (
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.cloudNotConfigured}
-            </ThemedText>
-          ))}
+        {/* Elegir el modelo es un ajuste y vive en Ajustes; acá queda sólo el aviso de que este
+            build no trae ninguna clave, y sólo con el modo que la necesita activo. Se dice antes de
+            leer en vez de dejar que el usuario lo descubra al sacar la foto: el estado nunca se
+            comunica sólo por un control ausente. */}
+        {enSupermercado && !modelo && (
+          <ThemedText type="small" themeColor="textSecondary">
+            {r.cloudNotConfigured}
+          </ThemedText>
+        )}
 
         <AccessibleButton
           label={

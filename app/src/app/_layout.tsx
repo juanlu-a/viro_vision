@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
+import { ModeloSupermercadoProvider } from '@/features/reader/ModeloSupermercadoProvider';
 import {
   ThemePreferenceProvider,
   useThemePreference,
@@ -40,7 +41,11 @@ function buildNavTheme(scheme: 'light' | 'dark') {
 export default function RootLayout() {
   return (
     <ThemePreferenceProvider>
-      <RootNavigator />
+      {/* El modelo de supermercado se elige en Ajustes y se usa en Inicio: el estado tiene que ser
+          uno solo, arriba de las dos pestañas. */}
+      <ModeloSupermercadoProvider>
+        <RootNavigator />
+      </ModeloSupermercadoProvider>
     </ThemePreferenceProvider>
   );
 }

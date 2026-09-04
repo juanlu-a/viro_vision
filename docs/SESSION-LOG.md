@@ -830,6 +830,29 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
 - **Verificado en el teléfono.** Build `202609021823`, `VALID` en el grupo interno. El modo
   supermercado funciona de punta a punta contra el proxy, sin ninguna clave en el binario.
 
+## 2026-09-04 — El selector de modelo se muda a Ajustes
+
+- **El selector del modelo de supermercado ahora vive en Ajustes**, no en Inicio. Elegir el modelo
+  es un ajuste: se toca una vez y no en cada lectura, y en Inicio competía por atención con la
+  acción principal. En Ajustes va **sin rótulo ni texto alrededor** (pedido explícito): el
+  disparador ya se anuncia como *"Modelo seleccionado: <modelo>"* y el menú como *"Seleccionar
+  modelo"*, así que un encabezado repetiría lo que el lector de pantalla ya dice.
+
+- **El hook `useModeloSupermercado` pasó a ser `ModeloSupermercadoProvider`**, montado en el layout
+  raíz. No es refactor de gusto: con el selector en Ajustes y la lectura en Inicio, dos instancias
+  del hook habrían tenido cada una su `useState`, y elegir un modelo en Ajustes **se vería aplicado
+  sin estarlo** hasta remontar Inicio. El storage y el resolver (`modeloSupermercado.ts`) no se
+  tocaron, tal como anticipaba el comentario del propio hook.
+
+- **En Inicio quedó el aviso de "sin clave configurada"**, sólo con el modo supermercado activo. Se
+  dice antes de leer y no al sacar la foto, y sigue valiendo la regla de accesibilidad: el estado no
+  se comunica por un control ausente. El aviso también aparece en Ajustes, donde ahora es el lugar
+  donde el usuario va a buscar el control que no está.
+
+- Verificado: `npm run lint`, `npm run typecheck`, `npm test` (178 tests). Actualizados
+  `PROJECT-STATUS.md` y el recorrido de VoiceOver de `qa-modo-supermercado.md`, que apuntaba
+  explícitamente a que el selector estaba en Inicio "y no en Ajustes".
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

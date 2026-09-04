@@ -7,6 +7,8 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { announce } from '@/features/audio/announcer';
+import { ModelSelector } from '@/features/reader/ModelSelector';
+import { useModeloSupermercado } from '@/features/reader/ModeloSupermercadoProvider';
 import { ThemeSelector } from '@/features/theme/ThemeSelector';
 import { strings } from '@/i18n';
 import { useTheme } from '@/hooks/use-theme';
@@ -46,6 +48,7 @@ function FeatureRow({
 
 export default function SettingsScreen() {
   const t = strings.settings;
+  const { modelo, modelos, elegir } = useModeloSupermercado();
 
   return (
     <Screen scroll>
@@ -56,6 +59,19 @@ export default function SettingsScreen() {
           {t.appearance.toUpperCase()}
         </ThemedText>
         <ThemeSelector />
+      </Card>
+
+      {/* Sin rótulo alrededor a pedido: el disparador ya se anuncia como "Modelo seleccionado: X"
+          y el menú como "Seleccionar modelo". Sin ninguna clave en el build no hay nada que elegir
+          y se dice, porque un control ausente no comunica estado. */}
+      <Card>
+        {modelo ? (
+          <ModelSelector value={modelo} options={modelos} onChange={elegir} />
+        ) : (
+          <ThemedText type="small" themeColor="textSecondary">
+            {strings.reader.cloudNotConfigured}
+          </ThemedText>
+        )}
       </Card>
 
       <Card>
