@@ -1,13 +1,8 @@
-"""Perfil GATT del dispositivo ViroVision y su adaptador a BlueZ (la placa).
+"""Adaptador del núcleo a BlueZ (`bluez_peripheral`): lo que corre en la placa.
 
-FUENTE DE VERDAD COMPARTIDA con la app: `app/src/features/device/gatt.ts` tiene estos mismos UUIDs
-copiados a mano. Si cambia algo acá, cambia allá en el mismo PR. Los UUIDs son de 128 bits generados
-al azar (`uuidgen`), con el 3.er y 4.º byte como índice de característica; el rango 0000xxxx-0000-
-1000-8000-00805f9b34fb que usaban los placeholders es el de los UUIDs de 16 bits asignados por el
-Bluetooth SIG y no se puede inventar ahí.
-
-La lógica (comandos, modos, transferencias) vive en `nucleo.py`; acá sólo se la conecta a
-`bluez_peripheral`. El emulador de la Mac (`emulador.py`) conecta el mismo núcleo a CoreBluetooth.
+Los UUIDs viven en `perfil.py` (compartidos con el emulador de la Mac y copiados a mano en la app);
+la lógica de comandos, modos y transferencias en `nucleo.py`. Acá sólo se conectan las dos cosas a
+las características de BlueZ.
 """
 
 from __future__ import annotations
@@ -20,17 +15,15 @@ from bluez_peripheral.gatt.characteristic import characteristic
 from bluez_peripheral.gatt.service import Service
 
 from .nucleo import ESTADO, EVENTO, MODO, TRANSFERENCIA, Capturar, Nucleo
-
-SERVICE_UUID = "4380c500-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_MODO = "4380c501-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_CONTROL = "4380c502-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_EVENTO = "4380c503-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_TRANSFERENCIA = "4380c504-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_ESTADO = "4380c505-7ca3-4e37-b27d-f60e8d8d73d1"
-
-UUID_POR_NOMBRE = {MODO: CH_MODO, EVENTO: CH_EVENTO, TRANSFERENCIA: CH_TRANSFERENCIA, ESTADO: CH_ESTADO}
-
-NOMBRE_ANUNCIADO = "ViroVision"
+from .perfil import (  # noqa: F401  (re-exportados para __main__)
+    CH_CONTROL,
+    CH_ESTADO,
+    CH_EVENTO,
+    CH_MODO,
+    CH_TRANSFERENCIA,
+    NOMBRE_ANUNCIADO,
+    SERVICE_UUID,
+)
 
 
 class ViroVisionService(Service):

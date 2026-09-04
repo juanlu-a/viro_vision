@@ -15,7 +15,7 @@ node_modules/
 # --- Python (hardware/ and ml/) ---
 __pycache__/
 *.py[cod]
-.venv/
+.venv*/
 venv/
 env/
 *.egg-info/

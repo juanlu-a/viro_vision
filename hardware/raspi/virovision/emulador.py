@@ -23,7 +23,7 @@ from typing import Any
 
 from .camara import payload_sintetico
 from .estado import leer_estado
-from .gatt import (
+from .perfil import (
     CH_CONTROL,
     CH_ESTADO,
     CH_EVENTO,
