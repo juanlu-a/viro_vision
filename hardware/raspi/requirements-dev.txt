@@ -1,0 +1,2 @@
+# Sólo para correr los tests en la Mac/CI. No hace falta en la placa.
+pytest>=7

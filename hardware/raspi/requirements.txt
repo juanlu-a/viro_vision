@@ -1,0 +1,3 @@
+# Instalar dentro de un venv con --system-site-packages (setup.sh lo hace): picamera2 viene por apt
+# (python3-picamera2) y no por pip.
+bluez-peripheral==0.1.7

@@ -1,0 +1,21 @@
+[Unit]
+Description=ViroVision — daemon BLE de la placa
+After=bluetooth.target
+Requires=bluetooth.service
+
+[Service]
+Type=simple
+WorkingDirectory=__INSTALL_DIR__
+# Pedirle al controlador el intervalo de conexión más corto que permite (7,5-15 ms): cada intervalo
+# lleva unas pocas notificaciones, así que el intervalo ES el throughput. iOS lo negocia hacia 15 ms.
+# El "-" hace que un debugfs ausente no impida arrancar.
+ExecStartPre=-/bin/sh -c 'echo 6 > /sys/kernel/debug/bluetooth/hci0/conn_min_interval; echo 12 > /sys/kernel/debug/bluetooth/hci0/conn_max_interval'
+ExecStart=__INSTALL_DIR__/.venv/bin/python -m virovision
+Restart=always
+RestartSec=2
+# root: BlueZ sólo acepta registrar aplicaciones GATT y anuncios desde el bus del sistema, y la
+# política por defecto de D-Bus se lo permite a root sin tocar /etc/dbus-1.
+User=root
+
+[Install]
+WantedBy=multi-user.target
