@@ -51,9 +51,11 @@ npx expo run:ios --device "iPhone de Juan"
 ### 4. Con VoiceOver
 
 - [ ] Recorrer Inicio con swipes. Orden esperado: modo actual → botón ómnibus → botón supermercado →
-      **selector de modelo** → Sacar foto → Elegir de la fototeca → resultados.
-- [ ] El selector aparece **justo después** del botón que activa el modo: es la razón por la que está
-      ahí y no en Ajustes.
+      Sacar foto → Elegir de la fototeca → resultados.
+- [ ] El **selector de modelo** está en Ajustes (desde el 2026-09-04): el disparador se anuncia como
+      "Modelo seleccionado: <modelo>" y el menú como "Seleccionar modelo", `radiogroup` con `checked`.
+- [ ] Elegir otro modelo en Ajustes y volver a Inicio: la lectura siguiente tiene que reportar **ese**
+      modelo en *Modelo*. Es lo que el Provider garantiza y lo que dos hooks separados romperían.
 - [ ] El botón principal **muta** entre "Sacar foto y leer" y "Leyendo…" — no se intercambia por otro
       botón. Si el foco se pierde al leer, eso es la trampa ya documentada.
 - [ ] Agrandar el tipo del sistema (Ajustes → Pantalla y brillo → Tamaño del texto) y confirmar que

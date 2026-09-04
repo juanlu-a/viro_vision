@@ -92,8 +92,9 @@ tests via `jest-expo`.
 - **Lector de Inicio por modos (ADR 0006/0007)**: `features/reader/` — modo ómnibus = OCR local
   (`services/ondevice/ocr.ts`, ExecuTorch), modo supermercado = nube (`services/vision/`:
   proveedores Gemini / OpenAI / Anthropic / Groq, SSE, schema, limitador de cuota por proveedor).
-  Sin clave o sin internet, supermercado avisa. El modelo se elige en Inicio (modal accesible,
-  persistido y revalidado contra los disponibles del build). **El selector ofrece dos modelos desde
+  Sin clave o sin internet, supermercado avisa. El modelo se elige en **Ajustes** (modal accesible,
+  persistido y revalidado contra los disponibles del build; el estado lo comparte
+  `ModeloSupermercadoProvider`, que es quien alimenta la lectura en Inicio). **El selector ofrece dos modelos desde
   el 2026-09-02**: `gpt-5.6-luna` (default, mediana 1668 ms) y `qwen/qwen3.8-27b` en Groq (846 ms,
   gratis, pero ~4 lecturas/min). Gemini salió por la medición — rango 2820-32 586 ms. Ver
   [`docs/mediciones/`](mediciones/README.md). El laboratorio del spike se retiró

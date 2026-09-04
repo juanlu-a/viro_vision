@@ -5,7 +5,7 @@
  * modelo rige, y el menú es un `radiogroup` con `checked`.
  *
  * A diferencia del de tema, es **controlado por props**: no sabe de storage ni de dónde salen los
- * modelos, así el hook que decide (useModeloSupermercado) se testea sin UI.
+ * modelos, así lo que decide (ModeloSupermercadoProvider y su resolver) se testea sin UI.
  */
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -81,7 +81,7 @@ export function ModelSelector({ value, options, onChange, disabled = false }: Pr
           <View
             accessibilityViewIsModal
             accessibilityRole="radiogroup"
-            accessibilityLabel={t.modelLabel}
+            accessibilityLabel={t.modelSelect}
             className="gap-one rounded-lg border border-border-strong bg-surface-elevated p-two">
             {options.map((option) => {
               const selected = option.id === value.id;
