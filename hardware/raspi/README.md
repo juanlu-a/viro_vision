@@ -33,6 +33,25 @@ bluetoothctl show | grep -i powered   # Powered: yes
 Desde el iPhone, antes de tocar la app: **nRF Connect** o **LightBlue** (gratis) ven un periférico
 `ViroVision` con un servicio `4380c500-…` y cinco características. Si eso se ve, la placa está bien.
 
+## Emular la placa desde la Mac (sin hardware)
+
+El mismo núcleo (`virovision/nucleo.py`: comandos, modos, transferencias) se puede publicar por
+CoreBluetooth desde una Mac con `bless`. Sirve para probar la app contra el perfil GATT real: conectar,
+leer estado, cambiar de modo y reensamblar una transferencia. **El throughput contra la Mac no es el
+de la placa** (otro chip, Bluetooth 5, otro stack): valida la app, no decide el ADR 0003.
+
+```sh
+cd hardware/raspi
+python3.11 -m venv .venv-mac && .venv-mac/bin/pip install -r requirements-mac.txt   # python3 ≥ 3.9 sirve
+.venv-mac/bin/python -m virovision.emulador -v
+```
+
+La primera vez macOS pide permiso de Bluetooth para la terminal (Privacidad y seguridad → Bluetooth).
+Con el emulador corriendo, el iPhone ve «ViroVision» igual que vería la placa; la app se conecta con
+*Buscar dispositivo* y *Medir transferencia* funciona de punta a punta. `--nombre ViroVision-Mac` si
+la placa real está cerca y querés distinguirlas. Sin cámara: el comando `foto` responde con error, y
+`medir` manda bytes sintéticos.
+
 ## Correr a mano (depurar)
 
 ```sh
@@ -101,7 +120,9 @@ y el caveat no importa.
 cd hardware/raspi && pip install -r requirements-dev.txt && python3 -m pytest
 ```
 
-Sólo lo puro: el partido en chunks y la máquina de modos. Lo que habla con BlueZ se prueba en la placa.
+Sólo lo puro: el partido en chunks, la máquina de modos y el núcleo de comandos (que es el mismo
+código en la placa y en el emulador). Lo que habla con BlueZ se prueba en la placa; lo que habla con
+CoreBluetooth, arrancando el emulador.
 
 ## Qué falta (en orden)
 

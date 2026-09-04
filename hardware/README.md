@@ -7,6 +7,7 @@ documentación del hardware.
 ```
 hardware/
   raspi/        firmware: daemon Python (BLE GATT + cámara + modos). Ver raspi/README.md
+                incluye un emulador para publicar el mismo GATT desde una Mac (sin placa)
   (carcasa/)    modelos 3D — pendiente
 ```
 

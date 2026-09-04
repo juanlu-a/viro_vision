@@ -889,8 +889,17 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   tardaron. Reensamblado, medición y base64 en un módulo puro con tests. `EXPO_PUBLIC_SIMULATE_DEVICE=1`
   apaga el cliente real: hay que vaciarlo para medir (documentado en `.env.example`).
 
+- **La placa no se pudo alimentar en el viaje** (sin luz: cable USB-C o SD), así que **el daemon
+  ganó un emulador para la Mac**: la lógica se separó en `nucleo.py` (comandos, modos,
+  transferencias; independiente del transporte) y hay dos adaptadores, BlueZ para la placa y
+  CoreBluetooth vía `bless` para la Mac (`python -m virovision.emulador`). Arranca y anuncia
+  «ViroVision» con el UUID del servicio; permite probar la app de punta a punta sin hardware. Lección
+  de CoreBluetooth: una característica con valor en caché tiene que ser de sólo lectura, así que todas
+  van con valor dinámico. El throughput contra la Mac **no** es el de la placa y no decide el ADR.
+
 - Verificado: `npm run lint`, `npm run typecheck`, `npm test` (189 tests); `pytest` en
-  `hardware/raspi` (10). **Nada probado todavía contra la placa ni el iPhone**: eso es lo siguiente.
+  `hardware/raspi` (18); el emulador arranca y anuncia en esta Mac. **Nada probado todavía contra la
+  placa ni desde el iPhone**: lo siguiente es el dev build y conectar contra el emulador.
 
 ## Open threads / next
 

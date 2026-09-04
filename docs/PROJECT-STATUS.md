@@ -128,8 +128,9 @@ tests via `jest-expo`.
 **EAS** (`app/eas.json`): development / preview / production profiles bound to update channels;
 opcional — la distribución real va por TestFlight desde Xcode.
 
-**Hardware**: firmware inicial en `hardware/raspi/` (daemon BLE + cámara + modos; `setup.sh` por SSH).
-Sin verificar en la placa todavía. **ML**: not started (README stub only).
+**Hardware**: firmware inicial en `hardware/raspi/` (daemon BLE + cámara + modos; `setup.sh` por SSH),
+con **emulador para la Mac** (`python -m virovision.emulador`, mismo núcleo por CoreBluetooth) para
+probar la app sin placa. Sin verificar en la placa todavía. **ML**: not started (README stub only).
 
 ## Verificado en dispositivo (2026-09-02)
 
