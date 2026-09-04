@@ -32,7 +32,7 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 
 ```
 app/        React Native (Expo) app        ← main work so far
-hardware/   RPi Zero 2 W + Coral TPU + Cam Module 3   (README stub only)
+hardware/   RPi Zero 2 W + Coral TPU + Cam Module 3   raspi/ = daemon BLE (ADR 0003)
 ml/         YOLO11 detection, OCR, Edge AI  (README stub only)
 docs/       thesis deliverables, ADRs, this file
 .claude/skills/virovision/   knowledge skill
@@ -84,8 +84,10 @@ tests via `jest-expo`.
   (Dispositivo / BLE status), `settings` (appearance + about). Green/black design system + light mode.
 - Domain layers under `app/src/`: `features/{recognition,device,audio,auth}`,
   `services/{ble,audio,supabase,storage}`, `i18n` (Spanish strings), `types`.
-- **BLE** = typed stub (`services/ble/bleClient.ts`) — GATT profile placeholders in
-  `features/device/gatt.ts`. Not wired (needs a dev-client build + real device).
+- **BLE** = cliente real sobre `react-native-ble-plx` detrás del selector de `services/ble/bleClient.ts`
+  (stub tipado en Expo Go / web). Perfil GATT de 128 bits en `features/device/gatt.ts`, espejo de
+  `hardware/raspi/virovision/gatt.py`. La pestaña Dispositivo tiene **Medir transferencia** (spike del
+  ADR 0003). Necesita development build; sin verificar contra la placa todavía.
 - **Audio routing** to the device earphone = documented TODO in `services/audio/tts.ts`.
 - **Supabase auth** = **archived** (app has no login). The env-gated client (real/stub) + `AuthProvider`
   remain in the repo but are not wired into navigation — available if optional sync is added later.
@@ -126,7 +128,8 @@ tests via `jest-expo`.
 **EAS** (`app/eas.json`): development / preview / production profiles bound to update channels;
 opcional — la distribución real va por TestFlight desde Xcode.
 
-**Hardware / ML**: not started (README stubs only).
+**Hardware**: firmware inicial en `hardware/raspi/` (daemon BLE + cámara + modos; `setup.sh` por SSH).
+Sin verificar en la placa todavía. **ML**: not started (README stub only).
 
 ## Verificado en dispositivo (2026-09-02)
 
@@ -168,12 +171,12 @@ Pick a track (see the skill for pillar detail):
   COCO-pretrained YOLO already detects `bus`, so an end-to-end demo is possible before custom training.
 - **B. Finish the account layer:** after EAS/Supabase setup, add auth-gated navigation (login route +
   guard), profile, and persist settings to Supabase.
-- **C. Real BLE:** replace the `services/ble` stub with a live `react-native-ble-plx` client (needs a
-  dev-client build; testable against a mock peripheral until firmware exists).
+- **C. Real BLE:** hecho el 2026-09-04 (cliente ble-plx + medición). Falta verificarlo contra la
+  placa real y correr la medición del ADR 0003.
 - **D. ML pillar (Python, `ml/`):** datasets for buses + products, train/fine-tune YOLO11, export to
   TFLite/edge.
-- **E. Hardware pillar:** RPi firmware, BLE peripheral (GATT server matching `gatt.ts`), camera capture
-  (blocked on buying hardware).
+- **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). Siguen: botón GPIO,
+  DAC I2S + anuncios pregrabados, pipeline de ómnibus en el Coral, carcasa.
 
 **Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core
 value prop, and exercises the recognition/audio domain already scaffolded.

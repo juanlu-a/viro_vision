@@ -3,14 +3,17 @@
 System architecture, component and data-flow diagrams, and Architecture Decision Records (ADRs).
 
 - **System overview** — app ↔ device ↔ (optional) phone-side processing.
-- **App ↔ device integration** — the two channels: BLE (GATT) for data/control + a separate audio
-  channel (A2DP/HFP or wired) for the recognition TTS to the device earphone.
+- **App ↔ device integration** — [ADR 0003](adr/0003-enlace-placa-telefono.md): BLE (GATT) siempre
+  vivo como plano de control (es lo único que despierta a la app con el teléfono en el bolsillo); la
+  foto del modo supermercado viaja por BLE o por un AP WiFi de la placa según una medición con umbral;
+  el audio sale por un DAC I2S cableado en la placa (no A2DP: compartiría antena con BLE y WiFi).
 - **Recognition data flow** — per use case since [ADR 0006](adr/0006-pipelines-por-caso-de-uso.md):
   buses = on-device detection (Coral TPU) → banner crop → OCR → announcement; supermarket =
   cloud vision LLM chosen by the user → announcement (decided 2026-08-30; the local fallback is
   still open). Los tres flujos, dibujados, en [Flujos por caso de uso](#flujos-por-caso-de-uso).
-- **ADRs** — see [`adr/`](adr/) for the full index (0001 offline-first, 0002 Supabase,
-  0004 on-device runtime, 0006 pipelines por caso de uso, 0007 botones físicos y modos).
+- **ADRs** — see [`adr/`](adr/) for the full index (0001 offline-first, 0002 Supabase, 0003 enlace
+  placa ↔ teléfono, 0004 on-device runtime, 0006 pipelines por caso de uso, 0007 botones físicos y
+  modos, 0008 proxy de claves).
   To backfill: RPi Zero 2 W + Coral TPU, React Native (Expo), on-device vs. offload-to-phone.
 
 ## Modos de operación (diagrama canónico)
@@ -126,3 +129,8 @@ flowchart LR
 > **Estado (2026-09-01).** El caso supermercado es el que está en desarrollo. Los dos casos de
 > ómnibus quedaron **en stand by**: la app implementa hoy el camino local (OCR sobre la foto) que
 > ambos comparten, y elegir entre A y B depende de tener el hardware para medirlos.
+>
+> **Actualización (2026-09-04).** El equipo eligió el **caso B** para ómnibus (todo en la placa) y
+> confirmó el flujo de supermercado tal como está dibujado. El "BLE + WiFi" de las flechas se
+> resuelve en [ADR 0003](adr/0003-enlace-placa-telefono.md): BLE siempre, WiFi sólo si la medición
+> de throughput lo pide.

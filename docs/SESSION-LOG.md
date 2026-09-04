@@ -853,6 +853,45 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   `PROJECT-STATUS.md` y el recorrido de VoiceOver de `qa-modo-supermercado.md`, que apuntaba
   explícitamente a que el selector estaba en Inicio "y no en Ajustes".
 
+## 2026-09-04 (cont.) — El enlace placa ↔ teléfono: BLE fijo, la foto se decide midiendo
+
+- **El equipo decidió dónde corre cada cosa**: ómnibus **entero en la placa** (caso B del diagrama
+  canónico: YOLO + OCR cuantizados sobre la Zero 2 W + Coral) y supermercado como placa → foto →
+  teléfono → LLM en la nube → audio de vuelta al auricular de la placa. Restricciones: mínima
+  cantidad de software en la placa, sin cifrar el payload, 3 a 4 s de disparo a audio.
+
+- **Escrito el ADR 0003** (el número que estaba reservado para esto). Lo firme: Pi OS Lite + un
+  servicio systemd (no hay bare-metal: libcamera, libedgetpu, BlueZ); **BLE siempre vivo como plano
+  de control**, porque con el teléfono bloqueado en el bolsillo sólo una notificación BLE despierta
+  a la app; **audio por DAC I2S cableado**, no A2DP (compartiría antena con BLE + WiFi); anuncios
+  de ómnibus **pregrabados** en la SD. Lo abierto, con umbral: **si los 53 KB de la foto bajan por
+  BLE en menos de 2 s no hay WiFi; si no, la placa levanta un AP** (plan B diseñado ya: NetworkManager,
+  credenciales por BLE, HTTP plano, la app siempre tira).
+
+- **La pregunta del día fue "¿vale la pena WiFi?"** La cuenta cambió al mirar lo medido el 02/09: la
+  foto pesa **53 KB**, no 200. Sólo BLE ≈ 6 a 9 s con los 10-20 KB/s típicos del chip; BLE + WiFi ≈
+  3 a 3,5 s. Y "¿si la imagen es más chica?": la transferencia es lineal en bytes pero **el LLM no se
+  acelera** (las medianas del 02/09 no ordenan), y el acierto a 384 px fue sobre una imagen sintética.
+  Conclusión: el número que decide es el throughput BLE real de esta placa, que nadie midió, y el
+  tamaño mínimo de foto que aguanta la precisión con góndolas reales. Las dos variables van a
+  `docs/mediciones/2026-09-04-ble-throughput.md`, con tablas vacías para completar.
+
+- **Primer código del pilar de hardware: `hardware/raspi/`.** Un daemon Python (bluez-peripheral)
+  que anuncia «ViroVision», expone el GATT (modo, control, evento, transferencia, estado) y manda un
+  payload en chunks por notificaciones; cámara real con picamera2 a 1024 px / q70 (lo mismo que la
+  app manda a la nube) o bytes sintéticos sin cámara; máquina de modos de ADR 0007; `setup.sh` +
+  unidad systemd para instalar por SSH; tests puros con pytest. Caveat escrito: notifica por
+  `PropertiesChanged` en D-Bus, así que si la v1 da < 15 KB/s hay que repetir con `AcquireNotify`.
+
+- **La app dejó de tener el BLE en stub**: cliente real sobre `react-native-ble-plx` detrás del
+  selector (stub sólo en Expo Go / web), UUIDs de 128 bits (los `0000fffX` eran del rango de 16 bits
+  del SIG), y **«Medir transferencia»** en Dispositivo, que pide los 53 KB y dice en voz alta cuánto
+  tardaron. Reensamblado, medición y base64 en un módulo puro con tests. `EXPO_PUBLIC_SIMULATE_DEVICE=1`
+  apaga el cliente real: hay que vaciarlo para medir (documentado en `.env.example`).
+
+- Verificado: `npm run lint`, `npm run typecheck`, `npm test` (189 tests); `pytest` en
+  `hardware/raspi` (10). **Nada probado todavía contra la placa ni el iPhone**: eso es lo siguiente.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -881,10 +920,17 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   la app (`com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`), `PLAY_ENABLED=true`
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
-### Bloqueado por hardware
-- **Camino de ómnibus en stand by** (2026-09-01): los dos casos del diagrama están en mermaid, sin
-  implementar. Elegir entre ellos exige hardware con qué medirlos.
-- Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral.
+### Hardware (la placa ya está; 2026-09-04)
+- **Correr el spike 0 del ADR 0003**: instalar `hardware/raspi` en la Zero 2 W (`setup.sh`), dev
+  build en el iPhone, «Medir transferencia» × 5 por tamaño, WiFi de la placa apagado y prendido.
+  Umbral: 53 KB en < 2 s ⇒ sin WiFi. Si da < 15 KB/s, repetir con `AcquireNotify` antes de concluir.
+  Después, `## Actualización` en el ADR 0003 y la Tabla B (precisión por tamaño con fotos reales).
+- **Spike 1**: segundo plano en iOS — con la pantalla bloqueada, una notificación BLE despierta la
+  app y el ciclo entero termina antes de que iOS la suspenda. Recién ahí `isBackgroundEnabled: true`.
+- **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
+- **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
+- Placa: botón GPIO → `MaquinaDeModos`; DAC I2S + anuncios pregrabados; elegir el **detector para
+  la TPU** y medirlo (el camino de ómnibus es el caso B, todo en placa).
 
 ### Suelto
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.

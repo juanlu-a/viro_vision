@@ -27,9 +27,30 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003 — Transporte de imagen (WiFi vs BLE) · **reservado, sin escribir**
+### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04), transporte de la foto abierto a medición**
 
-El número está reservado a propósito. Depende de tener hardware.
+Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
+dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
+placa** (caso B del diagrama canónico); supermercado hace placa → foto → teléfono → nube → audio de
+vuelta al auricular de la placa. Restricciones: mínima cantidad de software en la placa, sin cifrar,
+3 a 4 s de disparo a audio en supermercado.
+
+**Qué se decidió firme**: (1) Raspberry Pi OS Lite + **un** servicio systemd con un daemon Python; no
+hay bare-metal posible (libcamera, libedgetpu, BlueZ). (2) **BLE (GATT) siempre vivo como plano de
+control**, porque con el teléfono bloqueado en el bolsillo sólo una notificación BLE despierta a la
+app; un socket WiFi no. (3) **Audio por DAC I2S cableado**, no A2DP: compartiría chip y antena con
+BLE + WiFi y cortaría. Esto **reemplaza** el "Bluetooth Classic (A2DP/HFP) o cableado" de los textos
+viejos. (4) Qué vuelve: supermercado → MP3 sintetizado en el teléfono; ómnibus → anuncios
+**pregrabados** en la SD (las líneas son un conjunto finito). (5) UUIDs GATT de 128 bits: los
+`0000fffX` eran del rango de 16 bits del SIG.
+
+**Qué quedó abierto, con umbral**: si la foto de referencia (53 KB, la que hoy sube a la nube) baja
+por BLE en **menos de 2 s**, no hay WiFi; si no, la placa levanta un **AP WiFi** (NetworkManager,
+credenciales por BLE, HTTP plano, la app siempre tira). El plan B está diseñado en el ADR para no
+rediseñar. La cuenta: sólo BLE ≈ 6 a 9 s con 10-20 KB/s típicos del chip; BLE + WiFi ≈ 3 a 3,5 s. La
+palanca grande sobre BLE es el **tamaño de la foto** (lineal en bytes; el LLM no se acelera), pero
+bajar de 1024 px exige medir precisión con fotos reales de góndola. Protocolo y tablas en
+`docs/mediciones/2026-09-04-ble-throughput.md`; el daemon que lo permite en `hardware/raspi/`.
 
 ### ADR 0004 — Runtime de inferencia on-device · **Proposed — actualizado 2026-08-22: se resuelve por caso de uso**
 

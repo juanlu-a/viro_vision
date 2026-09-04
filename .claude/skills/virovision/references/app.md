@@ -81,12 +81,14 @@ ViroVision:
 - **Complement with real usability testing** with blind / low-vision users — a correct API is
   necessary but not sufficient.
 
-## Two communication channels with the device
-BLE cannot carry real-time audio (low bandwidth), so the device uses **two channels**:
-1. **Data/control — BLE (GATT):** `react-native-ble-plx` (+ its Expo config plugin). Connection
-   state, commands, recognition results.
-2. **Audio — separate channel:** the TTS/recognition audio to the device earphone goes over a
-   Bluetooth Classic profile (A2DP/HFP) or a wired connection (hardware team's decision).
+## Enlace con el dispositivo (ADR 0003)
+1. **Control — BLE (GATT), siempre vivo:** `react-native-ble-plx` (+ su config plugin). Modo,
+   comandos, eventos, resultados, y la medición de transferencia. Cliente real detrás del selector de
+   `services/ble/bleClient.ts`; stub tipado en Expo Go / web. Necesita development build.
+2. **La foto (supermercado):** por BLE en chunks, o por un AP WiFi de la placa con HTTP plano si la
+   medición de throughput lo pide (umbral: 53 KB en < 2 s). Se decide midiendo.
+3. **Audio:** sale por la placa (DAC I2S cableado, no A2DP). Para supermercado la app manda el MP3
+   que ya sintetiza (`services/audio/sintesis.ts`); no hay que enrutar la salida del teléfono.
 
 ### Audio routing
 The app must **explicitly route its output** to the device's audio endpoint instead of the system
