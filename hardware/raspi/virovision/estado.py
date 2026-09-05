@@ -8,6 +8,7 @@ medir el BLE con el WiFi apagado y prendido, porque comparten antena.
 from __future__ import annotations
 
 import socket
+import subprocess
 import time
 from pathlib import Path
 from typing import Optional
@@ -26,9 +27,19 @@ def _leer(path: Path) -> Optional[str]:
         return None
 
 
-def ip_local() -> Optional[str]:
-    """IP con la que la placa sale a la red (la del WiFi, normalmente). Sin tráfico real: un socket
-    UDP "conectado" sólo elige la interfaz de salida. `None` si no hay red."""
+def ip_local(interfaz: str = "wlan0") -> Optional[str]:
+    """IPv4 de la interfaz WiFi, o `None` si no tiene. Se lee de la interfaz y no de la ruta por
+    defecto a propósito: en modo punto de acceso (plan B) la placa tiene 10.42.0.1 pero ninguna ruta
+    por defecto, y el truco del socket UDP "conectado" devolvía nada justo cuando más importa."""
+    try:
+        salida = subprocess.run(["ip", "-4", "-o", "addr", "show", "dev", interfaz], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        salida = ""
+    for linea in salida.splitlines():
+        partes = linea.split()
+        if "inet" in partes:
+            return partes[partes.index("inet") + 1].split("/")[0]
+    # Sin `ip` (la Mac del emulador): la interfaz de salida, si hay red.
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("10.255.255.255", 1))
