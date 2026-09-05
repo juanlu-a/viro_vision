@@ -29,8 +29,19 @@ def _argumentos() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="virovision", description="Daemon BLE de la placa ViroVision")
     parser.add_argument("--sin-camara", action="store_true", help="no intentar abrir la cámara (sólo medir)")
     parser.add_argument("--nombre", default=NOMBRE_ANUNCIADO, help="nombre BLE anunciado")
+    parser.add_argument("--hci", default="hci0", help="adaptador Bluetooth (default hci0)")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args()
+
+
+async def _obtener_adaptador(bus, hci: str) -> Adapter:
+    """`Adapter.get_first` de bluez-peripheral 0.1.7 recorre todos los hijos de /org/bluez y asume
+    que cada uno es un adaptador; BlueZ 5.82 (Trixie) expone además `/org/bluez/test`, sin
+    `Adapter1`, y la librería explota con InterfaceNotFoundError. Se construye el adaptador a mano
+    desde su ruta."""
+    ruta = f"/org/bluez/{hci}"
+    introspeccion = await bus.introspect("org.bluez", ruta)
+    return Adapter(bus.get_proxy_object("org.bluez", ruta, introspeccion))
 
 
 async def _main(args: argparse.Namespace) -> None:
@@ -44,20 +55,21 @@ async def _main(args: argparse.Namespace) -> None:
     if not await is_bluez_available(bus):
         raise SystemExit("BlueZ no está disponible en D-Bus: ¿está corriendo bluetooth.service?")
 
+    adaptador = await _obtener_adaptador(bus, args.hci)
+
     servicio = ViroVisionService(
         loop=loop,
         leer_estado=partial(leer_estado, camara=hay_camara),
         capturar=capturar,
         payload_sintetico=payload_sintetico,
     )
-    await servicio.register(bus)
+    await servicio.register(bus, adapter=adaptador)
 
     # Sin agente, BlueZ rechaza cualquier intento de emparejar. NoIo = "just works", sin PIN: el
     # usuario no puede leer un PIN en la placa, y ADR 0003 no cifra el payload a propósito.
     agente = NoIoAgent()
     await agente.register(bus)
 
-    adaptador = await Adapter.get_first(bus)
     await adaptador.set_powered(True)
     await adaptador.set_alias(args.nombre)
 
