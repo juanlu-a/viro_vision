@@ -1,6 +1,6 @@
 # Medición — throughput BLE placa → teléfono y tamaño de foto (spike 0 del ADR 0003)
 
-**Estado: protocolo listo, sin correr.** Las tablas se completan con la placa y el iPhone reales.
+**Estado (2026-09-05): primera corrida hecha; faltan las cinco por fila.** Resultados parciales abajo.
 Decide el transporte de la foto en el modo supermercado
 ([ADR 0003](../architecture/adr/0003-enlace-placa-telefono.md)).
 
@@ -39,6 +39,36 @@ el 02/09).
 5. Si el mejor resultado da menos de ~15 KB/s, **antes de concluir** repetir con la variante
    `AcquireNotify` del daemon (ver caveat en el README de la placa): el cuello podría ser D-Bus y no
    la radio.
+
+## Resultados parciales (2026-09-05)
+
+Placa: Zero 2 W, Raspberry Pi OS 2026-06-18 (Debian 13 Trixie), kernel 6.18, BlueZ 5.82, Python 3.13,
+daemon `4ebcf0a`+. Controlador BCM43438: **sin Data Length Extension** (LE features `0x1F`, bit 5 en
+cero) → paquetes de radio de 27 bytes; 15 buffers ACL de 27 bytes. iOS negocia ATT MTU 185 y un
+intervalo de conexión de 15 ms.
+
+| receptor | bytes | chunk | WiFi placa | ms | KB/s | chunks perdidos |
+|---|---|---|---|---|---|---|
+| **iPhone (app TestFlight)** | 53 000 | 182 | prendido | **4 490** | **11,8** | 0 |
+| Mac (bleak) | 53 000 | 182 | prendido | 4 245 | 12,5 | 0 |
+| Mac (bleak) | 30 000 | 182 | prendido | 2 477 | 12,1 | 0 |
+| Mac (bleak), pausa 1 ms | 30 000 | 182 | prendido | 3 210 | 9,3 | 0 |
+| Mac (bleak), pausa 1 ms | 30 000 | 95 | prendido | 3 627 | 8,3 | 0 |
+| Mac (bleak), pausa 1 ms | 30 000 | 47 | prendido | 3 767 | 8,0 | 0 |
+| Mac (bleak), pausa 4 ms | 30 000 | 23 | prendido | 9 166 | 3,3 | 0 |
+
+Lecturas:
+
+- **11,8 KB/s es exactamente una notificación de 182 bytes por intervalo de 15 ms** (182 / 0,015 =
+  12,1 KB/s). Con iPhone y con Mac da lo mismo: el techo lo pone el enlace, no el receptor.
+- **Achicar el chunk no ayuda**: 95 y 47 bytes dan menos, no más. La hipótesis de "más
+  notificaciones por evento con chunks chicos" queda descartada en este controlador.
+- **El daemon no es el cuello** una vez resuelta la pérdida por D-Bus: entrega los 298 chunks en
+  ~1,7 s (pausa de 4 ms) y el aire tarda 4,2 a 4,5 s. Sin pausa, dbus-next pierde chunks (llegaron
+  175 de 298 y nunca el `fin`); con 1 ms no perdió ninguno en tres corridas.
+- **53 KB en 4,5 s está más del doble por encima del umbral de 2 s.** Salvo que las cinco corridas
+  del iPhone digan otra cosa, el ADR 0003 va al plan B (WiFi para la foto). La única palanca que
+  queda del lado BLE es Android con intervalo de 7,5 ms (el doble), que no sirve para iOS.
 
 ## Tabla A — throughput BLE
 

@@ -901,6 +901,35 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   `hardware/raspi` (18); el emulador arranca y anuncia en esta Mac. **Nada probado todavía contra la
   placa ni desde el iPhone**: lo siguiente es el dev build y conectar contra el emulador.
 
+## 2026-09-05 — La placa en la red y el primer número real del enlace: 11,8 KB/s
+
+- **Configurar la placa sin teclado ni pantalla.** La imagen 2026-06-18 usa cloud-init: se editaron
+  en la partición `bootfs` desde la Mac `network-config` (WiFi de casa sumado), `user-data` (clave
+  SSH de la Mac) y el `instance-id` en `meta-data` y `cmdline.txt` para que reaplique la red. La SD
+  llegó protegida contra escritura por el interruptor del adaptador; una vez destrabado, arrancó y
+  apareció como `virovision.local`. Debian 13 (Trixie), Python 3.13, BlueZ 5.82.
+
+- **Instalación remota del daemon**, con tres arreglos que sólo aparecen en hardware real: `sudo`
+  sin contraseña para el usuario; `Adapter.get_first` de bluez-peripheral explota con BlueZ 5.82
+  porque existe `/org/bluez/test` (se toma `hci0` por ruta); y **dbus-next pierde chunks** cuando se
+  vuelcan sin pausa (175 de 298 llegaron, el `fin` nunca): pausa de 4 ms entre notificaciones,
+  configurable, y `PYTHONUNBUFFERED=1` para ver los `print()` de la librería en el journal.
+
+- **Primera medición real placa → iPhone (build de TestFlight): 53 KB en 4,49 s, 11,8 KB/s, 298
+  chunks de 182 bytes, sin pérdidas.** La Mac como central da lo mismo (12,5). Es una notificación
+  por intervalo de 15 ms: el controlador BCM43438 no tiene Data Length Extension (paquetes de radio
+  de 27 bytes, 15 buffers ACL) y iOS no baja de 15 ms. Chunks más chicos dan menos, no más. Detalle
+  en `docs/mediciones/2026-09-04-ble-throughput.md`. **Está más del doble por encima del umbral de
+  2 s del ADR 0003**: salvo sorpresa en las cinco corridas, la foto va por WiFi (plan B).
+
+- **La app decía «Conectado» con el enlace muerto** después de reiniciar el servicio de la placa, y
+  «No se pudo medir» al instante sin motivo. Arreglado: escucha la desconexión, consulta al stack
+  antes de escribir, y dice el motivo real del fallo por voz y en pantalla. Segundo build a TestFlight
+  con eso. La cámara no la detecta la placa (`No camera number 0 found`): revisar el flex.
+
+- Variable del repo `EXPO_PUBLIC_SIMULATE_DEVICE` pasó de `1` a `0`: los builds de TestFlight usan el
+  BLE real. El emulador de la Mac se apagó al volver la placa (los dos anunciaban «ViroVision»).
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -930,10 +959,10 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
 ### Hardware (la placa ya está; 2026-09-04)
-- **Correr el spike 0 del ADR 0003**: instalar `hardware/raspi` en la Zero 2 W (`setup.sh`), dev
-  build en el iPhone, «Medir transferencia» × 5 por tamaño, WiFi de la placa apagado y prendido.
-  Umbral: 53 KB en < 2 s ⇒ sin WiFi. Si da < 15 KB/s, repetir con `AcquireNotify` antes de concluir.
-  Después, `## Actualización` en el ADR 0003 y la Tabla B (precisión por tamaño con fotos reales).
+- **Cerrar el spike 0 del ADR 0003**: ya hay una corrida real (11,8 KB/s). Faltan las cinco por
+  fila con WiFi de la placa apagado y prendido, y Android si hay. Después, `## Actualización` en el
+  ADR 0003 (todo indica plan B: WiFi para la foto) y la Tabla B (precisión por tamaño con fotos
+  reales). `AcquireNotify` ya no cambia la conclusión: el techo es del controlador.
 - **Spike 1**: segundo plano en iOS — con la pantalla bloqueada, una notificación BLE despierta la
   app y el ciclo entero termina antes de que iOS la suspenda. Recién ahí `isBackgroundEnabled: true`.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.

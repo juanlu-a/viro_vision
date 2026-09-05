@@ -96,13 +96,27 @@ En corto: app conectada → *Medir transferencia* → cinco corridas por tamaño
 el WiFi de la placa prendido y apagado (`sudo rfkill block wifi` / `unblock`; comparten antena) →
 anotar el **rango**, no el promedio.
 
-### Caveat: D-Bus
+### Caveat: D-Bus (medido el 2026-09-05)
 
-`bluez-peripheral` notifica con `PropertiesChanged` sobre D-Bus, un mensaje por chunk. Ese camino
-tiene un costo por paquete que el firmware definitivo evitaría con `AcquireNotify` (un descriptor de
-archivo directo a BlueZ). **Si la medición v1 da menos de ~15 KB/s, antes de concluir "BLE no
-alcanza" hay que repetirla con `AcquireNotify`**; si da más de 27 KB/s (53 KB en < 2 s), BLE alcanza
-y el caveat no importa.
+`bluez-peripheral` notifica con `PropertiesChanged` sobre D-Bus, un mensaje por chunk. **Sin pausa
+entre chunks, dbus-next pierde mensajes**: el socket hacia bluetoothd se llena en ~250 ms, la
+librería recibe `EAGAIN` (`BlockingIOError: Resource temporarily unavailable`) y descarta el resto.
+Al receptor le llegaron 175 de 298 chunks y nunca el evento `fin`. Por eso `gatt.py` duerme 4 ms
+entre notificaciones (`VIROVISION_PAUSA_MS` para experimentar); con 1 ms tampoco perdió. La pausa no
+sesga la medición: el daemon entrega los 298 chunks en ~1,7 s y el aire tarda 4,5 s. El arreglo de
+fondo sigue siendo `AcquireNotify` (un fd con backpressure real), pero ya no cambia la conclusión:
+el techo de ~12 KB/s lo pone el controlador (sin DLE, 27 bytes por paquete de radio, 15 buffers) con
+el intervalo de 15 ms de iOS.
+
+### Otras lecciones de la primera instalación
+
+- **BlueZ 5.82 expone `/org/bluez/test`**, y `Adapter.get_first` de bluez-peripheral lo toma por un
+  adaptador y explota. El daemon toma `hci0` por su ruta (`--hci`).
+- **`PYTHONUNBUFFERED=1` en el servicio**: las excepciones que bluez-peripheral imprime con `print()`
+  no llegaban al journal hasta que el proceso moría.
+- **Si el servicio se reinicia con el teléfono conectado**, la app puede seguir diciendo «Conectado»
+  con el enlace muerto; desde el build del 2026-09-05 la app lo detecta y avisa. Con builds anteriores:
+  Desconectar y Buscar dispositivo de nuevo.
 
 ## Problemas conocidos
 
