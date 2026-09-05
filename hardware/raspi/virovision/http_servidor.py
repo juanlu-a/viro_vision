@@ -87,6 +87,11 @@ class ServidorHttp:
                     t0 = time.monotonic()
                     try:
                         jpeg = servidor._capturar()
+                    except TimeoutError as exc:
+                        # La cámara se trabó: se lo decimos enseguida (la app esperaría 20 s) y la
+                        # cámara ya se está reiniciando del lado de la placa.
+                        self._json(504, {"error": str(exc)[:200]})
+                        return
                     except Exception as exc:  # la cámara falla de formas variadas; el cliente merece un 500 y no un socket cortado
                         log.exception("captura fallida")
                         self._json(500, {"error": str(exc)[:200]})

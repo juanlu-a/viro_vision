@@ -64,7 +64,9 @@ async def _main(args: argparse.Namespace) -> None:
     http = None
     if not args.sin_http:
         http = ServidorHttp(
-            leer_estado=lambda: leer_estado(camara=hay_camara, puerto_http=args.puerto, ap=ap.encendido),
+            # `camara.disponible` y no `hay_camara`: si una captura se cuelga la cámara se reinicia, y
+            # si no vuelve, el estado tiene que decirlo.
+            leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto, ap=ap.encendido),
             payload_sintetico=payload_sintetico,
             capturar=camara.capturar_jpeg if hay_camara else None,
             puerto=args.puerto,
@@ -79,7 +81,7 @@ async def _main(args: argparse.Namespace) -> None:
 
     servicio = ViroVisionService(
         loop=loop,
-        leer_estado=lambda: leer_estado(camara=hay_camara, puerto_http=args.puerto if http else None, ap=ap.encendido),
+        leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto if http else None, ap=ap.encendido),
         capturar=capturar,
         payload_sintetico=payload_sintetico,
         control_ap=control_ap,
