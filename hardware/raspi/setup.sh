@@ -28,6 +28,13 @@ rfkill unblock bluetooth || true
 systemctl enable --now bluetooth.service
 bluetoothctl power on >/dev/null || true
 
+echo "→ WiFi sin ahorro de energía"
+# Medido el 2026-09-05: el primer GET tras un rato quieto tardó 153 ms contra 41-59 los siguientes; es
+# el despertar del powersave del WiFi. Para el plan B (la foto por HTTP) conviene no pagarlo.
+mkdir -p /etc/NetworkManager/conf.d
+printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/10-virovision-wifi-powersave.conf
+systemctl reload NetworkManager 2>/dev/null || true
+
 echo "→ servicio systemd"
 sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$INSTALL_DIR/virovision.service" > /etc/systemd/system/virovision.service
 systemctl daemon-reload

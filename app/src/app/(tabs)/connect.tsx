@@ -14,7 +14,7 @@ import { strings } from '@/i18n';
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { state, connect, disconnect, medir, medicion } = useDeviceConnection();
+  const { state, connect, disconnect, medir, medirWifi, medicion } = useDeviceConnection();
 
   const isConnected = state.status === 'connected';
   const isBusy = state.status === 'scanning' || state.status === 'connecting';
@@ -25,6 +25,10 @@ export default function ConnectScreen() {
   const medirYAnunciar = async () => {
     announce(t.measuring);
     announce(await medir());
+  };
+  const medirWifiYAnunciar = async () => {
+    announce(t.measuring);
+    announce(await medirWifi());
   };
 
   return (
@@ -86,6 +90,13 @@ export default function ConnectScreen() {
             hint={t.measureHint}
             loading={medicion.midiendo}
             onPress={medirYAnunciar}
+          />
+          <AccessibleButton
+            label={t.measureWifiButton}
+            hint={t.measureWifiHint}
+            loading={medicion.midiendo}
+            disabled={!state.device?.direccion}
+            onPress={medirWifiYAnunciar}
           />
           <AccessibleButton
             label={t.disconnectButton}

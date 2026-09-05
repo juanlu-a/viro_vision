@@ -104,6 +104,14 @@ export const es = {
     measureFailed: 'No se pudo medir.',
     measureIncomplete: 'La medición quedó incompleta: faltaron {faltantes} paquetes.',
     measureSection: 'Última medición',
+    measureWifiButton: 'Medir por WiFi',
+    measureWifiHint:
+      'Baja los mismos 53 kilobytes desde la placa por la red WiFi, en vez de Bluetooth, y mide cuánto tardan. El resultado se anuncia en voz alta.',
+    measureWifiResult: '{kb} kilobytes en {segundos} segundos por WiFi: {kbps} kilobytes por segundo.',
+    measureWifiNoAddress:
+      'La placa no informó una dirección de red. Tiene que estar conectada a un WiFi y con el servidor corriendo.',
+    addressLabel: 'Dirección en la red',
+    addressNone: 'sin red WiFi',
   },
   settings: {
     title: 'Ajustes',

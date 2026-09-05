@@ -69,6 +69,18 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
         )}
       </View>
 
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={`${t.addressLabel}: ${device.direccion ? `${device.direccion.ip}, puerto ${device.direccion.puerto}` : t.addressNone}`}>
+        <ThemedText type="small" themeColor="textSecondary">
+          {t.addressLabel}
+        </ThemedText>
+        <ThemedText type="small">
+          {device.direccion ? `${device.direccion.ip}:${device.direccion.puerto}` : t.addressNone}
+        </ThemedText>
+      </View>
+
       {device.firmwareVersion && (
         <View
           accessible

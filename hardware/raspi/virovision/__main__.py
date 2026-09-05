@@ -10,14 +10,15 @@ import argparse
 import asyncio
 import logging
 import signal
-from functools import partial
 
 from bluez_peripheral.advert import Advertisement
 from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
+from .ap import PuntoDeAcceso
 from .camara import Camara, payload_sintetico
 from .estado import leer_estado
+from .http_servidor import PUERTO_POR_DEFECTO, ServidorHttp
 from .gatt import NOMBRE_ANUNCIADO, SERVICE_UUID, ViroVisionService
 
 log = logging.getLogger("virovision")
@@ -30,6 +31,8 @@ def _argumentos() -> argparse.Namespace:
     parser.add_argument("--sin-camara", action="store_true", help="no intentar abrir la cámara (sólo medir)")
     parser.add_argument("--nombre", default=NOMBRE_ANUNCIADO, help="nombre BLE anunciado")
     parser.add_argument("--hci", default="hci0", help="adaptador Bluetooth (default hci0)")
+    parser.add_argument("--puerto", type=int, default=PUERTO_POR_DEFECTO, help="puerto del servidor HTTP (plan B)")
+    parser.add_argument("--sin-http", action="store_true", help="no levantar el servidor HTTP")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args()
 
@@ -51,6 +54,23 @@ async def _main(args: argparse.Namespace) -> None:
     hay_camara = False if args.sin_camara else camara.iniciar()
     capturar = (lambda: loop.run_in_executor(None, camara.capturar_jpeg)) if hay_camara else None
 
+    # El servidor HTTP (plan B del ADR 0003) corre en su hilo; su puerto viaja por `estado` para que
+    # la app sepa de dónde bajar la foto. La captura es la misma función bloqueante que usa el BLE.
+    ap = PuntoDeAcceso()
+
+    def control_ap(encender: bool) -> None:
+        ap.encender() if encender else ap.apagar()
+
+    http = None
+    if not args.sin_http:
+        http = ServidorHttp(
+            leer_estado=lambda: leer_estado(camara=hay_camara, puerto_http=args.puerto, ap=ap.encendido),
+            payload_sintetico=payload_sintetico,
+            capturar=camara.capturar_jpeg if hay_camara else None,
+            puerto=args.puerto,
+        )
+        http.iniciar()
+
     bus = await get_message_bus()
     if not await is_bluez_available(bus):
         raise SystemExit("BlueZ no está disponible en D-Bus: ¿está corriendo bluetooth.service?")
@@ -59,9 +79,10 @@ async def _main(args: argparse.Namespace) -> None:
 
     servicio = ViroVisionService(
         loop=loop,
-        leer_estado=partial(leer_estado, camara=hay_camara),
+        leer_estado=lambda: leer_estado(camara=hay_camara, puerto_http=args.puerto if http else None, ap=ap.encendido),
         capturar=capturar,
         payload_sintetico=payload_sintetico,
+        control_ap=control_ap,
     )
     await servicio.register(bus, adapter=adaptador)
 
@@ -89,6 +110,8 @@ async def _main(args: argparse.Namespace) -> None:
         except asyncio.TimeoutError:
             servicio.notificar_estado()
     log.info("apagando")
+    if http:
+        http.parar()
     bus.disconnect()
 
 

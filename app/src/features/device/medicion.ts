@@ -15,6 +15,15 @@ function coma(n: number, decimales: number): string {
   return n.toFixed(decimales).replace('.', ',');
 }
 
+/** La misma medición, pero por WiFi: sin paquetes, porque HTTP no los expone. */
+export function describirMedicionWifi(m: MedicionTransferencia): string {
+  const kb = coma(m.bytes / 1000, m.bytes % 1000 === 0 ? 0 : 1);
+  return strings.connect.measureWifiResult
+    .replace('{kb}', kb)
+    .replace('{segundos}', coma(m.ms / 1000, 2))
+    .replace('{kbps}', coma(m.kbps, 0));
+}
+
 export function describirMedicion(m: MedicionTransferencia): string {
   const kb = coma(m.bytes / 1000, m.bytes % 1000 === 0 ? 0 : 1);
   return strings.connect.measureResult

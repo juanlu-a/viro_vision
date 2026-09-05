@@ -123,6 +123,7 @@ class BleClientPlx implements BleClient {
       name: device.name ?? device.localName ?? DEVICE_ADVERTISED_NAME,
       batteryLevel: estado?.bateria ?? null,
       firmwareVersion: estado?.version ?? null,
+      direccion: estado?.ip && estado.puerto ? { ip: estado.ip, puerto: estado.puerto } : null,
     };
   }
 
