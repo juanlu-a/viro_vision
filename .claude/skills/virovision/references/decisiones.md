@@ -61,6 +61,14 @@ Referencia: el mismo archivo por HTTP sobre la misma radio, 46 ms. Lo siguiente 
 internet. Lecciones de la placa real: BlueZ 5.82 expone `/org/bluez/test` (bluez-peripheral explota);
 dbus-next pierde chunks sin pausa entre notificaciones (4 ms); `PYTHONUNBUFFERED=1` en el servicio.
 
+**Qué cambió el 2026-09-05 (2)**: el plan B se probó en el caso real (iPhone unido al AP de la placa,
+con datos): foto en 0,34 s de mediana, **Safari y la lectura de supermercado funcionan** con el
+teléfono unido a la placa. La condición que lo hizo posible: el AP es una red **sólo local** (sin
+router ni DNS en el DHCP); con el default de NetworkManager iOS quedaba sin internet. Regla: **la
+placa nunca se anuncia como salida a internet**. El híbrido BLE control + WiFi payload es el diseño
+confirmado. Falta: unirse al AP desde la app, AP atado a los modos, audio de vuelta, spike de segundo
+plano.
+
 ### ADR 0004 — Runtime de inferencia on-device · **Proposed — actualizado 2026-08-22: se resuelve por caso de uso**
 
 Proponía **Gemma vía LiteRT-LM**. El spike lo midió: el camino de visión de LiteRT-LM **no funciona

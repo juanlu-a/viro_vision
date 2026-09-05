@@ -85,6 +85,27 @@ Lecturas:
 **Umbral:** 53 000 bytes con mediana < 2000 ms ⇒ BLE alcanza. **Resultado: 4440-4470 ms. No alcanza,
 por más del doble.** El WiFi de la placa prendido o apagado no mueve la mediana; sólo ensancha el rango.
 
+### Plan B probado de punta a punta (2026-09-05, más tarde)
+
+Con el PR #61: la app lee por BLE la dirección de la placa (`estado.ip`) y baja los 53 KB por HTTP.
+
+| escenario | corridas (s) | mediana | nota |
+|---|---|---|---|
+| iPhone y placa en la **misma red** WiFi de casa | 2,24 · 0,04 · 0,05 | 0,05 | la primera es el aviso de permiso de red local de iOS |
+| iPhone unido al **AP de la placa** (`ViroVision`, 10.42.0.1), datos móviles | 0,34 · 0,44 · 0,05 · 0,06 · 1,03 | 0,34 | caso real: sin WiFi de infraestructura |
+| ídem, BLE en la misma sesión, para comparar | ~4 | 4 | igual que las diez corridas de arriba |
+
+**El requisito duro del plan B se cumplió, pero recién al segundo intento.** Con el AP tal como lo
+crea NetworkManager (`ipv4.method shared`), el DHCP anuncia la placa como router y DNS: el iPhone
+unido a `ViroVision` **quedaba sin internet** (Safari: "sin conexión"), y el modo supermercado con él.
+Con un drop-in de dnsmasq que quita las opciones 3 (router) y 6 (DNS), la red es **sólo local**, el
+teléfono conserva su ruta por defecto por datos, y **Safari carga, la lectura de supermercado
+funciona y la foto baja en menos de medio segundo, todo con el iPhone unido a la placa**. Está en
+`setup.sh` (`/etc/NetworkManager/dnsmasq-shared.d/10-virovision-solo-local.conf`).
+
+Conclusión: **el híbrido BLE (control) + WiFi (payload) queda validado en el caso real.** Lo que
+falta es que la app se una al AP sola y que el AP viva con los modos; ver el ADR.
+
 ### Referencia WiFi (mismo archivo, misma placa, 2026-09-05)
 
 53 000 bytes servidos por HTTP desde la placa y bajados desde la Mac en la misma red doméstica
