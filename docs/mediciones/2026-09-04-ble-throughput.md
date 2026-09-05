@@ -1,6 +1,7 @@
 # Medición — throughput BLE placa → teléfono y tamaño de foto (spike 0 del ADR 0003)
 
-**Estado (2026-09-05): primera corrida hecha; faltan las cinco por fila.** Resultados parciales abajo.
+**Estado (2026-09-05): medición cerrada para iPhone.** Diez corridas reales (cinco con el WiFi de la
+placa prendido, cinco apagado) y una referencia de WiFi. **No cumple el umbral: la foto va por WiFi.**
 Decide el transporte de la foto en el modo supermercado
 ([ADR 0003](../architecture/adr/0003-enlace-placa-telefono.md)).
 
@@ -49,7 +50,7 @@ intervalo de conexión de 15 ms.
 
 | receptor | bytes | chunk | WiFi placa | ms | KB/s | chunks perdidos |
 |---|---|---|---|---|---|---|
-| **iPhone (app TestFlight)** | 53 000 | 182 | prendido | **4 490** | **11,8** | 0 |
+| **iPhone (app TestFlight), 5 corridas** | 53 000 | 182 | prendido | **mediana 4 440** (4 080-6 150) | **11,9** (8,6-13,0) | 0 |
 | Mac (bleak) | 53 000 | 182 | prendido | 4 245 | 12,5 | 0 |
 | Mac (bleak) | 30 000 | 182 | prendido | 2 477 | 12,1 | 0 |
 | Mac (bleak), pausa 1 ms | 30 000 | 182 | prendido | 3 210 | 9,3 | 0 |
@@ -66,22 +67,30 @@ Lecturas:
 - **El daemon no es el cuello** una vez resuelta la pérdida por D-Bus: entrega los 298 chunks en
   ~1,7 s (pausa de 4 ms) y el aire tarda 4,2 a 4,5 s. Sin pausa, dbus-next pierde chunks (llegaron
   175 de 298 y nunca el `fin`); con 1 ms no perdió ninguno en tres corridas.
-- **53 KB en 4,5 s está más del doble por encima del umbral de 2 s.** Salvo que las cinco corridas
-  del iPhone digan otra cosa, el ADR 0003 va al plan B (WiFi para la foto). La única palanca que
-  queda del lado BLE es Android con intervalo de 7,5 ms (el doble), que no sirve para iOS.
+- **53 KB en 4,5 s está más del doble por encima del umbral de 2 s**, con diez corridas. El ADR
+  0003 va al plan B (WiFi para la foto). La única palanca que queda del lado BLE es Android con
+  intervalo de 7,5 ms (el doble), que no sirve para iOS y tampoco llegaría a 2 s.
 
 ## Tabla A — throughput BLE
 
 | bytes | teléfono | WiFi placa | MTU | corridas (ms) | mediana | rango | KB/s (mediana) |
 |---|---|---|---|---|---|---|---|
-| 53 000 | iPhone | apagado | | | | | |
-| 53 000 | iPhone | prendido | | | | | |
+| 53 000 | iPhone | apagado | 185 | 3580, 3660, 4470, 4520, 5010 | **4470** | 3580-5010 | **11,8** |
+| 53 000 | iPhone | prendido | 185 | 4080, 4260, 4440, 4490, 6150 | **4440** | 4080-6150 | **11,9** |
 | 35 000 | iPhone | apagado | | | | | |
 | 30 000 | iPhone | apagado | | | | | |
 | 15 000 | iPhone | apagado | | | | | |
 | 53 000 | Android | apagado | | | | | |
 
-**Umbral:** 53 000 bytes con mediana < 2000 ms ⇒ BLE alcanza.
+**Umbral:** 53 000 bytes con mediana < 2000 ms ⇒ BLE alcanza. **Resultado: 4440-4470 ms. No alcanza,
+por más del doble.** El WiFi de la placa prendido o apagado no mueve la mediana; sólo ensancha el rango.
+
+### Referencia WiFi (mismo archivo, misma placa, 2026-09-05)
+
+53 000 bytes servidos por HTTP desde la placa y bajados desde la Mac en la misma red doméstica
+(no es el AP del plan B, pero es la misma radio y el mismo tamaño): **153, 41, 46, 59, 43 ms**,
+mediana **46 ms**, unas **100 veces** más rápido que BLE. El primer valor alto es el despertar del
+ahorro de energía del WiFi de la placa; en el plan B conviene apagarlo mientras un modo esté activo.
 
 ## Tabla B — precisión según tamaño de foto (fotos reales de góndola)
 
@@ -95,13 +104,15 @@ reales del paso 8 de `qa-modo-supermercado.md`. Variar `LADO_MAYOR_MAX` en
 | 768 px | | | | | |
 | 640 px | | | | | |
 
-## Decisión
+## Decisión (2026-09-05)
 
-Se completa al final:
+- Throughput medido a 53 KB, WiFi de la placa apagado: **mediana 4470 ms, rango 3580-5010 (11,8 KB/s)**.
+  Prendido: 4440 ms, 4080-6150.
+- ¿Cumple el umbral de 2000 ms? **No**, por un factor de 2,2. Y no es del daemon ni del receptor: es
+  una notificación por intervalo de 15 ms, en un controlador sin DLE. La Mac da lo mismo.
+- Tamaño de foto más chico sin perder precisión: **pendiente** (Tabla B). Ya no decide el transporte:
+  ni a 30 KB (2,5 s medidos) BLE entra en el presupuesto.
+- **Transporte de la foto: WiFi (plan B del ADR 0003).** BLE queda como plano de control, siempre
+  vivo, como estaba decidido. Referencia WiFi: 46 ms por la misma foto.
 
-- Throughput medido (mediana y rango a 53 KB, WiFi apagado): …
-- ¿Cumple el umbral? …
-- Tamaño de foto más chico sin perder precisión: …
-- **Transporte de la foto:** BLE / WiFi (plan B del ADR 0003), porque …
-
-Al cerrar, agregar la sección `## Actualización 2026-MM-DD` al ADR 0003 con estas cuatro líneas.
+La `## Actualización 2026-09-05` del ADR 0003 recoge estas líneas.

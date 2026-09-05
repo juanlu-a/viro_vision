@@ -930,6 +930,14 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
 - Variable del repo `EXPO_PUBLIC_SIMULATE_DEVICE` pasó de `1` a `0`: los builds de TestFlight usan el
   BLE real. El emulador de la Mac se apagó al volver la placa (los dos anunciaban «ViroVision»).
 
+- **Medición cerrada con el segundo build**: diez corridas en iPhone, cinco con el WiFi de la placa
+  prendido (mediana 4,44 s) y cinco apagado (4,47 s; el WiFi se apagó con `systemd-run` y un
+  temporizador para no perder el SSH). **53 KB en 4,5 s = 2,2× el umbral**: el ADR 0003 recibe su
+  `## Actualización 2026-09-05` y **la foto va por WiFi (plan B)**; BLE sigue como plano de control.
+  Referencia de WiFi con la misma radio: 46 ms por HTTP desde la Mac. Chunks de 95, 47 y 23 bytes
+  rinden menos que 182; descartada esa palanca. `docs/mediciones/2026-09-04-ble-throughput.md` tiene
+  las tablas y la decisión.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -959,10 +967,14 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
 ### Hardware (la placa ya está; 2026-09-04)
-- **Cerrar el spike 0 del ADR 0003**: ya hay una corrida real (11,8 KB/s). Faltan las cinco por
-  fila con WiFi de la placa apagado y prendido, y Android si hay. Después, `## Actualización` en el
-  ADR 0003 (todo indica plan B: WiFi para la foto) y la Tabla B (precisión por tamaño con fotos
-  reales). `AcquireNotify` ya no cambia la conclusión: el techo es del controlador.
+- **Construir el plan B del ADR 0003 (decidido el 2026-09-05)**: en la placa, AP con NetworkManager
+  (sólo con un modo activo) + característica `wifi` + servidor HTTP (`GET /fotos/{id}`, `POST /audio`,
+  `GET /salud`); en la app, `wifi` en `gatt.ts`, módulo nativo para unirse a la red, permisos de red
+  local y ATS, y el flujo BLE-despierta → GET foto → nube → POST audio. Primer spike: iOS unido a un
+  WiFi sin internet enruta el HTTPS del proxy por datos.
+- **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
+  decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
+- **Cámara**: la placa no detecta la Camera Module 3 (`No camera number 0 found`); revisar el flex.
 - **Spike 1**: segundo plano en iOS — con la pantalla bloqueada, una notificación BLE despierta la
   app y el ciclo entero termina antes de que iOS la suspenda. Recién ahí `isBackgroundEnabled: true`.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.

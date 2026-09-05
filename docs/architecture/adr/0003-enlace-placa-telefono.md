@@ -1,7 +1,7 @@
 # ADR 0003 — Enlace placa ↔ teléfono: BLE como plano de control, la foto se decide midiendo
 
-- **Status:** Proposed (2026-09-04) — la decisión sobre el transporte de la foto queda **abierta a una
-  medición con umbral escrito**; el resto es firme
+- **Status:** Proposed (2026-09-04) — **actualizado 2026-09-05: la medición cerró el transporte de la
+  foto: WiFi (plan B)**. Falta validar con el tutor
 - **Date:** 2026-09-04
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** hardware, app, architecture, ble, wifi
@@ -211,6 +211,36 @@ documentos hasta hoy.
 - `app.json`: sin cambios de permisos; `isBackgroundEnabled` sigue en `false` hasta el spike 1.
 - Si gana el plan B: característica `wifi` en los dos lados, módulo nativo para unirse a la red,
   `NSLocalNetworkUsageDescription` + `NSAllowsLocalNetworking`, hotspot + servidor HTTP en la placa.
+
+## Actualización 2026-09-05 — La medición decidió: la foto va por WiFi
+
+Se corrió el spike 0 con la placa real (Raspberry Pi OS 2026-06-18, Trixie, BlueZ 5.82) y el build de
+TestFlight del día. Diez corridas en iPhone, cinco con el WiFi de la placa prendido y cinco apagado:
+
+| WiFi de la placa | mediana | rango | KB/s |
+|---|---|---|---|
+| apagado | **4,47 s** | 3,58-5,01 | 11,8 |
+| prendido | **4,44 s** | 4,08-6,15 | 11,9 |
+
+**53 KB tardan 4,5 s: 2,2 veces el umbral de 2 s.** No es del daemon (entrega los 298 chunks en
+1,7 s) ni del receptor (la Mac da 12,5 KB/s): es **una notificación de 182 bytes por intervalo de
+conexión de 15 ms**, el mínimo que acepta iOS. El controlador BCM43438 **no tiene Data Length
+Extension** (paquetes de radio de 27 bytes, 15 buffers ACL), y chunks más chicos rinden menos, no más.
+El caveat de D-Bus resultó real pero de otra forma: sin pausa, dbus-next **pierde** chunks; con una
+pausa de 4 ms no pierde ninguno y no es el cuello. Como referencia, el mismo archivo por HTTP sobre la
+misma radio WiFi baja en 46 ms. Detalle en `docs/mediciones/2026-09-04-ble-throughput.md`.
+
+**Decisión:** transporte de la foto por **WiFi, según el plan B de §4**: la placa como AP, credenciales
+por BLE, HTTP plano, la app siempre tira. **BLE sigue siendo el plano de control siempre vivo** (§2), y
+todo lo demás del ADR queda como estaba. La Tabla B (precisión por tamaño de foto) deja de decidir el
+transporte y pasa a ser una optimización de tokens y tráfico, como ya decía la medición del 02/09.
+
+Consecuencias inmediatas: se ejecuta la lista de §Implicaciones "si gana el plan B": característica
+`wifi` en los dos lados, módulo nativo para unirse a la red (`NEHotspotConfigurationManager` /
+`WifiNetworkSpecifier`), `NSLocalNetworkUsageDescription` + `NSAllowsLocalNetworking`, hotspot con
+NetworkManager y servidor HTTP en la placa. Y el spike 2 (iOS en un WiFi sin internet enruta el HTTPS
+del proxy por datos móviles) pasa a ser el primero de la lista. El AP se levanta sólo con un modo
+activo: el primer `GET` tras despertar el WiFi de la placa tardó 153 ms contra 41-59 los siguientes.
 
 ## Ver también
 

@@ -27,7 +27,7 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04), transporte de la foto abierto a medición**
+### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05: la foto va por WiFi**
 
 Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
 dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
@@ -51,6 +51,15 @@ rediseñar. La cuenta: sólo BLE ≈ 6 a 9 s con 10-20 KB/s típicos del chip; B
 palanca grande sobre BLE es el **tamaño de la foto** (lineal en bytes; el LLM no se acelera), pero
 bajar de 1024 px exige medir precisión con fotos reales de góndola. Protocolo y tablas en
 `docs/mediciones/2026-09-04-ble-throughput.md`; el daemon que lo permite en `hardware/raspi/`.
+
+**Qué cambió el 2026-09-05**: se midió con la placa y el iPhone reales, diez corridas: **53 KB en
+4,47 s de mediana (11,8 KB/s)**, 2,2 veces el umbral, con el WiFi de la placa prendido o apagado igual.
+Es una notificación por intervalo de 15 ms: el controlador no tiene DLE y iOS no baja de 15 ms; chunks
+más chicos rinden menos. **Decisión: la foto va por WiFi (plan B)**; BLE sigue como plano de control.
+Referencia: el mismo archivo por HTTP sobre la misma radio, 46 ms. Lo siguiente es construir el plan B
+(AP en la placa, `wifi` por GATT, HTTP plano, módulo nativo para unirse) y el spike de iOS en WiFi sin
+internet. Lecciones de la placa real: BlueZ 5.82 expone `/org/bluez/test` (bluez-peripheral explota);
+dbus-next pierde chunks sin pausa entre notificaciones (4 ms); `PYTHONUNBUFFERED=1` en el servicio.
 
 ### ADR 0004 — Runtime de inferencia on-device · **Proposed — actualizado 2026-08-22: se resuelve por caso de uso**
 
