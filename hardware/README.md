@@ -1,38 +1,57 @@
 # ViroVision — Hardware / IoT
 
-The glasses-mounted camera device: captures the environment, (optionally) runs recognition locally,
-and communicates with the phone app.
+El dispositivo montado en la patilla de los lentes: captura el entorno, corre reconocimiento local
+donde puede, y habla con la app del teléfono. Este directorio tiene **el código de la placa** y la
+documentación del hardware.
 
-## Selected components
+```
+hardware/
+  raspi/        firmware: daemon Python (BLE GATT + cámara + modos). Ver raspi/README.md
+                incluye un emulador para publicar el mismo GATT desde una Mac (sin placa)
+  (carcasa/)    modelos 3D — pendiente
+```
 
-| Part | Choice | Why |
+## Componentes elegidos
+
+| Parte | Elección | Por qué |
 |------|--------|-----|
-| Compute | **Raspberry Pi Zero 2 W** | Balance of cost, size, power, and processing; Wi-Fi enables the "offload to phone" architecture. |
-| AI accelerator | **Coral TPU** (USB) | Runs TFLite models fast on the constrained board. |
-| Camera | **Raspberry Pi Camera Module 3** (IMX708, 12 MP, autofocus) | High quality to read bus lines at distance; uses **CSI** so it leaves USB free for the Coral TPU. |
-| Enclosure | 3D-printed casing on a glasses temple | Portable; must protect the camera flex cable. |
+| Cómputo | **Raspberry Pi Zero 2 W** | Equilibrio costo / tamaño / consumo / cómputo; radio BLE + WiFi 2,4 GHz en el mismo chip (BCM43436/8, Bluetooth 4.2). |
+| Acelerador | **Coral TPU** (USB) | Corre modelos TFLite en una placa chica. Rol: el pipeline de ómnibus (ADR 0006). |
+| Cámara | **Raspberry Pi Camera Module 3** (IMX708, 12 MP, autofoco) | Calidad para leer carteles a distancia; va por **CSI** y deja el USB libre para el Coral. |
+| Audio | **DAC I2S con amplificador** (MAX98357A o PCM5102A) → auricular cableado | La Zero 2 W no tiene jack; USB está ocupado; A2DP desde la placa compartiría antena con BLE + WiFi y cortaría el audio (ADR 0003). |
+| Entrada | **Un botón** (GPIO) | 1 click ómnibus, 2 clicks supermercado, largo = esperando (ADR 0007). |
+| Carcasa | impresa en 3D, en la patilla | Portátil; tiene que proteger el flex de la cámara. |
 
-Rejected: ESP32 (too little compute/RAM), Jetson Nano (too big/expensive/power-hungry), ESP32
-cameras (low quality/fixed focus), generic USB cameras (power draw + occupies the USB port needed by
-the Coral TPU).
+Descartados: ESP32 (cómputo/RAM insuficientes), Jetson Nano (grande, caro, consume), cámaras ESP32
+(baja calidad, foco fijo), cámaras USB (consumo + ocupan el USB del Coral).
 
-## Two communication channels with the phone
+## Software de la placa
 
-BLE cannot carry real-time audio, so the device uses **two** channels:
+Raspberry Pi OS **Lite** 64-bit + **un** servicio de systemd con un daemon Python. No hay opción
+bare-metal: cámara (libcamera), Coral (libedgetpu) y BLE (BlueZ) exigen Linux. Todo en
+[`raspi/`](raspi/README.md).
 
-1. **BLE (GATT)** — data & control (recognition results, commands, status). GATT profile mirrored in
-   the app at `app/src/features/device/gatt.ts` (placeholder UUIDs — align both sides).
-2. **Separate audio channel** — Bluetooth Classic (A2DP/HFP) or wired, to the device's earphone, for
-   the recognition TTS only.
+## Enlace con el teléfono (ADR 0003)
 
-## Two architectures to compare
+- **BLE (GATT), siempre vivo**: control, modo, eventos, resultados. Es lo único que puede despertar
+  a la app con el teléfono bloqueado en el bolsillo. Perfil en `raspi/virovision/gatt.py`, copiado en
+  `app/src/features/device/gatt.ts`.
+- **La foto (modo supermercado)**: por BLE si la medición del spike da 53 KB en menos de 2 s; si
+  no, la placa levanta un AP WiFi y la app la baja por HTTP plano. Se decide midiendo, no opinando.
+- **Audio**: siempre sale por el parlante/auricular de la placa. Supermercado: MP3 sintetizado en
+  el teléfono. Ómnibus: anuncios pregrabados en la SD (las líneas son un conjunto finito).
 
-- **On-device (standalone):** RPi + Coral TPU run detection/OCR locally; device sends results.
-- **Offload to phone:** device streams images; the phone processes them.
+## Dos arquitecturas a comparar
 
-## Status
+- **En placa (standalone)**: RPi + Coral corren detección y OCR; el teléfono no participa (ómnibus,
+  caso B del diagrama canónico).
+- **Descarga al teléfono**: la placa captura y transmite; el teléfono procesa (supermercado, vía
+  nube).
 
-Hardware selection is decided. **Not started:** firmware, BLE peripheral (GATT server), capture
-pipeline, 3D casing, and the protocol/latency (RTT) comparison (flagged pending in the thesis).
+## Estado
 
-See `.claude/skills/virovision/references/hardware.md` for the full rationale.
+Hardware elegido. **Firmware inicial en `raspi/`**: periférico BLE con el perfil GATT, transferencia
+medible, captura con picamera2, máquina de modos. Falta: botón, audio, pipeline de ómnibus en el
+Coral, carcasa, y la medición que decide el transporte de la foto.
+
+Detalle y razonamiento en `.claude/skills/virovision/references/hardware.md`.

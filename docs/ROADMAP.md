@@ -84,8 +84,10 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 [0007 Botones físicos y modos de operación](architecture/adr/0007-botones-fisicos-modos-de-operacion.md)
 *(Proposed — a validar con tutor)*.
 
+[0003 Enlace placa ↔ teléfono](architecture/adr/0003-enlace-placa-telefono.md)
+*(Proposed — el transporte de la foto se decide con la medición de throughput BLE, 2026-09-04)*.
+
 **Por escribir:**
-- **ADR 0003 — Image transport for offload-to-phone** (WiFi/local-network vs BLE).
 - **ADR 0005 — Design system & accessibility standards** (tokens, Dynamic Type, contrast, motion,
   screen-reader testing as a required step).
 

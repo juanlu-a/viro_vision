@@ -105,7 +105,8 @@ no haya dos copias que se desincronicen.
 
 ## Repository map
 - `app/` — React Native mobile app (scaffolded with Expo + dev client).
-- `hardware/` — RPi Zero 2 W firmware/scripts, BLE peripheral, 3D casing models.
+- `hardware/` — RPi Zero 2 W: `raspi/` es el daemon Python (periférico BLE + cámara + modos, ADR
+  0003); READMEs con componentes y enlace. Carcasa pendiente.
 - `ml/` — YOLO11 training, OCR, datasets, edge export (TFLite).
 - `docs/` — thesis deliverables, architecture, ADRs, and the end-to-end QA checklist
   (`qa-modo-supermercado.md`).

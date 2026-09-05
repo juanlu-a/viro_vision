@@ -853,6 +853,91 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   `PROJECT-STATUS.md` y el recorrido de VoiceOver de `qa-modo-supermercado.md`, que apuntaba
   explícitamente a que el selector estaba en Inicio "y no en Ajustes".
 
+## 2026-09-04 (cont.) — El enlace placa ↔ teléfono: BLE fijo, la foto se decide midiendo
+
+- **El equipo decidió dónde corre cada cosa**: ómnibus **entero en la placa** (caso B del diagrama
+  canónico: YOLO + OCR cuantizados sobre la Zero 2 W + Coral) y supermercado como placa → foto →
+  teléfono → LLM en la nube → audio de vuelta al auricular de la placa. Restricciones: mínima
+  cantidad de software en la placa, sin cifrar el payload, 3 a 4 s de disparo a audio.
+
+- **Escrito el ADR 0003** (el número que estaba reservado para esto). Lo firme: Pi OS Lite + un
+  servicio systemd (no hay bare-metal: libcamera, libedgetpu, BlueZ); **BLE siempre vivo como plano
+  de control**, porque con el teléfono bloqueado en el bolsillo sólo una notificación BLE despierta
+  a la app; **audio por DAC I2S cableado**, no A2DP (compartiría antena con BLE + WiFi); anuncios
+  de ómnibus **pregrabados** en la SD. Lo abierto, con umbral: **si los 53 KB de la foto bajan por
+  BLE en menos de 2 s no hay WiFi; si no, la placa levanta un AP** (plan B diseñado ya: NetworkManager,
+  credenciales por BLE, HTTP plano, la app siempre tira).
+
+- **La pregunta del día fue "¿vale la pena WiFi?"** La cuenta cambió al mirar lo medido el 02/09: la
+  foto pesa **53 KB**, no 200. Sólo BLE ≈ 6 a 9 s con los 10-20 KB/s típicos del chip; BLE + WiFi ≈
+  3 a 3,5 s. Y "¿si la imagen es más chica?": la transferencia es lineal en bytes pero **el LLM no se
+  acelera** (las medianas del 02/09 no ordenan), y el acierto a 384 px fue sobre una imagen sintética.
+  Conclusión: el número que decide es el throughput BLE real de esta placa, que nadie midió, y el
+  tamaño mínimo de foto que aguanta la precisión con góndolas reales. Las dos variables van a
+  `docs/mediciones/2026-09-04-ble-throughput.md`, con tablas vacías para completar.
+
+- **Primer código del pilar de hardware: `hardware/raspi/`.** Un daemon Python (bluez-peripheral)
+  que anuncia «ViroVision», expone el GATT (modo, control, evento, transferencia, estado) y manda un
+  payload en chunks por notificaciones; cámara real con picamera2 a 1024 px / q70 (lo mismo que la
+  app manda a la nube) o bytes sintéticos sin cámara; máquina de modos de ADR 0007; `setup.sh` +
+  unidad systemd para instalar por SSH; tests puros con pytest. Caveat escrito: notifica por
+  `PropertiesChanged` en D-Bus, así que si la v1 da < 15 KB/s hay que repetir con `AcquireNotify`.
+
+- **La app dejó de tener el BLE en stub**: cliente real sobre `react-native-ble-plx` detrás del
+  selector (stub sólo en Expo Go / web), UUIDs de 128 bits (los `0000fffX` eran del rango de 16 bits
+  del SIG), y **«Medir transferencia»** en Dispositivo, que pide los 53 KB y dice en voz alta cuánto
+  tardaron. Reensamblado, medición y base64 en un módulo puro con tests. `EXPO_PUBLIC_SIMULATE_DEVICE=1`
+  apaga el cliente real: hay que vaciarlo para medir (documentado en `.env.example`).
+
+- **La placa no se pudo alimentar en el viaje** (sin luz: cable USB-C o SD), así que **el daemon
+  ganó un emulador para la Mac**: la lógica se separó en `nucleo.py` (comandos, modos,
+  transferencias; independiente del transporte) y hay dos adaptadores, BlueZ para la placa y
+  CoreBluetooth vía `bless` para la Mac (`python -m virovision.emulador`). Arranca y anuncia
+  «ViroVision» con el UUID del servicio; permite probar la app de punta a punta sin hardware. Lección
+  de CoreBluetooth: una característica con valor en caché tiene que ser de sólo lectura, así que todas
+  van con valor dinámico. El throughput contra la Mac **no** es el de la placa y no decide el ADR.
+
+- Verificado: `npm run lint`, `npm run typecheck`, `npm test` (189 tests); `pytest` en
+  `hardware/raspi` (18); el emulador arranca y anuncia en esta Mac. **Nada probado todavía contra la
+  placa ni desde el iPhone**: lo siguiente es el dev build y conectar contra el emulador.
+
+## 2026-09-05 — La placa en la red y el primer número real del enlace: 11,8 KB/s
+
+- **Configurar la placa sin teclado ni pantalla.** La imagen 2026-06-18 usa cloud-init: se editaron
+  en la partición `bootfs` desde la Mac `network-config` (WiFi de casa sumado), `user-data` (clave
+  SSH de la Mac) y el `instance-id` en `meta-data` y `cmdline.txt` para que reaplique la red. La SD
+  llegó protegida contra escritura por el interruptor del adaptador; una vez destrabado, arrancó y
+  apareció como `virovision.local`. Debian 13 (Trixie), Python 3.13, BlueZ 5.82.
+
+- **Instalación remota del daemon**, con tres arreglos que sólo aparecen en hardware real: `sudo`
+  sin contraseña para el usuario; `Adapter.get_first` de bluez-peripheral explota con BlueZ 5.82
+  porque existe `/org/bluez/test` (se toma `hci0` por ruta); y **dbus-next pierde chunks** cuando se
+  vuelcan sin pausa (175 de 298 llegaron, el `fin` nunca): pausa de 4 ms entre notificaciones,
+  configurable, y `PYTHONUNBUFFERED=1` para ver los `print()` de la librería en el journal.
+
+- **Primera medición real placa → iPhone (build de TestFlight): 53 KB en 4,49 s, 11,8 KB/s, 298
+  chunks de 182 bytes, sin pérdidas.** La Mac como central da lo mismo (12,5). Es una notificación
+  por intervalo de 15 ms: el controlador BCM43438 no tiene Data Length Extension (paquetes de radio
+  de 27 bytes, 15 buffers ACL) y iOS no baja de 15 ms. Chunks más chicos dan menos, no más. Detalle
+  en `docs/mediciones/2026-09-04-ble-throughput.md`. **Está más del doble por encima del umbral de
+  2 s del ADR 0003**: salvo sorpresa en las cinco corridas, la foto va por WiFi (plan B).
+
+- **La app decía «Conectado» con el enlace muerto** después de reiniciar el servicio de la placa, y
+  «No se pudo medir» al instante sin motivo. Arreglado: escucha la desconexión, consulta al stack
+  antes de escribir, y dice el motivo real del fallo por voz y en pantalla. Segundo build a TestFlight
+  con eso. La cámara no la detecta la placa (`No camera number 0 found`): revisar el flex.
+
+- Variable del repo `EXPO_PUBLIC_SIMULATE_DEVICE` pasó de `1` a `0`: los builds de TestFlight usan el
+  BLE real. El emulador de la Mac se apagó al volver la placa (los dos anunciaban «ViroVision»).
+
+- **Medición cerrada con el segundo build**: diez corridas en iPhone, cinco con el WiFi de la placa
+  prendido (mediana 4,44 s) y cinco apagado (4,47 s; el WiFi se apagó con `systemd-run` y un
+  temporizador para no perder el SSH). **53 KB en 4,5 s = 2,2× el umbral**: el ADR 0003 recibe su
+  `## Actualización 2026-09-05` y **la foto va por WiFi (plan B)**; BLE sigue como plano de control.
+  Referencia de WiFi con la misma radio: 46 ms por HTTP desde la Mac. Chunks de 95, 47 y 23 bytes
+  rinden menos que 182; descartada esa palanca. `docs/mediciones/2026-09-04-ble-throughput.md` tiene
+  las tablas y la decisión.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -881,10 +966,21 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   la app (`com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`), `PLAY_ENABLED=true`
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
-### Bloqueado por hardware
-- **Camino de ómnibus en stand by** (2026-09-01): los dos casos del diagrama están en mermaid, sin
-  implementar. Elegir entre ellos exige hardware con qué medirlos.
-- Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral.
+### Hardware (la placa ya está; 2026-09-04)
+- **Construir el plan B del ADR 0003 (decidido el 2026-09-05)**: en la placa, AP con NetworkManager
+  (sólo con un modo activo) + característica `wifi` + servidor HTTP (`GET /fotos/{id}`, `POST /audio`,
+  `GET /salud`); en la app, `wifi` en `gatt.ts`, módulo nativo para unirse a la red, permisos de red
+  local y ATS, y el flujo BLE-despierta → GET foto → nube → POST audio. Primer spike: iOS unido a un
+  WiFi sin internet enruta el HTTPS del proxy por datos.
+- **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
+  decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
+- **Cámara**: la placa no detecta la Camera Module 3 (`No camera number 0 found`); revisar el flex.
+- **Spike 1**: segundo plano en iOS — con la pantalla bloqueada, una notificación BLE despierta la
+  app y el ciclo entero termina antes de que iOS la suspenda. Recién ahí `isBackgroundEnabled: true`.
+- **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
+- **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
+- Placa: botón GPIO → `MaquinaDeModos`; DAC I2S + anuncios pregrabados; elegir el **detector para
+  la TPU** y medirlo (el camino de ómnibus es el caso B, todo en placa).
 
 ### Suelto
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.

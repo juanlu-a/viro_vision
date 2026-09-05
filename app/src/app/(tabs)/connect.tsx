@@ -6,6 +6,7 @@ import { DeviceSummary } from '@/features/device/DeviceSummary';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
+import { announce } from '@/features/audio/announcer';
 import { useDeviceConnection } from '@/features/device/useDeviceConnection';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -13,12 +14,18 @@ import { strings } from '@/i18n';
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { state, connect, disconnect } = useDeviceConnection();
+  const { state, connect, disconnect, medir, medicion } = useDeviceConnection();
 
   const isConnected = state.status === 'connected';
   const isBusy = state.status === 'scanning' || state.status === 'connecting';
   const dotColor =
     isConnected ? theme.success : state.status === 'error' ? theme.danger : theme.textSecondary;
+
+  // La voz es la interfaz: el número que decide el ADR 0003 se dice en voz alta, no sólo se muestra.
+  const medirYAnunciar = async () => {
+    announce(t.measuring);
+    announce(await medir());
+  };
 
   return (
     <Screen
@@ -56,13 +63,38 @@ export default function ConnectScreen() {
         </Card>
       )}
 
+      {isConnected && medicion.mensaje && (
+        <Card>
+          <View
+            className="gap-[2px]"
+            accessible
+            accessibilityRole="text"
+            accessibilityLiveRegion="polite"
+            accessibilityLabel={`${t.measureSection}: ${medicion.mensaje}`}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t.measureSection.toUpperCase()}
+            </ThemedText>
+            <ThemedText type="default">{medicion.mensaje}</ThemedText>
+          </View>
+        </Card>
+      )}
+
       {isConnected ? (
-        <AccessibleButton
-          label={t.disconnectButton}
-          hint={t.disconnectHint}
-          variant="secondary"
-          onPress={disconnect}
-        />
+        <>
+          <AccessibleButton
+            label={t.measureButton}
+            hint={t.measureHint}
+            loading={medicion.midiendo}
+            onPress={medirYAnunciar}
+          />
+          <AccessibleButton
+            label={t.disconnectButton}
+            hint={t.disconnectHint}
+            variant="secondary"
+            disabled={medicion.midiendo}
+            onPress={disconnect}
+          />
+        </>
       ) : (
         <AccessibleButton
           label={t.scanButton}
