@@ -21,6 +21,12 @@ export interface BleClient {
   /** Resultados de reconocimiento que manda la placa. Devuelve la función para desuscribirse. */
   onRecognition(listener: (event: RecognitionEvent) => void): () => void;
   /**
+   * Avisa cuando el enlace se cae por fuera de `disconnect()` (la placa se reinició, se alejó, iOS
+   * cortó). Sin esto la pantalla siguió diciendo «Conectado» con el enlace muerto el 2026-09-05, y
+   * cada comando fallaba sin explicación.
+   */
+  onDisconnect(listener: () => void): () => void;
+  /**
    * Spike del ADR 0003: pide a la placa `bytes` de relleno por la característica `transferencia`
    * y mide cuánto tardan en llegar. Con 53 000 bytes (la foto que hoy sube a la nube) el umbral es
    * 2 s: menos, BLE alcanza y no hace falta WiFi.
@@ -76,6 +82,9 @@ const stubClient: BleClient = {
     /* nada conectado */
   },
   onRecognition() {
+    return () => {};
+  },
+  onDisconnect() {
     return () => {};
   },
   async medirTransferencia() {

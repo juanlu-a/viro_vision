@@ -9,7 +9,7 @@
  * en `transferencia.ts`; este archivo sólo mueve bytes entre ble-plx y ese módulo.
  */
 import { Platform } from 'react-native';
-import { BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
+import { BleError, BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 
 import { DEVICE_ADVERTISED_NAME, GATT, type EstadoDispositivo } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
@@ -64,6 +64,11 @@ function esperar<T>(ms: number, error: () => Error, ejecutar: (resolver: (v: T) 
   });
 }
 
+function describirErrorBle(err: unknown): string {
+  if (err instanceof BleError) return `${err.message} (código ${err.errorCode}${err.reason ? `, ${err.reason}` : ''})`;
+  return err instanceof Error ? err.message : String(err);
+}
+
 export function crearBleClientPlx(): BleClient | null {
   if (Platform.OS === 'web') return null;
   let manager: BleManager;
@@ -79,6 +84,7 @@ class BleClientPlx implements BleClient {
   private device: Device | null = null;
   private suscripciones: Subscription[] = [];
   private readonly oyentesReconocimiento = new Set<(event: RecognitionEvent) => void>();
+  private readonly oyentesDesconexion = new Set<() => void>();
   private ensamblador: Ensamblador | null = null;
   private alTerminarTransferencia: ((fin: Extract<Evento, { t: 'fin' }>) => void) | null = null;
   private alFallarTransferencia: ((error: Error) => void) | null = null;
@@ -94,7 +100,10 @@ class BleClientPlx implements BleClient {
     this.device = device;
 
     this.suscripciones.push(
-      this.manager.onDeviceDisconnected(device.id, () => this.limpiar()),
+      this.manager.onDeviceDisconnected(device.id, () => {
+        this.limpiar();
+        for (const oyente of this.oyentesDesconexion) oyente();
+      }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.evento, (error, c) => {
         if (error || !c?.value) return;
         this.recibirEvento(c.value);
@@ -128,9 +137,20 @@ class BleClientPlx implements BleClient {
     return () => this.oyentesReconocimiento.delete(listener);
   }
 
+  onDisconnect(listener: () => void): () => void {
+    this.oyentesDesconexion.add(listener);
+    return () => this.oyentesDesconexion.delete(listener);
+  }
+
   async medirTransferencia(bytes: number): Promise<MedicionTransferencia> {
     const device = this.device;
     if (!device) throw new BleNotConnectedError();
+    // El callback de desconexión de iOS puede llegar tarde o no llegar: se le pregunta al stack
+    // antes de escribir, y si el enlace murió se reporta como tal y no como «no se pudo medir».
+    if (!(await this.manager.isDeviceConnected(device.id).catch(() => false))) {
+      this.limpiar();
+      throw new BleNotConnectedError();
+    }
     if (this.ensamblador) throw new BleTransferError('ya hay una transferencia en curso');
 
     const ensamblador = new Ensamblador();
@@ -153,12 +173,18 @@ class BleClientPlx implements BleClient {
           };
         }
       );
-      await this.manager.writeCharacteristicWithResponseForDevice(
-        device.id,
-        GATT.serviceUuid,
-        GATT.characteristics.control,
-        codificarTextoBase64(comando)
-      );
+      try {
+        await this.manager.writeCharacteristicWithResponseForDevice(
+          device.id,
+          GATT.serviceUuid,
+          GATT.characteristics.control,
+          codificarTextoBase64(comando)
+        );
+      } catch (err) {
+        // El error de ble-plx trae el motivo real (código y razón del stack): se conserva porque
+        // es lo único que permite diagnosticar a distancia, y la UI lo lee del mensaje.
+        throw new BleTransferError(`escritura rechazada: ${describirErrorBle(err)}`);
+      }
       await fin;
       if (!ensamblador.completo) {
         throw new BleTransferError('la placa terminó pero faltan chunks', ensamblador.faltantes());

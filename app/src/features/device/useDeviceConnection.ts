@@ -4,7 +4,7 @@
  * Habla sólo con la interfaz `BleClient`: si atrás hay el cliente real o el stub lo decide
  * `services/ble`. Los mensajes se eligen por el TIPO de error, nunca parseando strings.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { strings } from '@/i18n';
 import {
@@ -42,6 +42,16 @@ export function useDeviceConnection() {
   const [state, setState] = useState<ConnectionState>(initialState);
   const [medicion, setMedicion] = useState<EstadoMedicion>(sinMedicion);
 
+  // Si el enlace se cae solo, la pantalla tiene que decirlo: el usuario no ve la placa.
+  useEffect(
+    () =>
+      getBleClient().onDisconnect(() => {
+        setState({ status: 'error', device: null, message: strings.connection.lost });
+        setMedicion(sinMedicion);
+      }),
+    []
+  );
+
   const connect = useCallback(async () => {
     setState({ status: 'scanning', device: null, message: strings.connection.scanning });
     setMedicion(sinMedicion);
@@ -67,7 +77,9 @@ export function useDeviceConnection() {
       setMedicion({ midiendo: false, medicion: resultado, mensaje });
       return mensaje;
     } catch (err) {
-      let mensaje: string = strings.connect.measureFailed;
+      // El detalle del error va a la pantalla y a la voz: es lo único que permite diagnosticar
+      // una medición fallida a distancia (2026-09-05: dos fallos sin ninguna pista visible).
+      let mensaje: string = `${strings.connect.measureFailed} ${err instanceof Error ? err.message : String(err)}`;
       if (err instanceof BleTransferError && err.faltantes.length > 0) {
         mensaje = strings.connect.measureIncomplete.replace('{faltantes}', String(err.faltantes.length));
       } else if (err instanceof BleNotConnectedError) {

@@ -101,7 +101,7 @@ export const es = {
     measuring: 'Midiendo… puede tardar unos segundos.',
     measureResult:
       '{kb} kilobytes en {segundos} segundos: {kbps} kilobytes por segundo, en {chunks} paquetes de {chunk} bytes.',
-    measureFailed: 'No se pudo medir. Probá de nuevo.',
+    measureFailed: 'No se pudo medir.',
     measureIncomplete: 'La medición quedó incompleta: faltaron {faltantes} paquetes.',
     measureSection: 'Última medición',
   },
@@ -144,6 +144,7 @@ export const es = {
     connected: 'Conectado',
     error: 'Error de conexión',
     notFound: 'No encontré el dispositivo. Fijate que esté prendido y cerca.',
+    lost: 'Se perdió la conexión con el dispositivo. Buscalo de nuevo.',
     // Expo Go y web no tienen el módulo nativo de Bluetooth; el cliente real necesita un development build.
     unavailable: 'Este build no tiene Bluetooth. Hace falta un development build.',
   },
