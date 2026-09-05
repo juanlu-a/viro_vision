@@ -35,6 +35,13 @@ mkdir -p /etc/NetworkManager/conf.d
 printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/10-virovision-wifi-powersave.conf
 systemctl reload NetworkManager 2>/dev/null || true
 
+echo "→ AP sólo local: sin puerta de enlace ni DNS en el DHCP"
+# Medido el 2026-09-05: con el AP anunciándose como router, el iPhone unido a «ViroVision» quedaba
+# sin internet (Safari: "sin conexión"). Sin las opciones 3 (router) y 6 (DNS) la red es sólo local y el
+# teléfono conserva su ruta por defecto por datos móviles. Es el requisito duro del plan B (ADR 0003).
+mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+printf 'dhcp-option=3\ndhcp-option=6\n' > /etc/NetworkManager/dnsmasq-shared.d/10-virovision-solo-local.conf
+
 echo "→ servicio systemd"
 sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$INSTALL_DIR/virovision.service" > /etc/systemd/system/virovision.service
 systemctl daemon-reload
