@@ -73,7 +73,8 @@ Servicio `4380c500-7ca3-4e37-b27d-f60e8d8d73d1`. Copiado a mano en
 | `control` | 02 | write · write w/o response | JSON con `cmd` (abajo) |
 | `evento` | 03 | notify | JSON ≤ 180 bytes |
 | `transferencia` | 04 | notify | binario: header 4 B (`seq` u16 LE, `total` u16 LE) + datos |
-| `estado` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `bateria` (null), `camara`, `wifi` |
+| `estado` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `bateria` (null), `camara`, `wifi`, `ip`, `puerto`, `ap` |
+| `wifi` | 06 | read | JSON `{ssid, clave, ip, puerto}` del punto de acceso; la app se une sola con esto |
 
 Comandos de `control`:
 
@@ -83,6 +84,7 @@ Comandos de `control`:
 | `{"cmd":"foto"}` | captura con la cámara (1024 px lado mayor, JPEG q70: lo mismo que la app manda a la nube) y la transfiere igual |
 | `{"cmd":"modo","valor":2}` | cambia de modo (equivale al botón) |
 | `{"cmd":"estado"}` | fuerza una notificación de `estado` |
+| `{"cmd":"ap","valor":true,"minutos":10}` | enciende el punto de acceso por tiempo acotado (tope 60); `valor:false` lo apaga |
 
 Cada transferencia va envuelta en dos eventos: `{"t":"inicio","id":1,"tipo":"medicion","bytes":53000,"chunks":298,"chunk":182}`
 y `{"t":"fin","id":1,...,"ms_placa":N}`. **`ms_placa` no es la medición**: es cuánto tardó la placa en
@@ -100,7 +102,7 @@ puerto en la característica `estado` (`ip`, `puerto`, `ap`). La app siempre tir
 | `GET /salud` | el mismo JSON que `estado` |
 | `GET /medir/<bytes>` | `<bytes>` aleatorios (hasta 5 MB), para medir la descarga sin cámara |
 | `GET /fotos/ultima` | captura ahora y devuelve el JPEG (1024 px, q70); 503 sin cámara |
-| `POST /audio` | guarda el MP3/WAV en `/tmp/virovision-audio/` para reproducirlo; 202 con el tamaño |
+| `POST /audio` | guarda el MP3/WAV en `/tmp/virovision-audio/` para reproducirlo; 202 con el tamaño. Con `X-Encoding: base64` decodifica el cuerpo (así lo manda la app: `fetch` de RN no envía bytes) |
 
 Dos modos de red, y el que importa es el segundo:
 
@@ -111,8 +113,14 @@ Dos modos de red, y el que importa es el segundo:
    teléfono conserva internet por datos (en iOS hay que verificarlo: es el spike que queda). La placa
    tiene una sola radio: con el AP arriba deja su red anterior y **se pierde el SSH**; por eso el AP
    se enciende siempre **por tiempo acotado** (default 10 min, tope 60) y vuelve solo a la red
-   conocida. Comando: `{"cmd":"ap","valor":true,"minutos":10}` por `control`; `{"cmd":"ap","valor":false}`
-   lo baja antes. Evento `{"t":"ap","encendido":…,"minutos":…}` y `estado.ap`.
+   conocida. **El AP sigue al modo**: se enciende al entrar a ómnibus o supermercado (20 min de tope,
+   renovados en cada cambio) y se apaga al volver a esperando. Comando manual:
+   `{"cmd":"ap","valor":true,"minutos":10}` por `control`; `{"cmd":"ap","valor":false}` lo baja antes.
+   Evento `{"t":"ap","encendido":…,"minutos":…}`, `estado.ap`, y `estado` vuelve a notificarse con la
+   IP nueva (10.42.0.1) para que la app sepa de dónde bajar la foto.
+   **El AP es una red sólo local**: `setup.sh` deja un drop-in de dnsmasq sin puerta de enlace ni DNS
+   (opciones DHCP 3 y 6). Con el default de NetworkManager el iPhone quedaba sin internet; así
+   conserva su ruta por datos móviles (medido el 2026-09-05).
 
 Para probar el modo 2 sin la app: unirse desde Ajustes del teléfono al WiFi `ViroVision`, abrir
 `http://10.42.0.1:8080/salud` en el navegador, y comprobar que el teléfono sigue con internet (abrir

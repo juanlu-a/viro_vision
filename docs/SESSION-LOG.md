@@ -967,6 +967,39 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   hay; ahora de la interfaz), y el reinicio de la placa con la cámara enchufada tardó más de lo que
   esperé y pareció muerta.
 
+## 2026-09-05 (cont. 2) — El flujo completo sin configurar nada (PR #62)
+
+- **Pregunta del usuario que ordenó el diseño**: "¿tengo que conectar el Bluetooth y además el WiFi a
+  mano?" No: eso fue sólo la prueba. El diseño final es cero configuración, y este PR lo construye.
+  El único permiso que ve el usuario es el de Bluetooth del sistema; el de la red WiFi lo muestra iOS
+  una sola vez.
+
+- **Placa**: característica `wifi` (credenciales del AP por BLE); **el AP sigue al modo** (arriba con
+  ómnibus o supermercado, abajo en esperando, tope de 20 min; `nmcli` en un hilo para no frenar el
+  BLE); `POST /audio` acepta base64 porque `fetch` de React Native no manda bytes.
+
+- **App**: `DispositivoProvider` compartido por Inicio y Dispositivo. Conecta por BLE al arrancar y
+  reconecta con espera creciente (3 s → 30 s); se une al WiFi de la placa con `react-native-wifi-reborn`
+  (plugin de Expo, entitlements de HotspotConfiguration) cuando ella enciende el AP y sale cuando lo
+  apaga; espera a que `/salud` responda antes de declarar "red lista"; sincroniza el modo por BLE en
+  los dos sentidos. En Inicio, **«Leer con el dispositivo»** reemplaza al botón de la cámara cuando la
+  placa está lista: la foto la saca la placa, viaja por HTTP y entra al mismo pipeline de nube; la
+  cámara del teléfono queda como botón secundario. El MP3 de la lectura vuelve a la placa.
+
+- **El disparador hoy es el botón de la app**, como con los modos: hace el papel del botón físico que
+  la placa no tiene. Cuando exista, el click iniciará el mismo camino desde la placa.
+
+- Lección del linter (React Compiler): nada de `setState` sincrónico dentro de efectos ni escribir
+  refs durante el render. La sincronización de red se dispara desde los manejadores de eventos
+  (conexión, `estado` nuevo) y la primera conexión sale del efecto de montaje en el siguiente tick.
+
+- Secreto `EXPO_PUBLIC_AUDIO_FILE_ENABLED=1` en el repo: sin MP3 no hay audio de vuelta que probar.
+  Cuesta una llamada al TTS por lectura.
+
+- Verificado: lint, typecheck, 199 tests; pytest 34 en la placa; desplegado en la placa real
+  (`/salud` con `ip`, `puerto`, `ap`; cámara detectada). **Falta la prueba de punta a punta desde el
+  iPhone** con el build de TestFlight, en curso.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -996,11 +1029,12 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
 ### Hardware (la placa ya está; 2026-09-04)
-- **Cerrar el híbrido de punta a punta (siguiente PR, tras #61)**: la app se une al AP sola
-  (`NEHotspotConfigurationManager` / `WifiNetworkSpecifier`, credenciales por la característica
-  `wifi`); el AP se prende con un modo activo y se apaga en *esperando*, siempre con tope; el flujo
-  completo botón → BLE despierta → `GET /fotos/ultima` → nube → `POST /audio` → parlante (DAC I2S);
-  spike 1 de segundo plano en iOS. Deuda: el AP por `systemd-run` no arrancó una vez sin registro.
+- **Probar el flujo completo del PR #62 desde el iPhone** y cerrar el PR. Después: **spike 1 de
+  segundo plano en iOS** (la notificación BLE despierta la app con la pantalla bloqueada y el ciclo
+  termina); **parlante en la placa** (DAC I2S) para reproducir el audio que ya llega a `/tmp`;
+  **botón físico** (GPIO) que dispare la captura desde la placa; Android: elegir la API de WiFi
+  silenciosa (`WifiNetworkSuggestion`) y probar. Deuda: el AP por `systemd-run` no arrancó una vez
+  sin registro.
 - **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
