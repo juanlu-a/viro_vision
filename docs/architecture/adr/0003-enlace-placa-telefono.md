@@ -242,6 +242,31 @@ NetworkManager y servidor HTTP en la placa. Y el spike 2 (iOS en un WiFi sin int
 del proxy por datos móviles) pasa a ser el primero de la lista. El AP se levanta sólo con un modo
 activo: el primer `GET` tras despertar el WiFi de la placa tardó 153 ms contra 41-59 los siguientes.
 
+## Actualización 2026-09-05 (2) — El plan B probado en el caso real: funciona, con una condición
+
+Mismo día, con el PR #61 (servidor HTTP en la placa, AP con NetworkManager, «Medir por WiFi» en la
+app). iPhone **unido al AP de la placa**, sin ninguna otra red, con datos móviles:
+
+- Foto de 53 KB por HTTP: 0,05 a 1,03 s, mediana **0,34 s** (misma sesión por BLE: ~4 s).
+- **Safari carga y la lectura de supermercado funciona** con el teléfono unido a la placa: el
+  teléfono conserva internet por datos. Era el spike 2, y era el requisito duro del equipo.
+- **La condición**: el AP tiene que ser una red **sólo local**. Con el DHCP anunciando la placa como
+  router y DNS (lo que hace NetworkManager por defecto en modo `shared`), iOS quedaba **sin internet**.
+  Quitar las opciones DHCP 3 y 6 lo resuelve; está en `setup.sh`. Es una regla del diseño, no un
+  ajuste: **la placa nunca se anuncia como salida a internet.**
+
+**El híbrido queda confirmado como diseño**: BLE es el plano de control siempre vivo (despierta la app,
+lleva botón, modo, eventos, resultados y credenciales) y WiFi lleva sólo el payload, a demanda. Es el
+patrón de las cámaras vestibles y de acción que mueven fotos al teléfono. Presupuesto del ciclo de
+supermercado: ~50 ms de foto + ~1,5 s de nube + 1 a 1,5 s de TTS + ~50 ms de audio ≈ **3 s**.
+
+Queda para el PR siguiente: (1) la app se une al AP sola (`NEHotspotConfigurationManager` /
+`WifiNetworkSpecifier`) con las credenciales de la característica `wifi`; (2) el AP vive con los
+modos: arriba con un modo activo, abajo en *esperando*, siempre con tope de tiempo; (3) el audio de
+vuelta por `POST /audio` al parlante; (4) el spike 1, segundo plano en iOS. Y una deuda del día:
+el AP levantado con un temporizador externo (`systemd-run`) no arrancó en un intento y no quedó
+registro de por qué; el camino que vale es el comando `ap` del daemon, que trae su propio tope.
+
 ## Ver también
 
 - Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).

@@ -71,6 +71,7 @@ const simulatedDevice: DeviceInfo = {
   name: 'ViroVision (simulado)',
   batteryLevel: 76,
   firmwareVersion: '0.1.0-dev',
+  direccion: null,
 };
 
 const stubClient: BleClient = {

@@ -14,7 +14,8 @@ import {
   getBleClient,
 } from '@/services/ble/bleClient';
 import { BleTransferError, type MedicionTransferencia } from '@/services/ble/transferencia';
-import { BYTES_FOTO_REFERENCIA, describirMedicion } from './medicion';
+import { medirDescargaHttp, urlDeLaPlaca } from '@/services/wifi/descargaHttp';
+import { BYTES_FOTO_REFERENCIA, describirMedicion, describirMedicionWifi } from './medicion';
 import type { ConnectionState } from './types';
 
 const initialState: ConnectionState = {
@@ -91,5 +92,27 @@ export function useDeviceConnection() {
     }
   }, []);
 
-  return { state, connect, disconnect, medir, medicion };
+  // Plan B del ADR 0003: la misma foto de referencia, pero bajada por HTTP desde la placa. La
+  // dirección llega por BLE (característica `estado`); BLE sigue siendo el plano de control.
+  const medirWifi = useCallback(async (): Promise<string> => {
+    const direccion = state.device?.direccion;
+    if (!direccion) {
+      const mensaje = strings.connect.measureWifiNoAddress;
+      setMedicion({ midiendo: false, medicion: null, mensaje });
+      return mensaje;
+    }
+    setMedicion({ midiendo: true, medicion: null, mensaje: strings.connect.measuring });
+    try {
+      const resultado = await medirDescargaHttp(urlDeLaPlaca(direccion, `/medir/${BYTES_FOTO_REFERENCIA}`));
+      const mensaje = describirMedicionWifi(resultado);
+      setMedicion({ midiendo: false, medicion: resultado, mensaje });
+      return mensaje;
+    } catch (err) {
+      const mensaje = `${strings.connect.measureFailed} ${err instanceof Error ? err.message : String(err)}`;
+      setMedicion({ midiendo: false, medicion: null, mensaje });
+      return mensaje;
+    }
+  }, [state.device]);
+
+  return { state, connect, disconnect, medir, medirWifi, medicion };
 }

@@ -89,6 +89,42 @@ y `{"t":"fin","id":1,...,"ms_placa":N}`. **`ms_placa` no es la medición**: es c
 entregarle los chunks a BlueZ. El número que vale lo mide la app, del primer chunk al último.
 `estado` se notifica solo cada 15 s.
 
+## Plan B: la foto por WiFi (HTTP) y el punto de acceso
+
+Decidido el 2026-09-05 (ADR 0003, Actualización): por BLE la foto tarda 4,5 s; por WiFi, 46 ms. El
+daemon levanta un **servidor HTTP** en el puerto 8080 (`--puerto`, `--sin-http`) y publica su IP y
+puerto en la característica `estado` (`ip`, `puerto`, `ap`). La app siempre tira; la placa nunca empuja.
+
+| ruta | qué hace |
+|---|---|
+| `GET /salud` | el mismo JSON que `estado` |
+| `GET /medir/<bytes>` | `<bytes>` aleatorios (hasta 5 MB), para medir la descarga sin cámara |
+| `GET /fotos/ultima` | captura ahora y devuelve el JPEG (1024 px, q70); 503 sin cámara |
+| `POST /audio` | guarda el MP3/WAV en `/tmp/virovision-audio/` para reproducirlo; 202 con el tamaño |
+
+Dos modos de red, y el que importa es el segundo:
+
+1. **Placa y teléfono en la misma red WiFi** (casa, laboratorio): no hay que hacer nada; la app baja de
+   la IP que informa `estado`. Sirve para desarrollar y medir.
+2. **Sin WiFi de infraestructura** (la calle, el supermercado): la placa levanta su **punto de acceso**
+   `ViroVision` (clave `virovision2026`, IP `10.42.0.1`) con NetworkManager, y el teléfono se une. El
+   teléfono conserva internet por datos (en iOS hay que verificarlo: es el spike que queda). La placa
+   tiene una sola radio: con el AP arriba deja su red anterior y **se pierde el SSH**; por eso el AP
+   se enciende siempre **por tiempo acotado** (default 10 min, tope 60) y vuelve solo a la red
+   conocida. Comando: `{"cmd":"ap","valor":true,"minutos":10}` por `control`; `{"cmd":"ap","valor":false}`
+   lo baja antes. Evento `{"t":"ap","encendido":…,"minutos":…}` y `estado.ap`.
+
+Para probar el modo 2 sin la app: unirse desde Ajustes del teléfono al WiFi `ViroVision`, abrir
+`http://10.42.0.1:8080/salud` en el navegador, y comprobar que el teléfono sigue con internet (abrir
+cualquier sitio). Desde la placa, a mano y con vuelta automática:
+
+```sh
+sudo systemd-run --unit=ap-prueba sh -c 'nmcli con up virovision-ap; sleep 600; nmcli con down virovision-ap'
+```
+
+`setup.sh` deja el WiFi sin ahorro de energía (`wifi.powersave = 2`): el primer GET tras un rato quieto
+tardaba 153 ms contra 41-59 los siguientes.
+
 ## Cómo medir (spike ADR 0003)
 
 Protocolo y tablas en [`docs/mediciones/2026-09-04-ble-throughput.md`](../../docs/mediciones/2026-09-04-ble-throughput.md).

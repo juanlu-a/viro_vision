@@ -3,13 +3,19 @@
  * un decimal con punto (VoiceOver en español lo lee raro) o bytes mostrados como kilobytes cambian
  * lo que la persona anota en la tabla de mediciones.
  */
-import { describirMedicion } from './medicion';
+import { describirMedicion, describirMedicionWifi } from './medicion';
 
 describe('describirMedicion', () => {
   it('habla en kilobytes, segundos y KB/s con coma decimal', () => {
     const texto = describirMedicion({ bytes: 53_000, chunks: 298, chunkBytes: 182, ms: 2970, kbps: 53_000 / 2970 });
     expect(texto).toBe(
       '53 kilobytes en 2,97 segundos: 17,8 kilobytes por segundo, en 298 paquetes de 182 bytes.'
+    );
+  });
+
+  it('por WiFi dice segundos y KB/s sin hablar de paquetes', () => {
+    expect(describirMedicionWifi({ bytes: 53_000, chunks: 1, chunkBytes: 53_000, ms: 46, kbps: 53_000 / 46 })).toBe(
+      '53 kilobytes en 0,05 segundos por WiFi: 1152 kilobytes por segundo.'
     );
   });
 

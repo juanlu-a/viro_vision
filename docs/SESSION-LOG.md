@@ -938,6 +938,35 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   rinden menos que 182; descartada esa palanca. `docs/mediciones/2026-09-04-ble-throughput.md` tiene
   las tablas y la decisión.
 
+## 2026-09-05 (cont.) — Plan B construido y probado: el híbrido funciona en el caso real
+
+- **PR #60 mergeado; PR #61 con el plan B.** Placa: servidor HTTP (`/salud`, `/medir/<n>`,
+  `/fotos/ultima`, `POST /audio`), `estado` con `ip`/`puerto`/`ap`, punto de acceso `ViroVision`
+  con NetworkManager encendido por BLE con tope de tiempo. App: `services/wifi/descargaHttp.ts`
+  (puro, con tests), dirección de la placa en el resumen, **«Medir por WiFi»**, permisos de red
+  local en HTTP plano. Dos builds a TestFlight.
+
+- **La cámara**: era hot-plug; con un reinicio la placa la tomó. Y no es la Camera Module 3: es la
+  **Raspberry Pi AI Camera (IMX500)**, compraron dos. Foto real por HTTP: 35 KB a 1024×766 en
+  200-235 ms captura incluida. Cambia el pilar de ML (detección en el sensor); otro PR.
+
+- **Medido desde el iPhone**: misma red, 53 KB en 0,04-0,05 s (la primera 2,24 s: permiso de red
+  local). **Unido al AP de la placa**, 0,05-1,03 s, mediana 0,34. BLE en la misma sesión: ~4 s.
+
+- **El hallazgo del día**: con el AP anunciándose como router (default de `ipv4.method shared`), el
+  iPhone quedaba **sin internet** y el modo supermercado con él. Un drop-in de dnsmasq sin las
+  opciones DHCP 3 y 6 hace la red sólo local: **Safari carga, la lectura de supermercado funciona y
+  la foto baja en menos de medio segundo, con el iPhone unido a la placa**. Requisito duro cumplido;
+  regla escrita en el ADR: la placa nunca se anuncia como salida a internet.
+
+- **Respuesta a "¿un híbrido?"**: el híbrido es el diseño. BLE despierta la app y lleva control;
+  WiFi lleva la foto y el audio a demanda; el AP vive con los modos. Presupuesto ≈ 3 s.
+
+- Tres arreglos que sólo aparecen en hardware: el adaptador BlueZ no recibía `control_ap` (bucle de
+  reinicios; test que construye el servicio), la IP se leía de la ruta por defecto (en modo AP no
+  hay; ahora de la interfaz), y el reinicio de la placa con la cámara enchufada tardó más de lo que
+  esperé y pareció muerta.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -967,14 +996,15 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
 ### Hardware (la placa ya está; 2026-09-04)
-- **Construir el plan B del ADR 0003 (decidido el 2026-09-05)**: en la placa, AP con NetworkManager
-  (sólo con un modo activo) + característica `wifi` + servidor HTTP (`GET /fotos/{id}`, `POST /audio`,
-  `GET /salud`); en la app, `wifi` en `gatt.ts`, módulo nativo para unirse a la red, permisos de red
-  local y ATS, y el flujo BLE-despierta → GET foto → nube → POST audio. Primer spike: iOS unido a un
-  WiFi sin internet enruta el HTTPS del proxy por datos.
+- **Cerrar el híbrido de punta a punta (siguiente PR, tras #61)**: la app se une al AP sola
+  (`NEHotspotConfigurationManager` / `WifiNetworkSpecifier`, credenciales por la característica
+  `wifi`); el AP se prende con un modo activo y se apaga en *esperando*, siempre con tope; el flujo
+  completo botón → BLE despierta → `GET /fotos/ultima` → nube → `POST /audio` → parlante (DAC I2S);
+  spike 1 de segundo plano en iOS. Deuda: el AP por `systemd-run` no arrancó una vez sin registro.
+- **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
-- **Cámara**: la placa no detecta la Camera Module 3 (`No camera number 0 found`); revisar el flex.
+- **Cámara**: resuelto (era hot-plug; y es la AI Camera). Ajustar el enfoque manual: las primeras fotos salieron desenfocadas.
 - **Spike 1**: segundo plano en iOS — con la pantalla bloqueada, una notificación BLE despierta la
   app y el ciclo entero termina antes de que iOS la suspenda. Recién ahí `isBackgroundEnabled: true`.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.

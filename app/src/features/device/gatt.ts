@@ -23,7 +23,7 @@ export const GATT = {
     evento: '4380c503-7ca3-4e37-b27d-f60e8d8d73d1',
     /** notify — binario: header de 4 bytes (`seq` u16 LE, `total` u16 LE) + datos. */
     transferencia: '4380c504-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** read · notify — JSON: `version`, `temp`, `uptime`, `bateria` (null hoy), `camara`, `wifi`. */
+    /** read · notify — JSON: `version`, `temp`, `uptime`, `bateria` (null hoy), `camara`, `wifi`, `ip`, `puerto`. */
     estado: '4380c505-7ca3-4e37-b27d-f60e8d8d73d1',
   },
 } as const;
@@ -39,4 +39,8 @@ export interface EstadoDispositivo {
   bateria: number | null;
   camara: boolean;
   wifi: boolean;
+  /** IP de la placa en la red WiFi, o null sin red. De acá baja la foto la app (ADR 0003, plan B). */
+  ip: string | null;
+  /** Puerto del servidor HTTP de la placa, o null si no está corriendo. */
+  puerto: number | null;
 }

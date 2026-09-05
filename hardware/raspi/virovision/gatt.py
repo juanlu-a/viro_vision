@@ -15,7 +15,7 @@ from bluez_peripheral.gatt.characteristic import CharacteristicFlags as Flags
 from bluez_peripheral.gatt.characteristic import characteristic
 from bluez_peripheral.gatt.service import Service
 
-from .nucleo import ESTADO, EVENTO, MODO, TRANSFERENCIA, Capturar, Nucleo
+from .nucleo import ESTADO, EVENTO, MODO, TRANSFERENCIA, Capturar, ControlAp, Nucleo
 from .perfil import (  # noqa: F401  (re-exportados para __main__)
     CH_CONTROL,
     CH_ESTADO,
@@ -41,9 +41,10 @@ class ViroVisionService(Service):
         leer_estado: Callable[[], dict],
         capturar: Optional[Capturar],
         payload_sintetico: Callable[[int], bytes],
+        control_ap: Optional[ControlAp] = None,
     ) -> None:
         super().__init__(SERVICE_UUID, True)
-        self.nucleo = Nucleo(loop, leer_estado, capturar, payload_sintetico, self._notificar)
+        self.nucleo = Nucleo(loop, leer_estado, capturar, payload_sintetico, self._notificar, control_ap=control_ap)
 
     async def _notificar(self, nombre: str, valor: bytes) -> None:
         caracteristica = {MODO: self.modo, EVENTO: self.evento, TRANSFERENCIA: self.transferencia, ESTADO: self.estado}[nombre]

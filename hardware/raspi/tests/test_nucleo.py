@@ -30,9 +30,9 @@ class Notificaciones:
         return [json.loads(v) for v in self.de(EVENTO)]
 
 
-def crear(loop, capturar=None):
+def crear(loop, capturar=None, control_ap=None):
     n = Notificaciones()
-    nucleo = Nucleo(loop, lambda: {"version": "t"}, capturar, lambda cant: bytes(range(256)) * (cant // 256) + bytes(cant % 256), n)
+    nucleo = Nucleo(loop, lambda: {"version": "t"}, capturar, lambda cant: bytes(range(256)) * (cant // 256) + bytes(cant % 256), n, control_ap=control_ap)
     return nucleo, n
 
 
@@ -112,6 +112,27 @@ def test_foto_con_camara_transfiere_lo_capturado(loop):
     loop.run_until_complete(_correr(loop))
     assert n.eventos()[0]["tipo"] == "foto"
     assert armar(n.de(TRANSFERENCIA)) == b"JPEG" * 100
+
+
+def test_ap_enciende_por_tiempo_acotado_y_avisa(loop):
+    llamadas = []
+    nucleo, n = crear(loop, control_ap=llamadas.append)
+    nucleo.escribir_control(b'{"cmd":"ap","valor":true,"minutos":999}')
+    loop.run_until_complete(_correr(loop))
+    assert llamadas == [True]
+    assert n.eventos()[0] == {"t": "ap", "encendido": True, "minutos": 60}  # tope: nunca queda sin red para siempre
+    assert nucleo._apagado_ap is not None  # el apagado automático quedó programado
+    nucleo.escribir_control(b'{"cmd":"ap","valor":false}')
+    loop.run_until_complete(_correr(loop))
+    assert llamadas == [True, False]
+    assert nucleo._apagado_ap is None
+
+
+def test_ap_sin_soporte_es_un_error_no_una_excepcion(loop):
+    nucleo, n = crear(loop)
+    nucleo.escribir_control(b'{"cmd":"ap"}')
+    loop.run_until_complete(_correr(loop))
+    assert n.eventos()[0]["t"] == "error"
 
 
 def test_estado_se_puede_pedir_por_comando(loop):

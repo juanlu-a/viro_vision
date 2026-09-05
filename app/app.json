@@ -15,7 +15,11 @@
         "NSBluetoothPeripheralUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
         "NSCameraUsageDescription": "ViroVision usa la cámara para sacar la foto del cartel del ómnibus o del producto que querés que te lea en voz alta.",
         "NSPhotoLibraryUsageDescription": "ViroVision accede a tus fotos para elegir la imagen del cartel de ómnibus o del producto que querés que te lea en voz alta.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocalNetworkUsageDescription": "ViroVision se comunica con el dispositivo de asistencia por la red WiFi local para recibir las fotos y enviarle el audio.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
@@ -43,6 +47,9 @@
         {
           "ios": {
             "deploymentTarget": "17.0"
+          },
+          "android": {
+            "usesCleartextTraffic": true
           }
         }
       ],

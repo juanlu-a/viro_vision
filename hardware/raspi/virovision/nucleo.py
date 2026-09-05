@@ -37,6 +37,10 @@ ESTADO = "estado"
 
 Capturar = Callable[[], Awaitable[bytes]]
 Notificar = Callable[[str, bytes], Awaitable[None]]
+# Encender/apagar el AP WiFi; None cuando el transporte no lo ofrece (el emulador de la Mac).
+ControlAp = Callable[[bool], None]
+AP_MINUTOS_POR_DEFECTO = 10
+AP_MINUTOS_MAX = 60
 
 
 def _json(obj: dict) -> bytes:
@@ -54,12 +58,15 @@ class Nucleo:
         capturar: Optional[Capturar],
         payload_sintetico: Callable[[int], bytes],
         notificar: Notificar,
+        control_ap: Optional[ControlAp] = None,
     ) -> None:
         self._loop = loop
         self._leer_estado = leer_estado
         self._capturar = capturar
         self._payload_sintetico = payload_sintetico
         self._notificar = notificar
+        self._control_ap = control_ap
+        self._apagado_ap: Optional[asyncio.TimerHandle] = None
         self.modos = MaquinaDeModos()
         self._transferencia_id = 0
         self._transferencia_en_curso: Optional[asyncio.Task] = None
@@ -108,8 +115,31 @@ class Nucleo:
             self._cambiar_modo(int(cmd.get("valor", 0)))
         elif nombre == "estado":
             self._programar(self._notificar(ESTADO, self.leer_estado()))
+        elif nombre == "ap":
+            self._ap(bool(cmd.get("valor", True)), int(cmd.get("minutos", AP_MINUTOS_POR_DEFECTO)))
         else:
             self._evento({"t": "error", "msg": f"comando desconocido: {nombre}"[:150]})
+
+    def _ap(self, encender: bool, minutos: int) -> None:
+        """Plan B del ADR 0003. El AP siempre se enciende por tiempo acotado: la placa tiene una sola
+        radio y con el AP arriba pierde su red (y el SSH); si la app no lo apaga, se apaga solo."""
+        if self._control_ap is None:
+            self._evento({"t": "error", "msg": "este dispositivo no maneja el AP"})
+            return
+        if self._apagado_ap:
+            self._apagado_ap.cancel()
+            self._apagado_ap = None
+        try:
+            self._control_ap(encender)
+        except Exception as exc:
+            self._evento({"t": "error", "msg": f"ap: {exc}"[:150]})
+            return
+        if encender:
+            minutos = max(1, min(minutos, AP_MINUTOS_MAX))
+            self._apagado_ap = self._loop.call_later(minutos * 60, self._ap, False, 0)
+        # El evento sale antes de que se caiga el enlace WiFi (BLE no se toca), así la app sabe qué pasó.
+        self._evento({"t": "ap", "encendido": encender, "minutos": minutos if encender else 0})
+        self._programar(self._notificar(ESTADO, self.leer_estado()))
 
     def notificar_estado(self) -> None:
         self._programar(self._notificar(ESTADO, self.leer_estado()))

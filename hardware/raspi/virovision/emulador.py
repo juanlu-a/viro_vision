@@ -23,6 +23,7 @@ from typing import Any
 
 from .camara import payload_sintetico
 from .estado import leer_estado
+from .http_servidor import PUERTO_POR_DEFECTO, ServidorHttp
 from .perfil import (
     CH_CONTROL,
     CH_ESTADO,
@@ -46,6 +47,7 @@ ESPERA_MAX_NOTIFICACION_S = 5.0
 def _argumentos() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="virovision.emulador", description="Emula la placa ViroVision desde la Mac")
     parser.add_argument("--nombre", default=NOMBRE_ANUNCIADO, help="nombre BLE anunciado")
+    parser.add_argument("--puerto", type=int, default=PUERTO_POR_DEFECTO, help="puerto del servidor HTTP (plan B)")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args()
 
@@ -68,9 +70,17 @@ async def _main(args: argparse.Namespace) -> None:
                 return
             await asyncio.sleep(0.002)
 
+    http = ServidorHttp(
+        leer_estado=lambda: leer_estado(camara=False, puerto_http=args.puerto),
+        payload_sintetico=payload_sintetico,
+        capturar=None,
+        puerto=args.puerto,
+    )
+    http.iniciar()
+
     nucleo = Nucleo(
         loop=loop,
-        leer_estado=partial(leer_estado, camara=False),
+        leer_estado=partial(leer_estado, camara=False, puerto_http=args.puerto),
         capturar=None,
         payload_sintetico=payload_sintetico,
         notificar=notificar,
@@ -121,6 +131,7 @@ async def _main(args: argparse.Namespace) -> None:
         except asyncio.TimeoutError:
             nucleo.notificar_estado()
     log.info("apagando")
+    http.parar()
     await server.stop()
 
 
