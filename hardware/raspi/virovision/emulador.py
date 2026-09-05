@@ -30,6 +30,7 @@ from .perfil import (
     CH_EVENTO,
     CH_MODO,
     CH_TRANSFERENCIA,
+    CH_WIFI,
     NOMBRE_ANUNCIADO,
     SERVICE_UUID,
     UUID_POR_NOMBRE,
@@ -94,6 +95,8 @@ async def _main(args: argparse.Namespace) -> None:
             return bytearray(nucleo.leer_modo())
         if uuid == CH_ESTADO:
             return bytearray(nucleo.leer_estado())
+        if uuid == CH_WIFI:
+            return bytearray(nucleo.leer_wifi())
         return bytearray(caracteristica.value or b"")
 
     def al_escribir(caracteristica: Any, valor: Any, **_: Any) -> None:
@@ -116,6 +119,7 @@ async def _main(args: argparse.Namespace) -> None:
     await server.add_new_characteristic(SERVICE_UUID, CH_EVENTO, Props.notify, None, Perms.readable)
     await server.add_new_characteristic(SERVICE_UUID, CH_TRANSFERENCIA, Props.notify, None, Perms.readable)
     await server.add_new_characteristic(SERVICE_UUID, CH_ESTADO, Props.read | Props.notify, None, Perms.readable)
+    await server.add_new_characteristic(SERVICE_UUID, CH_WIFI, Props.read, None, Perms.readable)
 
     # prioritize_local_name=False: la app escanea por el UUID del servicio, así que tiene que ir en el
     # paquete de anuncio aunque el nombre se recorte.

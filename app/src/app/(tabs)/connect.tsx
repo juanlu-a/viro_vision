@@ -14,7 +14,8 @@ import { strings } from '@/i18n';
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { state, connect, disconnect, medir, medirWifi, medicion } = useDeviceConnection();
+  const { state, wifi, direccion, connect, disconnect, medir, medirWifi, medicion } = useDeviceConnection();
+  const wifiTexto = { 'sin-red': t.wifiSinRed, uniendose: t.wifiUniendose, listo: t.wifiListo, error: t.wifiError }[wifi];
 
   const isConnected = state.status === 'connected';
   const isBusy = state.status === 'scanning' || state.status === 'connecting';
@@ -63,7 +64,13 @@ export default function ConnectScreen() {
 
       {isConnected && state.device && (
         <Card>
-          <DeviceSummary device={state.device} />
+          <DeviceSummary device={{ ...state.device, direccion }} />
+          <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.wifiLabel}: ${wifiTexto}`}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t.wifiLabel}
+            </ThemedText>
+            <ThemedText type="small">{wifiTexto}</ThemedText>
+          </View>
         </Card>
       )}
 
@@ -95,7 +102,7 @@ export default function ConnectScreen() {
             label={t.measureWifiButton}
             hint={t.measureWifiHint}
             loading={medicion.midiendo}
-            disabled={!state.device?.direccion}
+            disabled={!direccion}
             onPress={medirWifiYAnunciar}
           />
           <AccessibleButton

@@ -11,7 +11,7 @@
 import { Platform } from 'react-native';
 import { BleError, BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 
-import { DEVICE_ADVERTISED_NAME, GATT, type EstadoDispositivo } from '@/features/device/gatt';
+import { DEVICE_ADVERTISED_NAME, GATT, type CredencialesWifi, type EstadoDispositivo } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 
@@ -19,6 +19,7 @@ import { BleDeviceNotFoundError, BleNotConnectedError, type BleClient } from './
 import {
   BleTransferError,
   Ensamblador,
+  codificarBase64,
   codificarTextoBase64,
   decodificarBase64,
   decodificarTextoBase64,
@@ -85,6 +86,8 @@ class BleClientPlx implements BleClient {
   private suscripciones: Subscription[] = [];
   private readonly oyentesReconocimiento = new Set<(event: RecognitionEvent) => void>();
   private readonly oyentesDesconexion = new Set<() => void>();
+  private readonly oyentesEstado = new Set<(estado: EstadoDispositivo) => void>();
+  private readonly oyentesModo = new Set<(modo: number) => void>();
   private ensamblador: Ensamblador | null = null;
   private alTerminarTransferencia: ((fin: Extract<Evento, { t: 'fin' }>) => void) | null = null;
   private alFallarTransferencia: ((error: Error) => void) | null = null;
@@ -114,6 +117,20 @@ class BleClientPlx implements BleClient {
           return;
         }
         if (c?.value) this.recibirChunk(c.value);
+      }),
+      this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.estado, (error, c) => {
+        if (error || !c?.value) return;
+        try {
+          const estado = JSON.parse(decodificarTextoBase64(c.value)) as EstadoDispositivo;
+          for (const oyente of this.oyentesEstado) oyente(estado);
+        } catch {
+          /* un estado ilegible no tumba nada */
+        }
+      }),
+      this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.modo, (error, c) => {
+        if (error || !c?.value) return;
+        const bytes = decodificarBase64(c.value);
+        if (bytes.length > 0) for (const oyente of this.oyentesModo) oyente(bytes[0]);
       })
     );
 
@@ -124,6 +141,7 @@ class BleClientPlx implements BleClient {
       batteryLevel: estado?.bateria ?? null,
       firmwareVersion: estado?.version ?? null,
       direccion: estado?.ip && estado.puerto ? { ip: estado.ip, puerto: estado.puerto } : null,
+      ap: estado?.ap ?? false,
     };
   }
 
@@ -141,6 +159,41 @@ class BleClientPlx implements BleClient {
   onDisconnect(listener: () => void): () => void {
     this.oyentesDesconexion.add(listener);
     return () => this.oyentesDesconexion.delete(listener);
+  }
+
+  onEstado(listener: (estado: EstadoDispositivo) => void): () => void {
+    this.oyentesEstado.add(listener);
+    return () => this.oyentesEstado.delete(listener);
+  }
+
+  onModo(listener: (modo: number) => void): () => void {
+    this.oyentesModo.add(listener);
+    return () => this.oyentesModo.delete(listener);
+  }
+
+  async escribirModo(modo: number): Promise<void> {
+    const device = this.device;
+    if (!device) throw new BleNotConnectedError();
+    await this.manager.writeCharacteristicWithResponseForDevice(
+      device.id,
+      GATT.serviceUuid,
+      GATT.characteristics.modo,
+      codificarBase64(new Uint8Array([modo]))
+    );
+  }
+
+  async leerWifi(): Promise<CredencialesWifi | null> {
+    const device = this.device;
+    if (!device) throw new BleNotConnectedError();
+    try {
+      const c = await this.manager.readCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.wifi);
+      if (!c.value) return null;
+      const datos = JSON.parse(decodificarTextoBase64(c.value)) as Partial<CredencialesWifi>;
+      return datos.ssid && datos.clave && datos.ip ? { ssid: datos.ssid, clave: datos.clave, ip: datos.ip, puerto: datos.puerto ?? null } : null;
+    } catch {
+      // Un firmware viejo sin la característica: la placa no ofrece AP y el modo «misma red» sigue sirviendo.
+      return null;
+    }
   }
 
   async medirTransferencia(bytes: number): Promise<MedicionTransferencia> {

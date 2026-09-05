@@ -21,6 +21,8 @@ export interface DeviceInfo {
    * una red o no corre el servidor. Llega por la característica `estado`.
    */
   direccion: { ip: string; puerto: number } | null;
+  /** True si la placa está siendo punto de acceso en este momento (ADR 0003, plan B). */
+  ap: boolean;
 }
 
 export interface ConnectionState {

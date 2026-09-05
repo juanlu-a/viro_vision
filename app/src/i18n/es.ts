@@ -35,6 +35,11 @@ export const es = {
     announceOmnibus: 'Modo ómnibus activado.',
     announceSupermercado: 'Modo supermercado activado.',
     readButton: 'Sacar foto y leer',
+    readWithDeviceButton: 'Leer con el dispositivo',
+    readWithDeviceHint:
+      'La cámara del dispositivo saca la foto y la manda al teléfono por WiFi; el resultado se anuncia en voz alta.',
+    readingFromDevice: 'Pidiendo la foto al dispositivo…',
+    deviceCaptureFailed: 'El dispositivo no pudo mandar la foto.',
     readHintEsperando: 'Primero activá un modo.',
     readHintBus: 'Abre la cámara, lee el cartel de la foto con el OCR local y anuncia la línea en voz alta.',
     readHintSuper: 'Abre la cámara, manda la foto al modelo en la nube elegido y anuncia el producto en voz alta.',
@@ -112,6 +117,11 @@ export const es = {
       'La placa no informó una dirección de red. Tiene que estar conectada a un WiFi y con el servidor corriendo.',
     addressLabel: 'Dirección en la red',
     addressNone: 'sin red WiFi',
+    wifiLabel: 'Red con el dispositivo',
+    wifiSinRed: 'sin red',
+    wifiUniendose: 'conectando…',
+    wifiListo: 'lista',
+    wifiError: 'sin respuesta',
   },
   settings: {
     title: 'Ajustes',

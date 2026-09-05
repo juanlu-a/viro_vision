@@ -8,6 +8,7 @@
  *
  * El perfil GATT vive en `features/device/gatt.ts`, espejo de `hardware/raspi/virovision/gatt.py`.
  */
+import type { CredencialesWifi, EstadoDispositivo } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 
@@ -26,6 +27,14 @@ export interface BleClient {
    * cada comando fallaba sin explicación.
    */
   onDisconnect(listener: () => void): () => void;
+  /** Cada notificación de `estado` (cada ~15 s, y al cambiar el AP). */
+  onEstado(listener: (estado: EstadoDispositivo) => void): () => void;
+  /** Cambios de modo que informa la placa (botón físico, o eco de `escribirModo`). 0/1/2 (ADR 0007). */
+  onModo(listener: (modo: number) => void): () => void;
+  /** Fija el modo en la placa (0 esperando, 1 ómnibus, 2 supermercado). Ella enciende o apaga su AP. */
+  escribirModo(modo: number): Promise<void>;
+  /** Credenciales del AP de la placa, o null si no tiene. */
+  leerWifi(): Promise<CredencialesWifi | null>;
   /**
    * Spike del ADR 0003: pide a la placa `bytes` de relleno por la característica `transferencia`
    * y mide cuánto tardan en llegar. Con 53 000 bytes (la foto que hoy sube a la nube) el umbral es
@@ -72,6 +81,7 @@ const simulatedDevice: DeviceInfo = {
   batteryLevel: 76,
   firmwareVersion: '0.1.0-dev',
   direccion: null,
+  ap: false,
 };
 
 const stubClient: BleClient = {
@@ -87,6 +97,18 @@ const stubClient: BleClient = {
   },
   onDisconnect() {
     return () => {};
+  },
+  onEstado() {
+    return () => {};
+  },
+  onModo() {
+    return () => {};
+  },
+  async escribirModo() {
+    if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
+  },
+  async leerWifi() {
+    return null;
   },
   async medirTransferencia() {
     throw new BleNotImplementedError();

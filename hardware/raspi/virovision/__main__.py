@@ -83,6 +83,7 @@ async def _main(args: argparse.Namespace) -> None:
         capturar=capturar,
         payload_sintetico=payload_sintetico,
         control_ap=control_ap,
+        leer_wifi=lambda: {**ap.credenciales(), "puerto": args.puerto if http else None},
     )
     await servicio.register(bus, adapter=adaptador)
 

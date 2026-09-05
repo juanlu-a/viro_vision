@@ -8,13 +8,13 @@
  * precisión. Sin internet o sin clave, supermercado **avisa** y no lee: el fallback local para ese
  * modo sigue pendiente (ADR 0006, actualización 2026-08-30).
  *
- * La imagen entra por la **cámara del teléfono**, que ocupa el lugar de la placa del dispositivo
- * mientras no hay hardware. La fototeca queda como segunda fuente para poder pasarle la misma foto
- * a varios modelos y que la comparación mida modelos y no fotos.
+ * La imagen entra por la **cámara de la placa** cuando el dispositivo está conectado y con red
+ * (ADR 0003: la foto baja por WiFi, BLE es el control), y si no por la **cámara del teléfono**. La
+ * fototeca queda como segunda fuente para poder pasarle la misma foto a varios modelos y que la
+ * comparación mida modelos y no fotos.
  *
- * Cuando exista hardware, el modo lo fija el botón físico del dispositivo y esta pantalla sólo lo
- * refleja (ADR 0007); mientras tanto los botones de la app aplican los MISMOS gestos a la misma
- * máquina de estados (`modes.ts`).
+ * El modo se sincroniza con la placa: los gestos de la app se le escriben por BLE (ella enciende su
+ * AP con un modo activo) y el modo que la placa informe (botón físico, ADR 0007) se refleja acá.
  *
  * Cada transición de modo y cada resultado se **anuncian por voz**: es una app para personas que
  * no ven la pantalla, y el texto en pantalla es el registro, no la interfaz.
@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { announce } from '@/features/audio/announcer';
+import { useDispositivo } from '@/features/device/DispositivoProvider';
 import { adivinarLectura, frasearLectura, frasearProducto } from '@/features/reader/lectura';
 import type { BusReading } from '@/features/reader/lectura';
 import { transicionar } from '@/features/reader/modes';
@@ -35,7 +36,7 @@ import {
   capturarFoto,
   prepararParaLaNube,
 } from '@/services/camera';
-import type { FotoCapturada, FuenteDeImagen } from '@/services/camera';
+import type { FotoCapturada, FuenteDeImagen, ImagenParaLaNube } from '@/services/camera';
 import { cargarOcr, leerImagen, liberarOcr, ocrCargado } from '@/services/ondevice';
 import {
   VisionNetworkError,
@@ -116,10 +117,15 @@ function mensajeDeError(err: unknown): string {
 async function guardarAudioDeLaLectura(
   texto: string,
   update: (patch: Partial<LectorState>) => void,
+  enviarAlDispositivo?: (uri: string) => Promise<boolean>,
 ): Promise<void> {
   if (!isSintesisHabilitada) return;
   try {
-    update({ audio: await sintetizarAArchivo(texto) });
+    const uri = await sintetizarAArchivo(texto);
+    update({ audio: uri });
+    // Y al parlante de la placa, por WiFi (ADR 0003). El usuario ya escuchó la lectura por el
+    // teléfono: esto es el camino del dispositivo final, no lo que hoy garantiza el anuncio.
+    if (enviarAlDispositivo) await enviarAlDispositivo(uri);
   } catch {
     // Silencio deliberado: nada de lo que el usuario hace depende de esto.
   }
@@ -130,6 +136,7 @@ export function useLector() {
   const ref = useRef(inicial);
   const vivo = useRef(true);
   const { modelo } = useModeloSupermercado();
+  const dispositivo = useDispositivo();
 
   useEffect(() => {
     vivo.current = true;
@@ -150,9 +157,8 @@ export function useLector() {
    * Aplica un gesto del botón (el de la app hoy; el del dispositivo cuando exista) a la máquina
    * de ADR 0007. Cada transición se anuncia por audio: el usuario no tiene otro indicador de estado.
    */
-  const aplicarGesto = useCallback(
-    (gesto: Gesto) => {
-      const siguiente = transicionar(ref.current.modo, gesto);
+  const cambiarModo = useCallback(
+    (siguiente: Modo) => {
       if (siguiente === ref.current.modo) return;
       update({
         modo: siguiente,
@@ -168,6 +174,23 @@ export function useLector() {
     },
     [update],
   );
+
+  const aplicarGesto = useCallback(
+    (gesto: Gesto) => {
+      const siguiente = transicionar(ref.current.modo, gesto);
+      if (siguiente === ref.current.modo) return;
+      cambiarModo(siguiente);
+      // La placa se entera del modo por BLE y enciende o apaga su AP. Si no está, no pasa nada.
+      void dispositivo.escribirModo(siguiente);
+    },
+    [cambiarModo, dispositivo],
+  );
+
+  // El modo que informa la placa (botón físico) manda: la app lo refleja y lo anuncia.
+  const modoDelDispositivo = dispositivo.modoDispositivo;
+  useEffect(() => {
+    if (modoDelDispositivo && modoDelDispositivo !== ref.current.modo) cambiarModo(modoDelDispositivo);
+  }, [modoDelDispositivo, cambiarModo]);
 
   /** Modo ómnibus: SIEMPRE local (ADR 0006) — OCR sobre la foto, sin tocar la red. */
   const leerOmnibus = useCallback(
@@ -186,9 +209,9 @@ export function useLector() {
       const dicho = frasearLectura(lectura, crudo);
       announce(dicho);
       update({ estado: 'idle', lectura, textoCrudo: crudo, ms: r.ms, mensaje: dicho });
-      void guardarAudioDeLaLectura(dicho, update);
+      void guardarAudioDeLaLectura(dicho, update, dispositivo.enviarAudio);
     },
-    [update],
+    [update, dispositivo.enviarAudio],
   );
 
   /**
@@ -197,7 +220,7 @@ export function useLector() {
    * para ser leído.
    */
   const leerSupermercado = useCallback(
-    async (foto: FotoCapturada) => {
+    async (entrada: FotoCapturada | ImagenParaLaNube) => {
       const model = modelo;
       if (!model) {
         announce(t.cloudNotConfigured);
@@ -208,8 +231,9 @@ export function useLector() {
 
       try {
         // El achique va acá y no en la captura: es el único modo que sube la imagen, y en ómnibus
-        // reescalar sólo le sacaría píxeles al OCR sin ganar nada.
-        const imagen = await prepararParaLaNube(foto);
+        // reescalar sólo le sacaría píxeles al OCR sin ganar nada. La foto de la placa ya viene a
+        // 1024 px y en base64: no se toca.
+        const imagen = 'imageBase64' in entrada ? entrada : await prepararParaLaNube(entrada);
         const r = await reconocerProducto({
           model,
           ...imagen,
@@ -226,7 +250,7 @@ export function useLector() {
         const dicho = frasearProducto(r.producto, crudo);
         announce(dicho);
         update({ estado: 'idle', producto: r.producto, textoCrudo: crudo, ms: r.ms, modelo: r.model, mensaje: dicho });
-        void guardarAudioDeLaLectura(dicho, update);
+        void guardarAudioDeLaLectura(dicho, update, dispositivo.enviarAudio);
       } catch (err) {
         const mensaje = mensajeDeError(err);
         announce(mensaje);
@@ -235,13 +259,41 @@ export function useLector() {
     },
     // El modelo entra por dependencia: cambiar de modelo recrea el callback, que es exactamente
     // lo que queremos — la próxima lectura usa el elegido.
-    [modelo, update],
+    [modelo, update, dispositivo.enviarAudio],
   );
 
+  /**
+   * La foto la saca la placa (por WiFi) cuando está conectada y con red; si no, el teléfono. Es la
+   * misma lectura después: sólo cambia de dónde viene la imagen (ADR 0003).
+   */
+  const leerConLaPlaca = useCallback(async () => {
+    const { modo } = ref.current;
+    if (modo === 'esperando') return;
+    update({ estado: 'reading', mensaje: t.readingFromDevice, progreso: null });
+    let foto;
+    try {
+      foto = await dispositivo.descargarFoto();
+    } catch (err) {
+      const mensaje = `${t.deviceCaptureFailed} ${err instanceof Error ? err.message : String(err)}`;
+      announce(mensaje);
+      update({ estado: 'idle', progreso: null, mensaje });
+      return;
+    }
+    try {
+      if (modo === 'omnibus') await leerOmnibus(foto.uri);
+      else await leerSupermercado(foto.imagen);
+    } catch (err) {
+      const mensaje = `${t.error}: ${err instanceof Error ? err.message : String(err)}`;
+      announce(t.error);
+      update({ estado: 'idle', progreso: null, mensaje });
+    }
+  }, [dispositivo, leerOmnibus, leerSupermercado, update]);
+
   const leer = useCallback(
-    async (fuente: FuenteDeImagen) => {
+    async (fuente: FuenteDeImagen | 'placa') => {
       const { modo } = ref.current;
       if (modo === 'esperando') return; // en reposo no se captura ni se anuncia (ADR 0007)
+      if (fuente === 'placa') return leerConLaPlaca();
 
       let foto: FotoCapturada | null;
       try {
@@ -269,8 +321,8 @@ export function useLector() {
         update({ estado: 'idle', progreso: null, mensaje });
       }
     },
-    [leerOmnibus, leerSupermercado, update],
+    [leerConLaPlaca, leerOmnibus, leerSupermercado, update],
   );
 
-  return { state, aplicarGesto, leer, modelo };
+  return { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca: dispositivo.fotoDisponible };
 }

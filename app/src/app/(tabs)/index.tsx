@@ -35,7 +35,7 @@ const READ_HINT: Record<Modo, string> = {
 export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
-  const { state, aplicarGesto, leer, modelo } = useLector();
+  const { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca } = useLector();
 
   const ocupado = state.estado !== 'idle';
   const enOmnibus = state.modo === 'omnibus';
@@ -83,19 +83,32 @@ export default function HomeScreen() {
           </ThemedText>
         )}
 
+        {/* Con la placa conectada y con red, la foto la saca ELLA (ADR 0003): es el flujo real del
+            dispositivo. La cámara del teléfono queda como alternativa debajo, no desaparece. */}
         <AccessibleButton
           label={
             state.estado === 'preparing' && state.progreso != null
               ? `${r.reading} ${Math.round(state.progreso * 100)} %`
               : state.estado === 'reading'
                 ? r.reading
-                : r.readButton
+                : fotoDesdeLaPlaca
+                  ? r.readWithDeviceButton
+                  : r.readButton
           }
-          hint={READ_HINT[state.modo]}
-          onPress={() => leer('camara')}
+          hint={fotoDesdeLaPlaca ? r.readWithDeviceHint : READ_HINT[state.modo]}
+          onPress={() => leer(fotoDesdeLaPlaca ? 'placa' : 'camara')}
           disabled={ocupado || state.modo === 'esperando'}
           loading={ocupado}
         />
+        {fotoDesdeLaPlaca && (
+          <AccessibleButton
+            label={r.readButton}
+            hint={READ_HINT[state.modo]}
+            variant="secondary"
+            onPress={() => leer('camara')}
+            disabled={ocupado || state.modo === 'esperando'}
+          />
+        )}
         {/* La fototeca es la segunda fuente, no la principal: existe para poder pasarle la MISMA
             foto a varios modelos y que la comparación mida modelos y no fotos (ADR 0006). Va
             debajo de la acción principal para que el lector de pantalla llegue primero a la que

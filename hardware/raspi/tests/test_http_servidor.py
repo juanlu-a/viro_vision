@@ -86,6 +86,24 @@ def test_audio_se_guarda_y_responde_202(servidor, tmp_path, monkeypatch):
     assert open(respuesta["archivo"], "rb").read() == b"ID3mp3"
 
 
+def test_audio_en_base64_se_decodifica(servidor, tmp_path, monkeypatch):
+    import base64
+
+    import virovision.http_servidor as m
+
+    monkeypatch.setattr(m, "DIRECTORIO_AUDIO", str(tmp_path))
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{servidor.puerto}/audio",
+        data=base64.b64encode(b"ID3mp3"),
+        method="POST",
+        headers={"Content-Type": "audio/mpeg", "X-Encoding": "base64"},
+    )
+    with urllib.request.urlopen(req, timeout=5) as r:
+        respuesta = json.loads(r.read())
+    assert respuesta["bytes"] == 6
+    assert open(respuesta["archivo"], "rb").read() == b"ID3mp3"
+
+
 def test_ruta_desconocida_es_404(servidor):
     with pytest.raises(urllib.error.HTTPError) as exc:
         _get(servidor, "/nada")

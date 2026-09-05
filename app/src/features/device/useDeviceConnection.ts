@@ -1,28 +1,16 @@
 /**
- * Hook que lleva la máquina de estados de la conexión BLE para la pantalla Dispositivo.
- *
- * Habla sólo con la interfaz `BleClient`: si atrás hay el cliente real o el stub lo decide
- * `services/ble`. Los mensajes se eligen por el TIPO de error, nunca parseando strings.
+ * Hook de la pantalla Dispositivo: la conexión viene del `DispositivoProvider` (compartida con
+ * Inicio); acá sólo viven las mediciones de transferencia del spike del ADR 0003.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { strings } from '@/i18n';
-import {
-  BleDeviceNotFoundError,
-  BleNotConnectedError,
-  BleNotImplementedError,
-  getBleClient,
-} from '@/services/ble/bleClient';
+import { BleNotConnectedError, getBleClient } from '@/services/ble/bleClient';
 import { BleTransferError, type MedicionTransferencia } from '@/services/ble/transferencia';
 import { medirDescargaHttp, urlDeLaPlaca } from '@/services/wifi/descargaHttp';
-import { BYTES_FOTO_REFERENCIA, describirMedicion, describirMedicionWifi } from './medicion';
-import type { ConnectionState } from './types';
 
-const initialState: ConnectionState = {
-  status: 'idle',
-  device: null,
-  message: strings.connection.idle,
-};
+import { useDispositivo } from './DispositivoProvider';
+import { BYTES_FOTO_REFERENCIA, describirMedicion, describirMedicionWifi } from './medicion';
 
 export interface EstadoMedicion {
   midiendo: boolean;
@@ -33,42 +21,9 @@ export interface EstadoMedicion {
 
 const sinMedicion: EstadoMedicion = { midiendo: false, medicion: null, mensaje: null };
 
-function mensajeDeError(err: unknown): string {
-  if (err instanceof BleNotImplementedError) return strings.connection.unavailable;
-  if (err instanceof BleDeviceNotFoundError) return strings.connection.notFound;
-  return strings.connection.error;
-}
-
 export function useDeviceConnection() {
-  const [state, setState] = useState<ConnectionState>(initialState);
+  const dispositivo = useDispositivo();
   const [medicion, setMedicion] = useState<EstadoMedicion>(sinMedicion);
-
-  // Si el enlace se cae solo, la pantalla tiene que decirlo: el usuario no ve la placa.
-  useEffect(
-    () =>
-      getBleClient().onDisconnect(() => {
-        setState({ status: 'error', device: null, message: strings.connection.lost });
-        setMedicion(sinMedicion);
-      }),
-    []
-  );
-
-  const connect = useCallback(async () => {
-    setState({ status: 'scanning', device: null, message: strings.connection.scanning });
-    setMedicion(sinMedicion);
-    try {
-      const device = await getBleClient().connect();
-      setState({ status: 'connected', device, message: strings.connection.connected });
-    } catch (err) {
-      setState({ status: 'error', device: null, message: mensajeDeError(err) });
-    }
-  }, []);
-
-  const disconnect = useCallback(async () => {
-    await getBleClient().disconnect();
-    setState(initialState);
-    setMedicion(sinMedicion);
-  }, []);
 
   const medir = useCallback(async (): Promise<string> => {
     setMedicion({ midiendo: true, medicion: null, mensaje: strings.connect.measuring });
@@ -85,17 +40,15 @@ export function useDeviceConnection() {
         mensaje = strings.connect.measureIncomplete.replace('{faltantes}', String(err.faltantes.length));
       } else if (err instanceof BleNotConnectedError) {
         mensaje = strings.connection.idle;
-        setState(initialState);
       }
       setMedicion({ midiendo: false, medicion: null, mensaje });
       return mensaje;
     }
   }, []);
 
-  // Plan B del ADR 0003: la misma foto de referencia, pero bajada por HTTP desde la placa. La
-  // dirección llega por BLE (característica `estado`); BLE sigue siendo el plano de control.
+  // Plan B del ADR 0003: la misma foto de referencia, bajada por HTTP desde la placa.
   const medirWifi = useCallback(async (): Promise<string> => {
-    const direccion = state.device?.direccion;
+    const { direccion } = dispositivo;
     if (!direccion) {
       const mensaje = strings.connect.measureWifiNoAddress;
       setMedicion({ midiendo: false, medicion: null, mensaje });
@@ -112,7 +65,16 @@ export function useDeviceConnection() {
       setMedicion({ midiendo: false, medicion: null, mensaje });
       return mensaje;
     }
-  }, [state.device]);
+  }, [dispositivo]);
 
-  return { state, connect, disconnect, medir, medirWifi, medicion };
+  return {
+    state: dispositivo.conexion,
+    direccion: dispositivo.direccion,
+    wifi: dispositivo.wifi,
+    connect: dispositivo.connect,
+    disconnect: dispositivo.disconnect,
+    medir,
+    medirWifi,
+    medicion,
+  };
 }
