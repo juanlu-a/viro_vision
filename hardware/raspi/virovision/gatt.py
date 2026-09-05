@@ -8,6 +8,7 @@ las características de BlueZ.
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Callable, Optional
 
 from bluez_peripheral.gatt.characteristic import CharacteristicFlags as Flags
@@ -25,7 +26,9 @@ from .perfil import (  # noqa: F401  (re-exportados para __main__)
     SERVICE_UUID,
 )
 
-PAUSA_ENTRE_NOTIFICACIONES_S = 0.004
+# Configurable por entorno para experimentar (VIROVISION_PAUSA_MS); el default de 4 ms es el medido
+# como seguro el 2026-09-05 (ver _notificar).
+PAUSA_ENTRE_NOTIFICACIONES_S = float(os.environ.get("VIROVISION_PAUSA_MS", "4")) / 1000
 
 
 class ViroVisionService(Service):
