@@ -25,6 +25,8 @@ from .perfil import (  # noqa: F401  (re-exportados para __main__)
     SERVICE_UUID,
 )
 
+PAUSA_ENTRE_NOTIFICACIONES_S = 0.004
+
 
 class ViroVisionService(Service):
     """Un servicio, cinco características. Los getters/setters son sincrónicos porque así los llama
@@ -43,9 +45,14 @@ class ViroVisionService(Service):
     async def _notificar(self, nombre: str, valor: bytes) -> None:
         caracteristica = {MODO: self.modo, EVENTO: self.evento, TRANSFERENCIA: self.transferencia, ESTADO: self.estado}[nombre]
         caracteristica.changed(valor)
-        # `changed` sólo encola el mensaje D-Bus: sin ceder el loop, dbus-next no escribe nada al
-        # socket hasta que terminamos, y BlueZ recibiría los 300 chunks de golpe.
-        await asyncio.sleep(0)
+        # `changed` sólo encola un mensaje D-Bus. Medido el 2026-09-05 en la placa: volcar los 298
+        # chunks de 53 KB sin pausa llena el socket hacia bluetoothd en ~250 ms, dbus-next recibe
+        # EAGAIN (`BlockingIOError: Resource temporarily unavailable`) y DESCARTA el resto: al
+        # receptor le llegaron 175 de 298 y nunca el evento `fin`. La pausa deja que bluetoothd
+        # drene el socket; a 4 ms el tope es ~45 KB/s con chunks de 182 bytes, muy por encima de
+        # lo que da el enlace BLE 4.2, así que no sesga la medición: el cuello sigue siendo el aire.
+        # El arreglo de fondo es AcquireNotify (un fd con backpressure real); ver README.
+        await asyncio.sleep(PAUSA_ENTRE_NOTIFICACIONES_S)
 
     @characteristic(CH_MODO, Flags.READ | Flags.NOTIFY | Flags.WRITE)
     def modo(self, options):

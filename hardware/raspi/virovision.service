@@ -10,6 +10,9 @@ WorkingDirectory=__INSTALL_DIR__
 # lleva unas pocas notificaciones, así que el intervalo ES el throughput. iOS lo negocia hacia 15 ms.
 # El "-" hace que un debugfs ausente no impida arrancar.
 ExecStartPre=-/bin/sh -c 'echo 6 > /sys/kernel/debug/bluetooth/hci0/conn_min_interval; echo 12 > /sys/kernel/debug/bluetooth/hci0/conn_max_interval'
+# Sin buffer: los errores que bluez-peripheral imprime con print() llegan al journal al instante y
+# no cuando el proceso muere (el 2026-09-05 se perdieron por esto).
+Environment=PYTHONUNBUFFERED=1
 ExecStart=__INSTALL_DIR__/.venv/bin/python -m virovision
 Restart=always
 RestartSec=2
