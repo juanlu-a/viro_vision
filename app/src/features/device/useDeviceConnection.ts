@@ -71,6 +71,7 @@ export function useDeviceConnection() {
     state: dispositivo.conexion,
     direccion: dispositivo.direccion,
     wifi: dispositivo.wifi,
+    wifiDetalle: dispositivo.wifiDetalle,
     connect: dispositivo.connect,
     disconnect: dispositivo.disconnect,
     medir,

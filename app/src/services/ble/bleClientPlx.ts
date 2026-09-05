@@ -40,6 +40,7 @@ type Evento =
   | { t: 'inicio'; id: number; tipo: 'medicion' | 'foto'; bytes: number; chunks: number; chunk: number }
   | { t: 'fin'; id: number; bytes: number; chunks: number; ms_placa: number }
   | { t: 'modo'; valor: number }
+  | { t: 'ap'; encendido: boolean; minutos: number }
   | { t: 'error'; msg: string }
   | { t: 'resultado'; evento: RecognitionEvent };
 
@@ -88,6 +89,7 @@ class BleClientPlx implements BleClient {
   private readonly oyentesDesconexion = new Set<() => void>();
   private readonly oyentesEstado = new Set<(estado: EstadoDispositivo) => void>();
   private readonly oyentesModo = new Set<(modo: number) => void>();
+  private readonly oyentesAp = new Set<(encendido: boolean) => void>();
   private ensamblador: Ensamblador | null = null;
   private alTerminarTransferencia: ((fin: Extract<Evento, { t: 'fin' }>) => void) | null = null;
   private alFallarTransferencia: ((error: Error) => void) | null = null;
@@ -169,6 +171,11 @@ class BleClientPlx implements BleClient {
   onModo(listener: (modo: number) => void): () => void {
     this.oyentesModo.add(listener);
     return () => this.oyentesModo.delete(listener);
+  }
+
+  onAp(listener: (encendido: boolean) => void): () => void {
+    this.oyentesAp.add(listener);
+    return () => this.oyentesAp.delete(listener);
   }
 
   async escribirModo(modo: number): Promise<void> {
@@ -309,6 +316,9 @@ class BleClientPlx implements BleClient {
         break;
       case 'error':
         this.alFallarTransferencia?.(new BleTransferError(evento.msg));
+        break;
+      case 'ap':
+        for (const oyente of this.oyentesAp) oyente(evento.encendido);
         break;
       case 'resultado':
         for (const oyente of this.oyentesReconocimiento) oyente(evento.evento);

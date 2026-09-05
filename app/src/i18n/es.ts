@@ -122,6 +122,11 @@ export const es = {
     wifiUniendose: 'conectando…',
     wifiListo: 'lista',
     wifiError: 'sin respuesta',
+    wifiReadyAnnounce: 'Red con el dispositivo lista.',
+    wifiFailedAnnounce: 'No se pudo usar la red del dispositivo.',
+    wifiModuleMissing: 'Este build no puede unirse a redes WiFi. Hace falta un development build.',
+    wifiJoinFailed: 'El teléfono no pudo unirse al WiFi del dispositivo:',
+    wifiNoResponse: 'El dispositivo no responde en {ip}.',
   },
   settings: {
     title: 'Ajustes',

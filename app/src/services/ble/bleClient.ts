@@ -31,6 +31,8 @@ export interface BleClient {
   onEstado(listener: (estado: EstadoDispositivo) => void): () => void;
   /** Cambios de modo que informa la placa (botón físico, o eco de `escribirModo`). 0/1/2 (ADR 0007). */
   onModo(listener: (modo: number) => void): () => void;
+  /** La placa encendió o apagó su punto de acceso: su dirección de red está por cambiar. */
+  onAp(listener: (encendido: boolean) => void): () => void;
   /** Fija el modo en la placa (0 esperando, 1 ómnibus, 2 supermercado). Ella enciende o apaga su AP. */
   escribirModo(modo: number): Promise<void>;
   /** Credenciales del AP de la placa, o null si no tiene. */
@@ -102,6 +104,9 @@ const stubClient: BleClient = {
     return () => {};
   },
   onModo() {
+    return () => {};
+  },
+  onAp() {
     return () => {};
   },
   async escribirModo() {

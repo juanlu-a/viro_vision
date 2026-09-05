@@ -18,6 +18,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { announce } from '@/features/audio/announcer';
 import { strings } from '@/i18n';
 import {
   BleDeviceNotFoundError,
@@ -27,7 +28,7 @@ import {
 import { codificarBase64 } from '@/services/ble/transferencia';
 import { descargarFotoDeLaPlaca, type FotoDeLaPlaca } from '@/services/camera';
 import { urlDeLaPlaca } from '@/services/wifi/descargaHttp';
-import { esperarPlaca, salirDelWifi, unirseAlWifi } from '@/services/wifi/unirse';
+import { WifiNoDisponibleError, esperarPlaca, salirDelWifi, unirseAlWifi } from '@/services/wifi/unirse';
 
 import { MODO_DESDE_GATT, MODO_GATT, type CredencialesWifi, type EstadoDispositivo } from './gatt';
 import type { ConnectionState, DeviceInfo } from './types';
@@ -45,6 +46,8 @@ interface DispositivoValue {
   /** Dónde está la placa en la red ahora (cambia cuando enciende su AP). */
   direccion: Direccion | null;
   wifi: EstadoWifi;
+  /** Por qué la red está en error, para la pantalla y la voz; null si no hay error. */
+  wifiDetalle: string | null;
   /** True cuando se puede pedir una foto por WiFi: conectada, con red y `/salud` respondiendo. */
   fotoDisponible: boolean;
   /** True mientras la placa es punto de acceso (con un modo activo). */
@@ -77,6 +80,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const [direccion, setDireccion] = useState<Direccion | null>(null);
   const [ap, setAp] = useState(false);
   const [wifi, setWifi] = useState<EstadoWifi>('sin-red');
+  const [wifiDetalle, setWifiDetalle] = useState<string | null>(null);
   const [modoDispositivo, setModoDispositivo] = useState<ModoDispositivo | null>(null);
 
   const credenciales = useRef<CredencialesWifi | null>(null);
@@ -96,31 +100,66 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
    * eventos (conexión, estado nuevo), nunca desde un efecto. Cada corrida lleva un número: si la
    * situación cambió mientras esperaba, sus resultados se descartan.
    */
-  const sincronizarRed = useCallback(async (apActivo: boolean, destino: Direccion | null) => {
-    const corrida = ++sincronizacionRed.current;
-    const vigente = () => corrida === sincronizacionRed.current;
-    if (!destino) {
-      setWifi('sin-red');
-      return;
-    }
-    if (apActivo && credenciales.current && unidoA.current !== credenciales.current.ssid) {
-      setWifi('uniendose');
-      try {
-        await unirseAlWifi(credenciales.current);
-        unidoA.current = credenciales.current.ssid;
-      } catch {
-        if (vigente()) setWifi('error');
+  const fallarRed = useCallback((detalle: string) => {
+    setWifi('error');
+    setWifiDetalle(detalle);
+    // La voz es la interfaz: un fallo silencioso deja al usuario esperando un botón que no llega.
+    announce(`${strings.connect.wifiFailedAnnounce} ${detalle}`);
+  }, []);
+
+  const sincronizarRed = useCallback(
+    async (apActivo: boolean, destino: Direccion | null) => {
+      const corrida = ++sincronizacionRed.current;
+      const vigente = () => corrida === sincronizacionRed.current;
+      setWifiDetalle(null);
+      if (!destino) {
+        setWifi('sin-red');
         return;
       }
-    }
-    if (!apActivo && unidoA.current) {
-      await salirDelWifi(unidoA.current);
-      unidoA.current = null;
-    }
-    if (!vigente()) return;
+      if (apActivo && credenciales.current && unidoA.current !== credenciales.current.ssid) {
+        setWifi('uniendose');
+        try {
+          await unirseAlWifi(credenciales.current);
+          unidoA.current = credenciales.current.ssid;
+        } catch (err) {
+          if (!vigente()) return;
+          fallarRed(
+            err instanceof WifiNoDisponibleError
+              ? strings.connect.wifiModuleMissing
+              : `${strings.connect.wifiJoinFailed} ${err instanceof Error ? err.message : String(err)}`
+          );
+          return;
+        }
+      }
+      if (!apActivo && unidoA.current) {
+        await salirDelWifi(unidoA.current);
+        unidoA.current = null;
+      }
+      if (!vigente()) return;
+      setWifi('uniendose');
+      const responde = await esperarPlaca(destino);
+      if (!vigente()) return;
+      if (responde) {
+        setWifi('listo');
+        announce(strings.connect.wifiReadyAnnounce);
+      } else {
+        fallarRed(strings.connect.wifiNoResponse.replace('{ip}', destino.ip));
+      }
+    },
+    [fallarRed]
+  );
+
+  /**
+   * La placa avisa por BLE que su AP cambia ANTES de cambiar de red: desde ese instante la dirección
+   * vieja no sirve y el botón del dispositivo tiene que desaparecer hasta que `estado` traiga la
+   * nueva y `/salud` responda. Sin esto, un toque en esos segundos moría esperando 20 s
+   * (2026-09-05, primera prueba del flujo).
+   */
+  const empezarTransicionDeRed = useCallback(() => {
+    sincronizacionRed.current += 1;
+    setDireccion(null);
     setWifi('uniendose');
-    const responde = await esperarPlaca(destino);
-    if (vigente()) setWifi(responde ? 'listo' : 'error');
+    setWifiDetalle(null);
   }, []);
 
   const aplicarEstado = useCallback(
@@ -186,6 +225,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       }),
       cliente.onEstado(aplicarEstado),
       cliente.onModo((valor) => setModoDispositivo(MODO_DESDE_GATT[valor] ?? null)),
+      cliente.onAp(empezarTransicionDeRed),
     ];
     // La primera conexión sale del efecto de montaje pero en el siguiente tick: el efecto sólo
     // suscribe; conectar cambia estado y eso no va dentro del efecto.
@@ -195,7 +235,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       for (const baja of bajas) baja();
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [aplicarEstado, programarReintento]);
+  }, [aplicarEstado, empezarTransicionDeRed, programarReintento]);
 
   const connect = useCallback(async () => {
     autoconexion.current = true;
@@ -228,14 +268,19 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
     setModoDispositivo(null);
   }, []);
 
-  const escribirModo = useCallback(async (modo: ModoDispositivo) => {
-    if (conexion.status !== 'connected') return;
-    try {
-      await getBleClient().escribirModo(MODO_GATT[modo]);
-    } catch {
-      // La placa no se enteró del modo: la app sigue funcionando con la cámara del teléfono.
-    }
-  }, [conexion.status]);
+  const escribirModo = useCallback(
+    async (modo: ModoDispositivo) => {
+      if (conexion.status !== 'connected') return;
+      try {
+        await getBleClient().escribirModo(MODO_GATT[modo]);
+        // Cambiar de modo cambia el AP y con él la dirección de la placa: la transición arranca ya.
+        if (credenciales.current) empezarTransicionDeRed();
+      } catch {
+        // La placa no se enteró del modo: la app sigue funcionando con la cámara del teléfono.
+      }
+    },
+    [conexion.status, empezarTransicionDeRed]
+  );
 
   const fotoDisponible = conexion.status === 'connected' && wifi === 'listo' && direccion !== null;
 
@@ -266,8 +311,8 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   );
 
   const value = useMemo<DispositivoValue>(
-    () => ({ conexion, direccion, wifi, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio }),
-    [conexion, direccion, wifi, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio]
+    () => ({ conexion, direccion, wifi, wifiDetalle, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio }),
+    [conexion, direccion, wifi, wifiDetalle, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio]
   );
 
   return <DispositivoContext.Provider value={value}>{children}</DispositivoContext.Provider>;
