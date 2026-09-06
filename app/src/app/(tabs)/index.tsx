@@ -17,6 +17,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { formatMs } from '@/features/reader/lectura';
 import type { Modo } from '@/features/reader/modes';
+import { filasDeLinea, filasDeProducto } from '@/features/reader/resultado';
 import { useLector } from '@/features/reader/useLector';
 import { strings } from '@/i18n';
 
@@ -38,6 +39,7 @@ export default function HomeScreen() {
   const { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca } = useLector();
 
   const ocupado = state.estado !== 'idle';
+  const filas = state.producto ? filasDeProducto(state.producto) : state.lectura ? filasDeLinea(state.lectura) : null;
   const enOmnibus = state.modo === 'omnibus';
   const enSupermercado = state.modo === 'supermercado';
 
@@ -122,7 +124,10 @@ export default function HomeScreen() {
           disabled={ocupado || state.modo === 'esperando'}
         />
 
-        {state.mensaje !== '' && (
+        {/* La voz ya dijo la frase; la pantalla muestra los campos uno por uno, legibles y
+            recorribles con el lector de pantalla. El texto crudo del modelo sólo aparece cuando no
+            hubo lectura estructurada (o en ómnibus, donde es lo que detectó el OCR). */}
+        {state.mensaje !== '' && !filas && (
           <View accessible accessibilityRole="text" accessibilityLabel={state.mensaje}>
             <ThemedText type="small" themeColor="textSecondary">
               {r.resultLabel}
@@ -130,7 +135,29 @@ export default function HomeScreen() {
             <ThemedText type="subtitle">{state.mensaje}</ThemedText>
           </View>
         )}
-        {state.textoCrudo && (
+        {filas && (
+          <View className="gap-two">
+            <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+              {r.resultLabel.toUpperCase()}
+            </ThemedText>
+            {filas.map((f) => (
+              <View
+                key={f.etiqueta}
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`${f.etiqueta}: ${f.valor}`}
+                className="flex-row items-baseline justify-between gap-three">
+                <ThemedText type="small" themeColor="textSecondary">
+                  {f.etiqueta}
+                </ThemedText>
+                <ThemedText type={f.vacio ? 'small' : 'subtitle'} themeColor={f.vacio ? 'textSecondary' : undefined} className="flex-1 text-right">
+                  {f.valor}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        )}
+        {state.textoCrudo && (state.modo === 'omnibus' || !filas) && (
           <View accessible accessibilityRole="text">
             <ThemedText type="small" themeColor="textSecondary">
               {r.rawLabel}
