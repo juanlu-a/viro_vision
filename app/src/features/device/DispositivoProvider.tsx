@@ -116,6 +116,17 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
         setWifi('sin-red');
         return;
       }
+      if (apActivo && !credenciales.current) {
+        // La placa encendió su AP pero la app no tiene sus credenciales: casi siempre es la caché de
+        // GATT de iOS sirviendo una lista de características anterior a `wifi` (2026-09-05). Se vuelve
+        // a leer una vez; si sigue vacía, se le dice al usuario el remedio, que es suyo.
+        credenciales.current = await getBleClient().leerWifi().catch(() => null);
+        if (!vigente()) return;
+        if (!credenciales.current) {
+          fallarRed(strings.connect.wifiNoCredentials);
+          return;
+        }
+      }
       if (apActivo && credenciales.current && unidoA.current !== credenciales.current.ssid) {
         setWifi('uniendose');
         try {

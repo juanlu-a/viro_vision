@@ -127,6 +127,8 @@ export const es = {
     wifiModuleMissing: 'Este build no puede unirse a redes WiFi. Hace falta un development build.',
     wifiJoinFailed: 'El teléfono no pudo unirse al WiFi del dispositivo:',
     wifiNoResponse: 'El dispositivo no responde en {ip}.',
+    wifiNoCredentials:
+      'El dispositivo no informó los datos de su red WiFi. Apagá y prendé el Bluetooth del teléfono desde Ajustes y volvé a conectar.',
   },
   settings: {
     title: 'Ajustes',
