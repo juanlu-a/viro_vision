@@ -63,7 +63,14 @@ mkdir -p "$BUILD_DIR"
 # forzar CODE_SIGN_IDENTITY="Apple Distribution" tampoco sirve — Xcode lo rechaza como conflicto
 # con la firma automática. Sólo aplica con API key; en el Mac se firma como siempre.
 DIST=()
-if [ "${#AUTH[@]}" -gt 0 ]; then
+if [ -n "${IOS_SIGNING_PROFILE:-}" ]; then
+  # Firma MANUAL con el certificado de distribución y el perfil instalados por el workflow: el
+  # archive sale firmado y con TODOS los entitlements del proyecto. El camino sin firmar (abajo)
+  # exportaba sólo team-identifier y la app fallaba en runtime (2026-09-06). Los ajustes de firma
+  # los fija plugins/withDevelopmentTeam.js en el pbxproj del target de la app durante el prebuild;
+  # no se pasan acá para no alcanzar a los Pods.
+  DIST=()
+elif [ "${#AUTH[@]}" -gt 0 ]; then
   DIST=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
 fi
 if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
@@ -83,6 +90,15 @@ tail -3 "$BUILD_DIR/xcodebuild-archive.log"
 # ExportOptions. Se lee del pbxproj —lo fija plugins/withDevelopmentTeam.js en el prebuild— para
 # que el ID viva en un solo lugar. En el Mac el archive va firmado y el teamID coincide: es inocuo.
 TEAM_ID=$(sed -n 's/.*DEVELOPMENT_TEAM = \([A-Z0-9]*\);.*/\1/p' "ios/$SCHEME.xcodeproj/project.pbxproj" | head -1)
+BUNDLE_ID=$(sed -n 's/.*PRODUCT_BUNDLE_IDENTIFIER = \([^;]*\);.*/\1/p' "ios/$SCHEME.xcodeproj/project.pbxproj" | head -1 | tr -d '"')
+# Firma manual (CI con certificado propio) o automática (Mac del desarrollador). Ver arriba.
+if [ -n "${IOS_SIGNING_PROFILE:-}" ]; then
+  SIGNING_XML="<key>signingStyle</key><string>manual</string>
+  <key>signingCertificate</key><string>Apple Distribution</string>
+  <key>provisioningProfiles</key><dict><key>$BUNDLE_ID</key><string>$IOS_SIGNING_PROFILE</string></dict>"
+else
+  SIGNING_XML="<key>signingStyle</key><string>automatic</string>"
+fi
 if [ -z "$TEAM_ID" ]; then
   echo "No hay DEVELOPMENT_TEAM en el pbxproj: el prebuild no corrió plugins/withDevelopmentTeam.js." >&2
   exit 64
@@ -97,8 +113,8 @@ cat > "$PLIST" <<PLIST
 <dict>
   <key>method</key><string>app-store-connect</string>
   <key>destination</key><string>$DESTINATION</string>
-  <key>signingStyle</key><string>automatic</string>
-  <key>teamID</key><string>$TEAM_ID</string>
+  $SIGNING_XML
+  <key>teamID</key><string>${IOS_SIGNING_TEAM:-$TEAM_ID}</string>
   <key>uploadSymbols</key><true/>
   <key>manageAppVersionAndBuildNumber</key><false/>
 </dict>
