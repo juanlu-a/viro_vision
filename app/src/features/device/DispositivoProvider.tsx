@@ -48,6 +48,10 @@ interface DispositivoValue {
   wifi: EstadoWifi;
   /** Por qué la red está en error, para la pantalla y la voz; null si no hay error. */
   wifiDetalle: string | null;
+  /** El último `estado` tal como lo mandó la placa: diagnóstico sin SSH (2026-09-06). */
+  estadoCrudo: EstadoDispositivo | null;
+  /** El último aviso de error que mandó la placa por BLE, o null. */
+  ultimoAviso: string | null;
   /** True cuando se puede pedir una foto por WiFi: conectada, con red y `/salud` respondiendo. */
   fotoDisponible: boolean;
   /** True mientras la placa es punto de acceso (con un modo activo). */
@@ -81,6 +85,8 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const [ap, setAp] = useState(false);
   const [wifi, setWifi] = useState<EstadoWifi>('sin-red');
   const [wifiDetalle, setWifiDetalle] = useState<string | null>(null);
+  const [estadoCrudo, setEstadoCrudo] = useState<EstadoDispositivo | null>(null);
+  const [ultimoAviso, setUltimoAviso] = useState<string | null>(null);
   const [modoDispositivo, setModoDispositivo] = useState<ModoDispositivo | null>(null);
 
   const credenciales = useRef<CredencialesWifi | null>(null);
@@ -176,6 +182,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const aplicarEstado = useCallback(
     (estado: EstadoDispositivo) => {
       const destino = estado.ip && estado.puerto ? { ip: estado.ip, puerto: estado.puerto } : null;
+      setEstadoCrudo(estado);
       setAp(estado.ap);
       setDireccion(destino);
       setConexion((c) =>
@@ -237,6 +244,12 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       cliente.onEstado(aplicarEstado),
       cliente.onModo((valor) => setModoDispositivo(MODO_DESDE_GATT[valor] ?? null)),
       cliente.onAp(empezarTransicionDeRed),
+      cliente.onErrorDispositivo((mensaje) => {
+        // La placa no tiene pantalla: si algo le falló (levantar el AP, la cámara), la app es el
+        // único lugar donde se puede enterar alguien.
+        setUltimoAviso(mensaje);
+        announce(`${strings.connect.deviceErrorAnnounce} ${mensaje}`);
+      }),
     ];
     // La primera conexión sale del efecto de montaje pero en el siguiente tick: el efecto sólo
     // suscribe; conectar cambia estado y eso no va dentro del efecto.
@@ -322,8 +335,8 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   );
 
   const value = useMemo<DispositivoValue>(
-    () => ({ conexion, direccion, wifi, wifiDetalle, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio }),
-    [conexion, direccion, wifi, wifiDetalle, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio]
+    () => ({ conexion, direccion, wifi, wifiDetalle, estadoCrudo, ultimoAviso, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio }),
+    [conexion, direccion, wifi, wifiDetalle, estadoCrudo, ultimoAviso, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio]
   );
 
   return <DispositivoContext.Provider value={value}>{children}</DispositivoContext.Provider>;

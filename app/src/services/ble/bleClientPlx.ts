@@ -90,6 +90,7 @@ class BleClientPlx implements BleClient {
   private readonly oyentesEstado = new Set<(estado: EstadoDispositivo) => void>();
   private readonly oyentesModo = new Set<(modo: number) => void>();
   private readonly oyentesAp = new Set<(encendido: boolean) => void>();
+  private readonly oyentesError = new Set<(mensaje: string) => void>();
   private ensamblador: Ensamblador | null = null;
   private alTerminarTransferencia: ((fin: Extract<Evento, { t: 'fin' }>) => void) | null = null;
   private alFallarTransferencia: ((error: Error) => void) | null = null;
@@ -176,6 +177,11 @@ class BleClientPlx implements BleClient {
   onAp(listener: (encendido: boolean) => void): () => void {
     this.oyentesAp.add(listener);
     return () => this.oyentesAp.delete(listener);
+  }
+
+  onErrorDispositivo(listener: (mensaje: string) => void): () => void {
+    this.oyentesError.add(listener);
+    return () => this.oyentesError.delete(listener);
   }
 
   async escribirModo(modo: number): Promise<void> {
@@ -316,6 +322,7 @@ class BleClientPlx implements BleClient {
         break;
       case 'error':
         this.alFallarTransferencia?.(new BleTransferError(evento.msg));
+        for (const oyente of this.oyentesError) oyente(evento.msg);
         break;
       case 'ap':
         for (const oyente of this.oyentesAp) oyente(evento.encendido);

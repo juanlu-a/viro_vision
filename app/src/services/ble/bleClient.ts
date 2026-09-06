@@ -33,6 +33,8 @@ export interface BleClient {
   onModo(listener: (modo: number) => void): () => void;
   /** La placa encendió o apagó su punto de acceso: su dirección de red está por cambiar. */
   onAp(listener: (encendido: boolean) => void): () => void;
+  /** Avisos de error que manda la placa (`{t:'error', msg}`), para mostrarlos y decirlos. */
+  onErrorDispositivo(listener: (mensaje: string) => void): () => void;
   /** Fija el modo en la placa (0 esperando, 1 ómnibus, 2 supermercado). Ella enciende o apaga su AP. */
   escribirModo(modo: number): Promise<void>;
   /** Credenciales del AP de la placa, o null si no tiene. */
@@ -107,6 +109,9 @@ const stubClient: BleClient = {
     return () => {};
   },
   onAp() {
+    return () => {};
+  },
+  onErrorDispositivo() {
     return () => {};
   },
   async escribirModo() {
