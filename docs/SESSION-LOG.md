@@ -1000,6 +1000,33 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   (`/salud` con `ip`, `puerto`, `ap`; cámara detectada). **Falta la prueba de punta a punta desde el
   iPhone** con el build de TestFlight, en curso.
 
+## 2026-09-06 — El flujo completo funciona en la calle; el resultado se vuelve legible
+
+- **«Funciona bárbaro»**: con el tercer build del PR #62, sin WiFi de infraestructura (el usuario de
+  viaje), la app se conectó sola por BLE, la placa levantó su AP al activar supermercado, el iPhone
+  se unió solo (aviso de iOS una vez), y **«Leer con el dispositivo» sacó la foto con la AI Camera,
+  la mandó a la nube y la app la anunció**. Dos vueltas antes: (1) un toque durante el cambio de red
+  moría a los 20 s → el evento `ap` y la escritura del modo invalidan la dirección hasta que
+  `/salud` responda; (2) la app no se unía al AP → **caché de GATT de iOS** sin la característica
+  `wifi` nueva; remedio: Bluetooth off/on desde Ajustes, y ahora la app lo dice por voz.
+
+- **Pedido**: el resultado en pantalla era el texto crudo del modelo. Ahora son filas
+  (Producto · Marca · Detalle, o Línea · Destino), «sin leer» para un campo nulo, texto crudo sólo en
+  ómnibus o sin lectura estructurada (`features/reader/resultado.ts`, con tests). La voz ya decía la
+  frase; no cambia.
+
+- **«Sin red WiFi» en reposo no es una falla**: sin infraestructura, la placa en esperando no tiene
+  red a propósito (el AP sigue al modo). El texto pasó a «red apagada; se prende al activar un modo».
+
+- **Robustez de red en la placa, pendiente de desplegar** (no hay red común con la Mac fuera de casa):
+  al apagar el AP se pide a NetworkManager conectar wlan0 a la red conocida en vez de confiar en el
+  autoconnect; un vigilante reconecta si pasa más de un minuto sin red fuera del modo AP; `estado`
+  publica el nombre de la conexión activa (`red`). Motivo: un ciclo de AP dejó la placa sin ninguna
+  red y nadie podía ver por qué.
+
+- macOS revocó el acceso de la terminal a `Documents` en medio de la sesión (TCC): «Operation not
+  permitted» hasta en `git status`. Se restauró desde Privacidad y seguridad.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1029,7 +1056,8 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
 ### Hardware (la placa ya está; 2026-09-04)
-- **Probar el flujo completo del PR #62 desde el iPhone** y cerrar el PR. Después: **spike 1 de
+- **Cerrar el PR #62** (flujo completo probado en la calle el 2026-09-06) y **desplegar en la placa**
+  los cambios de red pendientes cuando comparta red con la Mac (o por el AP, uniendo la Mac). Después: **spike 1 de
   segundo plano en iOS** (la notificación BLE despierta la app con la pantalla bloqueada y el ciclo
   termina); **parlante en la placa** (DAC I2S) para reproducir el audio que ya llega a `/tmp`;
   **botón físico** (GPIO) que dispare la captura desde la placa; Android: elegir la API de WiFi
