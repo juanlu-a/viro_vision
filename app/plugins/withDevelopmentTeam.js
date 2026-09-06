@@ -43,8 +43,8 @@ module.exports = function withDevelopmentTeam(config) {
         // no se pueden firmar con el perfil de la app. Motivo de la firma manual: el archive sin
         // firmar exportaba sin los entitlements del proyecto (2026-09-06, docs/dev-build-ios.md).
         buildSettings.CODE_SIGN_STYLE = 'Manual';
+        // Sin la variante `[sdk=iphoneos*]`: el parser del pbxproj que usa expo rechaza esa clave.
         buildSettings.CODE_SIGN_IDENTITY = '"Apple Distribution"';
-        buildSettings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = '"Apple Distribution"';
         buildSettings.PROVISIONING_PROFILE_SPECIFIER = `"${process.env.IOS_SIGNING_PROFILE}"`;
       } else {
         buildSettings.CODE_SIGN_STYLE = 'Automatic';
