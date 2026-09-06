@@ -66,7 +66,7 @@ async def _main(args: argparse.Namespace) -> None:
         http = ServidorHttp(
             # `camara.disponible` y no `hay_camara`: si una captura se cuelga la cámara se reinicia, y
             # si no vuelve, el estado tiene que decirlo.
-            leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto, ap=ap.encendido),
+            leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto, ap=ap.encendido, red=ap.conexion_activa()),
             payload_sintetico=payload_sintetico,
             capturar=camara.capturar_jpeg if hay_camara else None,
             puerto=args.puerto,
@@ -81,7 +81,7 @@ async def _main(args: argparse.Namespace) -> None:
 
     servicio = ViroVisionService(
         loop=loop,
-        leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto if http else None, ap=ap.encendido),
+        leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto if http else None, ap=ap.encendido, red=ap.conexion_activa()),
         capturar=capturar,
         payload_sintetico=payload_sintetico,
         control_ap=control_ap,
@@ -107,11 +107,22 @@ async def _main(args: argparse.Namespace) -> None:
     for senal in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(senal, parar.set)
 
+    sin_red_desde = None
     while not parar.is_set():
         try:
             await asyncio.wait_for(parar.wait(), ESTADO_CADA_SEGUNDOS)
         except asyncio.TimeoutError:
             servicio.notificar_estado()
+            # Vigilante de red: si no es AP y lleva más de un minuto sin red, pedirle a NM que
+            # conecte. Una placa sin ninguna red no sirve para nada y no se puede arreglar a distancia.
+            if not ap.encendido and ap.conexion_activa() is None:
+                sin_red_desde = sin_red_desde or loop.time()
+                if loop.time() - sin_red_desde > 60:
+                    log.warning("sin red desde hace %d s: reconectando", int(loop.time() - sin_red_desde))
+                    await loop.run_in_executor(None, ap.reconectar)
+                    sin_red_desde = None
+            else:
+                sin_red_desde = None
     log.info("apagando")
     if http:
         http.parar()
