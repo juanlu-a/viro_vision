@@ -158,6 +158,11 @@ el intervalo de 15 ms de iOS.
   adaptador y explota. El daemon toma `hci0` por su ruta (`--hci`).
 - **`PYTHONUNBUFFERED=1` en el servicio**: las excepciones que bluez-peripheral imprime con `print()`
   no llegaban al journal hasta que el proceso moría.
+- **iOS cachea la lista de características de la placa.** Cuando el perfil GATT gana una característica
+  (el 2026-09-05, `wifi`), el iPhone puede seguir sirviéndole a la app la lista anterior: la app no
+  la encuentra y el flujo falla sin error visible (el AP se levantaba y la app no se unía). Remedio:
+  apagar y prender el Bluetooth del teléfono desde Ajustes. Cada vez que cambie el GATT, avisarlo
+  en las notas del build.
 - **Si el servicio se reinicia con el teléfono conectado**, la app puede seguir diciendo «Conectado»
   con el enlace muerto; desde el build del 2026-09-05 la app lo detecta y avisa. Con builds anteriores:
   Desconectar y Buscar dispositivo de nuevo.
