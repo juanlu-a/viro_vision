@@ -42,6 +42,8 @@ export const es = {
     deviceConnecting: 'Conectando con el dispositivo…',
     deviceConnectingHint: 'La placa está levantando su red WiFi. En unos segundos vas a poder leer con su cámara.',
     deviceCaptureFailed: 'El dispositivo no pudo mandar la foto.',
+    devicePhotoLabel: 'Foto tomada por el dispositivo',
+    devicePhotoDetail: '{kb} kilobytes, capturada y recibida en {ms} milisegundos.',
     readHintEsperando: 'Primero activá un modo.',
     readHintBus: 'Abre la cámara, lee el cartel de la foto con el OCR local y anuncia la línea en voz alta.',
     readHintSuper: 'Abre la cámara, manda la foto al modelo en la nube elegido y anuncia el producto en voz alta.',
@@ -145,6 +147,7 @@ export const es = {
     no: 'no',
     deviceErrorLabel: 'Último aviso del dispositivo',
     deviceErrorAnnounce: 'El dispositivo avisa:',
+    modeWriteFailed: 'No pude avisarle el modo al dispositivo:',
     wifiNoCredentials:
       'El dispositivo no informó los datos de su red WiFi. Apagá y prendé el Bluetooth del teléfono desde Ajustes y volvé a conectar.',
   },

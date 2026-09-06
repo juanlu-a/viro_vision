@@ -314,8 +314,12 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
         await getBleClient().escribirModo(MODO_GATT[modo]);
         // Cambiar de modo cambia el AP y con él la dirección de la placa: la transición arranca ya.
         if (credenciales.current) empezarTransicionDeRed();
-      } catch {
-        // La placa no se enteró del modo: la app sigue funcionando con la cámara del teléfono.
+      } catch (err) {
+        // La placa no se enteró del modo: la app sigue con la cámara del teléfono, pero se dice.
+        // El 2026-09-06 el modo no llegaba a la placa y nadie lo supo hasta leer su log.
+        const detalle = err instanceof Error ? err.message : String(err);
+        setUltimoAviso(`${strings.connect.modeWriteFailed} ${detalle}`);
+        announce(`${strings.connect.modeWriteFailed} ${detalle}`);
       }
     },
     [conexion.status, empezarTransicionDeRed]

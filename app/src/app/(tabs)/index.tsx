@@ -8,7 +8,7 @@
  * El botón del modo contrario se deshabilita porque el diagrama canónico no tiene salto directo
  * entre modos: se pasa por esperando, acá y en el firmware.
  */
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
@@ -169,6 +169,27 @@ export default function HomeScreen() {
               {r.rawLabel}
             </ThemedText>
             <ThemedText type="code">{state.textoCrudo.slice(0, 200)}</ThemedText>
+          </View>
+        )}
+        {/* La foto de la placa, para juzgar enfoque y calidad a ojo. Con label: quien no ve la
+            imagen sabe al menos qué es y cuánto pesa. */}
+        {state.fotoPlaca && (
+          <View
+            className="gap-two"
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={`${r.devicePhotoLabel}. ${r.devicePhotoDetail.replace('{kb}', (state.fotoPlaca.bytes / 1000).toFixed(0)).replace('{ms}', String(state.fotoPlaca.ms))}`}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {r.devicePhotoLabel}
+            </ThemedText>
+            <Image
+              source={{ uri: state.fotoPlaca.uri }}
+              style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 12 }}
+              resizeMode="contain"
+            />
+            <ThemedText type="code">
+              {r.devicePhotoDetail.replace('{kb}', (state.fotoPlaca.bytes / 1000).toFixed(0)).replace('{ms}', String(state.fotoPlaca.ms))}
+            </ThemedText>
           </View>
         )}
         {state.modelo && (

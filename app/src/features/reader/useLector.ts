@@ -69,6 +69,8 @@ export interface LectorState {
   modelo: string | null;
   /** Ruta del .mp3 de la lectura, cuando la síntesis a archivo está habilitada. */
   audio: string | null;
+  /** La foto que sacó la placa en la última lectura, para verla y juzgar enfoque y calidad. */
+  fotoPlaca: { uri: string; bytes: number; ms: number } | null;
 }
 
 const inicial: LectorState = {
@@ -82,6 +84,7 @@ const inicial: LectorState = {
   ms: null,
   modelo: null,
   audio: null,
+  fotoPlaca: null,
 };
 
 /**
@@ -168,6 +171,7 @@ export function useLector() {
         ms: null,
         modelo: null,
         audio: null,
+        fotoPlaca: null,
         mensaje: '',
       });
       announce(ANUNCIO_MODO[siguiente]);
@@ -273,6 +277,7 @@ export function useLector() {
     let foto;
     try {
       foto = await dispositivo.descargarFoto();
+      update({ fotoPlaca: { uri: foto.uri, bytes: foto.bytes, ms: foto.ms } });
     } catch (err) {
       const mensaje = `${t.deviceCaptureFailed} ${err instanceof Error ? err.message : String(err)}`;
       announce(mensaje);
