@@ -121,9 +121,9 @@ export const es = {
     measureWifiNoAddress:
       'La placa no informó una dirección de red. Tiene que estar conectada a un WiFi y con el servidor corriendo.',
     addressLabel: 'Dirección en la red',
-    addressNone: 'sin red WiFi',
+    addressNone: 'red apagada; se prende al activar un modo',
     wifiLabel: 'Red con el dispositivo',
-    wifiSinRed: 'sin red',
+    wifiSinRed: 'apagada hasta activar un modo',
     wifiUniendose: 'conectando…',
     wifiListo: 'lista',
     wifiError: 'sin respuesta',
