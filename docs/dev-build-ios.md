@@ -193,6 +193,28 @@ o un APK por EAS, que no requiere toolchain local ni cuenta paga.
 
 ## Problemas conocidos
 
+### Una capacidad nueva en `app.json` no alcanza: hay que habilitarla en el App ID
+
+Lección del 2026-09-06. El plugin de `react-native-wifi-reborn` agregó a los entitlements
+`com.apple.developer.networking.HotspotConfiguration` y `wifi-info`, el build compiló y subió sin
+quejas, y en el teléfono `NEHotspotConfigurationManager` devolvía **"internal error"**: la app no podía
+unirse al WiFi de la placa. El App ID `com.virovision.app` sólo tenía habilitada *In-App Purchase*; la
+firma automática en la nube no agrega capacidades por su cuenta. Se habilitaron por la API de App
+Store Connect (rol Administración) y el build siguiente salió firmado con ellas:
+
+```sh
+# desde app/, con ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_PATH en el entorno
+node --input-type=module -e "
+import { asc } from './scripts/asc.mjs';
+const r = await asc('GET', '/v1/bundleIds?filter[identifier]=com.virovision.app&include=bundleIdCapabilities');
+console.log((r.included ?? []).map(c => c.attributes.capabilityType));   // ver las habilitadas
+// habilitar una: POST /v1/bundleIdCapabilities con capabilityType HOT_SPOT | ACCESS_WIFI_INFORMATION | …
+"
+```
+
+Regla: **cada entitlement nuevo que aparezca en `npx expo config --type introspect` tiene que existir
+como capacidad del App ID** antes del build, o la app falla en runtime sin ningún error de compilación.
+
 - **`xcodebuild` no encuentra destino de simulador**: pasaba el 2026-07-18 porque el runtime
   instalado era iOS 26.2 y Xcode esperaba 26.5. Se resolvió instalando el runtime que falta
   (Xcode → Settings → Components, o `xcodebuild -downloadPlatform iOS`).
