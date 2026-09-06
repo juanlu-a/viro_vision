@@ -43,7 +43,8 @@ AUTH=()
 DESTINATION=export
 if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ] && [ -n "${ASC_KEY_PATH:-}" ]; then
   AUTH=(-authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" -authenticationKeyPath "$ASC_KEY_PATH")
-  DESTINATION=upload
+  # Antes acá se ponía DESTINATION=upload y xcodebuild subía directo; ahora se exporta siempre el
+  # .ipa para poder inspeccionar sus entitlements, y la subida la hace altool más abajo.
 fi
 
 echo "› Archive (build $BUILD_NUMBER)…"
@@ -114,7 +115,38 @@ if ! xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportOptionsPlist "$PLI
 fi
 tail -5 "$BUILD_DIR/xcodebuild-export.log"
 
-if [ "$DESTINATION" = upload ]; then
+# Los entitlements del .ipa se verifican ANTES de subir. El 2026-09-06 el build subió "bien" y en el
+# teléfono NEHotspotConfiguration devolvía «internal error»: el archive va sin firmar y al exportar,
+# Apple firma con lo que trae el perfil; si un entitlement del proyecto no quedó adentro, nadie lo
+# ve hasta que la app falla en la calle. Cada entitlement que exija una capacidad va acá.
+ENTITLEMENTS_REQUERIDOS=(com.apple.developer.networking.HotspotConfiguration)
+IPA=$(ls "$EXPORT_DIR"/*.ipa | head -1)
+INSPECCION="$BUILD_DIR/ipa-inspeccion"
+rm -rf "$INSPECCION" && mkdir -p "$INSPECCION"
+unzip -q "$IPA" -d "$INSPECCION"
+APP=$(ls -d "$INSPECCION"/Payload/*.app | head -1)
+ENTITLEMENTS_IPA=$(codesign -d --entitlements :- "$APP" 2>/dev/null || true)
+echo "› Entitlements del .ipa:"
+echo "$ENTITLEMENTS_IPA" | grep -oE 'com\.apple\.developer\.[A-Za-z0-9.-]+' | sort -u | sed 's/^/    /'
+for e in "${ENTITLEMENTS_REQUERIDOS[@]}"; do
+  if ! echo "$ENTITLEMENTS_IPA" | grep -q "$e"; then
+    echo "✗ El .ipa no lleva el entitlement $e: la app fallaría en runtime («internal error» al unirse al WiFi). No se sube." >&2
+    echo "  Revisar que la capacidad esté habilitada en el App ID y que la firma la incluya (docs/dev-build-ios.md)." >&2
+    exit 72
+  fi
+done
+echo "✓ Entitlements requeridos presentes."
+
+if [ "${#AUTH[@]}" -gt 0 ]; then
+  echo "› Subiendo a App Store Connect…"
+  # altool busca la clave en ./private_keys, ~/private_keys, ~/.private_keys o API_PRIVATE_KEYS_DIR.
+  KEYS_DIR=$(mktemp -d) && cp "$ASC_KEY_PATH" "$KEYS_DIR/AuthKey_$ASC_KEY_ID.p8"
+  if ! API_PRIVATE_KEYS_DIR="$KEYS_DIR" xcrun altool --upload-app -f "$IPA" -t ios \
+      --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" > "$BUILD_DIR/altool-upload.log" 2>&1; then
+    echo "✗ Subida falló; últimas líneas del log:" >&2
+    tail -40 "$BUILD_DIR/altool-upload.log" >&2
+    exit 74
+  fi
   echo "✓ Build $BUILD_NUMBER subido a App Store Connect. Aparece en TestFlight en unos minutos (procesamiento de Apple)."
 else
   echo "✓ IPA en $EXPORT_DIR. Subilo con Xcode → Window → Organizer → Distribute App, o exportá ASC_KEY_ID/ASC_ISSUER_ID/ASC_KEY_PATH para subir directo."
