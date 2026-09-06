@@ -324,5 +324,13 @@ export function useLector() {
     [leerConLaPlaca, leerOmnibus, leerSupermercado, update],
   );
 
-  return { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca: dispositivo.fotoDisponible };
+  return {
+    state,
+    aplicarGesto,
+    leer,
+    modelo,
+    fotoDesdeLaPlaca: dispositivo.fotoDisponible,
+    // La placa está conectada y su red se está levantando: el botón del dispositivo está por llegar.
+    placaConectando: dispositivo.conexion.status === 'connected' && dispositivo.wifi === 'uniendose',
+  };
 }

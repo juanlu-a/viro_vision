@@ -39,6 +39,8 @@ export const es = {
     readWithDeviceHint:
       'La cámara del dispositivo saca la foto y la manda al teléfono por WiFi; el resultado se anuncia en voz alta.',
     readingFromDevice: 'Pidiendo la foto al dispositivo…',
+    deviceConnecting: 'Conectando con el dispositivo…',
+    deviceConnectingHint: 'La placa está levantando su red WiFi. En unos segundos vas a poder leer con su cámara.',
     deviceCaptureFailed: 'El dispositivo no pudo mandar la foto.',
     readHintEsperando: 'Primero activá un modo.',
     readHintBus: 'Abre la cámara, lee el cartel de la foto con el OCR local y anuncia la línea en voz alta.',

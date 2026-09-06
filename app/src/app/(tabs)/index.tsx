@@ -36,7 +36,7 @@ const READ_HINT: Record<Modo, string> = {
 export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
-  const { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca } = useLector();
+  const { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca, placaConectando } = useLector();
 
   const ocupado = state.estado !== 'idle';
   const filas = state.producto ? filasDeProducto(state.producto) : state.lectura ? filasDeLinea(state.lectura) : null;
@@ -87,6 +87,11 @@ export default function HomeScreen() {
 
         {/* Con la placa conectada y con red, la foto la saca ELLA (ADR 0003): es el flujo real del
             dispositivo. La cámara del teléfono queda como alternativa debajo, no desaparece. */}
+        {/* Mientras la placa levanta su red, se dice: un botón que aparece solo diez segundos después
+            de activar el modo, sin aviso, parece que falta (2026-09-06). */}
+        {placaConectando && state.modo !== 'esperando' && !fotoDesdeLaPlaca && (
+          <AccessibleButton label={r.deviceConnecting} hint={r.deviceConnectingHint} disabled loading onPress={() => {}} />
+        )}
         <AccessibleButton
           label={
             state.estado === 'preparing' && state.progreso != null
@@ -98,6 +103,7 @@ export default function HomeScreen() {
                   : r.readButton
           }
           hint={fotoDesdeLaPlaca ? r.readWithDeviceHint : READ_HINT[state.modo]}
+          variant={placaConectando && !fotoDesdeLaPlaca ? 'secondary' : 'primary'}
           onPress={() => leer(fotoDesdeLaPlaca ? 'placa' : 'camara')}
           disabled={ocupado || state.modo === 'esperando'}
           loading={ocupado}

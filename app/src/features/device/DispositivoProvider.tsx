@@ -99,6 +99,8 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   // por eso va en un ref y no se captura directo.
   const conectarRef = useRef<() => Promise<void>>(async () => {});
   const sincronizacionRed = useRef(0);
+  // Lo último que se sincronizó, para no reiniciar la comprobación con cada latido de `estado`.
+  const redSincronizada = useRef<{ ap: boolean; ip: string | null; ok: boolean }>({ ap: false, ip: null, ok: false });
 
   /**
    * La red sigue al AP: unirse cuando la placa lo enciende, salir cuando lo apaga, y comprobar que
@@ -114,23 +116,23 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const sincronizarRed = useCallback(
-    async (apActivo: boolean, destino: Direccion | null) => {
+    async (apActivo: boolean, destino: Direccion | null): Promise<boolean> => {
       const corrida = ++sincronizacionRed.current;
       const vigente = () => corrida === sincronizacionRed.current;
       setWifiDetalle(null);
       if (!destino) {
         setWifi('sin-red');
-        return;
+        return false;
       }
       if (apActivo && !credenciales.current) {
         // La placa encendió su AP pero la app no tiene sus credenciales: casi siempre es la caché de
         // GATT de iOS sirviendo una lista de características anterior a `wifi` (2026-09-05). Se vuelve
         // a leer una vez; si sigue vacía, se le dice al usuario el remedio, que es suyo.
         credenciales.current = await getBleClient().leerWifi().catch(() => null);
-        if (!vigente()) return;
+        if (!vigente()) return false;
         if (!credenciales.current) {
           fallarRed(strings.connect.wifiNoCredentials);
-          return;
+          return false;
         }
       }
       if (apActivo && credenciales.current && unidoA.current !== credenciales.current.ssid) {
@@ -139,29 +141,30 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
           await unirseAlWifi(credenciales.current);
           unidoA.current = credenciales.current.ssid;
         } catch (err) {
-          if (!vigente()) return;
+          if (!vigente()) return false;
           fallarRed(
             err instanceof WifiNoDisponibleError
               ? strings.connect.wifiModuleMissing
               : `${strings.connect.wifiJoinFailed} ${err instanceof Error ? err.message : String(err)}`
           );
-          return;
+          return false;
         }
       }
       if (!apActivo && unidoA.current) {
         await salirDelWifi(unidoA.current);
         unidoA.current = null;
       }
-      if (!vigente()) return;
+      if (!vigente()) return false;
       setWifi('uniendose');
       const responde = await esperarPlaca(destino);
-      if (!vigente()) return;
+      if (!vigente()) return false;
       if (responde) {
         setWifi('listo');
         announce(strings.connect.wifiReadyAnnounce);
-      } else {
-        fallarRed(strings.connect.wifiNoResponse.replace('{ip}', destino.ip));
+        return true;
       }
+      fallarRed(strings.connect.wifiNoResponse.replace('{ip}', destino.ip));
+      return false;
     },
     [fallarRed]
   );
@@ -174,6 +177,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
    */
   const empezarTransicionDeRed = useCallback(() => {
     sincronizacionRed.current += 1;
+    redSincronizada.current = { ap: false, ip: null, ok: false };
     setDireccion(null);
     setWifi('uniendose');
     setWifiDetalle(null);
@@ -188,7 +192,17 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       setConexion((c) =>
         c.device ? { ...c, device: { ...c.device, batteryLevel: estado.bateria, firmwareVersion: estado.version } } : c
       );
-      void sincronizarRed(estado.ap, destino);
+      // `estado` llega cada 15 s. Reiniciar la comprobación de red con cada latido cancelaba la
+      // anterior antes de terminar (unirse al WiFi + esperar a la placa puede pasar de 15 s) y la red
+      // nunca llegaba a «lista» (2026-09-06). Sólo se sincroniza si cambió algo, o si quedó en falla.
+      const previa = redSincronizada.current;
+      const cambio = previa.ap !== estado.ap || previa.ip !== (destino?.ip ?? null);
+      if (cambio || !previa.ok) {
+        redSincronizada.current = { ap: estado.ap, ip: destino?.ip ?? null, ok: false };
+        void sincronizarRed(estado.ap, destino).then((ok) => {
+          if (ok && redSincronizada.current.ip === (destino?.ip ?? null)) redSincronizada.current.ok = true;
+        });
+      }
     },
     [sincronizarRed]
   );
@@ -215,6 +229,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       setDireccion(device.direccion);
       setAp(device.ap);
       credenciales.current = await cliente.leerWifi().catch(() => null);
+      redSincronizada.current = { ap: device.ap, ip: device.direccion?.ip ?? null, ok: false };
       void sincronizarRed(device.ap, device.direccion);
     } catch (err) {
       setConexion({ status: 'error', device: null, message: mensajeDeError(err) });
