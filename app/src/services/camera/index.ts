@@ -5,6 +5,8 @@
  * Barrel puro: única superficie de import (`@/services/camera`).
  */
 export { capturarFoto, prepararParaLaNube } from './captura';
+export { descargarFotoDeLaPlaca } from './fotoDeLaPlaca';
+export type { FotoDeLaPlaca } from './fotoDeLaPlaca';
 export type { FotoCapturada, FuenteDeImagen, ImagenParaLaNube } from './captura';
 export { CameraPermissionError, ImagenIlegibleError } from './errors';
 export { calcularRedimension, LADO_MAYOR_MAX } from './redimension';

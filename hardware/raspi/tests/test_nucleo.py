@@ -30,9 +30,9 @@ class Notificaciones:
         return [json.loads(v) for v in self.de(EVENTO)]
 
 
-def crear(loop, capturar=None, control_ap=None):
+def crear(loop, capturar=None, control_ap=None, leer_wifi=None):
     n = Notificaciones()
-    nucleo = Nucleo(loop, lambda: {"version": "t"}, capturar, lambda cant: bytes(range(256)) * (cant // 256) + bytes(cant % 256), n, control_ap=control_ap)
+    nucleo = Nucleo(loop, lambda: {"version": "t"}, capturar, lambda cant: bytes(range(256)) * (cant // 256) + bytes(cant % 256), n, control_ap=control_ap, leer_wifi=leer_wifi)
     return nucleo, n
 
 
@@ -126,6 +126,27 @@ def test_ap_enciende_por_tiempo_acotado_y_avisa(loop):
     loop.run_until_complete(_correr(loop))
     assert llamadas == [True, False]
     assert nucleo._apagado_ap is None
+
+
+def test_el_ap_sigue_al_modo(loop):
+    llamadas = []
+    nucleo, n = crear(loop, control_ap=llamadas.append)
+    nucleo.escribir_control(b'{"cmd":"modo","valor":2}')
+    loop.run_until_complete(_correr(loop))
+    assert llamadas == [True]
+    assert [e["t"] for e in n.eventos()] == ["modo", "ap"]
+    assert n.eventos()[1]["minutos"] == 20
+    nucleo.escribir_control(b'{"cmd":"modo","valor":0}')
+    loop.run_until_complete(_correr(loop))
+    assert llamadas == [True, False]
+    assert nucleo._apagado_ap is None
+
+
+def test_wifi_devuelve_las_credenciales_o_vacio(loop):
+    nucleo, _ = crear(loop, leer_wifi=lambda: {"ssid": "ViroVision", "clave": "x", "ip": "10.42.0.1", "puerto": 8080})
+    assert json.loads(nucleo.leer_wifi()) == {"ssid": "ViroVision", "clave": "x", "ip": "10.42.0.1", "puerto": 8080}
+    sin_ap, _ = crear(loop)
+    assert sin_ap.leer_wifi() == b"{}"
 
 
 def test_ap_sin_soporte_es_un_error_no_una_excepcion(loop):

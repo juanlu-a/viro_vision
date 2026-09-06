@@ -41,6 +41,10 @@ Notificar = Callable[[str, bytes], Awaitable[None]]
 ControlAp = Callable[[bool], None]
 AP_MINUTOS_POR_DEFECTO = 10
 AP_MINUTOS_MAX = 60
+# Con un modo activo el AP se enciende solo (la app va a pedir la foto por WiFi) y se apaga en
+# esperando. El tope existe porque la placa tiene una radio: con el AP arriba no está en ninguna
+# otra red, y un modo olvidado no puede dejarla incomunicada para siempre.
+AP_MINUTOS_CON_MODO = 20
 
 
 def _json(obj: dict) -> bytes:
@@ -59,6 +63,7 @@ class Nucleo:
         payload_sintetico: Callable[[int], bytes],
         notificar: Notificar,
         control_ap: Optional[ControlAp] = None,
+        leer_wifi: Optional[Callable[[], dict]] = None,
     ) -> None:
         self._loop = loop
         self._leer_estado = leer_estado
@@ -66,6 +71,7 @@ class Nucleo:
         self._payload_sintetico = payload_sintetico
         self._notificar = notificar
         self._control_ap = control_ap
+        self._leer_wifi = leer_wifi
         self._apagado_ap: Optional[asyncio.TimerHandle] = None
         self.modos = MaquinaDeModos()
         self._transferencia_id = 0
@@ -78,6 +84,10 @@ class Nucleo:
 
     def leer_estado(self) -> bytes:
         return _json(self._leer_estado())
+
+    def leer_wifi(self) -> bytes:
+        """Credenciales del AP para que la app se una sola. Vacío si este dispositivo no tiene AP."""
+        return _json(self._leer_wifi()) if self._leer_wifi else b"{}"
 
     # --- escrituras -------------------------------------------------------------------------
 
@@ -129,17 +139,22 @@ class Nucleo:
         if self._apagado_ap:
             self._apagado_ap.cancel()
             self._apagado_ap = None
+        minutos = max(1, min(minutos, AP_MINUTOS_MAX)) if encender else 0
+        self._programar(self._conmutar_ap(encender, minutos))
+
+    async def _conmutar_ap(self, encender: bool, minutos: int) -> None:
+        # `nmcli con up` tarda varios segundos: va a un hilo para que el BLE siga respondiendo.
         try:
-            self._control_ap(encender)
+            await self._loop.run_in_executor(None, self._control_ap, encender)
         except Exception as exc:
-            self._evento({"t": "error", "msg": f"ap: {exc}"[:150]})
+            await self._notificar(EVENTO, _json({"t": "error", "msg": f"ap: {exc}"[:150]}))
             return
         if encender:
-            minutos = max(1, min(minutos, AP_MINUTOS_MAX))
             self._apagado_ap = self._loop.call_later(minutos * 60, self._ap, False, 0)
-        # El evento sale antes de que se caiga el enlace WiFi (BLE no se toca), así la app sabe qué pasó.
-        self._evento({"t": "ap", "encendido": encender, "minutos": minutos if encender else 0})
-        self._programar(self._notificar(ESTADO, self.leer_estado()))
+        # El evento y el estado nuevo (con la IP del AP) salen por BLE, que no se toca: así la app
+        # sabe a qué red unirse y de dónde bajar la foto.
+        await self._notificar(EVENTO, _json({"t": "ap", "encendido": encender, "minutos": minutos}))
+        await self._notificar(ESTADO, self.leer_estado())
 
     def notificar_estado(self) -> None:
         self._programar(self._notificar(ESTADO, self.leer_estado()))
@@ -164,6 +179,9 @@ class Nucleo:
             # se notifica a la app.
             self._programar(self._notificar(MODO, self.leer_modo()))
             self._evento({"t": "modo", "valor": int(nuevo)})
+            # El AP sigue al modo (plan B): arriba mientras haya algo que leer, abajo en reposo.
+            if self._control_ap is not None:
+                self._ap(nuevo is not Modo.ESPERANDO, AP_MINUTOS_CON_MODO)
 
     @staticmethod
     def _chunk(cmd: dict, mtu: int) -> int:

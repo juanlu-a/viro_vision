@@ -55,6 +55,7 @@
       ],
       "expo-router",
       "expo-dev-client",
+      "react-native-wifi-reborn",
       [
         "expo-splash-screen",
         {

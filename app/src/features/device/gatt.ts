@@ -23,8 +23,10 @@ export const GATT = {
     evento: '4380c503-7ca3-4e37-b27d-f60e8d8d73d1',
     /** notify — binario: header de 4 bytes (`seq` u16 LE, `total` u16 LE) + datos. */
     transferencia: '4380c504-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** read · notify — JSON: `version`, `temp`, `uptime`, `bateria` (null hoy), `camara`, `wifi`, `ip`, `puerto`. */
+    /** read · notify — JSON: `version`, `temp`, `uptime`, `bateria` (null hoy), `camara`, `wifi`, `ip`, `puerto`, `ap`. */
     estado: '4380c505-7ca3-4e37-b27d-f60e8d8d73d1',
+    /** read — JSON `{ ssid, clave, ip, puerto }` del punto de acceso de la placa; `{}` si no tiene. */
+    wifi: '4380c506-7ca3-4e37-b27d-f60e8d8d73d1',
   },
 } as const;
 
@@ -43,4 +45,22 @@ export interface EstadoDispositivo {
   ip: string | null;
   /** Puerto del servidor HTTP de la placa, o null si no está corriendo. */
   puerto: number | null;
+  /** True mientras la placa es punto de acceso: entonces `ip` es la del AP (10.42.0.1). */
+  ap: boolean;
 }
+
+/**
+ * Credenciales del punto de acceso de la placa (ADR 0003, plan B). La app las lee por BLE y se une
+ * sola: el usuario no configura ningún WiFi. Sin secreto a propósito: WPA2 cifra el aire y los
+ * datos no son sensibles.
+ */
+export interface CredencialesWifi {
+  ssid: string;
+  clave: string;
+  ip: string;
+  puerto: number | null;
+}
+
+/** Modo de operación como lo codifica la placa en la característica `modo` (ADR 0007). */
+export const MODO_GATT = { esperando: 0, omnibus: 1, supermercado: 2 } as const;
+export const MODO_DESDE_GATT = ['esperando', 'omnibus', 'supermercado'] as const;

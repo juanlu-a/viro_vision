@@ -22,6 +22,7 @@ from .perfil import (  # noqa: F401  (re-exportados para __main__)
     CH_EVENTO,
     CH_MODO,
     CH_TRANSFERENCIA,
+    CH_WIFI,
     NOMBRE_ANUNCIADO,
     SERVICE_UUID,
 )
@@ -42,9 +43,10 @@ class ViroVisionService(Service):
         capturar: Optional[Capturar],
         payload_sintetico: Callable[[int], bytes],
         control_ap: Optional[ControlAp] = None,
+        leer_wifi: Optional[Callable[[], dict]] = None,
     ) -> None:
         super().__init__(SERVICE_UUID, True)
-        self.nucleo = Nucleo(loop, leer_estado, capturar, payload_sintetico, self._notificar, control_ap=control_ap)
+        self.nucleo = Nucleo(loop, leer_estado, capturar, payload_sintetico, self._notificar, control_ap=control_ap, leer_wifi=leer_wifi)
 
     async def _notificar(self, nombre: str, valor: bytes) -> None:
         caracteristica = {MODO: self.modo, EVENTO: self.evento, TRANSFERENCIA: self.transferencia, ESTADO: self.estado}[nombre]
@@ -86,6 +88,10 @@ class ViroVisionService(Service):
     @characteristic(CH_ESTADO, Flags.READ | Flags.NOTIFY)
     def estado(self, options):
         return self.nucleo.leer_estado()
+
+    @characteristic(CH_WIFI, Flags.READ)
+    def wifi(self, options):
+        return self.nucleo.leer_wifi()
 
     def notificar_estado(self) -> None:
         self.nucleo.notificar_estado()

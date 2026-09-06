@@ -26,7 +26,7 @@ def test_el_adaptador_bluez_construye_con_todos_los_argumentos_del_nucleo():
             payload_sintetico=bytes,
             control_ap=lambda encender: None,
         )
-        assert len(servicio._characteristics) == 5
+        assert len(servicio._characteristics) == 6
         assert servicio.modo.getter_func(servicio, None) == b"\x00"
     finally:
         loop.close()
