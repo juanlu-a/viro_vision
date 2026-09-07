@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
 import { DispositivoProvider } from '@/features/device/DispositivoProvider';
+import { telemetria } from '@/services/telemetria';
 import { ModeloSupermercadoProvider } from '@/features/reader/ModeloSupermercadoProvider';
 import {
   ThemePreferenceProvider,
@@ -57,6 +58,8 @@ function RootNavigator() {
   const { scheme, isReady } = useThemePreference();
 
   useEffect(() => {
+    // Telemetría de desarrollo (Supabase): una vez por arranque; sin proxy configurado no hace nada.
+    telemetria.iniciar();
     // El splash se mantiene hasta saber qué tema aplicar: si no, la app pinta con un esquema y
     // salta al otro, un parpadeo desorientador para alguien con baja visión.
     if (isReady) SplashScreen.hideAsync();

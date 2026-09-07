@@ -38,6 +38,7 @@ import {
 } from '@/services/camera';
 import type { FotoCapturada, FuenteDeImagen, ImagenParaLaNube } from '@/services/camera';
 import { cargarOcr, leerImagen, liberarOcr, ocrCargado } from '@/services/ondevice';
+import { cronometro, telemetria } from '@/services/telemetria';
 import {
   VisionNetworkError,
   VisionNotConfiguredError,
@@ -124,7 +125,9 @@ async function guardarAudioDeLaLectura(
 ): Promise<void> {
   if (!isSintesisHabilitada) return;
   try {
+    const t = cronometro();
     const uri = await sintetizarAArchivo(texto);
+    telemetria.registrar('tts_nube', { caracteres: texto.length }, t());
     update({ audio: uri });
     // Y al parlante de la placa, por WiFi (ADR 0003). El usuario ya escuchó la lectura por el
     // teléfono: esto es el camino del dispositivo final, no lo que hoy garantiza el anuncio.
@@ -183,6 +186,7 @@ export function useLector() {
     (gesto: Gesto) => {
       const siguiente = transicionar(ref.current.modo, gesto);
       if (siguiente === ref.current.modo) return;
+      telemetria.registrar('modo', { modo: siguiente, gesto });
       cambiarModo(siguiente);
       // La placa se entera del modo por BLE y enciende o apaga su AP. Si no está, no pasa nada.
       void dispositivo.escribirModo(siguiente);
@@ -211,6 +215,7 @@ export function useLector() {
       const crudo = visibles.map((d) => d.text).join(' · ') || null;
 
       const dicho = frasearLectura(lectura, crudo);
+      telemetria.registrar('lectura_omnibus', { numero: lectura.numero, nombre: lectura.nombre, detecciones: visibles.length }, r.ms);
       announce(dicho);
       update({ estado: 'idle', lectura, textoCrudo: crudo, ms: r.ms, mensaje: dicho });
       void guardarAudioDeLaLectura(dicho, update, dispositivo.enviarAudio);
@@ -252,11 +257,15 @@ export function useLector() {
         });
         const crudo = r.texto || null;
         const dicho = frasearProducto(r.producto, crudo);
+        // Se registra lo leído: es el dato para medir alucinaciones contra lo que había en la góndola.
+        telemetria.registrar('lectura_supermercado', { modelo: r.model, tipo: r.producto?.tipo ?? null, marca: r.producto?.marca ?? null, detalle: r.producto?.detalle ?? null, fuente: 'imageBase64' in entrada ? 'placa' : 'telefono' }, r.ms);
+        telemetria.vaciar();
         announce(dicho);
         update({ estado: 'idle', producto: r.producto, textoCrudo: crudo, ms: r.ms, modelo: r.model, mensaje: dicho });
         void guardarAudioDeLaLectura(dicho, update, dispositivo.enviarAudio);
       } catch (err) {
         const mensaje = mensajeDeError(err);
+        telemetria.registrar('lectura_error', { modo: 'supermercado', error: err instanceof Error ? err.name : String(err), mensaje });
         announce(mensaje);
         update({ estado: 'idle', progreso: null, mensaje });
       }
@@ -277,8 +286,10 @@ export function useLector() {
     let foto;
     try {
       foto = await dispositivo.descargarFoto();
+      telemetria.registrar('foto_placa', { bytes: foto.bytes, modo }, foto.ms);
       update({ fotoPlaca: { uri: foto.uri, bytes: foto.bytes, ms: foto.ms } });
     } catch (err) {
+      telemetria.registrar('foto_placa_error', { modo, mensaje: err instanceof Error ? err.message : String(err) });
       const mensaje = `${t.deviceCaptureFailed} ${err instanceof Error ? err.message : String(err)}`;
       announce(mensaje);
       update({ estado: 'idle', progreso: null, mensaje });

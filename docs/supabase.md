@@ -127,6 +127,35 @@ devuelve `true` cuando hay proxy, precisamente porque las claves las tiene el se
 Sin la variable, la app llama directo al proveedor con la clave del `.env`. Ése es el camino de
 desarrollo y sigue funcionando igual: el proxy no es un reemplazo, es un interruptor.
 
+## Telemetría: `public.eventos` + función `telemetria` (desde 2026-09-07)
+
+Para ver a distancia qué pasó cuando alguien usa el dispositivo, sin estar al lado del teléfono ni
+entrar a la placa por SSH. La app registra eventos con tiempos (`app/src/services/telemetria/`) y los
+manda en lotes cada 5 s a la Edge Function `telemetria`, que inserta en `public.eventos` con el
+service role. **La app no tiene ninguna clave**: la URL se deriva de `EXPO_PUBLIC_VISION_PROXY_URL`
+(`…/vision` → `…/telemetria`); sin proxy configurado no hay telemetría. RLS habilitado sin políticas:
+la tabla no existe para anon. Sin cuentas: `telefono` es un UUID aleatorio por instalación.
+
+Eventos: `app_abierta`, `ble_conectado`/`ble_fallo`/`ble_desconectado`, `placa_estado` (sólo al
+cambiar), `placa_error`, `wifi_unido`/`wifi_lista`/`wifi_error`, `modo`/`modo_escrito`/`modo_fallo`,
+`foto_placa`, `lectura_supermercado` (modelo, tipo, marca, detalle, fuente), `lectura_omnibus`,
+`lectura_error`, `tts_nube`, `audio_enviado`, `medicion_ble`/`medicion_wifi`. `ms` es la duración del
+tramo; `detalle` lo demás.
+
+Consultar (SQL Editor del panel, o la Management API con un access token):
+
+```sql
+select momento at time zone 'America/Montevideo' as hora, tipo, ms, detalle
+from public.eventos order by id desc limit 50;
+-- una sesión entera, en orden
+select momento, tipo, ms, detalle from public.eventos where sesion = '<id>' order by momento;
+```
+
+Despliegue: `supabase functions deploy telemetria --no-verify-jwt --project-ref oxukvenxiqkjhksgoigq`.
+La tabla se creó con `supabase/migrations/20260907190000_eventos.sql` por la Management API
+(`POST /v1/projects/<ref>/database/query`), porque desde esta red el puerto 5432 del pooler no
+responde y `supabase db push` no llega.
+
 ## Límites que importan
 
 | Límite | Valor | Por qué no molesta acá |

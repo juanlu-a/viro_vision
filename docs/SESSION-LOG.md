@@ -1055,6 +1055,27 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   autonomía medida no alcanza. Con el HAT en mano: leer el INA219 desde el daemon hacia
   `estado.bateria`, medir consumo, y medir la separación de los pogo pins para la carcasa.
 
+## 2026-09-07 (cont.) — Logs a Supabase, y la app se queda sólo con lo que el usuario necesita
+
+- **Pedido**: registrar tiempos y estados de cada uso para verlos en Supabase, y sacar de la app la
+  información técnica. Tabla `public.eventos` (RLS sin políticas) y Edge Function `telemetria`
+  (inserta con service role), desplegadas y probadas con un evento desde curl. En la app,
+  `services/telemetria/`: cola pura con lotes, reintentos y tope (tests), identidad anónima por
+  instalación, envío cada 5 s, `registrar()` que nunca lanza ni espera. Se registran conexión BLE,
+  estado de la placa (sólo al cambiar), WiFi con tiempos, modo, foto de la placa, cada lectura con
+  modelo y tiempos, TTS, audio de vuelta, errores y mediciones.
+- **Pantallas**: Dispositivo pierde dirección, firmware, telemetría cruda y último aviso; Inicio
+  pierde modelo, tiempo, texto crudo y ruta del audio. Queda el resultado en filas, la foto de la
+  placa y el estado en una palabra.
+- Lección de infraestructura: desde esta red el puerto 5432 del pooler de Supabase no responde;
+  `supabase db push` no llega. La tabla se creó por la Management API con el access token, y la
+  función se despliega con `--project-ref` sin `link`.
+- El PR #62 se mergeó tras resolver un conflicto en este archivo con otra sesión de Claude Code que
+  trabajaba en el mismo directorio (carcasa); esta sesión pasó a un worktree aparte
+  (`viro_vision-enlace`) para no pisarse.
+- **Pendiente de seguridad**: el access token de Supabase y la contraseña de la base circularon por
+  el chat el 2026-09-07; rotar ambos.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

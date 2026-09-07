@@ -7,6 +7,7 @@ import { useCallback, useState } from 'react';
 import { strings } from '@/i18n';
 import { BleNotConnectedError, getBleClient } from '@/services/ble/bleClient';
 import { BleTransferError, type MedicionTransferencia } from '@/services/ble/transferencia';
+import { telemetria } from '@/services/telemetria';
 import { medirDescargaHttp, urlDeLaPlaca } from '@/services/wifi/descargaHttp';
 
 import { useDispositivo } from './DispositivoProvider';
@@ -29,6 +30,7 @@ export function useDeviceConnection() {
     setMedicion({ midiendo: true, medicion: null, mensaje: strings.connect.measuring });
     try {
       const resultado = await getBleClient().medirTransferencia(BYTES_FOTO_REFERENCIA);
+      telemetria.registrar('medicion_ble', { bytes: resultado.bytes, chunks: resultado.chunks, chunkBytes: resultado.chunkBytes, kbps: Math.round(resultado.kbps * 10) / 10 }, resultado.ms);
       const mensaje = describirMedicion(resultado);
       setMedicion({ midiendo: false, medicion: resultado, mensaje });
       return mensaje;
@@ -57,6 +59,7 @@ export function useDeviceConnection() {
     setMedicion({ midiendo: true, medicion: null, mensaje: strings.connect.measuring });
     try {
       const resultado = await medirDescargaHttp(urlDeLaPlaca(direccion, `/medir/${BYTES_FOTO_REFERENCIA}`));
+      telemetria.registrar('medicion_wifi', { bytes: resultado.bytes, kbps: Math.round(resultado.kbps) }, resultado.ms);
       const mensaje = describirMedicionWifi(resultado);
       setMedicion({ midiendo: false, medicion: resultado, mensaje });
       return mensaje;

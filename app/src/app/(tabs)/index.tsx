@@ -15,7 +15,7 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { formatMs } from '@/features/reader/lectura';
+
 import type { Modo } from '@/features/reader/modes';
 import { filasDeLinea, filasDeProducto } from '@/features/reader/resultado';
 import { useLector } from '@/features/reader/useLector';
@@ -186,14 +186,6 @@ export default function HomeScreen() {
             ))}
           </View>
         )}
-        {state.textoCrudo && (state.modo === 'omnibus' || !filas) && (
-          <View accessible accessibilityRole="text">
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.rawLabel}
-            </ThemedText>
-            <ThemedText type="code">{state.textoCrudo.slice(0, 200)}</ThemedText>
-          </View>
-        )}
         {/* La foto de la placa, para juzgar enfoque y calidad a ojo. Con label: quien no ve la
             imagen sabe al menos qué es y cuánto pesa. */}
         {state.fotoPlaca && (
@@ -215,33 +207,9 @@ export default function HomeScreen() {
             </ThemedText>
           </View>
         )}
-        {state.modelo && (
-          <View accessible accessibilityRole="text">
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.modelUsedLabel}
-            </ThemedText>
-            <ThemedText type="code">{state.modelo}</ThemedText>
-          </View>
-        )}
-        {state.ms != null && (
-          <View accessible accessibilityRole="text">
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.timeLabel}
-            </ThemedText>
-            <ThemedText type="code">{formatMs(state.ms)}</ThemedText>
-          </View>
-        )}
-        {/* Sólo aparece con la síntesis a archivo habilitada, que está apagada por defecto. Es la
-            única forma de comprobar que el .mp3 se escribió sin reproducirlo — reproducirlo diría
-            la lectura dos veces. */}
-        {state.audio && (
-          <View accessible accessibilityRole="text">
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.audioLabel}
-            </ThemedText>
-            <ThemedText type="code">{state.audio}</ThemedText>
-          </View>
-        )}
+        {/* Modelo, tiempo, texto crudo y ruta del audio ya no se muestran: están en los logs de
+            Supabase (services/telemetria), que es donde se analizan. La pantalla queda para lo que
+            el usuario necesita: el resultado y la foto de la placa. */}
       </Card>
 
     </Screen>

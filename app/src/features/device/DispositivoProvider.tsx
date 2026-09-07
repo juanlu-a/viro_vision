@@ -26,6 +26,7 @@ import {
   getBleClient,
 } from '@/services/ble/bleClient';
 import { codificarBase64 } from '@/services/ble/transferencia';
+import { cronometro, telemetria } from '@/services/telemetria';
 import { descargarFotoDeLaPlaca, type FotoDeLaPlaca } from '@/services/camera';
 import { urlDeLaPlaca } from '@/services/wifi/descargaHttp';
 import { WifiNoDisponibleError, esperarPlaca, salirDelWifi, ssidActual, unirseAlWifi } from '@/services/wifi/unirse';
@@ -109,6 +110,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
    * situación cambió mientras esperaba, sus resultados se descartan.
    */
   const fallarRed = useCallback((detalle: string) => {
+    telemetria.registrar('wifi_error', { detalle });
     setWifi('error');
     setWifiDetalle(detalle);
     // La voz es la interfaz: un fallo silencioso deja al usuario esperando un botón que no llega.
@@ -119,6 +121,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
     async (apActivo: boolean, destino: Direccion | null): Promise<boolean> => {
       const corrida = ++sincronizacionRed.current;
       const vigente = () => corrida === sincronizacionRed.current;
+      const t = cronometro();
       setWifiDetalle(null);
       if (!destino) {
         setWifi('sin-red');
@@ -147,8 +150,10 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       }
       if (apActivo && credenciales.current && unidoA.current !== credenciales.current.ssid) {
         try {
+          const tUnion = cronometro();
           await unirseAlWifi(credenciales.current);
           unidoA.current = credenciales.current.ssid;
+          telemetria.registrar('wifi_unido', { ssid: credenciales.current.ssid }, tUnion());
         } catch (err) {
           if (!vigente()) return false;
           fallarRed(
@@ -168,6 +173,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       const responde = await esperarPlaca(destino);
       if (!vigente()) return false;
       if (responde) {
+        telemetria.registrar('wifi_lista', { ip: destino.ip, ap: apActivo }, t());
         setWifi('listo');
         announce(strings.connect.wifiReadyAnnounce);
         return true;
@@ -206,6 +212,8 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       // nunca llegaba a «lista» (2026-09-06). Sólo se sincroniza si cambió algo, o si quedó en falla.
       const previa = redSincronizada.current;
       const cambio = previa.ap !== estado.ap || previa.ip !== (destino?.ip ?? null);
+      // El estado llega cada 15 s: sólo se registra cuando cambia algo que importa.
+      if (cambio) telemetria.registrar('placa_estado', { ap: estado.ap, ip: destino?.ip ?? null, wifi: estado.wifi, camara: estado.camara, temp: estado.temp, red: (estado as { red?: string | null }).red ?? null });
       if (cambio || !previa.ok) {
         redSincronizada.current = { ap: estado.ap, ip: destino?.ip ?? null, ok: false };
         void sincronizarRed(estado.ap, destino).then((ok) => {
@@ -230,9 +238,11 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
     if (conectando.current) return;
     conectando.current = true;
     setConexion({ status: 'scanning', device: null, message: strings.connection.scanning });
+    const t = cronometro();
     try {
       const cliente = getBleClient();
       const device: DeviceInfo = await cliente.connect();
+      telemetria.registrar('ble_conectado', { intento: reintento.current, firmware: device.firmwareVersion, ap: device.ap, ip: device.direccion?.ip ?? null }, t());
       reintento.current = 0;
       setConexion({ status: 'connected', device, message: strings.connection.connected });
       setDireccion(device.direccion);
@@ -241,6 +251,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       redSincronizada.current = { ap: device.ap, ip: device.direccion?.ip ?? null, ok: false };
       void sincronizarRed(device.ap, device.direccion);
     } catch (err) {
+      telemetria.registrar('ble_fallo', { intento: reintento.current, error: err instanceof Error ? err.name : String(err) }, t());
       setConexion({ status: 'error', device: null, message: mensajeDeError(err) });
       // Sin módulo nativo no hay nada que reintentar: la app corre sin placa.
       if (!(err instanceof BleNotImplementedError)) programarReintento();
@@ -258,6 +269,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
     const cliente = getBleClient();
     const bajas = [
       cliente.onDisconnect(() => {
+        telemetria.registrar('ble_desconectado');
         sincronizacionRed.current += 1; // invalida cualquier espera de red en curso
         setConexion({ status: 'error', device: null, message: strings.connection.lost });
         setDireccion(null);
@@ -271,6 +283,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       cliente.onErrorDispositivo((mensaje) => {
         // La placa no tiene pantalla: si algo le falló (levantar el AP, la cámara), la app es el
         // único lugar donde se puede enterar alguien.
+        telemetria.registrar('placa_error', { mensaje });
         setUltimoAviso(mensaje);
         announce(`${strings.connect.deviceErrorAnnounce} ${mensaje}`);
       }),
@@ -321,6 +334,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       if (conexion.status !== 'connected') return;
       try {
         await getBleClient().escribirModo(MODO_GATT[modo]);
+        telemetria.registrar('modo_escrito', { modo });
         // Desde el 2026-09-07 el AP de la placa está siempre encendido: cambiar de modo NO cambia la
         // red, y reiniciar la comprobación acá escondía el botón del dispositivo ~10 s por nada. La
         // transición sólo arranca si la placa avisa que su AP cambió (evento `ap`).
@@ -328,11 +342,12 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
         // La placa no se enteró del modo: la app sigue con la cámara del teléfono, pero se dice.
         // El 2026-09-06 el modo no llegaba a la placa y nadie lo supo hasta leer su log.
         const detalle = err instanceof Error ? err.message : String(err);
+        telemetria.registrar('modo_fallo', { modo, detalle });
         setUltimoAviso(`${strings.connect.modeWriteFailed} ${detalle}`);
         announce(`${strings.connect.modeWriteFailed} ${detalle}`);
       }
     },
-    [conexion.status, empezarTransicionDeRed]
+    [conexion.status]
   );
 
   const fotoDisponible = conexion.status === 'connected' && wifi === 'listo' && direccion !== null;
@@ -350,11 +365,13 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
         const bytes = new Uint8Array(await new File(uri).arrayBuffer());
         // El cuerpo va en base64 porque `fetch` de React Native no manda bytes crudos; la placa lo
         // decodifica por el header.
+        const t = cronometro();
         const r = await fetch(urlDeLaPlaca(direccion, '/audio'), {
           method: 'POST',
           headers: { 'Content-Type': 'audio/mpeg', 'X-Encoding': 'base64' },
           body: codificarBase64(bytes),
         });
+        telemetria.registrar('audio_enviado', { bytes: bytes.length, ok: r.ok }, t());
         return r.ok;
       } catch {
         return false;
