@@ -28,7 +28,7 @@ import {
 import { codificarBase64 } from '@/services/ble/transferencia';
 import { descargarFotoDeLaPlaca, type FotoDeLaPlaca } from '@/services/camera';
 import { urlDeLaPlaca } from '@/services/wifi/descargaHttp';
-import { WifiNoDisponibleError, esperarPlaca, salirDelWifi, unirseAlWifi } from '@/services/wifi/unirse';
+import { WifiNoDisponibleError, esperarPlaca, salirDelWifi, ssidActual, unirseAlWifi } from '@/services/wifi/unirse';
 
 import { MODO_DESDE_GATT, MODO_GATT, type CredencialesWifi, type EstadoDispositivo } from './gatt';
 import type { ConnectionState, DeviceInfo } from './types';
@@ -137,6 +137,15 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       }
       if (apActivo && credenciales.current && unidoA.current !== credenciales.current.ssid) {
         setWifi('uniendose');
+        // Si el teléfono ya está en la red de la placa (iOS la guarda como conocida y se une solo
+        // desde la primera vez), no se le pide nada al sistema: pedirlo puede mostrar el aviso de
+        // «permitir conexión», y el usuario quiere cero avisos después del primer emparejamiento.
+        if ((await ssidActual()) === credenciales.current.ssid) {
+          unidoA.current = credenciales.current.ssid;
+        }
+        if (!vigente()) return false;
+      }
+      if (apActivo && credenciales.current && unidoA.current !== credenciales.current.ssid) {
         try {
           await unirseAlWifi(credenciales.current);
           unidoA.current = credenciales.current.ssid;
