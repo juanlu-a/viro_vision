@@ -3,7 +3,7 @@
  * `esperarPlaca` fallara al primer intento, el flujo diría "sin conexión con la placa" justo cuando
  * está por funcionar; y si nunca se rindiera, una placa apagada colgaría la app.
  */
-import { WifiNoDisponibleError, esperarPlaca, unirseAlWifi } from './unirse';
+import { WifiNoDisponibleError, esperarPlaca, ssidActual, unirseAlWifi } from './unirse';
 
 const direccion = { ip: '10.42.0.1', puerto: 8080 };
 
@@ -31,7 +31,6 @@ describe('esperarPlaca', () => {
 
 describe('ssidActual', () => {
   it('sin el módulo nativo devuelve null en vez de fallar', async () => {
-    const { ssidActual } = await import('./unirse');
     expect(await ssidActual()).toBeNull();
   });
 });
