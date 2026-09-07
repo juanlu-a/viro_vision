@@ -54,7 +54,7 @@ autofocus); la que llegó es la AI Camera, y eso cambió el pilar de ML: la dete
 
 El dispositivo lleva **entrada física (botón)** y el reconocimiento funciona por **modos
 explícitos** — nunca siempre prendido: anunciar todo lo que la cámara ve, todo el tiempo, aturde.
-Desde *esperando*: **1 click** = modo detección de ómnibus (pipeline local detección + OCR);
+Desde *esperando*: **1 click** = modo detección de ómnibus (cámara abierta, detector en el sensor en cada frame; anuncia presencia y línea una vez por ómnibus);
 **2 clicks** = modo supermercado (pipeline LLM con visión); **click largo** desde cualquier modo =
 volver a esperando. Cada transición se anuncia por audio — el usuario no tiene otro indicador de
 estado. El diagrama canónico vive en

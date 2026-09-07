@@ -306,3 +306,12 @@ recorte del banner RapidOCR acierta el número en el 87,5 % y el destino en el 7
 vertical perdía el primer dígito, con 12 % no. El catálogo finito de líneas de STM (503 pares desde
 datos abiertos) corrige el destino por similitud y da la lista de anuncios a pregrabar (ADR 0003).
 Código, métricas y scripts: repo `bus-banner-recognizer`, rama `feat/pipeline-foto-banner-ocr`.
+
+**El modo ómnibus es vigilancia continua, no una foto.** El usuario no ve venir el ómnibus: al activar
+el modo (ADR 0007) la cámara queda abierta y el detector corre en cada frame dentro del sensor; una capa
+de seguimiento confirma la pista, anuncia la presencia ("se acerca un ómnibus"), lee el banner del
+ómnibus principal cuando es legible, vota entre lecturas y anuncia la línea **una vez por ómnibus**. La
+lectura por foto queda como caso particular (un frame). Esto no contradice el "nunca siempre prendido"
+de ADR 0007: el reconocimiento sigue atado a un modo explícito; dentro del modo ómnibus, vigilar es la
+función. Costo a medir: consumo de cámara + sensor durante el modo (UPS HAT), con apagado automático
+tras un tiempo sin ómnibus.

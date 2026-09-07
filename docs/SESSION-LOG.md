@@ -1006,6 +1006,19 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   métricas lo exigen); el acelerador del camino de ómnibus es el **IMX500**, no el Coral; con eso el USB de
   la Zero 2 W queda libre y el Spike 4 (libedgetpu en Bookworm) deja de existir.
 
+- **Corrección de Juan Lucas, y es la definición del modo: el modo ómnibus vigila, no saca una foto.**
+  El usuario no ve venir el ómnibus; al activar el modo la cámara queda abierta y el detector corre en
+  cada frame (en el sensor, gratis para la Pi). Se agregó la capa `seguimiento.py`: identidad de ómnibus
+  por solapamiento entre frames, confirmación (0,3 s), "se acerca" por crecimiento de la caja, lectura
+  sólo del ómnibus principal cuando el banner tiene ≥ 22 px, voto entre lecturas, **un anuncio de
+  presencia y uno de línea por ómnibus** (una pista perdida un instante no se re-anuncia). Simulado sobre
+  los videos con `bus-banner vigilar`: la línea llega 0,1-0,3 s después del aviso de presencia de día y
+  cerca; de noche insiste 10 lecturas. `scripts/vigilar_imx500.py` es la prueba de campo en la Pi
+  (picamera2 + IMX500 + `Vigilante`, anuncios `.wav` pregrabados, guarda el frame de cada lectura para
+  armar el dataset real). Fork en `juanlu-a/bus-banner-recognizer` para instalar en la placa con `pip
+  install git+…`. Esto no contradice el "nunca siempre prendido" de ADR 0007: el reconocimiento sigue
+  atado a un modo explícito; dentro del modo ómnibus, vigilar **es** la función.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1043,9 +1056,11 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Camino de ómnibus, siguiente**: (1) Magalí revisa la rama `feat/pipeline-foto-banner-ocr` de su repo
   y **rota la API key de Roboflow**; (2) en la V100: `pseudo_etiquetar_bus.py` → revisar en Roboflow →
   `entrenar.py` (2 clases) → `exportar_imx.py`; (3) en la Pi: `imx500-package`, medir el OCR con
-  `--detector manual` (RSS y latencia en 4×A53) antes de tocar el sensor; (4) `omnibus.py` en el daemon:
-  `Modo.OMNIBUS` + `cmd: leer` → tensores del IMX500 → `procesar_con_caja` → `evento resultado` + anuncio
-  pregrabado (`camara.py` hoy sólo da JPEG); (5) **fotos con el dispositivo** para el set de evaluación y
+  `--detector manual` (RSS y latencia en 4×A53), y correr `scripts/vigilar_imx500.py` en una parada
+  (con `--solo-carteles` y el `.rpk` de una clase si el de dos no está); medir consumo del modo con la
+  UPS HAT; (4) `omnibus.py` en el daemon: `Modo.OMNIBUS` abre la cámara y corre el `Vigilante` sobre los
+  tensores del IMX500 → `evento resultado` + anuncio pregrabado; apagado automático tras N minutos sin
+  ómnibus (`camara.py` hoy sólo da JPEG); (5) **fotos con el dispositivo** para el set de evaluación y
   una v7 del dataset.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
