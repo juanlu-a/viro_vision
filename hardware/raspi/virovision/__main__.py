@@ -15,9 +15,9 @@ from bluez_peripheral.advert import Advertisement
 from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
-from .ap import PuntoDeAcceso
+from .ap import IP_AP, PuntoDeAcceso
 from .camara import Camara, payload_sintetico
-from .estado import leer_estado
+from .estado import ip_local, leer_estado
 from .http_servidor import PUERTO_POR_DEFECTO, ServidorHttp
 from .gatt import NOMBRE_ANUNCIADO, SERVICE_UUID, ViroVisionService
 
@@ -104,10 +104,21 @@ async def _main(args: argparse.Namespace) -> None:
     # batería; se mide. `--sin-ap` para desarrollar con la placa en la red de la casa (con el AP
     # arriba la placa deja cualquier otra red y se pierde el SSH).
     if not args.sin_ap:
-        try:
-            await loop.run_in_executor(None, ap.encender)
-        except Exception as exc:  # noqa: BLE001
-            log.error("no pude levantar el AP: %s; sigo sin él", exc)
+        # Al arrancar, NetworkManager puede no estar listo todavía (el 2026-09-07 la placa quedó
+        # «sin red» tras el primer arranque con AP): se reintenta con espera creciente y se verifica
+        # que la interfaz tenga la IP del AP, no sólo que nmcli haya vuelto.
+        for intento, espera in enumerate((0, 5, 10, 20, 30), start=1):
+            if espera:
+                await asyncio.sleep(espera)
+            try:
+                await loop.run_in_executor(None, ap.encender)
+                if ip_local() == IP_AP:
+                    break
+                log.warning("AP levantado pero wlan0 no tiene %s (intento %d)", IP_AP, intento)
+            except Exception as exc:  # noqa: BLE001
+                log.error("no pude levantar el AP (intento %d): %s", intento, exc)
+        else:
+            log.error("el AP no quedó operativo tras varios intentos; sigo sin él (la app cae a la cámara del teléfono)")
 
     # timeout 0 = anunciar hasta que el proceso muera; el dispositivo tiene que ser encontrable
     # siempre, porque la app reconecta sola cuando vuelve al alcance.
