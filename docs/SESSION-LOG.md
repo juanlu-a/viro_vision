@@ -967,6 +967,45 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   hay; ahora de la interfaz), y el reinicio de la placa con la cámara enchufada tardó más de lo que
   esperé y pareció muerta.
 
+## 2026-09-07 — El camino de ómnibus sale del stand by: el repo de Magui anda, y el detector va al sensor
+
+- **Contexto.** Magalí tenía el pipeline de ómnibus en su repo
+  ([bus-banner-recognizer](https://github.com/MagaliDellapiazza02/bus-banner-recognizer): YOLO11n COCO
+  para `bus` + YOLO11n fine-tuneado con 140 fotos de Roboflow para `bus_sign` + PaddleOCR) y reportaba
+  que "tardaba" por procesar el video entero. Arnaldo Castro presta un servidor con **Tesla V100**.
+  Decisión de la sesión: **prescindir del Coral**. La cámara real es la AI Camera (IMX500): el detector
+  corre en el sensor y la Pi Zero 2 W sólo recorta y lee. Clonado en `repositorios/bus-banner-recognizer`,
+  rama `feat/pipeline-foto-banner-ocr`, **con push y sin PR** hasta que Magalí lo revise.
+
+- **Diagnóstico**: el repo no "andaba lento", no andaba. Cargaba los 1338 frames en RAM (2,4 GB) y
+  corría dos YOLO por frame; `results.names` sobre una lista (`AttributeError`); filtraba la clase
+  `destination_sign` cuando el modelo se llama `bus_sign` (nunca matcheaba); `NameError` en el dibujo;
+  **el OCR nunca se llamaba**; la API key de Roboflow quedó hardcodeada en el notebook (22 MB de outputs)
+  → **hay que rotarla**, ya está en la historia.
+
+- **Lo construido** (paquete `bus_banner`, pipeline de **foto**, no de video): detector → ómnibus más
+  grande → banner = cartel ancho más alto de su mitad superior → recorte con 12 % de margen → **OCR sólo
+  sobre el recorte** (RapidOCR, PP-OCRv4 mobile en onnxruntime, sin detección de texto; reintento con
+  detección si el parseo sale incompleto) → `{numero, destino, crudo, confianza}` con el mismo criterio
+  que `adivinarLectura` de la app, corregido contra un **catálogo de 503 pares línea/destino** de los datos
+  abiertos de STM + destinos observados. `Resultado.a_evento()` da el JSON ≤ 180 bytes de la
+  característica `evento` (`{t:'resultado', numero, nombre, ms}`). 29 tests (geometría, parseo, evento,
+  smoke con pesos). CLI `bus-banner foto|frame|video|evaluar`. Scripts para la V100: pseudo-etiquetar
+  `bus` con YOLO11x (dataset de **dos clases**, porque en el IMX500 corre una sola red), entrenar
+  (`fliplr=0`, `hsv_h=0.01`, yolo11n a 640) y exportar `format="imx"` (Linux x86, Python ≤ 3.11, Java 17).
+
+- **Medido** (Mac M4 Pro, CPU; 117 imágenes: un frame cada 30 de los tres videos + 14 de test de Roboflow,
+  `datos/eval/gt.csv`): RapidOCR **numero 0,875**, destino 0,732, OCR p50 81 ms; PaddleOCR 0,896 / 0,768,
+  p50 118 ms pero sin wheel para la Pi. CLAHE empeora; detección de texto siempre no mejora. El OCR solo
+  (lo que corre en la placa): 140 MB de RSS y ~5-150 ms en la Mac. Modo video en streaming: 90 frames en
+  8 s. **Ojo**: los videos son tres ómnibus y las fotos de Roboflow son fotos web; el set que vale son fotos
+  del dispositivo.
+
+- **Qué cambia en las decisiones** (enmienda a ADR 0006, y toca 0003 y las referencias): el detector del
+  banner **sí se fine-tunea** ("nada se entrena" queda para el OCR, que se evalúa y sólo se entrena si las
+  métricas lo exigen); el acelerador del camino de ómnibus es el **IMX500**, no el Coral; con eso el USB de
+  la Zero 2 W queda libre y el Spike 4 (libedgetpu en Bookworm) deja de existir.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1001,16 +1040,23 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   `wifi`); el AP se prende con un modo activo y se apaga en *esperando*, siempre con tope; el flujo
   completo botón → BLE despierta → `GET /fotos/ultima` → nube → `POST /audio` → parlante (DAC I2S);
   spike 1 de segundo plano en iOS. Deuda: el AP por `systemd-run` no arrancó una vez sin registro.
-- **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
+- **Camino de ómnibus, siguiente**: (1) Magalí revisa la rama `feat/pipeline-foto-banner-ocr` de su repo
+  y **rota la API key de Roboflow**; (2) en la V100: `pseudo_etiquetar_bus.py` → revisar en Roboflow →
+  `entrenar.py` (2 clases) → `exportar_imx.py`; (3) en la Pi: `imx500-package`, medir el OCR con
+  `--detector manual` (RSS y latencia en 4×A53) antes de tocar el sensor; (4) `omnibus.py` en el daemon:
+  `Modo.OMNIBUS` + `cmd: leer` → tensores del IMX500 → `procesar_con_caja` → `evento resultado` + anuncio
+  pregrabado (`camara.py` hoy sólo da JPEG); (5) **fotos con el dispositivo** para el set de evaluación y
+  una v7 del dataset.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
 - **Cámara**: resuelto (era hot-plug; y es la AI Camera). Ajustar el enfoque manual: las primeras fotos salieron desenfocadas.
 - **Spike 1**: segundo plano en iOS — con la pantalla bloqueada, una notificación BLE despierta la
   app y el ciclo entero termina antes de que iOS la suspenda. Recién ahí `isBackgroundEnabled: true`.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
-- **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
-- Placa: botón GPIO → `MaquinaDeModos`; DAC I2S + anuncios pregrabados; elegir el **detector para
-  la TPU** y medirlo (el camino de ómnibus es el caso B, todo en placa).
+- **Spike 3**: coexistencia BLE/WiFi en el BCM43438. (El Spike 4, libedgetpu en Bookworm, cayó con el
+  Coral el 2026-09-07.)
+- Placa: botón GPIO → `MaquinaDeModos`; DAC I2S + anuncios pregrabados (el catálogo de líneas del repo
+  de Magalí dice qué grabar); el detector ya está elegido (yolo11n de 2 clases en el IMX500), falta medirlo.
 
 ### Suelto
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
