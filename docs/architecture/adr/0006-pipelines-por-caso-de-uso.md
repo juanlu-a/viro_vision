@@ -1,6 +1,6 @@
 # ADR 0006 — Pipelines por caso de uso: bondis local, supermercado nube o LLM chico
 
-- **Status:** Proposed — a validar con el tutor
+- **Status:** Proposed — a validar con el tutor (enmendado 2026-09-07: el detector se fine-tunea y corre en el sensor IMX500, sin Coral)
 - **Date:** 2026-08-22 (reunión de equipo del 2026-08-21)
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, architecture
@@ -278,3 +278,31 @@ Sigue **sin verificar** `claude-haiku-4-5`: requiere tarjeta y no hay clave.
 probado), [`docs/spike-vision-local.md`](../../spike-vision-local.md) (las mediciones),
 [ADR 0007](0007-botones-fisicos-modos-de-operacion.md) (los modos que activan cada pipeline) y el
 diagrama de modos en [`docs/architecture/README.md`](../README.md).
+
+## Actualización 2026-09-07 — el detector del banner se fine-tunea y corre en el sensor IMX500, sin Coral
+
+Dos cosas cambian respecto del texto de arriba, y una se confirma.
+
+**El acelerador del camino de bondis es la AI Camera (Sony IMX500), no la Coral TPU.** La cámara que
+se compró (dos unidades, en la placa desde el 2026-09-05) trae el acelerador en el sensor: el detector
+corre ahí y la Pi Zero 2 W recibe las cajas por `picamera2` sin tocar el USB. Consecuencias: el Coral
+sale del diseño (con él, la restricción "USB ocupado" de ADR 0003 y el Spike 4 de libedgetpu en
+Bookworm); la Pi hace sólo recorte + OCR + anuncio, que es lo que el spike ya mostró barato. El export
+es `ultralytics format="imx"` (sólo YOLOv8n/YOLO11n, int8, Linux x86 con Python ≤ 3.11 y Java 17) y el
+`.rpk` se arma en la Pi con `imx500-package`. El riesgo abierto pasa de "YOLO sobre el Coral, sin medir"
+a "int8 en el IMX500 sobre carteles chicos, sin medir": se compara ONNX fp32 vs int8 sobre el set de
+evaluación antes de flashear.
+
+**El detector del banner sí se entrena.** "No hay que entrenar" valía para `bus` (COCO). Para el
+cartel no existe clase preentrenada, y Magalí ya fine-tuneó yolo11n con 140 fotos etiquetadas
+(Roboflow `find-bus-sign` v6). Como en el IMX500 corre **una** red, el objetivo es un solo yolo11n de
+**dos clases** (`bus_sign` + `bus`, las cajas de ómnibus pseudo-etiquetadas con YOLO11x y revisadas a
+mano), entrenado en la V100 de Arnaldo Castro. "Nada se entrena" queda vigente para el **OCR**: se
+evalúa (RapidOCR / PaddleOCR / Tesseract sobre el mismo `gt.csv`) y sólo se fine-tunearía si las
+métricas lo exigen.
+
+**Se confirma el recorte como frontera del OCR.** Medido el 2026-09-07 sobre 117 imágenes: con el
+recorte del banner RapidOCR acierta el número en el 87,5 % y el destino en el 73 %; con 25 % de margen
+vertical perdía el primer dígito, con 12 % no. El catálogo finito de líneas de STM (503 pares desde
+datos abiertos) corrige el destino por similitud y da la lista de anuncios a pregrabar (ADR 0003).
+Código, métricas y scripts: repo `bus-banner-recognizer`, rama `feat/pipeline-foto-banner-ocr`.

@@ -9,10 +9,10 @@ Format: short Markdown, numbered `NNNN-title.md`, status one of Proposed / Accep
 | [0002](0002-backend-and-auth-supabase.md) | Backend & auth: Supabase as the online account layer | Accepted |
 | [0003](0003-enlace-placa-telefono.md) | Enlace placa ↔ teléfono: BLE como plano de control, la foto se decide midiendo | Proposed — a validar con tutor (actualizado 2026-09-05 — medido: BLE 4,5 s, WiFi 0,3 s; híbrido BLE control + WiFi payload validado en el caso real) |
 | [0004](0004-on-device-inference-runtime.md) | Runtime de inferencia on-device (Gemma vía LiteRT-LM) | Proposed (actualizado 2026-08-22 — el runtime se resuelve por caso de uso, ver 0006) |
-| [0006](0006-pipelines-por-caso-de-uso.md) | Pipelines por caso de uso: bondis local (TPU preprocesadora), supermercado LLM en la nube | Proposed — a validar con tutor (actualizado 2026-09-01 — cinco modelos, cae la gratuidad) |
+| [0006](0006-pipelines-por-caso-de-uso.md) | Pipelines por caso de uso: bondis local (detector en el sensor IMX500), supermercado LLM en la nube | Proposed — a validar con tutor (actualizado 2026-09-01 — cinco modelos, cae la gratuidad; enmendado 2026-09-07 — el detector se fine-tunea y corre en el IMX500, sin Coral) |
 | [0007](0007-botones-fisicos-modos-de-operacion.md) | Botones físicos y modos de operación del dispositivo | Proposed — a validar con tutor |
 | [0008](0008-proxy-propio-para-claves-de-nube.md) | Un proxy propio para las claves de los modelos de nube | Accepted |
 
 ### To backfill (decisions already made in the thesis, not yet written as ADRs)
-- Hardware platform: **Raspberry Pi Zero 2 W + Coral TPU + Camera Module 3**.
+- Hardware platform: **Raspberry Pi Zero 2 W + AI Camera (IMX500)** (el Coral y la Camera Module 3 salieron el 2026-09-07 / 2026-09-05).
 - Mobile framework: **React Native (Expo)** over Flutter / native.

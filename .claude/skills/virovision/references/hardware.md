@@ -8,20 +8,20 @@ design.
 
 ## Selected components
 
-### Compute: Raspberry Pi Zero 2 W + Coral TPU
-Single-board Linux computer — the chosen balance of **cost, size, power and processing**. Since
-ADR 0006 (2026-08-22) the **Coral TPU's role is preprocessing the bus pipeline**: run the
-pretrained detector (TFLite / OpenCV) → crop the banner strip → send **only the crop** to the
-phone's OCR (best case: the whole pipeline runs on the TPU and only the result travels). It no
-longer describes "running the full models" as its job. Detection performance on this exact
-TPU+board combo is **unmeasured** — the main open technical risk of the bus path. Wi-Fi enables
-the alternative "offload to phone" architecture, so both architectures can be compared on one
-board.
+### Compute: Raspberry Pi Zero 2 W (+ el acelerador del sensor IMX500; **sin Coral desde 2026-09-07**)
+Single-board Linux computer — the chosen balance of **cost, size, power and processing**. El
+acelerador del camino de ómnibus es la **AI Camera (Sony IMX500)**: el detector yolo11n fine-tuneado
+(2 clases, export `format="imx"`) corre **en el sensor** y la Pi recibe las cajas por `picamera2`; la
+Pi sólo hace recorte del banner + OCR (RapidOCR, ~140 MB) + anuncio pregrabado. El Coral TPU salió del
+diseño (USB libre; el Spike 4 de libedgetpu deja de existir). Riesgo abierto: int8 en el IMX500 sobre
+carteles chicos, sin medir. Wi-Fi enables the alternative "offload to phone" architecture, so both
+architectures can be compared on one board.
 
-### Camera: Raspberry Pi Camera Module 3
-Sony IMX708, 12 MP, **autofocus**. Connects via the dedicated **CSI** connector — crucially, it
-does **not** occupy the USB port, leaving USB free for the Coral TPU. Good image quality is
-required to read bus lines at distance. Part of the RPi ecosystem (good docs/support).
+### Camera: Raspberry Pi AI Camera (Sony IMX500) — **la que se compró** (dos unidades; en la placa desde 2026-09-05)
+12 MP, acelerador de inferencia en el sensor, CSI. Los docs viejos decían Camera Module 3 (IMX708,
+autofocus); la que llegó es la AI Camera, y eso cambió el pilar de ML: la detección corre en el sensor
+(ADR 0006, enmienda 2026-09-07). **Enfoque manual**: las primeras fotos salieron desenfocadas (SESSION-LOG
+2026-09-05). Foto real por HTTP: 35 KB a 1024×766 en 200-235 ms captura incluida.
 
 ## Rejected alternatives (and why)
 - **ESP32** (microcontroller): very cheap/small/low-power, but too little compute + RAM for vision;
@@ -63,7 +63,7 @@ de estados y el debounce (umbral de click largo y ventana de doble click a defin
 real), y el GATT debe exponer el modo actual a la app.
 
 ## Two evaluated architectures
-- **On-device (standalone):** RPi + Coral TPU run detection/OCR locally; device only sends results.
+- **On-device (standalone, el caso B decidido):** IMX500 detecta, RPi recorta + OCR local; device only sends results.
 - **Offload to phone:** device captures + streams images (Wi-Fi/BLE); the phone does the heavy
   processing. RPi Zero 2 W was chosen partly to **implement and compare both**.
 
@@ -71,6 +71,6 @@ real), y el GATT debe exponer el modo actual a la app.
 Hardware selection is decided (above). **Firmware inicial en `hardware/raspi/`** (2026-09-04):
 periférico BLE con el perfil GATT, transferencia medible en chunks, captura con picamera2 (1024 px,
 JPEG q70, espejo de la app) y la máquina de modos de ADR 0007. Instalación por SSH con `setup.sh`;
-tests puros con pytest en la Mac. Faltan: botón GPIO, DAC y anuncios pregrabados, pipeline de ómnibus
-en el Coral, carcasa, y **correr la medición** que decide el transporte de la foto (cierra además la
+tests puros con pytest en la Mac. Faltan: botón GPIO, DAC y anuncios pregrabados, `omnibus.py` en el daemon
+(tensores del IMX500 → `bus_banner.Pipeline.procesar_con_caja`), carcasa, y **correr la medición** que decide el transporte de la foto (cierra además la
 comparación de protocolos marcada `PENDIENTE` en la tesis).

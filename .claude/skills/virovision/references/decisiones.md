@@ -112,6 +112,14 @@ VoiceOver frente a una góndola es peor producto que cinco. La **cámara del tel
 de la placa mientras no hay hardware, y la lectura además puede dejar un `.mp3` (apagado por
 defecto). El **camino de ómnibus queda en stand by**.
 
+**Qué cambió el 2026-09-07**: el camino de ómnibus sale del stand by y se enmienda 0006 en dos puntos.
+(1) **El acelerador es el sensor IMX500** de la AI Camera, no el Coral: el detector corre en la cámara,
+la Pi Zero 2 W sólo recorta, lee (RapidOCR sobre onnxruntime) y anuncia; el Coral, la restricción "USB
+ocupado" de 0003 y el Spike 4 (libedgetpu) desaparecen. (2) **El detector del banner se fine-tunea**
+(yolo11n de dos clases `bus_sign` + `bus`, en la V100 de Arnaldo Castro; export `format="imx"`); "nada se
+entrena" queda para el OCR. El código vive en el repo de Magalí (`bus-banner-recognizer`, rama
+`feat/pipeline-foto-banner-ocr`): medido en la Mac, numero 0,875 / destino 0,73 sobre 117 imágenes.
+
 ### ADR 0007 — Botones físicos y modos de operación · **Proposed (2026-08-22) — a validar con tutor**
 
 **Qué cambió**: hasta ahora no había ninguna interfaz de entrada física especificada. El
