@@ -16,6 +16,7 @@ from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
 from .ap import IP_AP, PuntoDeAcceso
+from .boton import GPIO_POR_DEFECTO, intentar_conectar
 from .camara import Camara, payload_sintetico
 from .estado import ip_local, leer_estado
 from .http_servidor import PUERTO_POR_DEFECTO, ServidorHttp
@@ -34,6 +35,8 @@ def _argumentos() -> argparse.Namespace:
     parser.add_argument("--puerto", type=int, default=PUERTO_POR_DEFECTO, help="puerto del servidor HTTP (plan B)")
     parser.add_argument("--sin-http", action="store_true", help="no levantar el servidor HTTP")
     parser.add_argument("--sin-ap", action="store_true", help="no levantar el punto de acceso al arrancar (desarrollo en la red de la casa)")
+    parser.add_argument("--sin-boton", action="store_true", help="no usar el botón físico (los modos entran sólo por BLE)")
+    parser.add_argument("--gpio-boton", type=int, default=GPIO_POR_DEFECTO, help=f"GPIO del botón de modo (default {GPIO_POR_DEFECTO} = pin físico 29)")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args()
 
@@ -89,6 +92,16 @@ async def _main(args: argparse.Namespace) -> None:
         leer_wifi=lambda: {**ap.credenciales(), "puerto": args.puerto if http else None},
     )
     await servicio.register(bus, adapter=adaptador)
+
+    # El botón físico (ADR 0007) va contra el mismo núcleo que el BLE: es un gesto del usuario, no
+    # un transporte. Si no hay botón (o gpiozero, o permisos sobre el pin) el daemon arranca igual y
+    # los modos siguen entrando por la app; una placa sin daemon sería mucho peor.
+    boton = None if args.sin_boton else intentar_conectar(
+        loop,
+        al_hacer_clicks=servicio.nucleo.desde_boton,
+        al_mantener=servicio.nucleo.boton_largo,
+        gpio=args.gpio_boton,
+    )
 
     # Sin agente, BlueZ rechaza cualquier intento de emparejar. NoIo = "just works", sin PIN: el
     # usuario no puede leer un PIN en la placa, y ADR 0003 no cifra el payload a propósito.
@@ -147,6 +160,8 @@ async def _main(args: argparse.Namespace) -> None:
             else:
                 sin_red_desde = None
     log.info("apagando")
+    if boton:
+        boton.cerrar()
     if http:
         http.parar()
     bus.disconnect()

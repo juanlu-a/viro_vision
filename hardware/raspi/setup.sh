@@ -14,8 +14,10 @@ echo "→ instalando en $INSTALL_DIR"
 echo "→ paquetes del sistema"
 apt-get update -qq
 # --no-install-recommends: picamera2 arrastra Qt y demás si se lo deja. En Lite no hace falta nada de eso.
+# gpiozero + lgpio: el botón físico (ADR 0007). Van por apt como picamera2 — el backend de gpiozero
+# en Trixie es lgpio, y el paquete de apt es el que trae la versión que casa con el kernel.
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-  bluez python3-venv python3-pip python3-picamera2
+  bluez python3-venv python3-pip python3-picamera2 python3-gpiozero python3-lgpio
 
 echo "→ venv (con los paquetes del sistema, por picamera2)"
 if [ ! -d "$INSTALL_DIR/.venv" ]; then
