@@ -990,6 +990,12 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
 - **Lo primero que se compra es el medidor USB**: la autonomía de arriba es estimación hasta que el
   daemon real pase por él.
 
+- **Novedad del mismo día: el equipo ya compró la Waveshare UPS HAT (C)**, con la 803040 de 1000 mAh
+  que trae. La propuesta pasa a decisión en `hardware/README.md`, la skill (`references/hardware.md`)
+  y `PROJECT-STATUS.md`. La 103450 de 2000 mAh queda como upgrade por el mismo header JST si la
+  autonomía medida no alcanza. Con el HAT en mano: leer el INA219 desde el daemon hacia
+  `estado.bateria`, medir consumo, y medir la separación de los pogo pins para la carcasa.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

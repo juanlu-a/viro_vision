@@ -32,7 +32,7 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 
 ```
 app/        React Native (Expo) app        ← main work so far
-hardware/   RPi Zero 2 W + Coral TPU + Cam Module 3   raspi/ = daemon BLE (ADR 0003)
+hardware/   RPi Zero 2 W + Coral TPU + Cam Module 3 + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
 ml/         YOLO11 detection, OCR, Edge AI  (README stub only)
 docs/       thesis deliverables, ADRs, this file
 .claude/skills/virovision/   knowledge skill
@@ -176,8 +176,10 @@ Pick a track (see the skill for pillar detail):
   placa real y correr la medición del ADR 0003.
 - **D. ML pillar (Python, `ml/`):** datasets for buses + products, train/fine-tune YOLO11, export to
   TFLite/edge.
-- **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). Siguen: botón GPIO,
-  DAC I2S + anuncios pregrabados, pipeline de ómnibus en el Coral, carcasa.
+- **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). **Alimentación
+  comprada el 2026-09-07**: Waveshare UPS HAT (C) + LiPo 1000 mAh (`hardware/README.md`, *Alimentación*).
+  Siguen: botón GPIO, DAC I2S + anuncios pregrabados, leer el INA219 del HAT → `estado.bateria`, medir
+  el consumo real, pipeline de ómnibus en el Coral, carcasa.
 
 **Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core
 value prop, and exercises the recognition/audio domain already scaffolded.
