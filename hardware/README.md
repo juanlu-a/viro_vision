@@ -19,7 +19,7 @@ hardware/
 | Acelerador | **Coral TPU** (USB) | Corre modelos TFLite en una placa chica. Rol: el pipeline de ómnibus (ADR 0006). |
 | Cámara | **Raspberry Pi Camera Module 3** (IMX708, 12 MP, autofoco) | Calidad para leer carteles a distancia; va por **CSI** y deja el USB libre para el Coral. |
 | Audio | **DAC I2S con amplificador** (MAX98357A o PCM5102A) → auricular cableado | La Zero 2 W no tiene jack; USB está ocupado; A2DP desde la placa compartiría antena con BLE + WiFi y cortaría el audio (ADR 0003). |
-| Entrada | **Un botón** (GPIO) | 1 click ómnibus, 2 clicks supermercado, largo = esperando (ADR 0007). |
+| Entrada | **Un botón** en GPIO 5 (pin 29, GND en el 30) | 1 click ómnibus, 2 clicks supermercado, largo = esperando (ADR 0007). Implementado en `raspi/virovision/boton.py`. |
 | Carcasa | impresa en 3D, en la patilla | Portátil; tiene que proteger el flex de la cámara. |
 | Alimentación | **Waveshare UPS HAT (C)** + LiPo 1S (**comprada el 2026-09-07**; viene con la 803040 de 1000 mAh) | Misma huella que la Zero, carga con el equipo prendido, da 1,8 A y trae un INA219 para anunciar la batería por voz. La 103450 de 2000 mAh queda como upgrade si la autonomía medida no alcanza. Ver [Alimentación](#alimentación). |
 
@@ -94,7 +94,7 @@ bare-metal: cámara (libcamera), Coral (libedgetpu) y BLE (BlueZ) exigen Linux. 
 ## Estado
 
 Hardware elegido. **Firmware inicial en `raspi/`**: periférico BLE con el perfil GATT, transferencia
-medible, captura con picamera2, máquina de modos. Falta: botón, audio, pipeline de ómnibus en el
+medible, captura con picamera2, máquina de modos y **botón físico** (GPIO 5). Falta: audio, pipeline de ómnibus en el
 Coral, carcasa, y la medición que decide el transporte de la foto.
 
 Detalle y razonamiento en `.claude/skills/virovision/references/hardware.md`.

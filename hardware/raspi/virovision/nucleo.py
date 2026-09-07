@@ -94,6 +94,25 @@ class Nucleo:
     def escribir_modo(self, valor: bytes) -> None:
         self._cambiar_modo(int(valor[0]) if valor else 0)
 
+    # --- botón físico (ADR 0007) -------------------------------------------------------------
+    # Entran por acá y no por `escribir_modo` porque el botón expresa un gesto, no un modo: cuál
+    # modo le toca a cada gesto lo decide `MaquinaDeModos`, que además sabe desde qué estado se
+    # permite. El anuncio a la app es el mismo, así que la app no distingue si el modo lo cambió el
+    # usuario con el dedo o ella misma por BLE.
+
+    def desde_boton(self, clicks: int) -> None:
+        """1 click = ómnibus, 2 = supermercado, y sólo desde esperando. Dentro de un modo los clicks
+        cortos todavía no hacen nada: salir es siempre el click largo."""
+        if self.modos.desde_clicks(clicks):
+            self._anunciar_modo()
+        else:
+            log.debug("botón: %d click(s) sin efecto en %s", clicks, self.modos.actual.name)
+
+    def boton_largo(self) -> None:
+        """Mantenerlo apretado: salir del modo actual, desde donde sea."""
+        if self.modos.click_largo():
+            self._anunciar_modo()
+
     def escribir_control(self, valor: bytes, mtu: int = 0) -> None:
         """`mtu` es el negociado con este central si el transporte lo conoce (BlueZ lo pasa en la
         escritura); es el dato que la app no puede saber de nuestro lado."""
@@ -174,16 +193,22 @@ class Nucleo:
             self._evento({"t": "error", "msg": f"modo {valor} no existe"})
             return
         if self.modos.cambiar(nuevo):
-            log.info("modo → %s", nuevo.name)
-            # La transición se anuncia también por audio en la placa cuando haya parlante; hoy sólo
-            # se notifica a la app.
-            self._programar(self._notificar(MODO, self.leer_modo()))
-            self._evento({"t": "modo", "valor": int(nuevo)})
-            # Desde el 2026-09-07 el AP NO sigue al modo: queda encendido mientras la placa está
-            # prendida (lo levanta __main__ al arrancar) para que el teléfono ya esté en la red cuando el
-            # usuario activa un modo. Esperar 20 s a que el AP suba y el teléfono se una, cada vez, era
-            # inaceptable para el usuario; el costo es batería, y se mide. `ap` sigue existiendo como
-            # comando manual.
+            self._anunciar_modo()
+
+    def _anunciar_modo(self) -> None:
+        """La transición ya pasó: contarla. Único punto de anuncio, lo haya pedido la app por BLE o
+        el usuario con el botón, así los dos caminos no se pueden desincronizar."""
+        actual = self.modos.actual
+        log.info("modo → %s", actual.name)
+        # La transición se anuncia también por audio en la placa cuando haya parlante; hoy sólo
+        # se notifica a la app.
+        self._programar(self._notificar(MODO, self.leer_modo()))
+        self._evento({"t": "modo", "valor": int(actual)})
+        # Desde el 2026-09-07 el AP NO sigue al modo: queda encendido mientras la placa está
+        # prendida (lo levanta __main__ al arrancar) para que el teléfono ya esté en la red cuando el
+        # usuario activa un modo. Esperar 20 s a que el AP suba y el teléfono se una, cada vez, era
+        # inaceptable para el usuario; el costo es batería, y se mide. `ap` sigue existiendo como
+        # comando manual.
 
     @staticmethod
     def _chunk(cmd: dict, mtu: int) -> int:

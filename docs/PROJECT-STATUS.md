@@ -178,7 +178,8 @@ Pick a track (see the skill for pillar detail):
   TFLite/edge.
 - **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). **Alimentación
   comprada el 2026-09-07**: Waveshare UPS HAT (C) + LiPo 1000 mAh (`hardware/README.md`, *Alimentación*).
-  Siguen: botón GPIO, DAC I2S + anuncios pregrabados, leer el INA219 del HAT → `estado.bateria`, medir
+  **Botón físico hecho el 2026-09-07** (`raspi/virovision/boton.py`, GPIO 5 / pin 29).
+  Siguen: DAC I2S + anuncios pregrabados, leer el INA219 del HAT → `estado.bateria`, medir
   el consumo real, pipeline de ómnibus en el Coral, carcasa.
 
 **Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core

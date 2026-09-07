@@ -1055,6 +1055,48 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   autonomía medida no alcanza. Con el HAT en mano: leer el INA219 desde el daemon hacia
   `estado.bateria`, medir consumo, y medir la separación de los pogo pins para la carcasa.
 
+## 2026-09-07 (cont.) — La placa vuelve a nacer, y el botón físico entra al daemon
+
+- **Se rompió la microSD soldando el botón.** Al soldar el pulsador al header, la tarjeta original
+  se partió. Reinstalación completa desde la Mac, sin teclado ni pantalla: misma imagen exacta que la
+  primera vez (`2026-06-18-raspios-trixie-arm64-lite`, checksum SHA256 verificado), `dd` a la tarjeta,
+  y cloud-init en `bootfs` (`user-data`, `network-config`, `meta-data`) con usuario `virovision`,
+  clave SSH de la Mac, `sudo` sin contraseña, hostname `virovision.local` y el WiFi de casa.
+  **Todo lo que había en la placa sale del repo**: no se perdió nada de trabajo, y esa es exactamente
+  la propiedad que justifica tener el firmware versionado y un `setup.sh` idempotente.
+
+- **Cómo saber si una placa arrancó sin poder entrar**: la partición ext4 pasó de los 2,4 GB de la
+  imagen a 124,5 GB, y el `cmdline.txt` apareció reescrito con `cfg80211.ieee80211_regdom=UY` (que lo
+  puso un `runcmd` propio). Las dos cosas las hace el propio Linux al bootear. Sirvió para descartar
+  que la soldadura hubiera matado la placa, que era el miedo real.
+
+- **El acceso quedó pendiente y el diagnóstico dio tres lecciones.** (1) La Zero 2 W es **sólo
+  2,4 GHz**: un hotspot de iPhone no le sirve sin *Maximizar compatibilidad*. (2) `network-config` de
+  cloud-init se lee **sólo en el primer arranque**; para reaplicarlo hay que cambiar el `instance_id`
+  de `meta-data`. (3) El truco de **renombrar el hotspot con el SSID y la clave de casa** hace que la
+  placa se conecte sin tocarle la configuración — un cliente WiFi sólo mira SSID + clave. Quedó
+  además habilitado el **USB gadget** (`dtoverlay=dwc2` + `modules-load=dwc2,g_ether`, IP fija
+  10.55.0.1 por un perfil de NetworkManager): acceso a la placa sin depender de ninguna red. Falta un
+  cable micro-USB **de datos** — el que había era de sólo carga, y eso costó una hora.
+
+- **Botón físico implementado** (ADR 0007, era el punto 1 de *qué falta* del README de la placa):
+  `virovision/boton.py` con `DetectorDeClicks` —puro, sin GPIO ni reloj, con el temporizador
+  inyectado— y `Boton`, que lo conecta a gpiozero. Los callbacks de gpiozero corren en su propio
+  hilo, así que entran al loop con `call_soon_threadsafe`: sin eso dos gestos seguidos se pisan el
+  contador de clicks. **Cableado: GPIO 5 (pin 29) y GND (pin 30)**, pull-up interno, y con un tact
+  switch de 4 patas hay que tomar **dos en diagonal** (las de una misma cara vienen en corto).
+  Decisiones que valen: un click largo **no** cuenta además como click al soltar (si no, salir de un
+  modo metería al usuario en otro en el mismo gesto), y el largo se actúa **al cumplirse el umbral**,
+  no al soltar, porque el anuncio de audio tiene que llegar cuando el gesto se cumple. El botón es
+  **opcional**: sin gpiozero o sin permisos el daemon arranca igual y los modos siguen entrando por
+  BLE. En `nucleo.py`, `desde_boton`/`boton_largo` reusan el mismo `_anunciar_modo` que el comando
+  BLE, así que la app no distingue quién cambió el modo y los dos caminos no se desincronizan.
+
+- Verificado: `pytest` en `hardware/raspi` (46, 7 nuevos de botón, 1 skip). **Sin probar contra la
+  placa todavía**: los tres tiempos (`REBOTE_S` 50 ms, `UMBRAL_LARGO_S` 0,8 s,
+  `VENTANA_DOBLE_CLICK_S` 0,4 s) son una primera estimación y hay que calibrarlos con el usuario, con
+  los ojos cerrados, que es como se usa.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1091,7 +1133,7 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   2026-09-07; falta que la app registre conexión BLE, red, lecturas con tiempos y errores, y sacar la
   información técnica de las pantallas. Después: **spike 1 de segundo plano en iOS** (la
   notificación BLE despierta la app con la pantalla bloqueada y el ciclo termina); **parlante en la
-  placa** (DAC I2S) para el audio que ya llega a `/tmp`; **botón físico** (GPIO); Android: API de
+  placa** (DAC I2S) para el audio que ya llega a `/tmp`; Android: API de
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
   registro; con el AP siempre encendido la placa no está en la red de casa: para desplegar, apagar el
   AP por BLE desde la Mac con la app cerrada.
@@ -1103,8 +1145,9 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   app y el ciclo entero termina antes de que iOS la suspenda. Recién ahí `isBackgroundEnabled: true`.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
 - **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
-- Placa: botón GPIO → `MaquinaDeModos`; DAC I2S + anuncios pregrabados; elegir el **detector para
-  la TPU** y medirlo (el camino de ómnibus es el caso B, todo en placa).
+- Placa: **calibrar los tiempos del botón** con el usuario (hecho el 2026-09-07, sin probar en
+  hardware); DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
+  de ómnibus es el caso B, todo en placa).
 
 ### Suelto
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.

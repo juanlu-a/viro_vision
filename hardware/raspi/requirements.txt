@@ -1,3 +1,4 @@
 # Instalar dentro de un venv con --system-site-packages (setup.sh lo hace): picamera2 viene por apt
-# (python3-picamera2) y no por pip.
+# (python3-picamera2) y no por pip. Lo mismo gpiozero + lgpio para el botón (python3-gpiozero,
+# python3-lgpio): el backend tiene que casar con el kernel, así que lo maneja apt.
 bluez-peripheral==0.1.7

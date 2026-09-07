@@ -167,6 +167,36 @@ el intervalo de 15 ms de iOS.
   con el enlace muerto; desde el build del 2026-09-05 la app lo detecta y avisa. Con builds anteriores:
   Desconectar y Buscar dispositivo de nuevo.
 
+## Botón físico (ADR 0007)
+
+El único control en la placa. `virovision/boton.py`; los modos que dispara viven en `modos.py`.
+
+| Gesto | Efecto |
+|---|---|
+| 1 click desde *esperando* | modo ómnibus |
+| 2 clicks desde *esperando* | modo supermercado |
+| mantenerlo apretado | volver a *esperando*, desde cualquier modo |
+
+Dentro de un modo los clicks cortos no hacen nada todavía: salir es siempre el click largo. Cada
+transición se notifica por `modo` y `evento` igual que si la hubiera pedido la app, así que **la app
+no distingue** si el modo lo cambió el dedo del usuario o ella misma.
+
+**Cableado**: pulsador entre **GPIO 5 (pin físico 29)** y **GND (pin 30, el de al lado)**. Pull-up
+interno, sin resistencia externa. Con un tact switch de 4 patas hay que usar **dos patas en
+diagonal**: las dos de una misma cara vienen unidas de fábrica y darían un botón apretado para
+siempre. `--gpio-boton N` para otro pin, `--sin-boton` para ignorarlo.
+
+**Tiempos** (en `boton.py`, todavía sin calibrar con el usuario):
+
+| Constante | Valor | Por qué |
+|---|---|---|
+| `REBOTE_S` | 50 ms | el rebote de un tact switch 6x6 está en el orden de los 10 ms |
+| `UMBRAL_LARGO_S` | 0,8 s | salir por accidente es peor que tener que insistir |
+| `VENTANA_DOBLE_CLICK_S` | 0,4 s | es lo que tarda en aplicarse un click simple: el precio del doble click |
+
+El botón es **opcional**: sin gpiozero, sin permisos sobre el pin o sin botón soldado, el daemon
+arranca igual (log `sin botón físico`) y los modos entran por BLE. Una placa sin daemon sería peor.
+
 ## Problemas conocidos
 
 - `BlueZ no está disponible en D-Bus`: `sudo systemctl start bluetooth` y revisar `rfkill list`.
@@ -189,7 +219,8 @@ CoreBluetooth, arrancando el emulador.
 
 ## Qué falta (en orden)
 
-1. Botón físico (GPIO) → `MaquinaDeModos.desde_clicks` / `click_largo`, con debounce medido.
-2. Salida de audio por DAC I2S y anuncios pregrabados de modo y de líneas de ómnibus (ADR 0003).
-3. Pipeline de ómnibus en placa (Coral): detección → recorte → OCR.
-4. Si la medición lo pide: AP WiFi con NetworkManager + servidor HTTP (`GET /fotos/{id}`, `POST /audio`).
+1. Salida de audio por DAC I2S y anuncios pregrabados de modo y de líneas de ómnibus (ADR 0003).
+2. Pipeline de ómnibus en placa (Coral): detección → recorte → OCR.
+3. Si la medición lo pide: AP WiFi con NetworkManager + servidor HTTP (`GET /fotos/{id}`, `POST /audio`).
+4. Calibrar los tiempos del botón con el usuario (ver *Botón físico*): los actuales son una primera
+   estimación, no una medición.
