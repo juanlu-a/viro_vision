@@ -21,16 +21,18 @@ hardware/
 | Audio | **DAC I2S con amplificador** (MAX98357A o PCM5102A) → auricular cableado | La Zero 2 W no tiene jack; USB está ocupado; A2DP desde la placa compartiría antena con BLE + WiFi y cortaría el audio (ADR 0003). |
 | Entrada | **Un botón** (GPIO) | 1 click ómnibus, 2 clicks supermercado, largo = esperando (ADR 0007). |
 | Carcasa | impresa en 3D, en la patilla | Portátil; tiene que proteger el flex de la cámara. |
-| Alimentación | **LiPo 1S 103450 (2000 mAh)** + **Waveshare UPS HAT (C)** (propuesta 2026-09-07, a confirmar midiendo) | 3–4 h continuas; el HAT carga con el equipo prendido, da 1,8 A y trae un INA219 para anunciar la batería por voz. Ver [Alimentación](#alimentación). |
+| Alimentación | **Waveshare UPS HAT (C)** + LiPo 1S (**comprada el 2026-09-07**; viene con la 803040 de 1000 mAh) | Misma huella que la Zero, carga con el equipo prendido, da 1,8 A y trae un INA219 para anunciar la batería por voz. La 103450 de 2000 mAh queda como upgrade si la autonomía medida no alcanza. Ver [Alimentación](#alimentación). |
 
 Descartados: ESP32 (cómputo/RAM insuficientes), Jetson Nano (grande, caro, consume), cámaras ESP32
 (baja calidad, foco fijo), cámaras USB (consumo + ocupan el USB del Coral).
 
 ## Alimentación
 
-Propuesta del 2026-09-07, pendiente de confirmar con el consumo real medido. Los números son de
-terceros (foro oficial de Raspberry Pi, CNX Software, Waveshare) y asumen que el Coral no está; con
-Coral el pico sube a ~1,5 A y el HAT sigue alcanzando.
+**Decidido y comprado el 2026-09-07: Waveshare UPS HAT (C)**, con la LiPo 803040 de 1000 mAh que
+trae. La celda de más capacidad (103450, 2000 mAh) queda como upgrade por el mismo header JST si la
+autonomía medida no alcanza. Los números de abajo son de terceros (foro oficial de Raspberry Pi, CNX
+Software, Waveshare) hasta que el daemon real pase por el medidor USB; asumen que el Coral no está
+(con Coral el pico sube a ~1,5 A y el HAT sigue alcanzando).
 
 **Consumo estimado de la placa**
 
@@ -56,10 +58,15 @@ GPIO soldado o ser una Zero 2 WH), da hasta 1,8 A, alimenta la Pi mientras carga
 `estado` del GATT y permite que la app **anuncie la batería por voz**, que es un requisito de
 accesibilidad y hoy no se puede. El PowerBoost da 1 A, no mide nada y hay que importarlo.
 
-**Lista de compra** (enviada al grupo el 2026-09-07): UPS HAT (C) · LiPo 103450 2000 mAh con
-protección y JST PH 2.0 · **medidor USB en línea** (UM25C o similar) para medir el daemon real antes de
-cerrar la carcasa · header 2×20 si la Zero no lo tiene. Plan B sin electrónica: power bank de
-5000 mAh en el bolsillo y un cable a los pads de 5 V de la Pi.
+**Comprado** (2026-09-07): la UPS HAT (C) con su 803040. **Falta**: el **medidor USB en línea** (UM25C o
+similar) para medir el daemon real antes de cerrar la carcasa; el header 2×20 soldado en la Zero si no
+lo tiene (los pogo pins lo necesitan); y, sólo si la medición lo pide, la 103450 de 2000 mAh con
+protección y JST PH 2.0. Plan B sin electrónica: power bank de 5000 mAh en el bolsillo y un cable a
+los pads de 5 V de la Pi.
+
+**Con el HAT en mano**: leer el INA219 desde el daemon (I2C, dirección 0x43 según Waveshare; verificar
+con `i2cdetect`) y publicar el porcentaje en `estado.bateria`; medir la separación de los pogo pins y la
+altura de los componentes para la carcasa.
 
 ## Software de la placa
 

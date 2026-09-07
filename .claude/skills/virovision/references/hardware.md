@@ -23,6 +23,16 @@ Sony IMX708, 12 MP, **autofocus**. Connects via the dedicated **CSI** connector 
 does **not** occupy the USB port, leaving USB free for the Coral TPU. Good image quality is
 required to read bus lines at distance. Part of the RPi ecosystem (good docs/support).
 
+### Power: Waveshare UPS HAT (C) + LiPo 1S (bought 2026-09-07)
+Charger + 5 V boost (up to 1.8 A) + **INA219** current/voltage monitor over I2C, same 65 × 30 footprint
+as the Zero, stacked underneath on pogo pins (the Pi needs its GPIO header soldered). Powers the Pi
+while charging. Ships with an 803040 1000 mAh cell (est. 1.5–2 h continuous); a 103450 2000 mAh cell
+(3–4 h) fits the same JST header if measured autonomy falls short. Chosen over the Adafruit PowerBoost
+1000C because the INA219 is what lets the app **announce battery level by voice** (`estado.bateria` is
+`null` until the daemon reads it). Consumption figures and the reasoning live in `hardware/README.md`
+(*Alimentación*); all of them are third-party estimates until the real daemon is measured with an
+inline USB meter.
+
 ## Rejected alternatives (and why)
 - **ESP32** (microcontroller): very cheap/small/low-power, but too little compute + RAM for vision;
   supports only simple cameras. Rejected as the main controller.
@@ -71,6 +81,8 @@ real), y el GATT debe exponer el modo actual a la app.
 Hardware selection is decided (above). **Firmware inicial en `hardware/raspi/`** (2026-09-04):
 periférico BLE con el perfil GATT, transferencia medible en chunks, captura con picamera2 (1024 px,
 JPEG q70, espejo de la app) y la máquina de modos de ADR 0007. Instalación por SSH con `setup.sh`;
-tests puros con pytest en la Mac. Faltan: botón GPIO, DAC y anuncios pregrabados, pipeline de ómnibus
-en el Coral, carcasa, y **correr la medición** que decide el transporte de la foto (cierra además la
-comparación de protocolos marcada `PENDIENTE` en la tesis).
+tests puros con pytest en la Mac. **Alimentación comprada** (2026-09-07): Waveshare UPS HAT (C) con su
+LiPo de 1000 mAh. Faltan: botón GPIO, DAC y anuncios pregrabados, leer el INA219 del HAT hacia
+`estado.bateria`, medir el consumo real, pipeline de ómnibus en el Coral, carcasa, y **correr la
+medición** que decide el transporte de la foto (cierra además la comparación de protocolos marcada
+`PENDIENTE` en la tesis).
