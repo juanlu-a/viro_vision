@@ -321,8 +321,9 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       if (conexion.status !== 'connected') return;
       try {
         await getBleClient().escribirModo(MODO_GATT[modo]);
-        // Cambiar de modo cambia el AP y con él la dirección de la placa: la transición arranca ya.
-        if (credenciales.current) empezarTransicionDeRed();
+        // Desde el 2026-09-07 el AP de la placa está siempre encendido: cambiar de modo NO cambia la
+        // red, y reiniciar la comprobación acá escondía el botón del dispositivo ~10 s por nada. La
+        // transición sólo arranca si la placa avisa que su AP cambió (evento `ap`).
       } catch (err) {
         // La placa no se enteró del modo: la app sigue con la cámara del teléfono, pero se dice.
         // El 2026-09-06 el modo no llegaba a la placa y nadie lo supo hasta leer su log.
