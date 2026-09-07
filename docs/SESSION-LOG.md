@@ -1026,6 +1026,34 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
 
 - macOS revocó el acceso de la terminal a `Documents` en medio de la sesión (TCC): «Operation not
   permitted» hasta en `git status`. Se restauró desde Privacidad y seguridad.
+## 2026-09-07 — Batería y alimentación: qué comprar
+
+- **Pedido**: recomendación de batería para el dispositivo, con el espacio como restricción, y la
+  lista de compra para el grupo. Se escribió en `hardware/README.md` (sección *Alimentación*).
+
+- **La restricción cambió de lugar**: con la batería en una **unidad de bolsillo** (la carcasa que se
+  modela aparte separa cámara + botón en la patilla del resto) el peso deja de mandar y gana la
+  capacidad. **LiPo 103450 de 2000 mAh** (50 × 34 × 10, ~36 g) como celda principal: 3–4 h de uso
+  continuo. La 803040 de 1000 mAh (40 × 30 × 8) queda como alternativa compacta si el reposo real
+  anda cerca de 0,5 W. Siempre con protección y JST PH 2.0, verificando polaridad.
+
+- **Los números**, todos de terceros hasta medir: la Zero 2 W pide ~0,6 W en reposo con OS Lite y
+  ~75 mA apagando HDMI y GPU; la IA del IMX500 suma ~100 mW; en detección continua un usuario gastó
+  60 % de 4400 mAh en 175 min (cota alta, 2–3 W). Sin el Coral el pico baja de ~1,5 A a ~0,6 A.
+
+- **Carga + 5 V: Waveshare UPS HAT (C)** antes que el PowerBoost 1000C. Misma huella que la Zero,
+  pogo pins, 1,8 A, carga con el equipo prendido, y **INA219**: es lo que permite anunciar la
+  batería por voz (`estado.bateria` hoy es `null`, y el comentario de `estado.py` ya lo esperaba).
+  Exige header GPIO soldado en la Pi.
+
+- **Lo primero que se compra es el medidor USB**: la autonomía de arriba es estimación hasta que el
+  daemon real pase por él.
+
+- **Novedad del mismo día: el equipo ya compró la Waveshare UPS HAT (C)**, con la 803040 de 1000 mAh
+  que trae. La propuesta pasa a decisión en `hardware/README.md`, la skill (`references/hardware.md`)
+  y `PROJECT-STATUS.md`. La 103450 de 2000 mAh queda como upgrade por el mismo header JST si la
+  autonomía medida no alcanza. Con el HAT en mano: leer el INA219 desde el daemon hacia
+  `estado.bateria`, medir consumo, y medir la separación de los pogo pins para la carcasa.
 
 ## Open threads / next
 
@@ -1056,13 +1084,17 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
 ### Hardware (la placa ya está; 2026-09-04)
-- **Cerrar el PR #62** (flujo completo probado en la calle el 2026-09-06) y **desplegar en la placa**
-  los cambios de red pendientes cuando comparta red con la Mac (o por el AP, uniendo la Mac). Después: **spike 1 de
-  segundo plano en iOS** (la notificación BLE despierta la app con la pantalla bloqueada y el ciclo
-  termina); **parlante en la placa** (DAC I2S) para reproducir el audio que ya llega a `/tmp`;
-  **botón físico** (GPIO) que dispare la captura desde la placa; Android: elegir la API de WiFi
-  silenciosa (`WifiNetworkSuggestion`) y probar. Deuda: el AP por `systemd-run` no arrancó una vez
-  sin registro.
+- **Medir el consumo real del daemon** con el medidor USB (reposo, modo ómnibus, modo supermercado
+  con AP) y confirmar la batería propuesta el 2026-09-07 (`hardware/README.md`, *Alimentación*); con
+  la UPS HAT en mano, leer el INA219 y llenar `estado.bateria`.
+- **Logs a Supabase (PR siguiente)**: tabla `eventos` y función `telemetria` ya desplegadas el
+  2026-09-07; falta que la app registre conexión BLE, red, lecturas con tiempos y errores, y sacar la
+  información técnica de las pantallas. Después: **spike 1 de segundo plano en iOS** (la
+  notificación BLE despierta la app con la pantalla bloqueada y el ciclo termina); **parlante en la
+  placa** (DAC I2S) para el audio que ya llega a `/tmp`; **botón físico** (GPIO); Android: API de
+  WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
+  registro; con el AP siempre encendido la placa no está en la red de casa: para desplegar, apagar el
+  AP por BLE desde la Mac con la app cerrada.
 - **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
