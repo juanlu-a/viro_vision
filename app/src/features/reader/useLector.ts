@@ -337,5 +337,18 @@ export function useLector() {
     fotoDesdeLaPlaca: dispositivo.fotoDisponible,
     // La placa está conectada y su red se está levantando: el botón del dispositivo está por llegar.
     placaConectando: dispositivo.conexion.status === 'connected' && dispositivo.wifi === 'uniendose',
+    /** Para la línea de estado de Inicio: qué hay del lado del dispositivo, en una palabra. */
+    estadoPlaca:
+      dispositivo.conexion.status === 'connected'
+        ? dispositivo.wifi === 'listo'
+          ? ('lista' as const)
+          : dispositivo.wifi === 'uniendose'
+            ? ('conectando' as const)
+            : dispositivo.wifi === 'error'
+              ? ('error' as const)
+              : ('sin-red' as const)
+        : dispositivo.conexion.status === 'scanning' || dispositivo.conexion.status === 'connecting'
+          ? ('buscando' as const)
+          : ('sin-placa' as const),
   };
 }

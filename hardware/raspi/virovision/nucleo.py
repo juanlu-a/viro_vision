@@ -179,9 +179,11 @@ class Nucleo:
             # se notifica a la app.
             self._programar(self._notificar(MODO, self.leer_modo()))
             self._evento({"t": "modo", "valor": int(nuevo)})
-            # El AP sigue al modo (plan B): arriba mientras haya algo que leer, abajo en reposo.
-            if self._control_ap is not None:
-                self._ap(nuevo is not Modo.ESPERANDO, AP_MINUTOS_CON_MODO)
+            # Desde el 2026-09-07 el AP NO sigue al modo: queda encendido mientras la placa está
+            # prendida (lo levanta __main__ al arrancar) para que el teléfono ya esté en la red cuando el
+            # usuario activa un modo. Esperar 20 s a que el AP suba y el teléfono se una, cada vez, era
+            # inaceptable para el usuario; el costo es batería, y se mide. `ap` sigue existiendo como
+            # comando manual.
 
     @staticmethod
     def _chunk(cmd: dict, mtu: int) -> int:

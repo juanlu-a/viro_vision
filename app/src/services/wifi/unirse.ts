@@ -90,7 +90,9 @@ interface EsperaDeps {
  */
 export async function esperarPlaca(
   direccion: { ip: string; puerto: number },
-  { fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), intentos = 10, esperaMs = 1000 }: EsperaDeps = {}
+  // 300 ms × 30 = 9 s de espera máxima, pero la placa suele responder al primer o segundo sondeo:
+  // sondear cada segundo sumaba hasta un segundo de espera inútil en un flujo que se quiere instantáneo.
+  { fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), intentos = 30, esperaMs = 300 }: EsperaDeps = {}
 ): Promise<boolean> {
   const url = urlDeLaPlaca(direccion, '/salud');
   for (let i = 0; i < intentos; i++) {

@@ -33,6 +33,7 @@ def _argumentos() -> argparse.Namespace:
     parser.add_argument("--hci", default="hci0", help="adaptador Bluetooth (default hci0)")
     parser.add_argument("--puerto", type=int, default=PUERTO_POR_DEFECTO, help="puerto del servidor HTTP (plan B)")
     parser.add_argument("--sin-http", action="store_true", help="no levantar el servidor HTTP")
+    parser.add_argument("--sin-ap", action="store_true", help="no levantar el punto de acceso al arrancar (desarrollo en la red de la casa)")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args()
 
@@ -96,6 +97,17 @@ async def _main(args: argparse.Namespace) -> None:
 
     await adaptador.set_powered(True)
     await adaptador.set_alias(args.nombre)
+
+    # AP siempre encendido mientras la placa esté prendida (ADR 0003, actualización 2026-09-07): el
+    # teléfono se une al conectarse por BLE y la foto está disponible en el instante en que se activa
+    # un modo. Sin tope de tiempo: el usuario no configura nada y no puede "reactivarlo". Cuesta
+    # batería; se mide. `--sin-ap` para desarrollar con la placa en la red de la casa (con el AP
+    # arriba la placa deja cualquier otra red y se pierde el SSH).
+    if not args.sin_ap:
+        try:
+            await loop.run_in_executor(None, ap.encender)
+        except Exception as exc:  # noqa: BLE001
+            log.error("no pude levantar el AP: %s; sigo sin él", exc)
 
     # timeout 0 = anunciar hasta que el proceso muera; el dispositivo tiene que ser encontrable
     # siempre, porque la app reconecta sola cuando vuelve al alcance.

@@ -8,7 +8,7 @@
  * El botón del modo contrario se deshabilita porque el diagrama canónico no tiene salto directo
  * entre modos: se pasa por esperando, acá y en el firmware.
  */
-import { Image, View } from 'react-native';
+import { ActivityIndicator, Image, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
@@ -36,7 +36,15 @@ const READ_HINT: Record<Modo, string> = {
 export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
-  const { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca, placaConectando } = useLector();
+  const { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca, placaConectando, estadoPlaca } = useLector();
+  const textoPlaca = {
+    lista: r.deviceReady,
+    conectando: r.deviceConnecting,
+    error: r.deviceNetworkError,
+    'sin-red': r.deviceNoNetwork,
+    buscando: r.deviceSearching,
+    'sin-placa': r.deviceAbsent,
+  }[estadoPlaca];
 
   const ocupado = state.estado !== 'idle';
   const filas = state.producto ? filasDeProducto(state.producto) : state.lectura ? filasDeLinea(state.lectura) : null;
@@ -52,6 +60,21 @@ export default function HomeScreen() {
         <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
           {r.section.toUpperCase()}
         </ThemedText>
+
+        {/* El dispositivo, en una línea y siempre: desde que la app abre, la placa se conecta y se
+            une a su red sola; esta línea muestra ese progreso para que "todavía no" no parezca "no
+            anda". Es una live region: el lector de pantalla anuncia los cambios. */}
+        <View
+          accessible
+          accessibilityRole="text"
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={`${r.deviceStatusLabel}: ${textoPlaca}`}
+          className="flex-row items-center gap-two">
+          {estadoPlaca === 'conectando' || estadoPlaca === 'buscando' ? <ActivityIndicator size="small" /> : null}
+          <ThemedText type="small" themeColor={estadoPlaca === 'lista' ? 'success' : estadoPlaca === 'error' ? 'danger' : 'textSecondary'}>
+            {r.deviceStatusLabel}: {textoPlaca}
+          </ThemedText>
+        </View>
 
         {/* El modo también como texto: el estado nunca se comunica sólo por botones o color. */}
         <View accessible accessibilityRole="text" accessibilityLabel={`${r.modeLabel}: ${MODO_LABEL[state.modo]}`}>

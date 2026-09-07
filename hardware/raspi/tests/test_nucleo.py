@@ -128,18 +128,15 @@ def test_ap_enciende_por_tiempo_acotado_y_avisa(loop):
     assert nucleo._apagado_ap is None
 
 
-def test_el_ap_sigue_al_modo(loop):
+def test_cambiar_de_modo_no_toca_el_ap(loop):
+    # Desde el 2026-09-07 el AP queda siempre encendido; el modo no lo prende ni lo apaga.
     llamadas = []
     nucleo, n = crear(loop, control_ap=llamadas.append)
     nucleo.escribir_control(b'{"cmd":"modo","valor":2}')
-    loop.run_until_complete(_correr(loop))
-    assert llamadas == [True]
-    assert [e["t"] for e in n.eventos()] == ["modo", "ap"]
-    assert n.eventos()[1]["minutos"] == 20
     nucleo.escribir_control(b'{"cmd":"modo","valor":0}')
     loop.run_until_complete(_correr(loop))
-    assert llamadas == [True, False]
-    assert nucleo._apagado_ap is None
+    assert llamadas == []
+    assert [e["t"] for e in n.eventos()] == ["modo", "modo"]
 
 
 def test_wifi_devuelve_las_credenciales_o_vacio(loop):
