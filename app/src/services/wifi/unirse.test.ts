@@ -29,6 +29,13 @@ describe('esperarPlaca', () => {
   });
 });
 
+describe('ssidActual', () => {
+  it('sin el módulo nativo devuelve null en vez de fallar', async () => {
+    const { ssidActual } = await import('./unirse');
+    expect(await ssidActual()).toBeNull();
+  });
+});
+
 describe('unirseAlWifi', () => {
   it('sin el módulo nativo (Expo Go, web, jest) falla con un error tipado y no con un TypeError', async () => {
     await expect(unirseAlWifi({ ssid: 'ViroVision', clave: 'x' })).rejects.toBeInstanceOf(WifiNoDisponibleError);

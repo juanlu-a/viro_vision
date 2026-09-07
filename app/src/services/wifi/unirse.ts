@@ -39,6 +39,27 @@ interface WifiManagerNativo {
   getCurrentWifiSSID(): Promise<string>;
 }
 
+/**
+ * Toda llamada al módulo nativo lleva tope de tiempo. El 2026-09-07 `getCurrentWifiSSID` no
+ * respondió nunca en iOS (sin permiso de ubicación, el sistema puede no contestar) y la app quedó
+ * en «conectando…» para siempre: una promesa que no vuelve es peor que un error.
+ */
+function conTope<T>(promesa: Promise<T>, ms: number, alVencer: () => T): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => resolve(alVencer()), ms);
+    promesa.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
+  });
+}
+
 function modulo(): WifiManagerNativo {
   // Se resuelve en cada llamada y no al importar: así este archivo se puede importar (y testear) donde
   // el módulo nativo no existe, y falla sólo cuando de verdad se lo usa.
@@ -50,8 +71,15 @@ function modulo(): WifiManagerNativo {
 export async function unirseAlWifi({ ssid, clave }: Pick<CredencialesWifi, 'ssid' | 'clave'>): Promise<void> {
   const wifi = modulo();
   try {
-    await wifi.connectToProtectedWifiSSID({ ssid, password: clave, isWEP: false, timeout: 20 });
+    await conTope(
+      wifi.connectToProtectedWifiSSID({ ssid, password: clave, isWEP: false, timeout: 20 }),
+      25_000,
+      () => {
+        throw new WifiUnionError('iOS no respondió al pedido de unirse en 25 s', 'timeout');
+      }
+    );
   } catch (err) {
+    if (err instanceof WifiUnionError) throw err;
     const e = err as { code?: string; message?: string };
     // iOS devuelve "already associated" cuando el teléfono ya está en esa red: no es un error.
     if ((e.message ?? '').toLowerCase().includes('already')) return;
@@ -70,7 +98,7 @@ export async function salirDelWifi(ssid: string): Promise<void> {
 
 export async function ssidActual(): Promise<string | null> {
   try {
-    return await modulo().getCurrentWifiSSID();
+    return await conTope(modulo().getCurrentWifiSSID(), 3_000, () => null);
   } catch {
     return null;
   }
