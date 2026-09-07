@@ -967,6 +967,29 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   hay; ahora de la interfaz), y el reinicio de la placa con la cámara enchufada tardó más de lo que
   esperé y pareció muerta.
 
+## 2026-09-07 — Batería y alimentación: qué comprar
+
+- **Pedido**: recomendación de batería para el dispositivo, con el espacio como restricción, y la
+  lista de compra para el grupo. Se escribió en `hardware/README.md` (sección *Alimentación*).
+
+- **La restricción cambió de lugar**: con la batería en una **unidad de bolsillo** (la carcasa que se
+  modela aparte separa cámara + botón en la patilla del resto) el peso deja de mandar y gana la
+  capacidad. **LiPo 103450 de 2000 mAh** (50 × 34 × 10, ~36 g) como celda principal: 3–4 h de uso
+  continuo. La 803040 de 1000 mAh (40 × 30 × 8) queda como alternativa compacta si el reposo real
+  anda cerca de 0,5 W. Siempre con protección y JST PH 2.0, verificando polaridad.
+
+- **Los números**, todos de terceros hasta medir: la Zero 2 W pide ~0,6 W en reposo con OS Lite y
+  ~75 mA apagando HDMI y GPU; la IA del IMX500 suma ~100 mW; en detección continua un usuario gastó
+  60 % de 4400 mAh en 175 min (cota alta, 2–3 W). Sin el Coral el pico baja de ~1,5 A a ~0,6 A.
+
+- **Carga + 5 V: Waveshare UPS HAT (C)** antes que el PowerBoost 1000C. Misma huella que la Zero,
+  pogo pins, 1,8 A, carga con el equipo prendido, y **INA219**: es lo que permite anunciar la
+  batería por voz (`estado.bateria` hoy es `null`, y el comentario de `estado.py` ya lo esperaba).
+  Exige header GPIO soldado en la Pi.
+
+- **Lo primero que se compra es el medidor USB**: la autonomía de arriba es estimación hasta que el
+  daemon real pase por él.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -996,6 +1019,9 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 
 ### Hardware (la placa ya está; 2026-09-04)
+- **Medir el consumo real del daemon** con el medidor USB (reposo, modo ómnibus, modo supermercado
+  con AP) y confirmar la batería propuesta el 2026-09-07 (`hardware/README.md`, *Alimentación*); con
+  la UPS HAT en mano, leer el INA219 y llenar `estado.bateria`.
 - **Cerrar el híbrido de punta a punta (siguiente PR, tras #61)**: la app se une al AP sola
   (`NEHotspotConfigurationManager` / `WifiNetworkSpecifier`, credenciales por la característica
   `wifi`); el AP se prende con un modo activo y se apaga en *esperando*, siempre con tope; el flujo
