@@ -267,6 +267,20 @@ vuelta por `POST /audio` al parlante; (4) el spike 1, segundo plano en iOS. Y un
 el AP levantado con un temporizador externo (`systemd-run`) no arrancó en un intento y no quedó
 registro de por qué; el camino que vale es el comando `ap` del daemon, que trae su propio tope.
 
+## Actualización 2026-09-07 — El AP queda siempre encendido; la red se une al conectar
+
+Con el flujo completo funcionando, esperar ~20 s al activar un modo (AP que sube, iOS que se une,
+sondeo) resultó inaceptable: para el usuario final, entrar al supermercado, apretar el botón y
+esperar veinte segundos es una experiencia espantosa. **Decisión**: la placa levanta su AP al
+arrancar y lo mantiene mientras está encendida (con reintentos hasta que la interfaz tenga su IP,
+porque NetworkManager puede no estar listo al inicio); la app se une **en cuanto conecta por BLE**,
+en segundo plano, y al activar un modo la foto está disponible al instante. Consecuencias: (1) el
+costo es batería de la placa, a medir; (2) mientras la placa esté encendida el teléfono está en su
+red y usa datos para internet, también en casa, aceptado explícitamente por el equipo; (3) el aviso
+de iOS para unirse a la red aparece **una sola vez** por teléfono; la app comprueba antes si ya está
+unida para no volver a pedirlo. El comando `ap` sigue existiendo para desarrollo: con el AP arriba la
+placa no está en ninguna otra red y se pierde el SSH; se apaga por BLE desde la Mac.
+
 ## Ver también
 
 - Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).

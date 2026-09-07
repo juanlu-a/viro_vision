@@ -1,6 +1,9 @@
 [Unit]
 Description=ViroVision — daemon BLE de la placa
-After=bluetooth.target
+# NetworkManager listo antes de arrancar: el daemon levanta el AP WiFi al inicio (ADR 0003) y con
+# NM a medio arrancar nmcli fallaba o dejaba la interfaz sin IP (2026-09-07).
+After=bluetooth.target NetworkManager.service network-online.target
+Wants=network-online.target
 Requires=bluetooth.service
 
 [Service]

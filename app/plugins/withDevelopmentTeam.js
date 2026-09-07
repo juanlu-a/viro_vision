@@ -36,7 +36,19 @@ module.exports = function withDevelopmentTeam(config) {
       if (buildSettings.PRODUCT_NAME === undefined) continue;
 
       buildSettings.DEVELOPMENT_TEAM = DEVELOPMENT_TEAM;
-      buildSettings.CODE_SIGN_STYLE = 'Automatic';
+      if (process.env.IOS_SIGNING_PROFILE) {
+        // Firma MANUAL, sólo en CI (el workflow exporta IOS_SIGNING_PROFILE tras instalar el
+        // certificado y el perfil). Va en el pbxproj y sólo en el target de la app, no por línea de
+        // comandos de xcodebuild: pasada globalmente alcanzaría a los Pods y sus bundles de recursos
+        // no se pueden firmar con el perfil de la app. Motivo de la firma manual: el archive sin
+        // firmar exportaba sin los entitlements del proyecto (2026-09-06, docs/dev-build-ios.md).
+        buildSettings.CODE_SIGN_STYLE = 'Manual';
+        // Sin la variante `[sdk=iphoneos*]`: el parser del pbxproj que usa expo rechaza esa clave.
+        buildSettings.CODE_SIGN_IDENTITY = '"Apple Distribution"';
+        buildSettings.PROVISIONING_PROFILE_SPECIFIER = `"${process.env.IOS_SIGNING_PROFILE}"`;
+      } else {
+        buildSettings.CODE_SIGN_STYLE = 'Automatic';
+      }
     }
 
     return cfg;

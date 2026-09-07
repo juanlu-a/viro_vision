@@ -15,9 +15,9 @@ from bluez_peripheral.advert import Advertisement
 from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
-from .ap import PuntoDeAcceso
+from .ap import IP_AP, PuntoDeAcceso
 from .camara import Camara, payload_sintetico
-from .estado import leer_estado
+from .estado import ip_local, leer_estado
 from .http_servidor import PUERTO_POR_DEFECTO, ServidorHttp
 from .gatt import NOMBRE_ANUNCIADO, SERVICE_UUID, ViroVisionService
 
@@ -33,6 +33,7 @@ def _argumentos() -> argparse.Namespace:
     parser.add_argument("--hci", default="hci0", help="adaptador Bluetooth (default hci0)")
     parser.add_argument("--puerto", type=int, default=PUERTO_POR_DEFECTO, help="puerto del servidor HTTP (plan B)")
     parser.add_argument("--sin-http", action="store_true", help="no levantar el servidor HTTP")
+    parser.add_argument("--sin-ap", action="store_true", help="no levantar el punto de acceso al arrancar (desarrollo en la red de la casa)")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args()
 
@@ -64,7 +65,9 @@ async def _main(args: argparse.Namespace) -> None:
     http = None
     if not args.sin_http:
         http = ServidorHttp(
-            leer_estado=lambda: leer_estado(camara=hay_camara, puerto_http=args.puerto, ap=ap.encendido),
+            # `camara.disponible` y no `hay_camara`: si una captura se cuelga la cámara se reinicia, y
+            # si no vuelve, el estado tiene que decirlo.
+            leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto, ap=ap.encendido, red=ap.conexion_activa()),
             payload_sintetico=payload_sintetico,
             capturar=camara.capturar_jpeg if hay_camara else None,
             puerto=args.puerto,
@@ -79,10 +82,11 @@ async def _main(args: argparse.Namespace) -> None:
 
     servicio = ViroVisionService(
         loop=loop,
-        leer_estado=lambda: leer_estado(camara=hay_camara, puerto_http=args.puerto if http else None, ap=ap.encendido),
+        leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto if http else None, ap=ap.encendido, red=ap.conexion_activa()),
         capturar=capturar,
         payload_sintetico=payload_sintetico,
         control_ap=control_ap,
+        leer_wifi=lambda: {**ap.credenciales(), "puerto": args.puerto if http else None},
     )
     await servicio.register(bus, adapter=adaptador)
 
@@ -94,6 +98,28 @@ async def _main(args: argparse.Namespace) -> None:
     await adaptador.set_powered(True)
     await adaptador.set_alias(args.nombre)
 
+    # AP siempre encendido mientras la placa esté prendida (ADR 0003, actualización 2026-09-07): el
+    # teléfono se une al conectarse por BLE y la foto está disponible en el instante en que se activa
+    # un modo. Sin tope de tiempo: el usuario no configura nada y no puede "reactivarlo". Cuesta
+    # batería; se mide. `--sin-ap` para desarrollar con la placa en la red de la casa (con el AP
+    # arriba la placa deja cualquier otra red y se pierde el SSH).
+    if not args.sin_ap:
+        # Al arrancar, NetworkManager puede no estar listo todavía (el 2026-09-07 la placa quedó
+        # «sin red» tras el primer arranque con AP): se reintenta con espera creciente y se verifica
+        # que la interfaz tenga la IP del AP, no sólo que nmcli haya vuelto.
+        for intento, espera in enumerate((0, 5, 10, 20, 30), start=1):
+            if espera:
+                await asyncio.sleep(espera)
+            try:
+                await loop.run_in_executor(None, ap.encender)
+                if ip_local() == IP_AP:
+                    break
+                log.warning("AP levantado pero wlan0 no tiene %s (intento %d)", IP_AP, intento)
+            except Exception as exc:  # noqa: BLE001
+                log.error("no pude levantar el AP (intento %d): %s", intento, exc)
+        else:
+            log.error("el AP no quedó operativo tras varios intentos; sigo sin él (la app cae a la cámara del teléfono)")
+
     # timeout 0 = anunciar hasta que el proceso muera; el dispositivo tiene que ser encontrable
     # siempre, porque la app reconecta sola cuando vuelve al alcance.
     anuncio = Advertisement(args.nombre, [SERVICE_UUID], 0x0000, 0)
@@ -104,11 +130,22 @@ async def _main(args: argparse.Namespace) -> None:
     for senal in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(senal, parar.set)
 
+    sin_red_desde = None
     while not parar.is_set():
         try:
             await asyncio.wait_for(parar.wait(), ESTADO_CADA_SEGUNDOS)
         except asyncio.TimeoutError:
             servicio.notificar_estado()
+            # Vigilante de red: si no es AP y lleva más de un minuto sin red, pedirle a NM que
+            # conecte. Una placa sin ninguna red no sirve para nada y no se puede arreglar a distancia.
+            if not ap.encendido and ap.conexion_activa() is None:
+                sin_red_desde = sin_red_desde or loop.time()
+                if loop.time() - sin_red_desde > 60:
+                    log.warning("sin red desde hace %d s: reconectando", int(loop.time() - sin_red_desde))
+                    await loop.run_in_executor(None, ap.reconectar)
+                    sin_red_desde = None
+            else:
+                sin_red_desde = None
     log.info("apagando")
     if http:
         http.parar()

@@ -48,7 +48,7 @@ def ip_local(interfaz: str = "wlan0") -> Optional[str]:
         return None
 
 
-def leer_estado(camara: bool, puerto_http: Optional[int] = None, ap: bool = False) -> dict:
+def leer_estado(camara: bool, puerto_http: Optional[int] = None, ap: bool = False, red: Optional[str] = None) -> dict:
     temp = _leer(_TERMICA)
     wifi = _leer(_WLAN) == "up"
     return {
@@ -64,4 +64,7 @@ def leer_estado(camara: bool, puerto_http: Optional[int] = None, ap: bool = Fals
         "puerto": puerto_http,
         # True mientras la placa es punto de acceso (plan B): entonces `ip` es la del AP, 10.42.0.1.
         "ap": ap,
+        # Nombre de la conexión de NetworkManager activa en wlan0 (o null): dice en qué red está la
+        # placa sin necesidad de SSH. Diagnóstico del 2026-09-06: "sin red" y nadie sabía por qué.
+        "red": red,
     }

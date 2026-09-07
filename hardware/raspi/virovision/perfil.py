@@ -17,6 +17,9 @@ CH_CONTROL = "4380c502-7ca3-4e37-b27d-f60e8d8d73d1"
 CH_EVENTO = "4380c503-7ca3-4e37-b27d-f60e8d8d73d1"
 CH_TRANSFERENCIA = "4380c504-7ca3-4e37-b27d-f60e8d8d73d1"
 CH_ESTADO = "4380c505-7ca3-4e37-b27d-f60e8d8d73d1"
+# Credenciales del punto de acceso de la placa (plan B, ADR 0003): la app las lee por BLE y se une
+# sola al WiFi; el usuario no configura nada.
+CH_WIFI = "4380c506-7ca3-4e37-b27d-f60e8d8d73d1"
 
 UUID_POR_NOMBRE = {MODO: CH_MODO, EVENTO: CH_EVENTO, TRANSFERENCIA: CH_TRANSFERENCIA, ESTADO: CH_ESTADO}
 

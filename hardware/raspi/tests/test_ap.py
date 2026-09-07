@@ -19,6 +19,8 @@ class NmcliFalso:
 
     def __call__(self, args):
         self.llamadas.append(list(args))
+        if args[:1] == ["-t"] and "--active" in args:
+            return subprocess.CompletedProcess(args, 0, stdout="netplan-wlan0-Jack_2.4:wlan0\nlo:lo\n", stderr="")
         if args[:1] == ["-t"]:
             return subprocess.CompletedProcess(args, 0, stdout=(NOMBRE_CONEXION + "\n") if self.existente else "Jack_2.4\n", stderr="")
         return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
@@ -43,13 +45,18 @@ def test_encender_con_la_conexion_ya_creada_solo_la_levanta():
     assert [l[:2] for l in nm.llamadas] == [["-t", "-f"], ["con", "up"]]
 
 
-def test_apagar_baja_la_conexion_y_marca_estado():
+def test_apagar_baja_la_conexion_y_reconecta_a_la_red_conocida():
     nm = NmcliFalso(existente=True)
     ap = PuntoDeAcceso(nm)
     ap.encender()
     ap.apagar()
     assert not ap.encendido
-    assert nm.llamadas[-1] == ["con", "down", NOMBRE_CONEXION]
+    assert nm.llamadas[-2] == ["con", "down", NOMBRE_CONEXION]
+    assert nm.llamadas[-1][:3] == ["-w", "25", "device"] and nm.llamadas[-1][-1] == "wlan0"
+
+
+def test_conexion_activa_devuelve_la_de_wlan0():
+    assert PuntoDeAcceso(NmcliFalso()).conexion_activa() == "netplan-wlan0-Jack_2.4"
 
 
 def test_un_nmcli_que_falla_lanza_con_el_motivo():

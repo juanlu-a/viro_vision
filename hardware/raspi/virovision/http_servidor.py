@@ -17,6 +17,8 @@ asyncio del BLE no se entera. Captura y lectura de estado se le pasan como calla
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import logging
 import os
@@ -85,6 +87,11 @@ class ServidorHttp:
                     t0 = time.monotonic()
                     try:
                         jpeg = servidor._capturar()
+                    except TimeoutError as exc:
+                        # La cámara se trabó: se lo decimos enseguida (la app esperaría 20 s) y la
+                        # cámara ya se está reiniciando del lado de la placa.
+                        self._json(504, {"error": str(exc)[:200]})
+                        return
                     except Exception as exc:  # la cámara falla de formas variadas; el cliente merece un 500 y no un socket cortado
                         log.exception("captura fallida")
                         self._json(500, {"error": str(exc)[:200]})
@@ -104,6 +111,14 @@ class ServidorHttp:
                     self._json(400, {"error": f"Content-Length fuera de rango (1-{AUDIO_MAX_BYTES})"})
                     return
                 cuerpo = self.rfile.read(largo)
+                # `fetch` de React Native no manda bytes crudos: la app envía el MP3 en base64 y lo
+                # dice con este header. Un cliente como curl manda los bytes tal cual.
+                if (self.headers.get("X-Encoding") or "").lower() == "base64":
+                    try:
+                        cuerpo = base64.b64decode(cuerpo, validate=True)
+                    except (binascii.Error, ValueError):
+                        self._json(400, {"error": "base64 inválido"})
+                        return
                 tipo = self.headers.get("Content-Type", "application/octet-stream")
                 extension = "mp3" if "mpeg" in tipo or "mp3" in tipo else "wav" if "wav" in tipo else "bin"
                 os.makedirs(DIRECTORIO_AUDIO, exist_ok=True)
@@ -116,7 +131,7 @@ class ServidorHttp:
                         servidor._reproducir(archivo)
                     except Exception as exc:
                         log.warning("no pude reproducir %s: %s", archivo, exc)
-                self._json(202, {"bytes": largo, "archivo": archivo, "reproducido": servidor._reproducir is not None})
+                self._json(202, {"bytes": len(cuerpo), "archivo": archivo, "reproducido": servidor._reproducir is not None})
 
         self._leer_estado = leer_estado
         self._payload_sintetico = payload_sintetico

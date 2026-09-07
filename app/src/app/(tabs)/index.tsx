@@ -8,7 +8,7 @@
  * El botón del modo contrario se deshabilita porque el diagrama canónico no tiene salto directo
  * entre modos: se pasa por esperando, acá y en el firmware.
  */
-import { View } from 'react-native';
+import { ActivityIndicator, Image, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
@@ -17,6 +17,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { formatMs } from '@/features/reader/lectura';
 import type { Modo } from '@/features/reader/modes';
+import { filasDeLinea, filasDeProducto } from '@/features/reader/resultado';
 import { useLector } from '@/features/reader/useLector';
 import { strings } from '@/i18n';
 
@@ -35,9 +36,18 @@ const READ_HINT: Record<Modo, string> = {
 export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
-  const { state, aplicarGesto, leer, modelo } = useLector();
+  const { state, aplicarGesto, leer, modelo, fotoDesdeLaPlaca, placaConectando, estadoPlaca } = useLector();
+  const textoPlaca = {
+    lista: r.deviceReady,
+    conectando: r.deviceConnecting,
+    error: r.deviceNetworkError,
+    'sin-red': r.deviceNoNetwork,
+    buscando: r.deviceSearching,
+    'sin-placa': r.deviceAbsent,
+  }[estadoPlaca];
 
   const ocupado = state.estado !== 'idle';
+  const filas = state.producto ? filasDeProducto(state.producto) : state.lectura ? filasDeLinea(state.lectura) : null;
   const enOmnibus = state.modo === 'omnibus';
   const enSupermercado = state.modo === 'supermercado';
 
@@ -50,6 +60,21 @@ export default function HomeScreen() {
         <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
           {r.section.toUpperCase()}
         </ThemedText>
+
+        {/* El dispositivo, en una línea y siempre: desde que la app abre, la placa se conecta y se
+            une a su red sola; esta línea muestra ese progreso para que "todavía no" no parezca "no
+            anda". Es una live region: el lector de pantalla anuncia los cambios. */}
+        <View
+          accessible
+          accessibilityRole="text"
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={`${r.deviceStatusLabel}: ${textoPlaca}`}
+          className="flex-row items-center gap-two">
+          {estadoPlaca === 'conectando' || estadoPlaca === 'buscando' ? <ActivityIndicator size="small" /> : null}
+          <ThemedText type="small" themeColor={estadoPlaca === 'lista' ? 'success' : estadoPlaca === 'error' ? 'danger' : 'textSecondary'}>
+            {r.deviceStatusLabel}: {textoPlaca}
+          </ThemedText>
+        </View>
 
         {/* El modo también como texto: el estado nunca se comunica sólo por botones o color. */}
         <View accessible accessibilityRole="text" accessibilityLabel={`${r.modeLabel}: ${MODO_LABEL[state.modo]}`}>
@@ -83,19 +108,38 @@ export default function HomeScreen() {
           </ThemedText>
         )}
 
+        {/* Con la placa conectada y con red, la foto la saca ELLA (ADR 0003): es el flujo real del
+            dispositivo. La cámara del teléfono queda como alternativa debajo, no desaparece. */}
+        {/* Mientras la placa levanta su red, se dice: un botón que aparece solo diez segundos después
+            de activar el modo, sin aviso, parece que falta (2026-09-06). */}
+        {placaConectando && state.modo !== 'esperando' && !fotoDesdeLaPlaca && (
+          <AccessibleButton label={r.deviceConnecting} hint={r.deviceConnectingHint} disabled loading onPress={() => {}} />
+        )}
         <AccessibleButton
           label={
             state.estado === 'preparing' && state.progreso != null
               ? `${r.reading} ${Math.round(state.progreso * 100)} %`
               : state.estado === 'reading'
                 ? r.reading
-                : r.readButton
+                : fotoDesdeLaPlaca
+                  ? r.readWithDeviceButton
+                  : r.readButton
           }
-          hint={READ_HINT[state.modo]}
-          onPress={() => leer('camara')}
+          hint={fotoDesdeLaPlaca ? r.readWithDeviceHint : READ_HINT[state.modo]}
+          variant={placaConectando && !fotoDesdeLaPlaca ? 'secondary' : 'primary'}
+          onPress={() => leer(fotoDesdeLaPlaca ? 'placa' : 'camara')}
           disabled={ocupado || state.modo === 'esperando'}
           loading={ocupado}
         />
+        {fotoDesdeLaPlaca && (
+          <AccessibleButton
+            label={r.readButton}
+            hint={READ_HINT[state.modo]}
+            variant="secondary"
+            onPress={() => leer('camara')}
+            disabled={ocupado || state.modo === 'esperando'}
+          />
+        )}
         {/* La fototeca es la segunda fuente, no la principal: existe para poder pasarle la MISMA
             foto a varios modelos y que la comparación mida modelos y no fotos (ADR 0006). Va
             debajo de la acción principal para que el lector de pantalla llegue primero a la que
@@ -109,7 +153,10 @@ export default function HomeScreen() {
           disabled={ocupado || state.modo === 'esperando'}
         />
 
-        {state.mensaje !== '' && (
+        {/* La voz ya dijo la frase; la pantalla muestra los campos uno por uno, legibles y
+            recorribles con el lector de pantalla. El texto crudo del modelo sólo aparece cuando no
+            hubo lectura estructurada (o en ómnibus, donde es lo que detectó el OCR). */}
+        {state.mensaje !== '' && !filas && (
           <View accessible accessibilityRole="text" accessibilityLabel={state.mensaje}>
             <ThemedText type="small" themeColor="textSecondary">
               {r.resultLabel}
@@ -117,12 +164,55 @@ export default function HomeScreen() {
             <ThemedText type="subtitle">{state.mensaje}</ThemedText>
           </View>
         )}
-        {state.textoCrudo && (
+        {filas && (
+          <View className="gap-two">
+            <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+              {r.resultLabel.toUpperCase()}
+            </ThemedText>
+            {filas.map((f) => (
+              <View
+                key={f.etiqueta}
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`${f.etiqueta}: ${f.valor}`}
+                className="flex-row items-baseline justify-between gap-three">
+                <ThemedText type="small" themeColor="textSecondary">
+                  {f.etiqueta}
+                </ThemedText>
+                <ThemedText type={f.vacio ? 'small' : 'subtitle'} themeColor={f.vacio ? 'textSecondary' : undefined} className="flex-1 text-right">
+                  {f.valor}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        )}
+        {state.textoCrudo && (state.modo === 'omnibus' || !filas) && (
           <View accessible accessibilityRole="text">
             <ThemedText type="small" themeColor="textSecondary">
               {r.rawLabel}
             </ThemedText>
             <ThemedText type="code">{state.textoCrudo.slice(0, 200)}</ThemedText>
+          </View>
+        )}
+        {/* La foto de la placa, para juzgar enfoque y calidad a ojo. Con label: quien no ve la
+            imagen sabe al menos qué es y cuánto pesa. */}
+        {state.fotoPlaca && (
+          <View
+            className="gap-two"
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={`${r.devicePhotoLabel}. ${r.devicePhotoDetail.replace('{kb}', (state.fotoPlaca.bytes / 1000).toFixed(0)).replace('{ms}', String(state.fotoPlaca.ms))}`}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {r.devicePhotoLabel}
+            </ThemedText>
+            <Image
+              source={{ uri: state.fotoPlaca.uri }}
+              style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 12 }}
+              resizeMode="contain"
+            />
+            <ThemedText type="code">
+              {r.devicePhotoDetail.replace('{kb}', (state.fotoPlaca.bytes / 1000).toFixed(0)).replace('{ms}', String(state.fotoPlaca.ms))}
+            </ThemedText>
           </View>
         )}
         {state.modelo && (

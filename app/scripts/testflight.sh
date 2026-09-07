@@ -43,7 +43,8 @@ AUTH=()
 DESTINATION=export
 if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ] && [ -n "${ASC_KEY_PATH:-}" ]; then
   AUTH=(-authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" -authenticationKeyPath "$ASC_KEY_PATH")
-  DESTINATION=upload
+  # Antes acá se ponía DESTINATION=upload y xcodebuild subía directo; ahora se exporta siempre el
+  # .ipa para poder inspeccionar sus entitlements, y la subida la hace altool más abajo.
 fi
 
 echo "› Archive (build $BUILD_NUMBER)…"
@@ -62,7 +63,14 @@ mkdir -p "$BUILD_DIR"
 # forzar CODE_SIGN_IDENTITY="Apple Distribution" tampoco sirve — Xcode lo rechaza como conflicto
 # con la firma automática. Sólo aplica con API key; en el Mac se firma como siempre.
 DIST=()
-if [ "${#AUTH[@]}" -gt 0 ]; then
+if [ -n "${IOS_SIGNING_PROFILE:-}" ]; then
+  # Firma MANUAL con el certificado de distribución y el perfil instalados por el workflow: el
+  # archive sale firmado y con TODOS los entitlements del proyecto. El camino sin firmar (abajo)
+  # exportaba sólo team-identifier y la app fallaba en runtime (2026-09-06). Los ajustes de firma
+  # los fija plugins/withDevelopmentTeam.js en el pbxproj del target de la app durante el prebuild;
+  # no se pasan acá para no alcanzar a los Pods.
+  DIST=()
+elif [ "${#AUTH[@]}" -gt 0 ]; then
   DIST=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
 fi
 if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
@@ -82,6 +90,15 @@ tail -3 "$BUILD_DIR/xcodebuild-archive.log"
 # ExportOptions. Se lee del pbxproj —lo fija plugins/withDevelopmentTeam.js en el prebuild— para
 # que el ID viva en un solo lugar. En el Mac el archive va firmado y el teamID coincide: es inocuo.
 TEAM_ID=$(sed -n 's/.*DEVELOPMENT_TEAM = \([A-Z0-9]*\);.*/\1/p' "ios/$SCHEME.xcodeproj/project.pbxproj" | head -1)
+BUNDLE_ID=$(sed -n 's/.*PRODUCT_BUNDLE_IDENTIFIER = \([^;]*\);.*/\1/p' "ios/$SCHEME.xcodeproj/project.pbxproj" | head -1 | tr -d '"')
+# Firma manual (CI con certificado propio) o automática (Mac del desarrollador). Ver arriba.
+if [ -n "${IOS_SIGNING_PROFILE:-}" ]; then
+  SIGNING_XML="<key>signingStyle</key><string>manual</string>
+  <key>signingCertificate</key><string>Apple Distribution</string>
+  <key>provisioningProfiles</key><dict><key>$BUNDLE_ID</key><string>$IOS_SIGNING_PROFILE</string></dict>"
+else
+  SIGNING_XML="<key>signingStyle</key><string>automatic</string>"
+fi
 if [ -z "$TEAM_ID" ]; then
   echo "No hay DEVELOPMENT_TEAM en el pbxproj: el prebuild no corrió plugins/withDevelopmentTeam.js." >&2
   exit 64
@@ -96,8 +113,8 @@ cat > "$PLIST" <<PLIST
 <dict>
   <key>method</key><string>app-store-connect</string>
   <key>destination</key><string>$DESTINATION</string>
-  <key>signingStyle</key><string>automatic</string>
-  <key>teamID</key><string>$TEAM_ID</string>
+  $SIGNING_XML
+  <key>teamID</key><string>${IOS_SIGNING_TEAM:-$TEAM_ID}</string>
   <key>uploadSymbols</key><true/>
   <key>manageAppVersionAndBuildNumber</key><false/>
 </dict>
@@ -114,7 +131,38 @@ if ! xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportOptionsPlist "$PLI
 fi
 tail -5 "$BUILD_DIR/xcodebuild-export.log"
 
-if [ "$DESTINATION" = upload ]; then
+# Los entitlements del .ipa se verifican ANTES de subir. El 2026-09-06 el build subió "bien" y en el
+# teléfono NEHotspotConfiguration devolvía «internal error»: el archive va sin firmar y al exportar,
+# Apple firma con lo que trae el perfil; si un entitlement del proyecto no quedó adentro, nadie lo
+# ve hasta que la app falla en la calle. Cada entitlement que exija una capacidad va acá.
+ENTITLEMENTS_REQUERIDOS=(com.apple.developer.networking.HotspotConfiguration)
+IPA=$(ls "$EXPORT_DIR"/*.ipa | head -1)
+INSPECCION="$BUILD_DIR/ipa-inspeccion"
+rm -rf "$INSPECCION" && mkdir -p "$INSPECCION"
+unzip -q "$IPA" -d "$INSPECCION"
+APP=$(ls -d "$INSPECCION"/Payload/*.app | head -1)
+ENTITLEMENTS_IPA=$(codesign -d --entitlements :- "$APP" 2>/dev/null || true)
+echo "› Entitlements del .ipa:"
+echo "$ENTITLEMENTS_IPA" | grep -oE 'com\.apple\.developer\.[A-Za-z0-9.-]+' | sort -u | sed 's/^/    /'
+for e in "${ENTITLEMENTS_REQUERIDOS[@]}"; do
+  if ! echo "$ENTITLEMENTS_IPA" | grep -q "$e"; then
+    echo "✗ El .ipa no lleva el entitlement $e: la app fallaría en runtime («internal error» al unirse al WiFi). No se sube." >&2
+    echo "  Revisar que la capacidad esté habilitada en el App ID y que la firma la incluya (docs/dev-build-ios.md)." >&2
+    exit 72
+  fi
+done
+echo "✓ Entitlements requeridos presentes."
+
+if [ "${#AUTH[@]}" -gt 0 ]; then
+  echo "› Subiendo a App Store Connect…"
+  # altool busca la clave en ./private_keys, ~/private_keys, ~/.private_keys o API_PRIVATE_KEYS_DIR.
+  KEYS_DIR=$(mktemp -d) && cp "$ASC_KEY_PATH" "$KEYS_DIR/AuthKey_$ASC_KEY_ID.p8"
+  if ! API_PRIVATE_KEYS_DIR="$KEYS_DIR" xcrun altool --upload-app -f "$IPA" -t ios \
+      --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" > "$BUILD_DIR/altool-upload.log" 2>&1; then
+    echo "✗ Subida falló; últimas líneas del log:" >&2
+    tail -40 "$BUILD_DIR/altool-upload.log" >&2
+    exit 74
+  fi
   echo "✓ Build $BUILD_NUMBER subido a App Store Connect. Aparece en TestFlight en unos minutos (procesamiento de Apple)."
 else
   echo "✓ IPA en $EXPORT_DIR. Subilo con Xcode → Window → Organizer → Distribute App, o exportá ASC_KEY_ID/ASC_ISSUER_ID/ASC_KEY_PATH para subir directo."

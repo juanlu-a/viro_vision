@@ -14,7 +14,21 @@ import { strings } from '@/i18n';
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { state, connect, disconnect, medir, medirWifi, medicion } = useDeviceConnection();
+  const { state, wifi, wifiDetalle, direccion, estadoCrudo, ultimoAviso, modoDispositivo, connect, disconnect, medir, medirWifi, medicion } =
+    useDeviceConnection();
+  // Lo que la placa dice de sí misma, tal cual: es el único diagnóstico posible sin SSH.
+  const telemetria = estadoCrudo
+    ? [
+        `${t.telemetryMode}: ${modoDispositivo ?? '?'}`,
+        `${t.telemetryAp}: ${estadoCrudo.ap ? t.yes : t.no}`,
+        `${t.telemetryWifi}: ${estadoCrudo.wifi ? t.yes : t.no}`,
+        `${t.telemetryIp}: ${estadoCrudo.ip ?? '—'}`,
+        `${t.telemetryCamera}: ${estadoCrudo.camara ? t.yes : t.no}`,
+        `${t.telemetryTemp}: ${estadoCrudo.temp != null ? `${estadoCrudo.temp} °C` : '—'}`,
+      ].join(' · ')
+    : null;
+  const wifiTexto = { 'sin-red': t.wifiSinRed, uniendose: t.wifiUniendose, listo: t.wifiListo, error: t.wifiError }[wifi];
+  const wifiCompleto = wifiDetalle ? `${wifiTexto}. ${wifiDetalle}` : wifiTexto;
 
   const isConnected = state.status === 'connected';
   const isBusy = state.status === 'scanning' || state.status === 'connecting';
@@ -63,7 +77,29 @@ export default function ConnectScreen() {
 
       {isConnected && state.device && (
         <Card>
-          <DeviceSummary device={state.device} />
+          <DeviceSummary device={{ ...state.device, direccion }} />
+          <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.wifiLabel}: ${wifiCompleto}`}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t.wifiLabel}
+            </ThemedText>
+            <ThemedText type="small">{wifiCompleto}</ThemedText>
+          </View>
+          {telemetria && (
+            <View accessible accessibilityRole="text" accessibilityLabel={`${t.telemetryLabel}: ${telemetria}`}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t.telemetryLabel}
+              </ThemedText>
+              <ThemedText type="code">{telemetria}</ThemedText>
+            </View>
+          )}
+          {ultimoAviso && (
+            <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.deviceErrorLabel}: ${ultimoAviso}`}>
+              <ThemedText type="small" themeColor="danger">
+                {t.deviceErrorLabel}
+              </ThemedText>
+              <ThemedText type="small">{ultimoAviso}</ThemedText>
+            </View>
+          )}
         </Card>
       )}
 
@@ -95,7 +131,7 @@ export default function ConnectScreen() {
             label={t.measureWifiButton}
             hint={t.measureWifiHint}
             loading={medicion.midiendo}
-            disabled={!state.device?.direccion}
+            disabled={!direccion}
             onPress={medirWifiYAnunciar}
           />
           <AccessibleButton

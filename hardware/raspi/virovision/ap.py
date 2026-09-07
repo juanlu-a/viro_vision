@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence
 
 log = logging.getLogger(__name__)
 
@@ -61,8 +61,29 @@ class PuntoDeAcceso:
     def apagar(self) -> None:
         resultado = self._ejecutar(["con", "down", NOMBRE_CONEXION])
         self.encendido = False
-        # Con el AP abajo, NetworkManager reconecta solo la red conocida con autoconnect.
         log.info("AP abajo (%s)", "ok" if resultado.returncode == 0 else (resultado.stderr or "").strip()[:120])
+        # No confiar en el autoconnect: el 2026-09-06 la placa quedó sin ninguna red después de bajar
+        # el AP (el teléfono seguía unido a un AP fantasma y `estado` decía "sin IP"). Se le pide a NM
+        # que conecte wlan0 a la mejor red conocida, explícitamente.
+        self.reconectar()
+
+    def reconectar(self) -> None:
+        """Conecta wlan0 a la red conocida con autoconnect (la de casa, la del laboratorio…)."""
+        resultado = self._ejecutar(["-w", "25", "device", "connect", "wlan0"])
+        log.info("reconexión a la red conocida: %s", "ok" if resultado.returncode == 0 else (resultado.stderr or resultado.stdout or "").strip()[:160])
+
+    def conexion_activa(self) -> Optional[str]:
+        """Nombre de la conexión activa en wlan0, o None. Va al `estado` para que la app (y quien
+        depure) sepa en qué red está la placa sin entrar por SSH."""
+        try:
+            salida = self._ejecutar(["-t", "-f", "NAME,DEVICE", "con", "show", "--active"]).stdout or ""
+        except Exception:  # noqa: BLE001
+            return None
+        for linea in salida.splitlines():
+            nombre, _, dispositivo = linea.rpartition(":")
+            if dispositivo == "wlan0":
+                return nombre
+        return None
 
     @staticmethod
     def _ok(resultado: subprocess.CompletedProcess) -> None:
