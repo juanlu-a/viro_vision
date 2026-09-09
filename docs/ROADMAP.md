@@ -36,9 +36,10 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 - **A2 · Permissions + accessible onboarding** *(next, parallel to A1)* — `app/src/features/permissions/`
   + a rationale-first onboarding route. Update `app.json`: Bluetooth (present) + WiFi/local-network
   (iOS `NSLocalNetworkUsageDescription`/`NSBonjourServices`; Android WiFi + `NEARBY_WIFI_DEVICES`) +
-  camera (via `expo-camera` when A5 nears). ✅ iOS `bundleIdentifier` / Android `package` fijados en
-  `com.virovision.app` (2026-08-10 — ver `dev-build-ios.md`); `expo-image-picker` ya trae
-  `NSPhotoLibraryUsageDescription` (elegir la foto a leer).
+  camera. ✅ iOS `bundleIdentifier` / Android `package` fijados en `com.virovision.app`
+  (2026-08-10 — ver `dev-build-ios.md`). Los permisos de cámara y fototeca salieron del manifiesto
+  el 2026-09-08 con `expo-image-picker`: la foto la saca la placa, así que la app no necesita
+  ninguno de los dos.
 - **A3 · Navigation + core screens** ✅ *(done — no login)* — iOS bottom tabs (Inicio / Dispositivo /
   Ajustes), app opens directly (no login gate — see ADR 0002 update). Home / Dispositivo / Ajustes
   rebuilt on the design system. (Real Settings model backed by `services/storage` still pending.)

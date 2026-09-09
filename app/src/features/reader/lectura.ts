@@ -21,12 +21,6 @@ export interface BusReading {
   nombre: string | null;
 }
 
-/** Duración legible para la fila "Tiempo" del resultado. Guion cuando no hubo medición. */
-export function formatMs(value: number): string {
-  if (!Number.isFinite(value)) return '—';
-  if (value >= 1000) return `${(value / 1000).toFixed(2)} s`;
-  return `${Math.round(value)} ms`;
-}
 
 /** Con 2-4 dígitos y confianza razonable, es candidata a número de línea. */
 export function adivinarLectura(textos: { text: string; score: number }[]): BusReading {

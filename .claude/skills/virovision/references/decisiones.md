@@ -112,6 +112,11 @@ VoiceOver frente a una góndola es peor producto que cinco. La **cámara del tel
 de la placa mientras no hay hardware, y la lectura además puede dejar un `.mp3` (apagado por
 defecto). El **camino de ómnibus queda en stand by**.
 
+**Qué cambió el 2026-09-08**: la placa anda, así que la entrada del flujo es **sólo la cámara de la
+placa**. Se retiran de Inicio la cámara del teléfono y la fototeca (y `expo-image-picker` con sus
+permisos). Lo que se pierde y hay que tener presente: la fototeca era el insumo del **dataset de
+evaluación** —la misma foto contra varios modelos—, y esa corrida pasa a hacerse fuera de la app.
+
 ### ADR 0007 — Botones físicos y modos de operación · **Proposed (2026-08-22) — a validar con tutor**
 
 **Qué cambió**: hasta ahora no había ninguna interfaz de entrada física especificada. El

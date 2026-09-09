@@ -22,42 +22,42 @@ cd app
 npx expo run:ios --device "iPhone de Juan"
 ```
 
-### 1. La cámara
+### 1. La cámara (la de la placa: desde el 2026-09-08 es la única)
 
 - [ ] Inicio → **Activar modo supermercado**. Se anuncia por voz.
-- [ ] **Sacar foto y leer** → iOS pide permiso de cámara **con el texto en español** ("ViroVision usa
-      la cámara para sacar la foto del cartel del ómnibus o del producto…"). Si sale el texto genérico
-      de Apple, el plugin no aplicó y hay que rehacer el prebuild.
-- [ ] Sacar la foto de un producto real → se anuncia **tipo, marca y detalle** ("arroz Saman, Blue
-      Patna 1 kg").
-- [ ] En pantalla aparecen *Última lectura*, *Modelo* y *Tiempo*.
+- [ ] La línea *Dispositivo* de arriba llega a **listo, con su red**. Hasta que llegue, **Leer con el
+      dispositivo** está deshabilitado — es lo esperado, no una falla.
+- [ ] **Leer con el dispositivo** con un producto real frente a la cámara de la placa → se anuncia
+      **tipo, marca y detalle** ("arroz Saman, Blue Patna 1 kg").
+- [ ] En pantalla aparece *Última lectura* con sus campos, y **nada más**: ni tiempo, ni modelo, ni
+      texto crudo, ni la foto. Eso ahora va a los logs de Supabase.
 
-### 2. El permiso denegado (el caso que antes no decía nada)
+### 2. Sin dispositivo (el caso que reemplazó al del permiso denegado)
 
-- [ ] Rechazar el permiso cuando iOS lo pide → **se anuncia** "ViroVision necesita permiso para usar
-      la cámara. Aceptalo cuando el teléfono lo pida."
-- [ ] Ajustes del iPhone → ViroVision → Cámara → apagar. Volver a intentar → se anuncia el **otro**
-      mensaje, el que manda a Ajustes y recuerda que la fototeca sigue disponible.
-- [ ] Con el permiso apagado, **Elegir foto de la fototeca** sigue funcionando. Es la salida, por eso
-      no se esconde.
+- [ ] Apagar la placa → la línea *Dispositivo* pasa a **no encontrado; prendelo y acercalo** y
+      **Leer con el dispositivo** queda deshabilitado.
+- [ ] Con VoiceOver sobre el botón deshabilitado, el hint dice qué falta (dispositivo prendido y
+      cerca, o buscarlo desde la pestaña Dispositivo). Un control apagado sin explicación es el
+      defecto que este paso busca.
+- [ ] iOS **no** pide permiso de cámara ni de fotos en ningún momento: salieron del manifiesto con
+      `expo-image-picker`. Si aparece alguno, quedó un plugin viejo y hay que rehacer el prebuild.
 
-### 3. El achique de la foto
+### 3. El tamaño de la foto
 
-- [ ] Anotar el *Tiempo* de tres lecturas con la cámara, **espaciadas** (ver la advertencia de abajo).
-- [ ] Comparar contra los 2-3 s medidos el 30/08/2026 con fotos de la fototeca
-      (`docs/pruebas-y-decisiones.md`). Debería ser igual o mejor: antes se subía la foto entera.
-- [ ] Si empeoró, el sospechoso es el redimensionado en sí, no la red — se mide aparte.
+- [ ] La placa entrega el JPEG ya a 1024 px y calidad 70; la app no la vuelve a tocar. Si la lectura
+      empeora o encarece, el lugar de mirar es `hardware/raspi/virovision/camara.py`, no la app.
 
 ### 4. Con VoiceOver
 
-- [ ] Recorrer Inicio con swipes. Orden esperado: modo actual → botón ómnibus → botón supermercado →
-      Sacar foto → Elegir de la fototeca → resultados.
+- [ ] Recorrer Inicio con swipes. Orden esperado: estado del dispositivo → modo actual → botón
+      ómnibus → botón supermercado → Leer con el dispositivo → resultados.
 - [ ] El **selector de modelo** está en Ajustes (desde el 2026-09-04): el disparador se anuncia como
       "Modelo seleccionado: <modelo>" y el menú como "Seleccionar modelo", `radiogroup` con `checked`.
-- [ ] Elegir otro modelo en Ajustes y volver a Inicio: la lectura siguiente tiene que reportar **ese**
-      modelo en *Modelo*. Es lo que el Provider garantiza y lo que dos hooks separados romperían.
-- [ ] El botón principal **muta** entre "Sacar foto y leer" y "Leyendo…" — no se intercambia por otro
-      botón. Si el foco se pierde al leer, eso es la trampa ya documentada.
+- [ ] Elegir otro modelo en Ajustes y volver a Inicio: la lectura siguiente tiene que salir por **ese**
+      modelo. Ya no se muestra en pantalla, así que se confirma en los logs de Supabase. Es lo que el
+      Provider garantiza y lo que dos hooks separados romperían.
+- [ ] El botón principal **muta** entre "Leer con el dispositivo" y "Leyendo…" — no se intercambia por
+      otro botón. Si el foco se pierde al leer, eso es la trampa ya documentada.
 - [ ] Agrandar el tipo del sistema (Ajustes → Pantalla y brillo → Tamaño del texto) y confirmar que
       ninguna etiqueta queda recortada.
 
@@ -121,10 +121,14 @@ todos los eventos **en silencio**. Esto es lo que hay que confirmar:
 
 ### 9. La corrida de comparación (= el dataset de evaluación)
 
+> ⚠️ **Este bloque no se puede correr desde la app desde el 2026-09-08.** La fototeca era lo que
+> permitía pasarle *la misma* foto a varios modelos, y se retiró con la cámara del teléfono
+> (ADR 0006, actualización 2026-09-08). Hasta reponer una entrada de prueba detrás de una bandera, la
+> corrida va **fuera de la app**: el set de fotos guardado, contra el proxy, un modelo por vuelta.
+
 - [ ] Elegir **10 productos de canasta básica** reales y sacarles foto **una sola vez** cada uno.
-- [ ] Para cada foto, correrla contra **los cuatro modelos** usando **Elegir foto de la fototeca** —
-      por eso la fototeca no se sacó: con la cámara cada modelo vería una foto distinta y la
-      comparación mediría fotos, no modelos.
+- [ ] Para cada foto, correrla contra **los cuatro modelos** con la MISMA imagen — si cada modelo
+      viera una foto distinta, la comparación mediría fotos, no modelos.
 - [ ] Anotar por corrida: modelo, tiempo, y si acertó `tipo`, `marca` y `detalle` **por separado**.
       Separados y no como un acierto único: el tipo decide si el producto sirve y la marca sólo cuál
       de los que sirven.

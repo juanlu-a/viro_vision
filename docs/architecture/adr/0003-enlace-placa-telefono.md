@@ -281,6 +281,20 @@ de iOS para unirse a la red aparece **una sola vez** por teléfono; la app compr
 unida para no volver a pedirlo. El comando `ap` sigue existiendo para desarrollo: con el AP arriba la
 placa no está en ninguna otra red y se pierde el SSH; se apaga por BLE desde la Mac.
 
+## Actualización 2026-09-08 — Se retiran los botones de medición
+
+La medición cumplió: el ADR está decidido (la foto va por HTTP sobre WiFi) y el número quedó
+registrado en [`docs/mediciones/2026-09-04-ble-throughput.md`](../../mediciones/2026-09-04-ble-throughput.md).
+Los dos botones que la disparaban —«Medir transferencia» por BLE y «Medir por WiFi»— salen de la
+pestaña Dispositivo, y con ellos el módulo de reensamblado por chunks del lado de la app
+(`services/ble/transferencia.ts`) y `medirDescargaHttp`. Del módulo viejo sobrevive sólo el base64,
+que usa cada característica del GATT y se mudó a `services/ble/base64.ts`.
+
+**La placa sigue publicando la característica `transferencia` y el comando `medir`**: sacarlos del
+firmware es un PR del pilar de hardware. El espejo de `features/device/gatt.ts` los documenta con
+una nota que dice que la app ya no los usa, para que nadie los vuelva a cablear creyendo que son el
+camino de la foto.
+
 ## Ver también
 
 - Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).

@@ -102,9 +102,9 @@ El dispositivo sólo captura y transmite; el reconocimiento lo hace un **LLM con
 llama la app. Es el único camino que sale a internet (ADR 0001 enmendado + ADR 0006): el usuario
 está quieto frente a la góndola y tolera latencia a cambio de precisión.
 
-**Mientras no haya hardware, la cámara del teléfono ocupa el lugar de la placa** y el anuncio sale
-por el parlante del teléfono — el resto del flujo es idéntico, y por eso se puede desarrollar y
-evaluar hoy.
+**La foto la saca la placa** y baja al teléfono por WiFi (ADR 0003). Hasta el 2026-09-08 la cámara
+del teléfono ocupaba ese lugar mientras no había hardware; con la placa andando se retiró, y sin
+dispositivo conectado la app no lee: el botón queda deshabilitado y la pantalla dice por qué.
 
 ```mermaid
 flowchart LR

@@ -25,7 +25,7 @@ import {
   BleNotImplementedError,
   getBleClient,
 } from '@/services/ble/bleClient';
-import { codificarBase64 } from '@/services/ble/transferencia';
+import { codificarBase64 } from '@/services/ble/base64';
 import { descargarFotoDeLaPlaca, type FotoDeLaPlaca } from '@/services/camera';
 import { urlDeLaPlaca } from '@/services/wifi/descargaHttp';
 import { WifiNoDisponibleError, esperarPlaca, salirDelWifi, ssidActual, unirseAlWifi } from '@/services/wifi/unirse';
@@ -48,8 +48,6 @@ interface DispositivoValue {
   wifi: EstadoWifi;
   /** Por qué la red está en error, para la pantalla y la voz; null si no hay error. */
   wifiDetalle: string | null;
-  /** El último `estado` tal como lo mandó la placa: diagnóstico sin SSH (2026-09-06). */
-  estadoCrudo: EstadoDispositivo | null;
   /** El último aviso de error que mandó la placa por BLE, o null. */
   ultimoAviso: string | null;
   /** True cuando se puede pedir una foto por WiFi: conectada, con red y `/salud` respondiendo. */
@@ -85,7 +83,6 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const [ap, setAp] = useState(false);
   const [wifi, setWifi] = useState<EstadoWifi>('sin-red');
   const [wifiDetalle, setWifiDetalle] = useState<string | null>(null);
-  const [estadoCrudo, setEstadoCrudo] = useState<EstadoDispositivo | null>(null);
   const [ultimoAviso, setUltimoAviso] = useState<string | null>(null);
   const [modoDispositivo, setModoDispositivo] = useState<ModoDispositivo | null>(null);
 
@@ -195,7 +192,6 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const aplicarEstado = useCallback(
     (estado: EstadoDispositivo) => {
       const destino = estado.ip && estado.puerto ? { ip: estado.ip, puerto: estado.puerto } : null;
-      setEstadoCrudo(estado);
       setAp(estado.ap);
       setDireccion(destino);
       setConexion((c) =>
@@ -338,7 +334,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const fotoDisponible = conexion.status === 'connected' && wifi === 'listo' && direccion !== null;
 
   const descargarFoto = useCallback(async () => {
-    if (!direccion) throw new Error(strings.connect.measureWifiNoAddress);
+    if (!direccion) throw new Error(strings.connect.noAddress);
     return descargarFotoDeLaPlaca(direccion);
   }, [direccion]);
 
@@ -364,8 +360,8 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   );
 
   const value = useMemo<DispositivoValue>(
-    () => ({ conexion, direccion, wifi, wifiDetalle, estadoCrudo, ultimoAviso, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio }),
-    [conexion, direccion, wifi, wifiDetalle, estadoCrudo, ultimoAviso, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio]
+    () => ({ conexion, direccion, wifi, wifiDetalle, ultimoAviso, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio }),
+    [conexion, direccion, wifi, wifiDetalle, ultimoAviso, fotoDisponible, ap, modoDispositivo, connect, disconnect, escribirModo, descargarFoto, enviarAudio]
   );
 
   return <DispositivoContext.Provider value={value}>{children}</DispositivoContext.Provider>;
