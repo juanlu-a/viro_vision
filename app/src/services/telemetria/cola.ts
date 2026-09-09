@@ -73,4 +73,9 @@ export class ColaDeEventos {
   olvidarPerdidos(): void {
     this.descartados = 0;
   }
+
+  /** Da por perdido un lote sin volver a encolarlo, sumándolo al contador que viaja después. */
+  descartar(cantidad: number): void {
+    this.descartados += cantidad;
+  }
 }

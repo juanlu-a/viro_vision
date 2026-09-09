@@ -165,6 +165,11 @@ Trampas ya pisadas, que no hay que repetir:
   crea la rama nueva. La lección viene de dos ramas que quedaron huérfanas sin PR
   (`feat/lector-en-inicio`, `docs/decisiones-equipo-2026-08`) mientras los ADRs ya referenciaban
   su contenido como existente.
+- **Antes de escribir una línea, `git fetch && git branch -r`.** No alcanza con buscar en `staging`:
+  lo que vive en una rama sin mergear no aparece ahí, y el repo ya tuvo tres. El 2026-09-09 se
+  reimplementaron enteros la telemetría y el sacar lo técnico de las pantallas sin ver que
+  `feat/telemetria-supabase` ya los tenía, con su migración, desde el 07/09. Si el nombre de una
+  rama se parece a lo que vas a hacer, mirala (`git log --oneline origin/<rama> -3`) antes.
 - **Conventional Commits con scope**, asunto en español: `fix(vision):`, `feat(marca):`,
   `docs:`. El cuerpo explica **el razonamiento**, no el diff — se lee dentro de seis meses.
 - **Nunca agregues un trailer de co-autoría de IA.** Los commits son del autor humano.

@@ -1190,6 +1190,46 @@ Verificación: lint (la advertencia preexistente de `DispositivoProvider` sigue 
 **Nota operativa**: quedó una fila de sonda (`tipo = 'sonda.contrato'`, `telefono = 'sonda-claude'`)
 en `eventos`, de cuando se verificó el contrato. Borrable.
 
+## 2026-09-09 (cont.) — El esquema versionado, y una rama huérfana que ya lo tenía todo
+
+Con la contraseña de la base se pudo cerrar el pendiente del esquema. Y al abrir la tabla apareció
+algo que conviene dejar escrito, porque es la segunda vez que muerde.
+
+**Ya existía `feat/telemetria-supabase`** (commit 028c045, 2026-09-07): una rama **sin PR y sin
+mergear** que ya hacía las dos cosas de los PRs #68 y #69 — sacaba lo técnico de las pantallas y
+mandaba eventos a `eventos`— y que además traía la migración de la tabla. Se le hizo un build manual
+a TestFlight el 07/09 (por eso la tabla tenía 28 filas antes de que nada de esto se mergeara) y ahí
+quedó. Es exactamente la falla que las convenciones ya documentaban con `feat/lector-en-inicio` y
+`docs/decisiones-equipo-2026-08`, y el chequeo que la habría evitado es de una línea:
+**`git branch -r` antes de empezar, no sólo `git branch --show-current`**. Buscar en `staging` no
+alcanza: lo que está en una rama sin mergear no aparece.
+
+Qué se hizo con eso: la **migración se tomó de esa rama**, con su fecha original
+(`20260907190000_eventos.sql`), y se verificó contra la base real con `supabase db dump` — coincide
+campo por campo e índice por índice. El cliente que queda es el de `staging`, que es un superconjunto
+(manejador global de errores, más eventos de BLE y red, deduplicación de `placa.estado`, reintentos
+con tope, 17 tests). Dos cosas de la rama vieja que valen y **no** están en el nuestro: derivaba la
+URL de telemetría de `EXPO_PUBLIC_VISION_PROXY_URL` en vez de pedir un secret nuevo, y registraba un
+evento por cada llamada al TTS de nube.
+
+**Y hay dos vocabularios de `tipo` en la tabla**: las 28 filas del build viejo usan `snake_case`
+(`app_abierta`, `ble_conectado`, `wifi_lista`) y todo lo nuevo usa puntos (`app.inicio`,
+`ble.conectado`, `wifi.listo`). Una consulta que filtre por `tipo` sin contemplar las dos formas
+muestra de menos sin avisar. Está documentado en `docs/supabase.md`.
+
+**Un defecto propio, encontrado al mirar el esquema**: el cliente devolvía a la cola cualquier lote
+fallido **sin tope**. Como siempre se sube lo más viejo primero, un lote que el servidor no puede
+aceptar habría tapado toda la telemetría posterior hasta que el tope de la cola lo desalojara — un
+solo evento malo apagando el diagnóstico entero. Ahora se reintenta tres veces y se da por perdido,
+contado. Tiene test.
+
+Lo que **no** resultó ser un defecto: el `check` de la tabla mide bytes del jsonb comprimido (≤ 8192)
+y el corte de la función mide caracteres de JSON (≤ 8000). Parecían un desajuste explotable; se probó
+con 7900 caracteres incompresibles y entró sin problema. Queda anotado en `docs/supabase.md` como
+margen, no como riesgo.
+
+Limpieza: se borraron las filas de sonda (`sonda-claude`, `sonda-limite`, `prueba`) de `eventos`.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1227,11 +1267,14 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Medir el consumo real del daemon** con el medidor USB (reposo, modo ómnibus, modo supermercado
   con AP) y confirmar la batería propuesta el 2026-09-07 (`hardware/README.md`, *Alimentación*); con
   la UPS HAT en mano, leer el INA219 y llenar `estado.bateria`.
-- **Logs a Supabase — hecho (2026-09-09)**: la app registra arranque, BLE, red, estado de la placa,
-  modos, lecturas con tiempos y errores, y los crashes por el manejador global. Lo que queda es
-  **mirar la tabla después de una salida real** y ver si lo que se registró alcanza para explicar
-  una falla; si falta un evento, agregarlo es una línea en `tipos.ts`. Y **el `create table` de
-  `eventos` sigue sin versionar**: `supabase db dump` y volcarlo a `supabase/migrations/`. Después: **spike 1 de segundo plano en iOS** (la
+- **Logs a Supabase — hecho (2026-09-09)**, esquema incluido. Lo que queda es **mirar la tabla
+  después de una salida real** y ver si lo que se registró alcanza para explicar una falla; si falta
+  un evento, agregarlo es una línea en `tipos.ts`. Dos mejoras pendientes que venían de la rama
+  huérfana: derivar la URL de telemetría del proxy en vez de un secret propio, y registrar las
+  llamadas al TTS de nube.
+- **Cerrar `feat/telemetria-supabase`**: su contenido está superado por lo que hay en `staging`
+  (`git diff origin/staging origin/feat/telemetria-supabase` para confirmarlo antes de borrarla).
+  Decidir si se descarta a conciencia o se rescata algo más. Después: **spike 1 de segundo plano en iOS** (la
   notificación BLE despierta la app con la pantalla bloqueada y el ciclo termina); **parlante en la
   placa** (DAC I2S) para el audio que ya llega a `/tmp`; Android: API de
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
