@@ -1208,9 +1208,15 @@ Qué se hizo con eso: la **migración se tomó de esa rama**, con su fecha origi
 (`20260907190000_eventos.sql`), y se verificó contra la base real con `supabase db dump` — coincide
 campo por campo e índice por índice. El cliente que queda es el de `staging`, que es un superconjunto
 (manejador global de errores, más eventos de BLE y red, deduplicación de `placa.estado`, reintentos
-con tope, 17 tests). Dos cosas de la rama vieja que valen y **no** están en el nuestro: derivaba la
-URL de telemetría de `EXPO_PUBLIC_VISION_PROXY_URL` en vez de pedir un secret nuevo, y registraba un
-evento por cada llamada al TTS de nube.
+con tope, 17 tests). Dos cosas de la rama vieja que valían y **se rescataron** en el mismo PR:
+
+- **La URL de telemetría se deriva de la del proxy** cuando no hay variable propia. No es comodidad:
+  sin eso, un build con el proxy configurado pero sin el secret nuevo sale sin ninguna telemetría y
+  nadie se entera hasta que hace falta diagnosticar algo. Al testear la función rescatada apareció un
+  borde suyo: `https://vision` también «termina en /vision» por la doble barra del esquema, y
+  derivaba `https:/telemetria`. Se saca el esquema antes de comparar.
+- **Un evento por cada llamada al TTS de nube** (`audio.sintesis`), separado del envío al parlante
+  (`audio.envio`): fallan y tardan por motivos distintos, y juntos se ven como un solo «tardó».
 
 **Y hay dos vocabularios de `tipo` en la tabla**: las 28 filas del build viejo usan `snake_case`
 (`app_abierta`, `ble_conectado`, `wifi_lista`) y todo lo nuevo usa puntos (`app.inicio`,
@@ -1270,8 +1276,6 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Logs a Supabase — hecho (2026-09-09)**, esquema incluido. Lo que queda es **mirar la tabla
   después de una salida real** y ver si lo que se registró alcanza para explicar una falla; si falta
   un evento, agregarlo es una línea en `tipos.ts`. Dos mejoras pendientes que venían de la rama
-  huérfana: derivar la URL de telemetría del proxy en vez de un secret propio, y registrar las
-  llamadas al TTS de nube.
 - **Cerrar `feat/telemetria-supabase`**: su contenido está superado por lo que hay en `staging`
   (`git diff origin/staging origin/feat/telemetria-supabase` para confirmarlo antes de borrarla).
   Decidir si se descarta a conciencia o se rescata algo más. Después: **spike 1 de segundo plano en iOS** (la

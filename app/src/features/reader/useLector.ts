@@ -107,10 +107,16 @@ async function guardarAudioDeLaLectura(
   const t0 = Date.now();
   try {
     const uri = await sintetizarAArchivo(texto);
+    // La llamada al TTS de nube, medida aparte del envío: son dos cosas que fallan por motivos
+    // distintos y tardan por motivos distintos, y juntas se ven como un solo "tardó". Mismo criterio
+    // que separar los ms de la foto de los del pipeline.
+    const msSintesis = Date.now() - t0;
+    registrar('audio.sintesis', { ms: msSintesis, detalle: { caracteres: texto.length } });
     // Y al parlante de la placa, por WiFi (ADR 0003). El usuario ya escuchó la lectura por el
     // teléfono: esto es el camino del dispositivo final, no lo que hoy garantiza el anuncio.
+    const t1 = Date.now();
     const enviado = enviarAlDispositivo ? await enviarAlDispositivo(uri) : false;
-    registrar('audio.envio', { ms: Date.now() - t0, detalle: { enviado } });
+    registrar('audio.envio', { ms: Date.now() - t1, detalle: { enviado } });
   } catch (err) {
     // Silencio deliberado para el usuario: nada de lo que hace depende de esto. Pero queda
     // registrado, porque es el camino del parlante del dispositivo y falla sin que nadie lo note.

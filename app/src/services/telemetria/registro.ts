@@ -24,6 +24,7 @@ import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 import { ColaDeEventos, MAX_POR_LOTE } from './cola';
+import { resolverUrlDeTelemetria } from './config';
 import { obtenerTelefono, generarId } from './identidad';
 import type { EventoTelemetria, LoteTelemetria, TipoEvento } from './tipos';
 
@@ -32,8 +33,15 @@ import type { EventoTelemetria, LoteTelemetria, TipoEvento } from './tipos';
  * puede viajar. La función **no pide autenticación** (`verify_jwt = false`, igual que el proxy de
  * visión): la app no tiene login y una anon key en el bundle no sería una defensa. Lo peor que
  * puede pasar es ruido en una tabla de desarrollo.
+ *
+ * Si no está la variable propia se **deriva de la del proxy** (ver `config.ts`): las dos funciones
+ * viven en el mismo proyecto, y sin eso un build con proxy pero sin el secret nuevo saldría sin
+ * ninguna telemetría y nadie se enteraría hasta necesitar diagnosticar algo.
  */
-const urlPorDefecto = process.env.EXPO_PUBLIC_TELEMETRY_URL ?? '';
+const urlPorDefecto = resolverUrlDeTelemetria(
+  process.env.EXPO_PUBLIC_TELEMETRY_URL,
+  process.env.EXPO_PUBLIC_VISION_PROXY_URL
+);
 
 /** Sin URL configurada la telemetría queda apagada entera: no encola, no reintenta, no pesa. */
 export const isTelemetriaConfigurada = urlPorDefecto.length > 0;

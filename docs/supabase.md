@@ -163,11 +163,18 @@ app registra esos eventos acá.
 | Función | [`supabase/functions/telemetria/index.ts`](../supabase/functions/telemetria/index.ts) |
 | Cliente | `app/src/services/telemetria/` (barrel: `@/services/telemetria`) |
 | Tabla | `public.eventos` — **su DDL vive sólo en el dashboard**, ver el pendiente de abajo |
-| Variable | `EXPO_PUBLIC_TELEMETRY_URL` (vacía = telemetría apagada entera) |
+| Variable | `EXPO_PUBLIC_TELEMETRY_URL`, **opcional**: si falta se deriva de `EXPO_PUBLIC_VISION_PROXY_URL` |
 
 La app **no tiene clave de la base**: manda lotes a la función, que inserta con el `service_role`.
 Mismo criterio que el proxy de visión, `verify_jwt = false` (ADR 0008): sin login, exigir la anon key
 sería pedir algo que ya viaja dentro del bundle.
+
+**La URL se deriva del proxy** (`…/functions/v1/vision` → `…/functions/v1/telemetria`) cuando no hay
+variable propia: las dos funciones viven en el mismo proyecto, y pedirlas por separado es pedir dos
+veces el mismo dato y dejar que se desincronicen. Sin eso, un build con proxy pero sin el secret
+nuevo sale **sin ninguna telemetría** y nadie se entera hasta que hace falta diagnosticar algo. La
+derivación **no adivina**: lo que no termina en `/vision` no deriva nada, porque una URL armada a la
+fuerza daría 404 en cada lote — apagada y sabida es mejor que encendida y rota.
 
 ## El contrato, y su trampa
 
@@ -200,7 +207,12 @@ Ciclo de vida (`app.inicio`, `app.fondo`, `app.error`), enlace BLE (`ble.buscand
 `ble.fallo`, `ble.perdido`, `ble.reintento`, `ble.desconectado`), red con la placa (`wifi.uniendose`,
 `wifi.listo`, `wifi.fallo`), lo que informa la placa (`placa.estado`, `placa.aviso`, `placa.modo`,
 `placa.modoFallo`), modos (`modo.cambio`) y la lectura entera (`lectura.inicio`, `foto.ok`,
-`foto.fallo`, `ocr.carga`, `nube.espera`, `lectura.ok`, `lectura.fallo`, `audio.envio`).
+`foto.fallo`, `ocr.carga`, `nube.espera`, `lectura.ok`, `lectura.fallo`, `audio.sintesis`,
+`audio.envio`).
+
+`audio.sintesis` (la llamada al TTS de nube) va **separada** de `audio.envio` (la subida al parlante
+de la placa): son dos cosas que fallan y tardan por motivos distintos, y juntas se ven como un solo
+«tardó». Mismo criterio que separar los ms de la foto de los del pipeline.
 
 `app.error` incluye el **manejador global de errores** de React Native: un crash es el evento más
 útil que esta tabla puede tener y es justo el que ningún `try` de la app registra.
