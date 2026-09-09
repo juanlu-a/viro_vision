@@ -26,6 +26,14 @@ const FRONTERA_ADR_0001 = {
               'ADR 0001 + ADR 0006: la nube sólo se usa en el modo supermercado, desde features/reader. El camino de reconocimiento y el anuncio tienen que funcionar sin internet.',
           },
           {
+            // La telemetría (ADR 0008) es red. Un evento registrado desde acá metería una llamada
+            // de red en el camino que ADR 0001 protege — y el diagnóstico no puede costarle al
+            // usuario la voz que sí necesita. Se registra desde features/reader y features/device.
+            group: ['@/services/telemetria', '@/services/telemetria/*', '**/services/telemetria/*'],
+            message:
+              'ADR 0001 + ADR 0008: la telemetría es red. El reconocimiento y el anuncio tienen que funcionar sin internet; registrá desde features/reader o features/device.',
+          },
+          {
             // Por lo mismo que arriba: el anuncio tiene que sonar SIN internet. La síntesis de voz
             // a archivo sale por el proxy (ADR 0008) y por eso se llama desde features/reader,
             // después del anuncio y sin bloquearlo — nunca desde adentro de `announce()`.

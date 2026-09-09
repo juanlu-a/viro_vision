@@ -19,7 +19,11 @@
  *
  * Cada transición de modo y cada resultado se **anuncian por voz**: es una app para personas que
  * no ven la pantalla. Lo que queda en pantalla es el resultado, nada más: los tiempos, el modelo
- * que respondió, el texto crudo y la foto se registran en Supabase, no en la interfaz.
+ * que respondió y el texto crudo van a la telemetría (`services/telemetria`), no a la interfaz.
+ *
+ * Los eventos se registran **acá y no dentro de `announce()`**: la telemetría es red y ADR 0001 la
+ * tiene prohibida en el camino del anuncio (lo fuerza el linter). `registrar()` es sincrónico y no
+ * espera nada, así que ninguna lectura se atrasa por él.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -32,6 +36,8 @@ import type { Gesto, Modo } from '@/features/reader/modes';
 import { useModeloSupermercado } from '@/features/reader/ModeloSupermercadoProvider';
 import { strings } from '@/i18n';
 import { isSintesisHabilitada, sintetizarAArchivo } from '@/services/audio/sintesis';
+import { registrar } from '@/services/telemetria';
+import { HttpDescargaError } from '@/services/wifi/descargaHttp';
 import type { ImagenParaLaNube } from '@/services/camera';
 import { cargarOcr, leerImagen, liberarOcr, ocrCargado } from '@/services/ondevice';
 import {
@@ -98,13 +104,20 @@ async function guardarAudioDeLaLectura(
   enviarAlDispositivo?: (uri: string) => Promise<boolean>,
 ): Promise<void> {
   if (!isSintesisHabilitada) return;
+  const t0 = Date.now();
   try {
     const uri = await sintetizarAArchivo(texto);
     // Y al parlante de la placa, por WiFi (ADR 0003). El usuario ya escuchó la lectura por el
     // teléfono: esto es el camino del dispositivo final, no lo que hoy garantiza el anuncio.
-    if (enviarAlDispositivo) await enviarAlDispositivo(uri);
-  } catch {
-    // Silencio deliberado: nada de lo que el usuario hace depende de esto.
+    const enviado = enviarAlDispositivo ? await enviarAlDispositivo(uri) : false;
+    registrar('audio.envio', { ms: Date.now() - t0, detalle: { enviado } });
+  } catch (err) {
+    // Silencio deliberado para el usuario: nada de lo que hace depende de esto. Pero queda
+    // registrado, porque es el camino del parlante del dispositivo y falla sin que nadie lo note.
+    registrar('audio.envio', {
+      ms: Date.now() - t0,
+      detalle: { enviado: false, mensaje: err instanceof Error ? err.message : String(err) },
+    });
   }
 }
 
@@ -135,8 +148,9 @@ export function useLector() {
    * de ADR 0007. Cada transición se anuncia por audio: el usuario no tiene otro indicador de estado.
    */
   const cambiarModo = useCallback(
-    (siguiente: Modo) => {
+    (siguiente: Modo, origen: 'app' | 'placa') => {
       if (siguiente === ref.current.modo) return;
+      registrar('modo.cambio', { detalle: { de: ref.current.modo, a: siguiente, origen } });
       update({ modo: siguiente, lectura: null, producto: null, mensaje: '' });
       announce(ANUNCIO_MODO[siguiente]);
     },
@@ -147,7 +161,7 @@ export function useLector() {
     (gesto: Gesto) => {
       const siguiente = transicionar(ref.current.modo, gesto);
       if (siguiente === ref.current.modo) return;
-      cambiarModo(siguiente);
+      cambiarModo(siguiente, 'app');
       // La placa se entera del modo por BLE y enciende o apaga su AP. Si no está, no pasa nada.
       void dispositivo.escribirModo(siguiente);
     },
@@ -157,7 +171,7 @@ export function useLector() {
   // El modo que informa la placa (botón físico) manda: la app lo refleja y lo anuncia.
   const modoDelDispositivo = dispositivo.modoDispositivo;
   useEffect(() => {
-    if (modoDelDispositivo && modoDelDispositivo !== ref.current.modo) cambiarModo(modoDelDispositivo);
+    if (modoDelDispositivo && modoDelDispositivo !== ref.current.modo) cambiarModo(modoDelDispositivo, 'placa');
   }, [modoDelDispositivo, cambiarModo]);
 
   /** Modo ómnibus: SIEMPRE local (ADR 0006) — OCR sobre la foto, sin tocar la red. */
@@ -165,7 +179,10 @@ export function useLector() {
     async (uri: string) => {
       if (!ocrCargado()) {
         update({ estado: 'preparing', mensaje: t.preparing, progreso: 0 });
-        await cargarOcr((p) => update({ progreso: p }));
+        // La primera carga baja ~250 MB: si alguien reporta que "la primera vez no anda", este
+        // número dice si estaba descargando o si se colgó.
+        const carga = await cargarOcr((p) => update({ progreso: p }));
+        registrar('ocr.carga', { ms: carga.ms });
       }
       update({ estado: 'reading', mensaje: t.reading, progreso: null });
 
@@ -176,6 +193,20 @@ export function useLector() {
 
       const dicho = frasearLectura(lectura, crudo);
       announce(dicho);
+      // Qué detectó el OCR y qué se sacó de ahí: sin el crudo no hay forma de distinguir "el cartel
+      // no se leyó" de "se leyó y `adivinarLectura` eligió mal", que se arreglan en lugares distintos.
+      registrar('lectura.ok', {
+        ms: r.ms,
+        detalle: {
+          modo: 'omnibus',
+          detecciones: r.detecciones.length,
+          usadas: visibles.length,
+          crudo: crudo?.slice(0, 300) ?? null,
+          numero: lectura.numero,
+          nombre: lectura.nombre,
+          dicho,
+        },
+      });
       update({ estado: 'idle', lectura, mensaje: dicho });
       void guardarAudioDeLaLectura(dicho, dispositivo.enviarAudio);
     },
@@ -191,6 +222,7 @@ export function useLector() {
     async (imagen: ImagenParaLaNube) => {
       const model = modelo;
       if (!model) {
+        registrar('lectura.fallo', { detalle: { modo: 'supermercado', etapa: 'modelo', motivo: 'sin modelo configurado' } });
         announce(t.cloudNotConfigured);
         update({ estado: 'idle', progreso: null, mensaje: t.cloudNotConfigured });
         return;
@@ -207,16 +239,43 @@ export function useLector() {
           // app colgada. El callback existía desde el principio y no lo llamaba nadie.
           onWait: (waitMs) => {
             const aviso = `${t.waitingSlot} ${Math.ceil(waitMs / 1000)} s.`;
+            registrar('nube.espera', { ms: waitMs, detalle: { model } });
             announce(aviso);
             update({ mensaje: aviso });
           },
         });
         const dicho = frasearProducto(r.producto, r.texto || null);
         announce(dicho);
+        registrar('lectura.ok', {
+          ms: r.ms,
+          detalle: {
+            modo: 'supermercado',
+            // El modelo PEDIDO y el que RESPONDIÓ: si no coinciden, el selector no está mandando.
+            modeloPedido: model,
+            modelo: r.model,
+            tipo: r.producto?.tipo ?? null,
+            marca: r.producto?.marca ?? null,
+            detalleProducto: r.producto?.detalle ?? null,
+            crudo: r.texto?.slice(0, 300) ?? null,
+            dicho,
+          },
+        });
         update({ estado: 'idle', producto: r.producto, mensaje: dicho });
         void guardarAudioDeLaLectura(dicho, dispositivo.enviarAudio);
       } catch (err) {
         const mensaje = mensajeDeError(err);
+        // El tipo del error es lo que separa "sin clave" de "sin internet" de "cuota agotada", y
+        // los tres se ven igual desde afuera: la app avisa y no lee.
+        registrar('lectura.fallo', {
+          detalle: {
+            modo: 'supermercado',
+            etapa: 'nube',
+            modeloPedido: model,
+            tipo: err instanceof Error ? err.name : typeof err,
+            mensaje: err instanceof Error ? err.message : String(err),
+            ...(err instanceof VisionQuotaError ? { esperaS: err.retryAfterSeconds } : null),
+          },
+        });
         announce(mensaje);
         update({ estado: 'idle', progreso: null, mensaje });
       }
@@ -236,12 +295,23 @@ export function useLector() {
   const leer = useCallback(async () => {
     const { modo } = ref.current;
     if (modo === 'esperando') return; // en reposo no se captura ni se anuncia (ADR 0007)
+    const t0 = Date.now();
+    registrar('lectura.inicio', { detalle: { modo, modelo: modelo ?? null } });
     update({ estado: 'reading', mensaje: t.readingFromDevice, progreso: null });
 
     let foto;
     try {
       foto = await dispositivo.descargarFoto();
+      // Peso y tiempo de la foto por separado del total: es lo que separa "la red está lenta" de
+      // "el modelo está lento", y los dos se ven igual como "tardó".
+      registrar('foto.ok', { ms: foto.ms, detalle: { bytes: foto.bytes } });
     } catch (err) {
+      const status = err instanceof HttpDescargaError ? err.status : null;
+      registrar('foto.fallo', {
+        ms: Date.now() - t0,
+        // El 503 es "la placa no tiene cámara" y lo dice ella; el resto es la red.
+        detalle: { modo, status, mensaje: err instanceof Error ? err.message : String(err) },
+      });
       // El motivo se dice: quien no ve la pantalla no tiene otra forma de saber por qué el botón
       // no hizo nada. La placa distingue "sin cámara" (503) de una red que no responde.
       const mensaje = `${t.deviceCaptureFailed} ${err instanceof Error ? err.message : String(err)}`;
@@ -254,11 +324,20 @@ export function useLector() {
       if (modo === 'omnibus') await leerOmnibus(foto.uri);
       else await leerSupermercado(foto.imagen);
     } catch (err) {
+      registrar('lectura.fallo', {
+        ms: Date.now() - t0,
+        detalle: {
+          modo,
+          etapa: modo === 'omnibus' ? 'ocr' : 'nube',
+          tipo: err instanceof Error ? err.name : typeof err,
+          mensaje: err instanceof Error ? err.message : String(err),
+        },
+      });
       const mensaje = `${t.error}: ${err instanceof Error ? err.message : String(err)}`;
       announce(t.error);
       update({ estado: 'idle', progreso: null, mensaje });
     }
-  }, [dispositivo, leerOmnibus, leerSupermercado, update]);
+  }, [dispositivo, leerOmnibus, leerSupermercado, modelo, update]);
 
   return {
     state,

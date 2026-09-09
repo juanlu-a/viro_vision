@@ -14,7 +14,8 @@
  * - **Sincroniza el modo**: la app se lo escribe a la placa y refleja el que la placa informe.
  *
  * REGLA DE FRONTERA (ADR 0001): nada de esto está en el camino del reconocimiento de ómnibus, que
- * corre local. La placa es una fuente de imagen más; sin ella, la cámara del teléfono.
+ * corre local. Lo que sí sale a la red es la **telemetría**: se registra acá y no en `features/audio`
+ * ni en `features/recognition`, que la tienen prohibida por el linter, y siempre sin esperarla.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -27,6 +28,7 @@ import {
 } from '@/services/ble/bleClient';
 import { codificarBase64 } from '@/services/ble/base64';
 import { descargarFotoDeLaPlaca, type FotoDeLaPlaca } from '@/services/camera';
+import { registrar } from '@/services/telemetria';
 import { urlDeLaPlaca } from '@/services/wifi/descargaHttp';
 import { WifiNoDisponibleError, esperarPlaca, salirDelWifi, ssidActual, unirseAlWifi } from '@/services/wifi/unirse';
 
@@ -98,6 +100,8 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const sincronizacionRed = useRef(0);
   // Lo último que se sincronizó, para no reiniciar la comprobación con cada latido de `estado`.
   const redSincronizada = useRef<{ ap: boolean; ip: string | null; ok: boolean }>({ ap: false, ip: null, ok: false });
+  // Lo último que se registró de `estado`, para no llenar la tabla de latidos idénticos.
+  const huellaEstado = useRef<string | null>(null);
 
   /**
    * La red sigue al AP: unirse cuando la placa lo enciende, salir cuando lo apaga, y comprobar que
@@ -108,6 +112,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const fallarRed = useCallback((detalle: string) => {
     setWifi('error');
     setWifiDetalle(detalle);
+    registrar('wifi.fallo', { detalle: { motivo: detalle } });
     // La voz es la interfaz: un fallo silencioso deja al usuario esperando un botón que no llega.
     announce(`${strings.connect.wifiFailedAnnounce} ${detalle}`);
   }, []);
@@ -162,10 +167,15 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       }
       if (!vigente()) return false;
       setWifi('uniendose');
+      registrar('wifi.uniendose', { detalle: { ap: apActivo, ip: destino.ip, ssid: credenciales.current?.ssid ?? null } });
+      const t0 = Date.now();
       const responde = await esperarPlaca(destino);
       if (!vigente()) return false;
       if (responde) {
         setWifi('listo');
+        // El tiempo hasta que la placa responde es lo que separa "tarda" de "no anda": el 2026-09-06
+        // la red no llegaba nunca a lista y sin este número no había forma de saber dónde se colgaba.
+        registrar('wifi.listo', { ms: Date.now() - t0, detalle: { ip: destino.ip } });
         announce(strings.connect.wifiReadyAnnounce);
         return true;
       }
@@ -192,6 +202,17 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const aplicarEstado = useCallback(
     (estado: EstadoDispositivo) => {
       const destino = estado.ip && estado.puerto ? { ip: estado.ip, puerto: estado.puerto } : null;
+      // `estado` llega cada 15 s: registrarlo entero serían 240 filas por hora de las cuales 239
+      // son idénticas. Se registra sólo cuando cambia algo que se pueda mirar después, y la batería
+      // por tramos de 5 % para que descargarse no genere una fila por latido.
+      const huella = JSON.stringify([
+        estado.ap, estado.wifi, estado.camara, estado.ip, estado.version,
+        estado.bateria == null ? null : Math.round(estado.bateria / 5),
+      ]);
+      if (huella !== huellaEstado.current) {
+        huellaEstado.current = huella;
+        registrar('placa.estado', { detalle: { ...estado } });
+      }
       setAp(estado.ap);
       setDireccion(destino);
       setConexion((c) =>
@@ -215,6 +236,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
   const programarReintento = useCallback(() => {
     if (!autoconexion.current || timer.current) return;
     const espera = REINTENTOS_MS[Math.min(reintento.current, REINTENTOS_MS.length - 1)];
+    registrar('ble.reintento', { ms: espera, detalle: { intento: reintento.current + 1 } });
     reintento.current += 1;
     timer.current = setTimeout(() => {
       timer.current = null;
@@ -226,10 +248,24 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
     if (conectando.current) return;
     conectando.current = true;
     setConexion({ status: 'scanning', device: null, message: strings.connection.scanning });
+    registrar('ble.buscando');
+    const t0 = Date.now();
     try {
       const cliente = getBleClient();
       const device: DeviceInfo = await cliente.connect();
       reintento.current = 0;
+      // Cuánto tardó en aparecer, y en qué estado apareció: es el contexto de todo lo que venga
+      // después en la sesión.
+      registrar('ble.conectado', {
+        ms: Date.now() - t0,
+        detalle: {
+          nombre: device.name,
+          firmware: device.firmwareVersion,
+          bateria: device.batteryLevel,
+          ap: device.ap,
+          conRed: device.direccion !== null,
+        },
+      });
       setConexion({ status: 'connected', device, message: strings.connection.connected });
       setDireccion(device.direccion);
       setAp(device.ap);
@@ -237,6 +273,15 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
       redSincronizada.current = { ap: device.ap, ip: device.direccion?.ip ?? null, ok: false };
       void sincronizarRed(device.ap, device.direccion);
     } catch (err) {
+      // El TIPO del error, no sólo el mensaje: distingue "no hay Bluetooth en este build" de
+      // "la placa no apareció", que llevan a lugares distintos.
+      registrar('ble.fallo', {
+        ms: Date.now() - t0,
+        detalle: {
+          tipo: err instanceof Error ? err.name : typeof err,
+          mensaje: err instanceof Error ? err.message : String(err),
+        },
+      });
       setConexion({ status: 'error', device: null, message: mensajeDeError(err) });
       // Sin módulo nativo no hay nada que reintentar: la app corre sin placa.
       if (!(err instanceof BleNotImplementedError)) programarReintento();
@@ -254,6 +299,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
     const cliente = getBleClient();
     const bajas = [
       cliente.onDisconnect(() => {
+        registrar('ble.perdido');
         sincronizacionRed.current += 1; // invalida cualquier espera de red en curso
         setConexion({ status: 'error', device: null, message: strings.connection.lost });
         setDireccion(null);
@@ -262,11 +308,15 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
         programarReintento();
       }),
       cliente.onEstado(aplicarEstado),
-      cliente.onModo((valor) => setModoDispositivo(MODO_DESDE_GATT[valor] ?? null)),
+      cliente.onModo((valor) => {
+        registrar('placa.modo', { detalle: { valor, modo: MODO_DESDE_GATT[valor] ?? null } });
+        setModoDispositivo(MODO_DESDE_GATT[valor] ?? null);
+      }),
       cliente.onAp(empezarTransicionDeRed),
       cliente.onErrorDispositivo((mensaje) => {
         // La placa no tiene pantalla: si algo le falló (levantar el AP, la cámara), la app es el
-        // único lugar donde se puede enterar alguien.
+        // único lugar donde se puede enterar alguien — y desde que hay telemetría, la tabla.
+        registrar('placa.aviso', { detalle: { mensaje } });
         setUltimoAviso(mensaje);
         announce(`${strings.connect.deviceErrorAnnounce} ${mensaje}`);
       }),
@@ -295,6 +345,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
     // Desconectar a mano apaga la reconexión hasta que el usuario vuelva a buscar: si no, la app
     // se reconectaría sola un segundo después y el botón no serviría para nada.
     autoconexion.current = false;
+    registrar('ble.desconectado');
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
@@ -324,6 +375,7 @@ export function DispositivoProvider({ children }: { children: React.ReactNode })
         // La placa no se enteró del modo: la app sigue con la cámara del teléfono, pero se dice.
         // El 2026-09-06 el modo no llegaba a la placa y nadie lo supo hasta leer su log.
         const detalle = err instanceof Error ? err.message : String(err);
+        registrar('placa.modoFallo', { detalle: { modo, mensaje: detalle } });
         setUltimoAviso(`${strings.connect.modeWriteFailed} ${detalle}`);
         announce(`${strings.connect.modeWriteFailed} ${detalle}`);
       }
