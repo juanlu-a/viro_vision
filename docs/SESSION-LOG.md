@@ -1218,10 +1218,13 @@ con tope, 17 tests). Dos cosas de la rama vieja que valían y **se rescataron** 
 - **Un evento por cada llamada al TTS de nube** (`audio.sintesis`), separado del envío al parlante
   (`audio.envio`): fallan y tardan por motivos distintos, y juntos se ven como un solo «tardó».
 
-**Y hay dos vocabularios de `tipo` en la tabla**: las 28 filas del build viejo usan `snake_case`
-(`app_abierta`, `ble_conectado`, `wifi_lista`) y todo lo nuevo usa puntos (`app.inicio`,
-`ble.conectado`, `wifi.listo`). Una consulta que filtre por `tipo` sin contemplar las dos formas
-muestra de menos sin avisar. Está documentado en `docs/supabase.md`.
+**Había dos vocabularios de `tipo` en la tabla**: las 28 filas del build viejo en `snake_case`
+(`app_abierta`, `ble_conectado`, `wifi_lista`) y las nuevas con puntos (`app.inicio`, `ble.conectado`,
+`wifi.listo`). Una consulta que filtrara por `tipo` sin contemplar las dos formas habría mostrado de
+menos **sin avisar**, así que se decidió tabla limpia: las 28 filas viejas se borraron y la tabla
+quedó en cero. La rama `feat/telemetria-supabase` se borró del remoto el mismo día, una vez
+confirmado con `git diff origin/staging` que no le quedaba nada propio — lo único que tenía y
+`staging` no era el estado viejo de la app, que el PR #68 sacó a propósito.
 
 **Un defecto propio, encontrado al mirar el esquema**: el cliente devolvía a la cola cualquier lote
 fallido **sin tope**. Como siempre se sube lo más viejo primero, un lote que el servidor no puede
@@ -1273,12 +1276,10 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Medir el consumo real del daemon** con el medidor USB (reposo, modo ómnibus, modo supermercado
   con AP) y confirmar la batería propuesta el 2026-09-07 (`hardware/README.md`, *Alimentación*); con
   la UPS HAT en mano, leer el INA219 y llenar `estado.bateria`.
-- **Logs a Supabase — hecho (2026-09-09)**, esquema incluido. Lo que queda es **mirar la tabla
-  después de una salida real** y ver si lo que se registró alcanza para explicar una falla; si falta
-  un evento, agregarlo es una línea en `tipos.ts`. Dos mejoras pendientes que venían de la rama
-- **Cerrar `feat/telemetria-supabase`**: su contenido está superado por lo que hay en `staging`
-  (`git diff origin/staging origin/feat/telemetria-supabase` para confirmarlo antes de borrarla).
-  Decidir si se descarta a conciencia o se rescata algo más. Después: **spike 1 de segundo plano en iOS** (la
+- **Logs a Supabase — hecho (2026-09-09)**, esquema y limpieza de la tabla incluidos. Lo que queda es
+  **mirar la tabla después de una salida real** y ver si lo que se registró alcanza para explicar una
+  falla; si falta un evento, agregarlo es una línea en `tipos.ts`.
+- Después: **spike 1 de segundo plano en iOS** (la
   notificación BLE despierta la app con la pantalla bloqueada y el ciclo termina); **parlante en la
   placa** (DAC I2S) para el audio que ya llega a `/tmp`; Android: API de
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin

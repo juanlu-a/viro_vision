@@ -244,20 +244,19 @@ curl -sS -X POST "$EXPO_PUBLIC_TELEMETRY_URL" -H 'content-type: application/json
 # Esperado: {"guardados":1}. Si dice {"guardados":0}, al evento le falta `tipo` o `momento`.
 ```
 
-## Ojo al consultar: hay DOS vocabularios de `tipo` en la tabla
+## Un solo vocabulario de `tipo`, y así conviene que siga
 
-La tabla tiene filas de **dos clientes distintos** y no usan los mismos nombres:
+Los `tipo` son **`punto.separado`**: `app.inicio`, `ble.conectado`, `wifi.listo`, `foto.fallo`,
+`modo.cambio`, `lectura.ok`. La lista completa y vigente está en
+`app/src/services/telemetria/tipos.ts`, que es una **unión cerrada de TypeScript** a propósito: con
+strings libres, un `lectura.fallo` y un `lectura_fallo` conviven felices y ninguna consulta los ve a
+los dos. Agregar un tipo es agregar una línea ahí.
 
-| Origen | Cuándo | Forma de `tipo` | Ejemplos |
-|---|---|---|---|
-| Build manual de `feat/telemetria-supabase` (rama nunca mergeada) | 2026-09-07/08, ~28 filas | `snake_case` | `app_abierta`, `ble_conectado`, `wifi_lista`, `foto_placa_error`, `modo_escrito`, `lectura_omnibus` |
-| El cliente que está en `staging` desde el 2026-09-09 | de ahí en adelante | `punto.separado` | `app.inicio`, `ble.conectado`, `wifi.listo`, `foto.fallo`, `modo.cambio`, `lectura.ok` |
-
-Una consulta que filtre por `tipo` y no contemple las dos formas va a mostrar de menos sin decirlo.
-Lo más simple es acotar por fecha: todo lo del 2026-09-09 en adelante usa la forma nueva, que es la
-única que la app produce hoy. La lista completa de tipos vigentes está en
-`app/src/services/telemetria/tipos.ts`, que es una unión cerrada justamente para que no aparezca un
-tercer vocabulario.
+> **Ya pasó una vez.** Hasta el 2026-09-09 la tabla tenía además ~28 filas en `snake_case`
+> (`app_abierta`, `ble_conectado`, `wifi_lista`) de un build manual de `feat/telemetria-supabase`,
+> una rama que nunca se mergeó. Se **borraron** ese día para dejar un solo vocabulario: una consulta
+> que filtre por `tipo` sin contemplar las dos formas muestra de menos **sin avisar**, que es la
+> peor forma de estar mal. La tabla arranca limpia desde ahí.
 
 ## Esquema versionado (2026-09-09)
 
