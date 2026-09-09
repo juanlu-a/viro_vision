@@ -21,7 +21,14 @@ export const GATT = {
     control: '4380c502-7ca3-4e37-b27d-f60e8d8d73d1',
     /** notify — JSON ≤ 180 bytes: `{ t: 'inicio' | 'fin' | 'modo' | 'error' | 'resultado', ... }`. */
     evento: '4380c503-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** notify — binario: header de 4 bytes (`seq` u16 LE, `total` u16 LE) + datos. */
+    /**
+     * notify — binario: header de 4 bytes (`seq` u16 LE, `total` u16 LE) + datos.
+     *
+     * **La app ya no la usa**: el ADR 0003 se cerró a favor de HTTP sobre WiFi (46 ms contra 4,5 s),
+     * y con la medición se fue el único cliente. Queda en el espejo porque la placa la sigue
+     * publicando; sacarla de `hardware/raspi/virovision/` es un PR aparte, y este comentario existe
+     * para que nadie la cablee de nuevo creyendo que es el camino de la foto.
+     */
     transferencia: '4380c504-7ca3-4e37-b27d-f60e8d8d73d1',
     /** read · notify — JSON: `version`, `temp`, `uptime`, `bateria` (null hoy), `camara`, `wifi`, `ip`, `puerto`, `ap`. */
     estado: '4380c505-7ca3-4e37-b27d-f60e8d8d73d1',

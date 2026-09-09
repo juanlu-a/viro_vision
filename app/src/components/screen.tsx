@@ -58,6 +58,10 @@ export function Screen({ children, scroll = false, edges, onRefresh }: ScreenPro
             // Sin `justify-center`: centraba verticalmente el contenido corto y el título de una
             // pantalla con scroll caía más abajo que el de una sin scroll.
             contentContainerClassName="grow"
+            // Sin barra de desplazamiento: en un teléfono la posición ya la da el gesto, y acá
+            // aparecía sobre el borde de las tarjetas cada vez que alguien deslizaba. No se pierde
+            // información: ninguna pantalla comunica nada por el largo del scroll.
+            showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             contentInsetAdjustmentBehavior="automatic"

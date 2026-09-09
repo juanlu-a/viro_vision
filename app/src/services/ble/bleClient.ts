@@ -13,7 +13,6 @@ import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 
 import { crearBleClientPlx } from './bleClientPlx';
-import type { MedicionTransferencia } from './transferencia';
 
 export interface BleClient {
   /** Busca el dispositivo por el UUID del servicio y se conecta. Resuelve con sus datos. */
@@ -39,12 +38,6 @@ export interface BleClient {
   escribirModo(modo: number): Promise<void>;
   /** Credenciales del AP de la placa, o null si no tiene. */
   leerWifi(): Promise<CredencialesWifi | null>;
-  /**
-   * Spike del ADR 0003: pide a la placa `bytes` de relleno por la característica `transferencia`
-   * y mide cuánto tardan en llegar. Con 53 000 bytes (la foto que hoy sube a la nube) el umbral es
-   * 2 s: menos, BLE alcanza y no hace falta WiFi.
-   */
-  medirTransferencia(bytes: number): Promise<MedicionTransferencia>;
 }
 
 /** El build no tiene el módulo nativo de BLE (Expo Go, web). */
@@ -119,9 +112,6 @@ const stubClient: BleClient = {
   },
   async leerWifi() {
     return null;
-  },
-  async medirTransferencia() {
-    throw new BleNotImplementedError();
   },
 };
 

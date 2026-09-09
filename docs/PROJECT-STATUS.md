@@ -86,8 +86,9 @@ tests via `jest-expo`.
   `services/{ble,audio,supabase,storage}`, `i18n` (Spanish strings), `types`.
 - **BLE** = cliente real sobre `react-native-ble-plx` detrás del selector de `services/ble/bleClient.ts`
   (stub tipado en Expo Go / web). Perfil GATT de 128 bits en `features/device/gatt.ts`, espejo de
-  `hardware/raspi/virovision/gatt.py`. La pestaña Dispositivo tiene **Medir transferencia** (spike del
-  ADR 0003). Necesita development build; sin verificar contra la placa todavía.
+  `hardware/raspi/virovision/gatt.py`. Necesita development build. Los botones de medición del spike
+  del ADR 0003 (**Medir transferencia** y **Medir por WiFi**) se retiraron el 2026-09-08: la decisión
+  ya está tomada (WiFi) y con ellos se fue el reensamblado por chunks del lado de la app.
 - **Audio routing** to the device earphone = documented TODO in `services/audio/tts.ts`.
 - **Supabase auth** = **archived** (app has no login). The env-gated client (real/stub) + `AuthProvider`
   remain in the repo but are not wired into navigation — available if optional sync is added later.
@@ -101,10 +102,13 @@ tests via `jest-expo`.
   gratis, pero ~4 lecturas/min). Gemini salió por la medición — rango 2820-32 586 ms. Ver
   [`docs/mediciones/`](mediciones/README.md). El laboratorio del spike se retiró
   (2026-08-30) y vive en la rama `spike/laboratorio-vision-local`.
-- **Captura por cámara (2026-09-01)**: `services/camera/` — la cámara del teléfono ocupa el lugar de
-  la placa del dispositivo mientras no hay hardware. Permiso pedido explícitamente y anunciado por
-  voz; la foto se achica a 1024 px de lado mayor antes de subirla. La fototeca queda como segunda
-  fuente, para pasarle la misma foto a varios modelos (dataset de evaluación).
+- **Captura (2026-09-08)**: `services/camera/` — la foto la saca **siempre la cámara de la placa** y
+  baja por WiFi (`GET /fotos/ultima`, ADR 0003), ya a 1024 px y calidad 70. La cámara del teléfono y
+  la fototeca, que ocupaban ese lugar mientras no había hardware, se retiraron junto con
+  `expo-image-picker` y los permisos de cámara y fotos: el producto tiene una sola fuente de imagen
+  y sostener dos era mantener un camino que nadie recorre. **Consecuencia abierta**: el dataset de
+  evaluación (pasos 8-9 de la QA) ya no se puede correr desde la app pasándole la misma foto a
+  varios modelos; hay que correrlo fuera de la app o volver a habilitar una entrada de prueba.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a

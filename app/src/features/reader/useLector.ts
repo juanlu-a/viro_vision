@@ -8,16 +8,18 @@
  * precisión. Sin internet o sin clave, supermercado **avisa** y no lee: el fallback local para ese
  * modo sigue pendiente (ADR 0006, actualización 2026-08-30).
  *
- * La imagen entra por la **cámara de la placa** cuando el dispositivo está conectado y con red
- * (ADR 0003: la foto baja por WiFi, BLE es el control), y si no por la **cámara del teléfono**. La
- * fototeca queda como segunda fuente para poder pasarle la misma foto a varios modelos y que la
- * comparación mida modelos y no fotos.
+ * La imagen entra SIEMPRE por la **cámara de la placa** (ADR 0003: la foto baja por WiFi, BLE es el
+ * plano de control). Hasta el 2026-09-08 había además la cámara del teléfono y la fototeca, que
+ * ocupaban ese lugar mientras no había hardware; con el dispositivo andando se fueron, porque una
+ * segunda fuente de imagen es un segundo camino que hay que probar y mantener para un producto que
+ * no lo tiene.
  *
  * El modo se sincroniza con la placa: los gestos de la app se le escriben por BLE (ella enciende su
  * AP con un modo activo) y el modo que la placa informe (botón físico, ADR 0007) se refleja acá.
  *
  * Cada transición de modo y cada resultado se **anuncian por voz**: es una app para personas que
- * no ven la pantalla, y el texto en pantalla es el registro, no la interfaz.
+ * no ven la pantalla. Lo que queda en pantalla es el resultado, nada más: los tiempos, el modelo
+ * que respondió, el texto crudo y la foto se registran en Supabase, no en la interfaz.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -30,13 +32,7 @@ import type { Gesto, Modo } from '@/features/reader/modes';
 import { useModeloSupermercado } from '@/features/reader/ModeloSupermercadoProvider';
 import { strings } from '@/i18n';
 import { isSintesisHabilitada, sintetizarAArchivo } from '@/services/audio/sintesis';
-import {
-  CameraPermissionError,
-  ImagenIlegibleError,
-  capturarFoto,
-  prepararParaLaNube,
-} from '@/services/camera';
-import type { FotoCapturada, FuenteDeImagen, ImagenParaLaNube } from '@/services/camera';
+import type { ImagenParaLaNube } from '@/services/camera';
 import { cargarOcr, leerImagen, liberarOcr, ocrCargado } from '@/services/ondevice';
 import {
   VisionNetworkError,
@@ -62,15 +58,6 @@ export interface LectorState {
   progreso: number | null;
   lectura: BusReading | null;
   producto: ProductoLeido | null;
-  /** Texto de respaldo cuando no hubo lectura estructurada (p. ej. las detecciones del OCR). */
-  textoCrudo: string | null;
-  ms: number | null;
-  /** Qué modelo de nube respondió, para mostrarlo junto al resultado. */
-  modelo: string | null;
-  /** Ruta del .mp3 de la lectura, cuando la síntesis a archivo está habilitada. */
-  audio: string | null;
-  /** La foto que sacó la placa en la última lectura, para verla y juzgar enfoque y calidad. */
-  fotoPlaca: { uri: string; bytes: number; ms: number } | null;
 }
 
 const inicial: LectorState = {
@@ -80,11 +67,6 @@ const inicial: LectorState = {
   progreso: null,
   lectura: null,
   producto: null,
-  textoCrudo: null,
-  ms: null,
-  modelo: null,
-  audio: null,
-  fotoPlaca: null,
 };
 
 /**
@@ -93,12 +75,6 @@ const inicial: LectorState = {
  * pedir), se usa: para eso viaja como campo de la clase.
  */
 function mensajeDeError(err: unknown): string {
-  if (err instanceof CameraPermissionError) {
-    // El consejo cambia según si iOS va a volver a preguntar: decirle "aceptá el permiso" a quien
-    // ya no va a ver el diálogo lo deja esperando un cartel que no aparece.
-    return err.canAskAgain ? t.cameraDenied : t.cameraDeniedForever;
-  }
-  if (err instanceof ImagenIlegibleError) return t.imageUnreadable;
   if (err instanceof VisionNotConfiguredError) return t.cloudNotConfigured;
   if (err instanceof VisionNetworkError) return t.cloudUnavailable;
   if (err instanceof VisionQuotaError) return `${t.quotaExhausted} ${err.retryAfterSeconds} s.`;
@@ -119,13 +95,11 @@ function mensajeDeError(err: unknown): string {
  */
 async function guardarAudioDeLaLectura(
   texto: string,
-  update: (patch: Partial<LectorState>) => void,
   enviarAlDispositivo?: (uri: string) => Promise<boolean>,
 ): Promise<void> {
   if (!isSintesisHabilitada) return;
   try {
     const uri = await sintetizarAArchivo(texto);
-    update({ audio: uri });
     // Y al parlante de la placa, por WiFi (ADR 0003). El usuario ya escuchó la lectura por el
     // teléfono: esto es el camino del dispositivo final, no lo que hoy garantiza el anuncio.
     if (enviarAlDispositivo) await enviarAlDispositivo(uri);
@@ -163,17 +137,7 @@ export function useLector() {
   const cambiarModo = useCallback(
     (siguiente: Modo) => {
       if (siguiente === ref.current.modo) return;
-      update({
-        modo: siguiente,
-        lectura: null,
-        producto: null,
-        textoCrudo: null,
-        ms: null,
-        modelo: null,
-        audio: null,
-        fotoPlaca: null,
-        mensaje: '',
-      });
+      update({ modo: siguiente, lectura: null, producto: null, mensaje: '' });
       announce(ANUNCIO_MODO[siguiente]);
     },
     [update],
@@ -212,8 +176,8 @@ export function useLector() {
 
       const dicho = frasearLectura(lectura, crudo);
       announce(dicho);
-      update({ estado: 'idle', lectura, textoCrudo: crudo, ms: r.ms, mensaje: dicho });
-      void guardarAudioDeLaLectura(dicho, update, dispositivo.enviarAudio);
+      update({ estado: 'idle', lectura, mensaje: dicho });
+      void guardarAudioDeLaLectura(dicho, dispositivo.enviarAudio);
     },
     [update, dispositivo.enviarAudio],
   );
@@ -224,7 +188,7 @@ export function useLector() {
    * para ser leído.
    */
   const leerSupermercado = useCallback(
-    async (entrada: FotoCapturada | ImagenParaLaNube) => {
+    async (imagen: ImagenParaLaNube) => {
       const model = modelo;
       if (!model) {
         announce(t.cloudNotConfigured);
@@ -234,10 +198,7 @@ export function useLector() {
       update({ estado: 'reading', mensaje: t.reading, progreso: null });
 
       try {
-        // El achique va acá y no en la captura: es el único modo que sube la imagen, y en ómnibus
-        // reescalar sólo le sacaría píxeles al OCR sin ganar nada. La foto de la placa ya viene a
-        // 1024 px y en base64: no se toca.
-        const imagen = 'imageBase64' in entrada ? entrada : await prepararParaLaNube(entrada);
+        // La foto de la placa ya viene a 1024 px y en base64: no se reescala ni se recodifica.
         const r = await reconocerProducto({
           model,
           ...imagen,
@@ -250,11 +211,10 @@ export function useLector() {
             update({ mensaje: aviso });
           },
         });
-        const crudo = r.texto || null;
-        const dicho = frasearProducto(r.producto, crudo);
+        const dicho = frasearProducto(r.producto, r.texto || null);
         announce(dicho);
-        update({ estado: 'idle', producto: r.producto, textoCrudo: crudo, ms: r.ms, modelo: r.model, mensaje: dicho });
-        void guardarAudioDeLaLectura(dicho, update, dispositivo.enviarAudio);
+        update({ estado: 'idle', producto: r.producto, mensaje: dicho });
+        void guardarAudioDeLaLectura(dicho, dispositivo.enviarAudio);
       } catch (err) {
         const mensaje = mensajeDeError(err);
         announce(mensaje);
@@ -267,23 +227,29 @@ export function useLector() {
   );
 
   /**
-   * La foto la saca la placa (por WiFi) cuando está conectada y con red; si no, el teléfono. Es la
-   * misma lectura después: sólo cambia de dónde viene la imagen (ADR 0003).
+   * Una lectura entera: la placa saca la foto, baja por WiFi y va al pipeline del modo activo.
+   *
+   * Es el único camino desde que se fueron la cámara del teléfono y la fototeca (2026-09-08). Sin
+   * placa con red el botón está deshabilitado y la pantalla lo dice, así que acá no hay fallback:
+   * inventar uno volvería a poner dos caminos donde el producto tiene uno.
    */
-  const leerConLaPlaca = useCallback(async () => {
+  const leer = useCallback(async () => {
     const { modo } = ref.current;
-    if (modo === 'esperando') return;
+    if (modo === 'esperando') return; // en reposo no se captura ni se anuncia (ADR 0007)
     update({ estado: 'reading', mensaje: t.readingFromDevice, progreso: null });
+
     let foto;
     try {
       foto = await dispositivo.descargarFoto();
-      update({ fotoPlaca: { uri: foto.uri, bytes: foto.bytes, ms: foto.ms } });
     } catch (err) {
+      // El motivo se dice: quien no ve la pantalla no tiene otra forma de saber por qué el botón
+      // no hizo nada. La placa distingue "sin cámara" (503) de una red que no responde.
       const mensaje = `${t.deviceCaptureFailed} ${err instanceof Error ? err.message : String(err)}`;
       announce(mensaje);
       update({ estado: 'idle', progreso: null, mensaje });
       return;
     }
+
     try {
       if (modo === 'omnibus') await leerOmnibus(foto.uri);
       else await leerSupermercado(foto.imagen);
@@ -294,48 +260,14 @@ export function useLector() {
     }
   }, [dispositivo, leerOmnibus, leerSupermercado, update]);
 
-  const leer = useCallback(
-    async (fuente: FuenteDeImagen | 'placa') => {
-      const { modo } = ref.current;
-      if (modo === 'esperando') return; // en reposo no se captura ni se anuncia (ADR 0007)
-      if (fuente === 'placa') return leerConLaPlaca();
-
-      let foto: FotoCapturada | null;
-      try {
-        foto = await capturarFoto(fuente);
-      } catch (err) {
-        // El permiso denegado se anuncia con su propio consejo. Sin esto el botón no hace nada
-        // visible y quien no ve la pantalla no tiene forma de saber por qué.
-        const mensaje = mensajeDeError(err);
-        announce(mensaje);
-        update({ estado: 'idle', progreso: null, mensaje });
-        return;
-      }
-      // Cancelar no es un error: no se anuncia ni deja mensaje. El usuario ya sabe que canceló.
-      if (!foto) return;
-
-      try {
-        if (modo === 'omnibus') {
-          await leerOmnibus(foto.uri);
-        } else {
-          await leerSupermercado(foto);
-        }
-      } catch (err) {
-        const mensaje = `${t.error}: ${err instanceof Error ? err.message : String(err)}`;
-        announce(t.error);
-        update({ estado: 'idle', progreso: null, mensaje });
-      }
-    },
-    [leerConLaPlaca, leerOmnibus, leerSupermercado, update],
-  );
-
   return {
     state,
     aplicarGesto,
     leer,
     modelo,
-    fotoDesdeLaPlaca: dispositivo.fotoDisponible,
-    // La placa está conectada y su red se está levantando: el botón del dispositivo está por llegar.
+    /** La placa puede sacar la foto ahora: conectada, con red y respondiendo. Sin esto no se lee. */
+    placaLista: dispositivo.fotoDisponible,
+    // La placa está conectada y su red se está levantando: leer está por habilitarse.
     placaConectando: dispositivo.conexion.status === 'connected' && dispositivo.wifi === 'uniendose',
     /** Para la línea de estado de Inicio: qué hay del lado del dispositivo, en una palabra. */
     estadoPlaca:

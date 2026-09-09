@@ -272,6 +272,20 @@ Sigue **sin verificar** `claude-haiku-4-5`: requiere tarjeta y no hay clave.
 - `ml/` deja de planificar entrenamiento: su trabajo pasa a ser el dataset de evaluación y el
   export del detector a la TPU.
 
+## Actualización 2026-09-08 — La entrada del flujo es la placa, y sólo la placa
+
+Lo de arriba («la cámara del teléfono ocupa ese lugar mientras no haya hardware») era una condición
+con fecha de vencimiento, y venció: la placa saca la foto y baja por WiFi (ADR 0003). Se retiran de
+Inicio el botón de la cámara del teléfono y el de la fototeca, y del binario `expo-image-picker` con
+los permisos de cámara y fotos. La app vuelve a tener **una** entrada, la del diagrama acordado.
+
+**Lo que se pierde, dicho explícitamente**: la fototeca era el insumo del dataset de evaluación —
+pasarle *la misma* foto a varios modelos para que la comparación midiera modelos y no fotos (pasos
+8-9 de [`docs/qa-modo-supermercado.md`](../../qa-modo-supermercado.md)). Esa corrida ya no se puede
+hacer desde la app. Cuando toque medir precisión por modelo hay que hacerlo fuera de la app —contra
+el proxy, con el set de fotos guardado— o reponer una entrada de prueba detrás de una bandera, como
+`EXPO_PUBLIC_SIMULATE_DEVICE`. Lo que no se repone es una segunda fuente de imagen para el usuario.
+
 ## Ver también
 
 [`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md) (el registro completo de lo

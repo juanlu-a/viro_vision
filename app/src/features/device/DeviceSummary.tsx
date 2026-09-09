@@ -1,5 +1,9 @@
 /**
- * Resumen del dispositivo conectado: nombre, batería y firmware.
+ * Resumen del dispositivo conectado: nombre y batería.
+ *
+ * La dirección en la red y la versión de firmware estaban acá y se fueron el 2026-09-08: son
+ * diagnóstico, y el diagnóstico ahora va a Supabase. Un `192.168.4.1:8080` no le dice nada a quien
+ * usa la app, y si la red falla la propia pantalla lo dice en palabras.
  *
  * La batería se comunica **por texto**, no sólo por la barra: para un usuario ciego la barra no
  * existe, y para uno con baja visión un indicador que sólo cambia de color no dice nada. La barra
@@ -69,29 +73,6 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
         )}
       </View>
 
-      <View
-        accessible
-        accessibilityRole="text"
-        accessibilityLabel={`${t.addressLabel}: ${device.direccion ? `${device.direccion.ip}, puerto ${device.direccion.puerto}` : t.addressNone}`}>
-        <ThemedText type="small" themeColor="textSecondary">
-          {t.addressLabel}
-        </ThemedText>
-        <ThemedText type="small">
-          {device.direccion ? `${device.direccion.ip}:${device.direccion.puerto}` : t.addressNone}
-        </ThemedText>
-      </View>
-
-      {device.firmwareVersion && (
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={`${t.firmwareLabel}: ${device.firmwareVersion}`}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {t.firmwareLabel}
-          </ThemedText>
-          <ThemedText type="small">{device.firmwareVersion}</ThemedText>
-        </View>
-      )}
     </View>
   );
 }

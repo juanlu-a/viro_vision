@@ -1,6 +1,7 @@
 /**
- * Existe porque esta foto entra al mismo pipeline de nube que la del teléfono: si el base64 saliera
- * distinto del que produce `prepararParaLaNube`, el modelo recibiría basura sin ningún error visible.
+ * Existe porque esta es la ÚNICA foto que entra al lector desde que se fue la cámara del teléfono:
+ * si el base64 saliera mal el modelo recibiría basura sin ningún error visible, y si un 503 de la
+ * placa ("sin cámara") no se distinguiera de un timeout, la app diría el motivo equivocado.
  */
 import { HttpDescargaError } from '@/services/wifi/descargaHttp';
 

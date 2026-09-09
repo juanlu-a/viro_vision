@@ -1,19 +1,28 @@
 /**
- * La foto sacada por la cámara de la placa, bajada por WiFi (ADR 0003, plan B).
+ * La foto sacada por la cámara de la placa, bajada por WiFi (ADR 0003, plan B). Desde que se fue la
+ * cámara del teléfono es la ÚNICA fuente de imagen del lector.
  *
- * `GET /fotos/ultima` captura en la placa y devuelve el JPEG ya a 1024 px y calidad 70: el mismo
- * tamaño que `prepararParaLaNube` produce con la cámara del teléfono, así que no se vuelve a
- * reescalar. Se guarda en caché con `uri` para el OCR local (que lee archivos) y se devuelve el
- * base64 para la nube, que es lo único que necesita el modo supermercado.
+ * `GET /fotos/ultima` captura en la placa y devuelve el JPEG ya a 1024 px y calidad 70 — el techo
+ * que las APIs de visión reescalan igual para armar su mosaico de tiles, así que el reescalado del
+ * lado del teléfono no compraba detalle y no existe más. Se guarda en caché con `uri` para el OCR
+ * local (que lee archivos) y se devuelve el base64 para la nube, que es lo único que necesita el
+ * modo supermercado.
+ *
+ * **El tamaño lo fija la placa**: si algún día captura más grande, se paga en transporte y en
+ * tokens sin ganar precisión. El lugar de arreglarlo es `hardware/raspi/virovision/camara.py`.
  */
 import { Directory, File, Paths } from 'expo-file-system';
 
-import { codificarBase64 } from '@/services/ble/transferencia';
+import { codificarBase64 } from '@/services/ble/base64';
 import { HttpDescargaError, urlDeLaPlaca } from '@/services/wifi/descargaHttp';
 
-import type { ImagenParaLaNube } from './captura';
-
 const CARPETA = 'fotos-placa';
+
+/** La imagen tal como la espera el modelo de la nube: base64 sin el prefijo `data:`. */
+export interface ImagenParaLaNube {
+  imageBase64: string;
+  mediaType: 'image/jpeg';
+}
 
 export interface FotoDeLaPlaca {
   uri: string;

@@ -1097,6 +1097,52 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   `VENTANA_DOBLE_CLICK_S` 0,4 s) son una primera estimación y hay que calibrarlos con el usuario, con
   los ojos cerrados, que es como se usa.
 
+## 2026-09-08 — La app deja de ser su propia consola
+
+Cuatro pedidos, un mismo hilo: la app llevaba encima el andamio con el que se construyó, y con la
+placa andando y los logs en Supabase el andamio ya no sostiene nada.
+
+- **Fuera la información técnica de las pantallas.** Era el pendiente que quedó anotado el 2026-09-07
+  al desplegar la tabla `eventos` y la función `telemetria`. De Inicio se van el texto crudo del OCR,
+  el modelo que respondió, el tiempo y la ruta del `.mp3`, y también la **vista previa de la foto de
+  la placa** con sus bytes y milisegundos. De Dispositivo se va el volcado de telemetría ("lo que
+  informa el dispositivo": modo, AP, wifi, ip, cámara, temp) y, de la tarjeta del dispositivo, la
+  dirección en la red y la versión de firmware. Queda lo que el usuario usa o necesita saber: estado
+  de la conexión, nombre, batería, estado de la red y los avisos cuando algo falla. Un
+  `192.168.4.1:8080` no le dice nada a quien no ve la pantalla, y era una pantalla de diagnóstico
+  incrustada en la interfaz. **Ojo: la app todavía no escribe en `eventos`** — eso sigue pendiente,
+  así que por unos días el diagnóstico no está ni en la pantalla ni en la nube.
+- **Una sola fuente de imagen: la placa.** Se van los botones de la cámara del teléfono y de la
+  fototeca, `capturarFoto`, `prepararParaLaNube`, `calcularRedimension` y sus tests, y del binario
+  `expo-image-picker` con `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription` y
+  `android.permission.CAMERA`. El reescalado a 1024 px no se reemplazó: la placa ya entrega el JPEG a
+  1024 px y calidad 70, y el techo real lo fija ella (`camara.py`), no el teléfono. Sin dispositivo
+  con red, **Leer con el dispositivo** queda deshabilitado y el hint dice qué falta — un control
+  apagado sin explicación es exactamente el defecto que la accesibilidad de esta base no tolera.
+- **Fuera los botones de medición.** «Medir transferencia» y «Medir por WiFi» eran el spike del
+  ADR 0003, que ya está decidido y con el número guardado en `docs/mediciones/`. Con ellos se van
+  `features/device/medicion.ts`, `services/ble/transferencia.ts` (reensamblado por chunks) y
+  `medirDescargaHttp`. Del módulo viejo sobrevive el **base64**, que lo usa cada característica del
+  GATT: se mudó a `services/ble/base64.ts` con su test. `useDeviceConnection` quedó siendo un alias
+  del provider y se borró; Dispositivo consume `useDispositivo()` directo.
+- **Sin barra de desplazamiento vertical.** `showsVerticalScrollIndicator={false}` en `Screen`:
+  aparecía sobre el borde de las tarjetas y en un teléfono la posición ya la da el gesto.
+
+**Lo que esto cuesta, dicho de frente.** La fototeca era el insumo del **dataset de evaluación** —la
+misma foto contra varios modelos, para que la comparación midiera modelos y no fotos (pasos 8-9 de
+`qa-modo-supermercado.md`). Esa corrida ya no se puede hacer desde la app; queda anotado en el ADR
+0006, en la QA y acá abajo. La alternativa cuando toque medir precisión es correrla fuera de la app
+contra el proxy, o reponer una entrada de prueba detrás de una bandera como
+`EXPO_PUBLIC_SIMULATE_DEVICE` — nunca un segundo botón para el usuario.
+
+**Lo que NO se tocó**: la placa sigue publicando la característica `transferencia` y el comando
+`medir`; sacarlos del firmware es un PR del pilar de hardware. `features/device/gatt.ts` los deja
+documentados con una nota que dice que la app ya no los usa, para que nadie los vuelva a cablear
+creyendo que son el camino de la foto.
+
+Verificación: lint (una advertencia preexistente en `DispositivoProvider`), typecheck, **181 tests
+en 19 suites** y `expo export` de iOS, todo verde.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1108,6 +1154,11 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Validar ADR 0006, 0007 y 0008 con el tutor** — 0006 y 0007 siguen en Proposed.
 
 ### Deuda técnica conocida
+- **El dataset de evaluación quedó sin forma de correrse** (2026-09-08): la fototeca era lo que
+  permitía pasarle la misma foto a varios modelos, y se fue con la cámara del teléfono. Decidir si
+  se corre fuera de la app contra el proxy o se repone una entrada detrás de una bandera.
+- **La placa sigue con la transferencia por chunks en el firmware** (característica `transferencia`,
+  comando `medir`), sin ningún cliente desde el 2026-09-08. PR del pilar de hardware.
 - **El error de proxy caído dice "sin conexión a internet"**, que es mentira: conexión hay, el que
   no está es el proxy. Pesa más desde que el proxy es punto único de falla del modo supermercado.
   Arreglo chico.
@@ -1129,9 +1180,10 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Medir el consumo real del daemon** con el medidor USB (reposo, modo ómnibus, modo supermercado
   con AP) y confirmar la batería propuesta el 2026-09-07 (`hardware/README.md`, *Alimentación*); con
   la UPS HAT en mano, leer el INA219 y llenar `estado.bateria`.
-- **Logs a Supabase (PR siguiente)**: tabla `eventos` y función `telemetria` ya desplegadas el
-  2026-09-07; falta que la app registre conexión BLE, red, lecturas con tiempos y errores, y sacar la
-  información técnica de las pantallas. Después: **spike 1 de segundo plano en iOS** (la
+- **Logs a Supabase — la mitad hecha**: tabla `eventos` y función `telemetria` desplegadas el
+  2026-09-07, y la información técnica salió de las pantallas el 2026-09-08. **Falta lo otro**: que
+  la app efectivamente registre conexión BLE, red, lecturas con tiempos y errores. Hasta que eso
+  entre, ese diagnóstico no está en ningún lado — es el pendiente más urgente de la lista. Después: **spike 1 de segundo plano en iOS** (la
   notificación BLE despierta la app con la pantalla bloqueada y el ciclo termina); **parlante en la
   placa** (DAC I2S) para el audio que ya llega a `/tmp`; Android: API de
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
