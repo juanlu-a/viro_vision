@@ -1276,9 +1276,9 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Medir el consumo real del daemon** con el medidor USB (reposo, modo ómnibus, modo supermercado
   con AP) y confirmar la batería propuesta el 2026-09-07 (`hardware/README.md`, *Alimentación*); con
   la UPS HAT en mano, leer el INA219 y llenar `estado.bateria`.
-- **Logs a Supabase — hecho (2026-09-09)**, esquema incluido. Lo que queda es **mirar la tabla
-  después de una salida real** y ver si lo que se registró alcanza para explicar una falla; si falta
-  un evento, agregarlo es una línea en `tipos.ts`. Dos mejoras pendientes que venían de la rama
+- **Logs a Supabase — hecho (2026-09-09)**, esquema y limpieza de la tabla incluidos. Lo que queda es
+  **mirar la tabla después de una salida real** y ver si lo que se registró alcanza para explicar una
+  falla; si falta un evento, agregarlo es una línea en `tipos.ts`.
 - Después: **spike 1 de segundo plano en iOS** (la
   notificación BLE despierta la app con la pantalla bloqueada y el ciclo termina); **parlante en la
   placa** (DAC I2S) para el audio que ya llega a `/tmp`; Android: API de
