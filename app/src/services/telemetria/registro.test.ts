@@ -130,6 +130,30 @@ describe('subir', () => {
     expect(cuerpos[0].eventos).toHaveLength(1);
   });
 
+  it('un lote que el servidor rechaza siempre se da por perdido: si no, tapa toda la telemetría', async () => {
+    const quinientos = (async () => ({ ok: false, status: 500 })) as unknown as typeof fetch;
+    const parar = arrancar(quinientos);
+    registrar('lectura.fallo', { detalle: { veneno: true } });
+    // Tres intentos del MISMO lote. Sin tope volvería a la cola para siempre y, como siempre se
+    // sube lo más viejo primero, nada más llegaría nunca a la tabla.
+    await subir();
+    await subir();
+    await subir();
+    parar();
+
+    const { impl, cuerpos } = fetchQueRegistra();
+    const parar2 = arrancar(impl);
+    registrar('lectura.ok');
+    await subir();
+    parar2();
+
+    const tipos = cuerpos[0].eventos.map((e: any) => e.tipo);
+    expect(tipos).toContain('lectura.ok'); // lo nuevo pasa
+    expect(tipos).not.toContain('lectura.fallo'); // el lote envenenado no volvió
+    const aviso = cuerpos[0].eventos.find((e: any) => e.tipo === 'app.error');
+    expect(aviso?.detalle?.eventosPerdidos).toBe(1); // y la pérdida quedó declarada
+  });
+
   it('tras desbordar la cola sin red, el lote que sí sube declara cuántos eventos se perdieron', async () => {
     const rechaza = (async () => {
       throw new Error('Network request failed');

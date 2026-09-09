@@ -24,6 +24,7 @@ import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 import { ColaDeEventos, MAX_POR_LOTE } from './cola';
+import { resolverUrlDeTelemetria } from './config';
 import { obtenerTelefono, generarId } from './identidad';
 import type { EventoTelemetria, LoteTelemetria, TipoEvento } from './tipos';
 
@@ -32,8 +33,15 @@ import type { EventoTelemetria, LoteTelemetria, TipoEvento } from './tipos';
  * puede viajar. La función **no pide autenticación** (`verify_jwt = false`, igual que el proxy de
  * visión): la app no tiene login y una anon key en el bundle no sería una defensa. Lo peor que
  * puede pasar es ruido en una tabla de desarrollo.
+ *
+ * Si no está la variable propia se **deriva de la del proxy** (ver `config.ts`): las dos funciones
+ * viven en el mismo proyecto, y sin eso un build con proxy pero sin el secret nuevo saldría sin
+ * ninguna telemetría y nadie se enteraría hasta necesitar diagnosticar algo.
  */
-const urlPorDefecto = process.env.EXPO_PUBLIC_TELEMETRY_URL ?? '';
+const urlPorDefecto = resolverUrlDeTelemetria(
+  process.env.EXPO_PUBLIC_TELEMETRY_URL,
+  process.env.EXPO_PUBLIC_VISION_PROXY_URL
+);
 
 /** Sin URL configurada la telemetría queda apagada entera: no encola, no reintenta, no pesa. */
 export const isTelemetriaConfigurada = urlPorDefecto.length > 0;
@@ -46,6 +54,17 @@ const UMBRAL_DE_SUBIDA = 25;
 
 /** Un envío colgado no puede quedar reteniendo el lote para siempre. */
 const TIMEOUT_MS = 10_000;
+
+/**
+ * Cuántas veces se reintenta el MISMO lote antes de darlo por perdido.
+ *
+ * Sin tope, un lote que el servidor no puede aceptar —un 500 por una restricción de la tabla, por
+ * ejemplo— vuelve a la cola, se reintenta, vuelve a fallar, y así hasta que el tope de la cola lo
+ * desaloje: mientras tanto **ninguna telemetría sube**, porque siempre se intenta primero lo más
+ * viejo. O sea que un solo evento malo apagaría el diagnóstico entero justo cuando hace falta.
+ * Tres intentos alcanzan para un corte de red corto y no para envenenar la cola.
+ */
+const MAX_INTENTOS_POR_LOTE = 3;
 
 export interface OpcionesTelemetria {
   url?: string;
@@ -69,6 +88,8 @@ interface Estado {
   timer: ReturnType<typeof setTimeout> | null;
   subiendo: boolean;
   encendida: boolean;
+  /** Fallos seguidos del lote que está al frente de la cola. Ver MAX_INTENTOS_POR_LOTE. */
+  intentos: number;
 }
 
 /** Versión de la app + plataforma: sin esto, comparar dos fallas es comparar dos builds distintos. */
@@ -91,6 +112,7 @@ const estado: Estado = {
   timer: null,
   subiendo: false,
   encendida: false,
+  intentos: 0,
 };
 
 /**
@@ -145,12 +167,21 @@ export async function subir(): Promise<void> {
       });
       if (!r.ok) throw new Error(String(r.status));
       estado.cola.olvidarPerdidos();
+      estado.intentos = 0;
     } finally {
       estado.cancelar(timer);
     }
   } catch {
-    // Sin internet (el caso normal con el AP de la placa) el lote vuelve a la cola y espera.
-    estado.cola.devolver(lote);
+    estado.intentos += 1;
+    if (estado.intentos >= MAX_INTENTOS_POR_LOTE) {
+      // El servidor no va a aceptar este lote nunca. Se lo da por perdido —contado, para que el
+      // hueco se vea— y la cola sigue con lo siguiente, que es lo que importa.
+      estado.cola.descartar(lote.length);
+      estado.intentos = 0;
+    } else {
+      // Sin internet (el caso normal con el AP de la placa) el lote vuelve a la cola y espera.
+      estado.cola.devolver(lote);
+    }
   } finally {
     estado.subiendo = false;
   }
@@ -231,5 +262,6 @@ export function reiniciarTelemetriaParaTests(): void {
   estado.timer = null;
   estado.subiendo = false;
   estado.encendida = false;
+  estado.intentos = 0;
   estado.telefono = 'sin-id';
 }

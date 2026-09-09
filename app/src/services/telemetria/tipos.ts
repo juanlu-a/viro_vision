@@ -50,6 +50,7 @@ export type TipoEvento =
   | 'foto.fallo'
   | 'ocr.carga'
   | 'nube.espera'
+  | 'audio.sintesis'
   | 'audio.envio';
 
 export interface EventoTelemetria {

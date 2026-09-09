@@ -163,11 +163,18 @@ app registra esos eventos acá.
 | Función | [`supabase/functions/telemetria/index.ts`](../supabase/functions/telemetria/index.ts) |
 | Cliente | `app/src/services/telemetria/` (barrel: `@/services/telemetria`) |
 | Tabla | `public.eventos` — **su DDL vive sólo en el dashboard**, ver el pendiente de abajo |
-| Variable | `EXPO_PUBLIC_TELEMETRY_URL` (vacía = telemetría apagada entera) |
+| Variable | `EXPO_PUBLIC_TELEMETRY_URL`, **opcional**: si falta se deriva de `EXPO_PUBLIC_VISION_PROXY_URL` |
 
 La app **no tiene clave de la base**: manda lotes a la función, que inserta con el `service_role`.
 Mismo criterio que el proxy de visión, `verify_jwt = false` (ADR 0008): sin login, exigir la anon key
 sería pedir algo que ya viaja dentro del bundle.
+
+**La URL se deriva del proxy** (`…/functions/v1/vision` → `…/functions/v1/telemetria`) cuando no hay
+variable propia: las dos funciones viven en el mismo proyecto, y pedirlas por separado es pedir dos
+veces el mismo dato y dejar que se desincronicen. Sin eso, un build con proxy pero sin el secret
+nuevo sale **sin ninguna telemetría** y nadie se entera hasta que hace falta diagnosticar algo. La
+derivación **no adivina**: lo que no termina en `/vision` no deriva nada, porque una URL armada a la
+fuerza daría 404 en cada lote — apagada y sabida es mejor que encendida y rota.
 
 ## El contrato, y su trampa
 
@@ -200,7 +207,12 @@ Ciclo de vida (`app.inicio`, `app.fondo`, `app.error`), enlace BLE (`ble.buscand
 `ble.fallo`, `ble.perdido`, `ble.reintento`, `ble.desconectado`), red con la placa (`wifi.uniendose`,
 `wifi.listo`, `wifi.fallo`), lo que informa la placa (`placa.estado`, `placa.aviso`, `placa.modo`,
 `placa.modoFallo`), modos (`modo.cambio`) y la lectura entera (`lectura.inicio`, `foto.ok`,
-`foto.fallo`, `ocr.carga`, `nube.espera`, `lectura.ok`, `lectura.fallo`, `audio.envio`).
+`foto.fallo`, `ocr.carga`, `nube.espera`, `lectura.ok`, `lectura.fallo`, `audio.sintesis`,
+`audio.envio`).
+
+`audio.sintesis` (la llamada al TTS de nube) va **separada** de `audio.envio` (la subida al parlante
+de la placa): son dos cosas que fallan y tardan por motivos distintos, y juntas se ven como un solo
+«tardó». Mismo criterio que separar los ms de la foto de los del pipeline.
 
 `app.error` incluye el **manejador global de errores** de React Native: un crash es el evento más
 útil que esta tabla puede tener y es justo el que ningún `try` de la app registra.
@@ -217,6 +229,11 @@ lo más viejo**, porque cuando alguien reporta una falla lo que hay que mirar so
 segundos. Lo descartado se cuenta y viaja en el siguiente lote como `app.error` con
 `eventosPerdidos`: un hueco silencioso se leería como "eso no pasó".
 
+Un lote se reintenta **como mucho tres veces** y después se da por perdido. Sin ese tope, un lote que
+el servidor no puede aceptar volvería a la cola para siempre y —como siempre se sube lo más viejo
+primero— **taparía toda la telemetría posterior**: un solo evento malo apagaría el diagnóstico entero
+justo cuando hace falta.
+
 ## Verificar que funciona
 
 ```sh
@@ -227,10 +244,36 @@ curl -sS -X POST "$EXPO_PUBLIC_TELEMETRY_URL" -H 'content-type: application/json
 # Esperado: {"guardados":1}. Si dice {"guardados":0}, al evento le falta `tipo` o `momento`.
 ```
 
-## Pendiente
+## Ojo al consultar: hay DOS vocabularios de `tipo` en la tabla
 
-**El DDL de `public.eventos` no está versionado**: la tabla se creó en el dashboard el 2026-09-07 y
-no hay migración en el repo. La función sí quedó versionada el 2026-09-09, recuperada de la v1
-desplegada con `supabase functions download telemetria` — que hizo falta justamente porque nadie
-podía saber el contrato sin bajarla. Falta hacer lo mismo con la tabla: `supabase db dump` con la
-contraseña de la base y volcar el `create table` a `supabase/migrations/`.
+La tabla tiene filas de **dos clientes distintos** y no usan los mismos nombres:
+
+| Origen | Cuándo | Forma de `tipo` | Ejemplos |
+|---|---|---|---|
+| Build manual de `feat/telemetria-supabase` (rama nunca mergeada) | 2026-09-07/08, ~28 filas | `snake_case` | `app_abierta`, `ble_conectado`, `wifi_lista`, `foto_placa_error`, `modo_escrito`, `lectura_omnibus` |
+| El cliente que está en `staging` desde el 2026-09-09 | de ahí en adelante | `punto.separado` | `app.inicio`, `ble.conectado`, `wifi.listo`, `foto.fallo`, `modo.cambio`, `lectura.ok` |
+
+Una consulta que filtre por `tipo` y no contemple las dos formas va a mostrar de menos sin decirlo.
+Lo más simple es acotar por fecha: todo lo del 2026-09-09 en adelante usa la forma nueva, que es la
+única que la app produce hoy. La lista completa de tipos vigentes está en
+`app/src/services/telemetria/tipos.ts`, que es una unión cerrada justamente para que no aparezca un
+tercer vocabulario.
+
+## Esquema versionado (2026-09-09)
+
+[`supabase/migrations/20260907190000_eventos.sql`](../supabase/migrations/20260907190000_eventos.sql).
+Es el archivo original de la rama que creó la tabla, recuperado con su fecha, y **verificado contra
+la base real** con `supabase db dump`: coincide campo por campo e índice por índice.
+
+Lo que conviene saber al leerlo:
+
+- **RLS encendido y sin ninguna política**, a propósito: con la anon key un `GET /rest/v1/eventos`
+  devuelve `[]`, no filas (verificado el 2026-09-09). La función entra con el `service_role`, que
+  salta RLS. **No agregar una política de lectura sin pensarlo**: la anon key viaja dentro del bundle
+  de la app, así que una política para `anon` es una política para cualquiera que la extraiga.
+- Tres índices, por los tres accesos que se usan: lo último que pasó (`creado_en desc`), una sesión
+  entera en orden (`sesion, momento`) y todas las veces que pasó una cosa (`tipo, creado_en desc`).
+- El `check` de `detalle` mide **bytes del jsonb ya comprimido** (≤ 8192) y el corte de la función
+  mide **caracteres de JSON** (≤ 8000): son medidas distintas. En la práctica la de la función es
+  más estricta —se probó con 7900 caracteres incompresibles y entró sin problema—, y ese margen es
+  el que evita que un evento gigante haga fallar el insert del lote entero.
