@@ -7,3 +7,9 @@ project_id = "virovision"
 # Está aceptado a conciencia en ADR 0008; las defensas reales son el freno por IP de la función y
 # el tope de gasto en la consola de cada proveedor.
 verify_jwt = false
+
+[functions.telemetria]
+# Mismo criterio que `vision` (ADR 0008): la app no tiene login, así que exigir JWT sería pedir una
+# anon key que ya viaja dentro del bundle. Lo peor que puede pasar acá es ruido en una tabla de
+# desarrollo, y el tope por lote y el de detalle lo acotan.
+verify_jwt = false

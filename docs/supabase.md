@@ -148,3 +148,89 @@ curl -sS -X POST "$EXPO_PUBLIC_VISION_PROXY_URL" \
 strings app/ios/build/.../ViroVision | grep -E 'AIza|sk-'
 # Esperado: nada.
 ```
+
+# Telemetría: la función `telemetria` y la tabla `eventos`
+
+La segunda función del proyecto, y la única razón por la que hoy se puede saber qué pasó cuando algo
+falla. Desde el **2026-09-08** la información técnica no está en las pantallas de la app (era una
+consola de diagnóstico incrustada en la interfaz de alguien que no la ve); desde el **2026-09-09** la
+app registra esos eventos acá.
+
+## Cómo está armado
+
+| Pieza | Dónde |
+|---|---|
+| Función | [`supabase/functions/telemetria/index.ts`](../supabase/functions/telemetria/index.ts) |
+| Cliente | `app/src/services/telemetria/` (barrel: `@/services/telemetria`) |
+| Tabla | `public.eventos` — **su DDL vive sólo en el dashboard**, ver el pendiente de abajo |
+| Variable | `EXPO_PUBLIC_TELEMETRY_URL` (vacía = telemetría apagada entera) |
+
+La app **no tiene clave de la base**: manda lotes a la función, que inserta con el `service_role`.
+Mismo criterio que el proxy de visión, `verify_jwt = false` (ADR 0008): sin login, exigir la anon key
+sería pedir algo que ya viaja dentro del bundle.
+
+## El contrato, y su trampa
+
+```jsonc
+POST https://<proyecto>.supabase.co/functions/v1/telemetria
+{
+  "telefono": "tel-…",   // id anónimo de la instalación, generado por la app
+  "sesion":   "ses-…",   // cambia en cada arranque: es lo que agrupa "qué pasó esa vez"
+  "app":      "1.0.0+42 ios",
+  "eventos": [
+    { "tipo": "lectura.ok", "momento": "2026-09-09T12:00:00.000Z", "ms": 1668,
+      "detalle": { "modo": "supermercado", "modelo": "gpt-5.6-luna" } }
+  ]
+}
+```
+
+⚠️ **Un evento sin `tipo` o sin `momento` se descarta y la respuesta sigue siendo `200`**, con
+`{"guardados": 0}`. O sea que una app que arma mal el cuerpo se ve idéntica a una que anda, y el
+defecto recién aparece cuando alguien consulta la tabla después de una falla y no encuentra nada. Por
+eso `registrar()` pone el `momento` él mismo y los tipos son una unión cerrada
+(`services/telemetria/tipos.ts`), y por eso hay un test que arma el cuerpo y lo compara campo a campo.
+
+Los otros dos topes: **100 eventos por lote** (lo de más se recorta del lado del servidor) y **8 KB
+de `detalle`**, que al pasarse se reemplaza **entero** por `{"recortado": true}` — no la parte de
+más. Nada de imágenes ni textos largos en `detalle`.
+
+## Qué se registra
+
+Ciclo de vida (`app.inicio`, `app.fondo`, `app.error`), enlace BLE (`ble.buscando`, `ble.conectado`,
+`ble.fallo`, `ble.perdido`, `ble.reintento`, `ble.desconectado`), red con la placa (`wifi.uniendose`,
+`wifi.listo`, `wifi.fallo`), lo que informa la placa (`placa.estado`, `placa.aviso`, `placa.modo`,
+`placa.modoFallo`), modos (`modo.cambio`) y la lectura entera (`lectura.inicio`, `foto.ok`,
+`foto.fallo`, `ocr.carga`, `nube.espera`, `lectura.ok`, `lectura.fallo`, `audio.envio`).
+
+`app.error` incluye el **manejador global de errores** de React Native: un crash es el evento más
+útil que esta tabla puede tener y es justo el que ningún `try` de la app registra.
+
+`placa.estado` llega cada 15 s desde la placa pero **sólo se registra cuando cambia algo** (AP, wifi,
+cámara, ip, versión, o la batería por tramos de 5 %): registrarlo entero serían 240 filas por hora de
+las cuales 239 son idénticas.
+
+## Por qué falla seguido, y está bien
+
+Mientras el teléfono está unido al **AP de la placa** hay WiFi pero no internet (ADR 0003): durante
+una sesión de uso real los envíos fallan y los lotes se acumulan. La cola tiene tope (500) y **tira
+lo más viejo**, porque cuando alguien reporta una falla lo que hay que mirar son los últimos
+segundos. Lo descartado se cuenta y viaja en el siguiente lote como `app.error` con
+`eventosPerdidos`: un hueco silencioso se leería como "eso no pasó".
+
+## Verificar que funciona
+
+```sh
+# Un evento de prueba (la función no pide auth)
+curl -sS -X POST "$EXPO_PUBLIC_TELEMETRY_URL" -H 'content-type: application/json' \
+  -d '{"telefono":"prueba","sesion":"prueba","app":"curl","eventos":[
+       {"tipo":"app.inicio","momento":"2026-09-09T00:00:00.000Z"}]}'
+# Esperado: {"guardados":1}. Si dice {"guardados":0}, al evento le falta `tipo` o `momento`.
+```
+
+## Pendiente
+
+**El DDL de `public.eventos` no está versionado**: la tabla se creó en el dashboard el 2026-09-07 y
+no hay migración en el repo. La función sí quedó versionada el 2026-09-09, recuperada de la v1
+desplegada con `supabase functions download telemetria` — que hizo falta justamente porque nadie
+podía saber el contrato sin bajarla. Falta hacer lo mismo con la tabla: `supabase db dump` con la
+contraseña de la base y volcar el `create table` a `supabase/migrations/`.

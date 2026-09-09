@@ -1143,6 +1143,53 @@ creyendo que son el camino de la foto.
 Verificación: lint (una advertencia preexistente en `DispositivoProvider`), typecheck, **181 tests
 en 19 suites** y `expo export` de iOS, todo verde.
 
+## 2026-09-09 — La app empieza a contar qué le pasa
+
+La otra mitad del PR anterior. El 08/09 la información técnica salió de las pantallas y quedó un
+hueco: el diagnóstico no estaba ni en la pantalla ni en la nube. Esto lo cierra.
+
+**Primero hubo que averiguar el contrato, y eso fue la lección.** La función `telemetria` estaba
+desplegada desde el 07/09 pero **escrita en el dashboard y no versionada**: sondeándola por HTTP se
+sabía que aceptaba `{telefono, sesion, eventos}`, pero cualquier evento contestaba `{"guardados":0}`
+sin decir por qué. Hubo que actualizar el CLI de Supabase y bajarla con Docker
+(`supabase functions download telemetria`) para descubrir que **cada evento necesita `tipo` y
+`momento`**, y que sin ellos se descarta con status 200. Una app que arma mal el cuerpo se ve
+idéntica a una que anda. La función quedó versionada en `supabase/functions/telemetria/` con los
+tipos puestos y la lógica intacta; **falta hacer lo mismo con el `create table` de `eventos`**, que
+sigue viviendo sólo en el dashboard.
+
+**El cliente**: `app/src/services/telemetria/`. Tres reglas que no son estilo sino requisito de
+ADR 0001 — `registrar()` es sincrónico y no devuelve promesa, nada de ahí lanza jamás, y el envío es
+best-effort. La tercera importa más de lo que parece: unido al AP de la placa hay WiFi **sin
+internet** (ADR 0003), así que durante una sesión de uso real los envíos fallan y los lotes se
+acumulan. La cola tiene tope de 500 y **tira lo más viejo**, porque cuando alguien reporta una falla
+lo que se mira son los últimos segundos, no el arranque; lo descartado se cuenta y viaja después como
+`app.error` con `eventosPerdidos`, para que un hueco no se lea como "eso no pasó".
+
+**Qué se registra**: arranque y paso a segundo plano, el enlace BLE entero (búsqueda con su tiempo,
+conexión con el estado en que apareció la placa, fallos POR TIPO de error, pérdidas, reintentos), la
+red con la placa (cuánto tarda en responder — el 06/09 no llegaba nunca a "lista" y no había forma de
+saber dónde se colgaba), lo que la placa informa de sí misma, los cambios de modo con su origen
+(app o botón físico), y la lectura de punta a punta: `foto.ok` con bytes y ms **separados** del total,
+que es lo que distingue "la red está lenta" de "el modelo está lento"; el crudo del OCR, que
+distingue "el cartel no se leyó" de "se leyó y `adivinarLectura` eligió mal"; y el modelo **pedido**
+junto al que **respondió**, que si no coinciden significa que el selector no está mandando.
+
+**Y el manejador global de errores de React Native**, que es el evento más útil que esta tabla puede
+tener y justo el que ningún `try` de la app registra. Se encadena al anterior para no robarle la
+pantalla roja a nadie en desarrollo.
+
+**La frontera de ADR 0001 se extendió al linter**: `@/services/telemetria` queda prohibido desde
+`features/audio/` y `features/recognition/`, como ya lo estaban `services/vision` y `services/cloud`.
+La telemetría es red, y el anuncio tiene que sonar sin internet. Se verificó que el linter lo frena
+de verdad, no que la regla esté escrita.
+
+Verificación: lint (la advertencia preexistente de `DispositivoProvider` sigue ahí), typecheck,
+**197 tests en 21 suites** y `expo export` de iOS.
+
+**Nota operativa**: quedó una fila de sonda (`tipo = 'sonda.contrato'`, `telefono = 'sonda-claude'`)
+en `eventos`, de cuando se verificó el contrato. Borrable.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1180,10 +1227,11 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Medir el consumo real del daemon** con el medidor USB (reposo, modo ómnibus, modo supermercado
   con AP) y confirmar la batería propuesta el 2026-09-07 (`hardware/README.md`, *Alimentación*); con
   la UPS HAT en mano, leer el INA219 y llenar `estado.bateria`.
-- **Logs a Supabase — la mitad hecha**: tabla `eventos` y función `telemetria` desplegadas el
-  2026-09-07, y la información técnica salió de las pantallas el 2026-09-08. **Falta lo otro**: que
-  la app efectivamente registre conexión BLE, red, lecturas con tiempos y errores. Hasta que eso
-  entre, ese diagnóstico no está en ningún lado — es el pendiente más urgente de la lista. Después: **spike 1 de segundo plano en iOS** (la
+- **Logs a Supabase — hecho (2026-09-09)**: la app registra arranque, BLE, red, estado de la placa,
+  modos, lecturas con tiempos y errores, y los crashes por el manejador global. Lo que queda es
+  **mirar la tabla después de una salida real** y ver si lo que se registró alcanza para explicar
+  una falla; si falta un evento, agregarlo es una línea en `tipos.ts`. Y **el `create table` de
+  `eventos` sigue sin versionar**: `supabase db dump` y volcarlo a `supabase/migrations/`. Después: **spike 1 de segundo plano en iOS** (la
   notificación BLE despierta la app con la pantalla bloqueada y el ciclo termina); **parlante en la
   placa** (DAC I2S) para el audio que ya llega a `/tmp`; Android: API de
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin

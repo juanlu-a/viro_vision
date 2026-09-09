@@ -109,6 +109,14 @@ tests via `jest-expo`.
   y sostener dos era mantener un camino que nadie recorre. **Consecuencia abierta**: el dataset de
   evaluación (pasos 8-9 de la QA) ya no se puede correr desde la app pasándole la misma foto a
   varios modelos; hay que correrlo fuera de la app o volver a habilitar una entrada de prueba.
+- **Telemetría (2026-09-09)**: `services/telemetria/` + la función `telemetria` → tabla `eventos`.
+  Es el reemplazo del diagnóstico que salió de las pantallas el 2026-09-08: arranque, BLE, red con la
+  placa, estado de la placa, modos, la lectura de punta a punta con tiempos separados (foto vs.
+  pipeline) y los crashes por el manejador global de RN. `registrar()` es sincrónico y no lanza —
+  ADR 0001 le prohíbe estorbar al reconocimiento, y el linter le prohíbe entrar a `features/audio/` y
+  `features/recognition/`. Cola con tope que descarta lo viejo, porque unido al AP de la placa hay
+  WiFi sin internet y los envíos fallan seguido. Se enciende con `EXPO_PUBLIC_TELEMETRY_URL`; vacía,
+  queda apagada entera. Detalle en [`docs/supabase.md`](supabase.md).
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a
