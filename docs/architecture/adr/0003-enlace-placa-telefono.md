@@ -235,6 +235,14 @@ El caveat de D-Bus resultó real pero de otra forma: sin pausa, dbus-next **pier
 pausa de 4 ms no pierde ninguno y no es el cuello. Como referencia, el mismo archivo por HTTP sobre la
 misma radio WiFi baja en 46 ms. Detalle en `docs/mediciones/2026-09-04-ble-throughput.md`.
 
+> ⚠️ **Estas mediciones son de la Zero 2 W, y no se pueden repetir en la placa que está en uso hoy.**
+> Desde el 2026-09-09 se está trabajando con una **Raspberry Pi 3 Model B+ prestada** (se rompió el
+> conector CSI de 22 pines de la Zero 2 W), y su radio es otra: **Cypress CYW43455, HCI 5.0** contra
+> el **BCM43438 (BT 4.2)** de la Zero. La ausencia de Data Length Extension en el BCM43438 es *toda*
+> la razón del techo de 11,8 KB/s que mandó al plan B, y la 3 B+ no la tiene. **Un número mejor
+> medido ahí no reabre esta decisión: mide otro hardware.** Quien mida en la placa prestada y
+> concluya que "BLE alcanza" va a estar sacando la conclusión contraria a la de este ADR.
+
 **Decisión:** transporte de la foto por **WiFi, según el plan B de §4**: la placa como AP, credenciales
 por BLE, HTTP plano, la app siempre tira. **BLE sigue siendo el plano de control siempre vivo** (§2), y
 todo lo demás del ADR queda como estaba. La Tabla B (precisión por tamaño de foto) deja de decidir el
