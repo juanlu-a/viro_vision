@@ -126,7 +126,7 @@ en el extremo bueno. Es la lección metodológica: **cinco corridas y no una, y 
   proyecto, y el usuario no pone credenciales.
 - **Son dos y no más** porque el selector se recorre con VoiceOver y cada opción de más es un swipe
   entre la persona y la lectura.
-- Los perfiles retirados viven en `PERFILES_RETIRADOS` y sus proveedores siguen implementados y
+- Los perfiles retirados viven en `RETIRED_PROFILES` y sus proveedores siguen implementados y
   testeados: volver a ofrecer uno es mover una entrada, no escribir código.
 
 ### El techo de resolución: correcto, pero por otro motivo del que estaba escrito

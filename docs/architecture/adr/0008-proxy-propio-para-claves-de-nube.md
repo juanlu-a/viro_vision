@@ -91,7 +91,7 @@ había tardado media hora.
 
 La degradación elegante es correcta en runtime y es una trampa en el pipeline: un build que no puede
 cumplir la mitad de su función no debería tardar treinta minutos en decirlo. `app/scripts/
-verificar-claves.mjs` corre antes del build y falla si los proveedores que el **registro** ofrece no
+check-keys.mjs` corre antes del build y falla si los proveedores que el **registro** ofrece no
 tienen clave en el **entorno**. Compara justamente lo que se desincronizó: chequear "hay alguna
 clave" no habría detectado nada, porque la de Gemini estaba ahí — faltaba una clave de un proveedor
 *que siguiera en la lista*.
@@ -167,7 +167,7 @@ no escribir un proveedor nuevo.
 - `app/src/services/vision/providers/` **no cambia**. Es el objetivo del diseño.
 - Se agrega `app/src/services/vision/transport.ts`: toma el `{url, headers, body}` que
   `buildRequest` ya devuelve y lo reescribe hacia el proxy cuando `EXPO_PUBLIC_VISION_PROXY_URL`
-  está seteada. Lleva **regla de frontera** comentada, como `reconocerProducto.ts`.
+  está seteada. Lleva **regla de frontera** comentada, como `recognizeProduct.ts`.
 - Se agrega `supabase/functions/vision/`, el primer código de servidor del repo.
 - **Tensión a nombrar, para que nadie la lea como una violación.** El boundary rule de
   `app/src/services/supabase/client.ts` (ADR 0001 + 0002) dice que **la cuenta online** no puede
@@ -176,7 +176,7 @@ no escribir un proveedor nuevo.
   hospedada en el mismo proveedor. La regla sigue vigente tal cual está escrita.
 - El `.env.example` y los workflows de CI dejan de necesitar las claves de proveedor cuando el
   proxy esté activo; se mantienen mientras el camino directo siga siendo el de desarrollo.
-- `app/scripts/verificar-claves.mjs` corre en los dos workflows de publicación (`npm run claves`) y
+- `app/scripts/check-keys.mjs` corre en los dos workflows de publicación (`npm run keys`) y
   falla el job antes del build si no hay ni clave de un proveedor del registro ni proxy.
 
 ## Estado: desplegado (2026-09-02)

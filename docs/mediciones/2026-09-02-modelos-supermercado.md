@@ -16,7 +16,7 @@ no había claves.
 una foto de producto, salen los tres campos `tipo` / `marca` / `detalle`.
 
 **Con qué código.** Con **el de la app**, no con una réplica. El arnés importa
-`buildProductoRequest`, `getProvider().readEvent` y `parseProductoLeido` de
+`buildProductRequest`, `getProvider().readEvent` y `parseProductReading` de
 `app/src/services/vision/`, y sólo reemplaza el transporte (`node:https` en vez de `expo/fetch`,
 porque el `fetch` global de jest-expo está mockeado). Es deliberado: **una réplica mide la réplica.**
 Ya pasó en este proyecto que la documentación de un proveedor no describiera su API real, y lo único

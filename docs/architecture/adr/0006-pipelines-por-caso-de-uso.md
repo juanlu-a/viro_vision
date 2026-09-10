@@ -247,7 +247,7 @@ queda como segunda opción, que es donde su perfil sirve.
 cumpliendo: paga el proyecto (mil lecturas cuestan menos de USD 0,50) y el usuario no pone
 credenciales. Lo que ya no hay es un default con tier gratuito; el camino gratis existe y es Groq.
 
-**Los modelos retirados no se borran.** Viven en `PERFILES_RETIRADOS` con la medición que los
+**Los modelos retirados no se borran.** Viven en `RETIRED_PROFILES` con la medición que los
 descartó, y sus proveedores siguen implementados y testeados: volver a ofrecer uno es mover una
 entrada de lista. `gemini-3.5-flash-lite` conserva la mejor cuota de las tres y la peor latencia, así
 que si algún día la cuota pesara más que el tiempo, es el candidato.

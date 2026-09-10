@@ -35,7 +35,7 @@ Desde el iPhone, antes de tocar la app: **nRF Connect** o **LightBlue** (gratis)
 
 ## Emular la placa desde la Mac (sin hardware)
 
-El mismo núcleo (`virovision/nucleo.py`: comandos, modos, transferencias) se puede publicar por
+El mismo núcleo (`virovision/core.py`: comandos, modos, transferencias) se puede publicar por
 CoreBluetooth desde una Mac con `bless`. Sirve para probar la app contra el perfil GATT real: conectar,
 leer estado, cambiar de modo y reensamblar una transferencia. **El throughput contra la Mac no es el
 de la placa** (otro chip, Bluetooth 5, otro stack): valida la app, no decide el ADR 0003.
@@ -43,12 +43,12 @@ de la placa** (otro chip, Bluetooth 5, otro stack): valida la app, no decide el 
 ```sh
 cd hardware/raspi
 python3.11 -m venv .venv-mac && .venv-mac/bin/pip install -r requirements-mac.txt   # python3 ≥ 3.9 sirve
-.venv-mac/bin/python -m virovision.emulador -v
+.venv-mac/bin/python -m virovision.emulator -v
 ```
 
 La primera vez macOS pide permiso de Bluetooth para la terminal (Privacidad y seguridad → Bluetooth).
 Con el emulador corriendo, el iPhone ve «ViroVision» igual que vería la placa; la app se conecta con
-*Buscar dispositivo* y *Medir transferencia* funciona de punta a punta. `--nombre ViroVision-Mac` si
+*Buscar dispositivo* y *Medir transferencia* funciona de punta a punta. `--name ViroVision-Mac` si
 la placa real está cerca y querés distinguirlas. Sin cámara: el comando `foto` responde con error, y
 `medir` manda bytes sintéticos.
 
@@ -57,7 +57,7 @@ la placa real está cerca y querés distinguirlas. Sin cámara: el comando `foto
 ```sh
 sudo systemctl stop virovision
 sudo .venv/bin/python -m virovision -v            # con cámara
-sudo .venv/bin/python -m virovision -v --sin-camara
+sudo .venv/bin/python -m virovision -v --no-camera
 ```
 
 Necesita root: BlueZ sólo deja registrar aplicaciones GATT y anuncios desde el bus del sistema.
@@ -69,45 +69,45 @@ Servicio `4380c500-7ca3-4e37-b27d-f60e8d8d73d1`. Copiado a mano en
 
 | característica | UUID (…c5**XX**) | props | contenido |
 |---|---|---|---|
-| `modo` | 01 | read · notify · write | `uint8`: 0 esperando, 1 ómnibus, 2 supermercado |
+| `mode` | 01 | read · notify · write | `uint8`: 0 esperando, 1 ómnibus, 2 supermercado |
 | `control` | 02 | write · write w/o response | JSON con `cmd` (abajo) |
-| `evento` | 03 | notify | JSON ≤ 180 bytes |
-| `transferencia` | 04 | notify | binario: header 4 B (`seq` u16 LE, `total` u16 LE) + datos |
-| `estado` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `bateria` (null), `camara`, `wifi`, `ip`, `puerto`, `ap` |
-| `wifi` | 06 | read | JSON `{ssid, clave, ip, puerto}` del punto de acceso; la app se une sola con esto |
+| `event` | 03 | notify | JSON ≤ 180 bytes |
+| `transfer` | 04 | notify | binario: header 4 B (`seq` u16 LE, `total` u16 LE) + datos |
+| `status` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `battery` (null), `camera`, `wifi`, `ip`, `port`, `ap` |
+| `wifi` | 06 | read | JSON `{ssid, password, ip, port}` del punto de acceso; la app se une sola con esto |
 
 Comandos de `control`:
 
 | comando | efecto |
 |---|---|
-| `{"cmd":"medir","bytes":53000,"chunk":182,"intervalo_ms":0}` | manda `bytes` aleatorios por `transferencia`. `chunk` = tamaño de notificación (default: MTU − 3); `intervalo_ms` = pausa entre chunks (default 0) |
-| `{"cmd":"foto"}` | captura con la cámara (1024 px lado mayor, JPEG q70: lo mismo que la app manda a la nube) y la transfiere igual |
-| `{"cmd":"modo","valor":2}` | cambia de modo (equivale al botón) |
-| `{"cmd":"estado"}` | fuerza una notificación de `estado` |
-| `{"cmd":"ap","valor":true,"minutos":10}` | enciende el punto de acceso por tiempo acotado (tope 60); `valor:false` lo apaga |
+| `{"cmd":"measure","bytes":53000,"chunk":182,"interval_ms":0}` | manda `bytes` aleatorios por `transfer`. `chunk` = tamaño de notificación (default: MTU − 3); `interval_ms` = pausa entre chunks (default 0) |
+| `{"cmd":"photo"}` | captura con la cámara (1024 px lado mayor, JPEG q70: lo mismo que la app manda a la nube) y la transfiere igual |
+| `{"cmd":"mode","value":2}` | cambia de modo (equivale al botón) |
+| `{"cmd":"status"}` | fuerza una notificación de `status` |
+| `{"cmd":"ap","value":true,"minutes":10}` | enciende el punto de acceso por tiempo acotado (tope 60); `value:false` lo apaga |
 
-Cada transferencia va envuelta en dos eventos: `{"t":"inicio","id":1,"tipo":"medicion","bytes":53000,"chunks":298,"chunk":182}`
-y `{"t":"fin","id":1,...,"ms_placa":N}`. **`ms_placa` no es la medición**: es cuánto tardó la placa en
-entregarle los chunks a BlueZ. El número que vale lo mide la app, del primer chunk al último.
-`estado` se notifica solo cada 15 s.
+Cada transferencia va envuelta en dos eventos: `{"t":"start","id":1,"kind":"measurement","bytes":53000,"chunks":298,"chunk":182}`
+y `{"t":"end","id":1,...,"device_ms":N}`. **`device_ms` no es la medición**: es cuánto tardó la placa
+en entregarle los chunks a BlueZ. El número que vale lo mide la app, del primer chunk al último.
+`status` se notifica solo cada 15 s.
 
 ## Plan B: la foto por WiFi (HTTP) y el punto de acceso
 
 Decidido el 2026-09-05 (ADR 0003, Actualización): por BLE la foto tarda 4,5 s; por WiFi, 46 ms. El
-daemon levanta un **servidor HTTP** en el puerto 8080 (`--puerto`, `--sin-http`) y publica su IP y
-puerto en la característica `estado` (`ip`, `puerto`, `ap`). La app siempre tira; la placa nunca empuja.
+daemon levanta un **servidor HTTP** en el puerto 8080 (`--port`, `--no-http`) y publica su IP y
+puerto en la característica `status` (`ip`, `port`, `ap`). La app siempre tira; la placa nunca empuja.
 
 | ruta | qué hace |
 |---|---|
-| `GET /salud` | el mismo JSON que `estado` |
-| `GET /medir/<bytes>` | `<bytes>` aleatorios (hasta 5 MB), para medir la descarga sin cámara |
-| `GET /fotos/ultima` | captura ahora y devuelve el JPEG (1024 px, q70); 503 sin cámara |
+| `GET /health` | el mismo JSON que `status` |
+| `GET /measure/<bytes>` | `<bytes>` aleatorios (hasta 5 MB), para medir la descarga sin cámara |
+| `GET /photos/latest` | captura ahora y devuelve el JPEG (1024 px, q70); 503 sin cámara |
 | `POST /audio` | guarda el MP3/WAV en `/tmp/virovision-audio/` para reproducirlo; 202 con el tamaño. Con `X-Encoding: base64` decodifica el cuerpo (así lo manda la app: `fetch` de RN no envía bytes) |
 
 Dos modos de red, y el que importa es el segundo:
 
 1. **Placa y teléfono en la misma red WiFi** (casa, laboratorio): no hay que hacer nada; la app baja de
-   la IP que informa `estado`. Sirve para desarrollar y medir.
+   la IP que informa `status`. Sirve para desarrollar y medir.
 2. **Sin WiFi de infraestructura** (la calle, el supermercado): la placa levanta su **punto de acceso**
    `ViroVision` (clave `virovision2026`, IP `10.42.0.1`) con NetworkManager, y el teléfono se une. El
    teléfono conserva internet por datos (en iOS hay que verificarlo: es el spike que queda). La placa
@@ -116,14 +116,14 @@ Dos modos de red, y el que importa es el segundo:
    conocida. **El AP sigue al modo**: se enciende al entrar a ómnibus o supermercado (20 min de tope,
    renovados en cada cambio) y se apaga al volver a esperando. Comando manual:
    `{"cmd":"ap","valor":true,"minutos":10}` por `control`; `{"cmd":"ap","valor":false}` lo baja antes.
-   Evento `{"t":"ap","encendido":…,"minutos":…}`, `estado.ap`, y `estado` vuelve a notificarse con la
+   Evento `{"t":"ap","on":…,"minutes":…}`, `status.ap`, y `status` vuelve a notificarse con la
    IP nueva (10.42.0.1) para que la app sepa de dónde bajar la foto.
    **El AP es una red sólo local**: `setup.sh` deja un drop-in de dnsmasq sin puerta de enlace ni DNS
    (opciones DHCP 3 y 6). Con el default de NetworkManager el iPhone quedaba sin internet; así
    conserva su ruta por datos móviles (medido el 2026-09-05).
 
 Para probar el modo 2 sin la app: unirse desde Ajustes del teléfono al WiFi `ViroVision`, abrir
-`http://10.42.0.1:8080/salud` en el navegador, y comprobar que el teléfono sigue con internet (abrir
+`http://10.42.0.1:8080/health` en el navegador, y comprobar que el teléfono sigue con internet (abrir
 cualquier sitio). Desde la placa, a mano y con vuelta automática:
 
 ```sh
@@ -169,7 +169,7 @@ el intervalo de 15 ms de iOS.
 
 ## Botón físico (ADR 0007)
 
-El único control en la placa. `virovision/boton.py`; los modos que dispara viven en `modos.py`.
+El único control en la placa. `virovision/button.py`; los modos que dispara viven en `modes.py`.
 
 | Gesto | Efecto |
 |---|---|
@@ -178,15 +178,15 @@ El único control en la placa. `virovision/boton.py`; los modos que dispara vive
 | mantenerlo apretado | volver a *esperando*, desde cualquier modo |
 
 Dentro de un modo los clicks cortos no hacen nada todavía: salir es siempre el click largo. Cada
-transición se notifica por `modo` y `evento` igual que si la hubiera pedido la app, así que **la app
+transición se notifica por `mode` y `event` igual que si la hubiera pedido la app, así que **la app
 no distingue** si el modo lo cambió el dedo del usuario o ella misma.
 
 **Cableado**: pulsador entre **GPIO 5 (pin físico 29)** y **GND (pin 30, el de al lado)**. Pull-up
 interno, sin resistencia externa. Con un tact switch de 4 patas hay que usar **dos patas en
 diagonal**: las dos de una misma cara vienen unidas de fábrica y darían un botón apretado para
-siempre. `--gpio-boton N` para otro pin, `--sin-boton` para ignorarlo.
+siempre. `--button-gpio N` para otro pin, `--no-button` para ignorarlo.
 
-**Tiempos** (en `boton.py`, todavía sin calibrar con el usuario):
+**Tiempos** (en `button.py`, todavía sin calibrar con el usuario):
 
 | Constante | Valor | Por qué |
 |---|---|---|

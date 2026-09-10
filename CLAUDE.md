@@ -16,8 +16,11 @@ Reglas duras que aplican desde el primer minuto:
   internos de TestFlight). `main` es producción: sólo recibe PRs `staging → main` (= release,
   publica al link público). Nunca commitees directo en `staging` ni en `main`.
 - **Nada de trailers de co-autoría de IA** en commits ni PRs.
-- Conventional Commits con scope, asunto en español; identificadores en inglés, comentarios y
-  cadenas en español; toda cadena visible va en `app/src/i18n/es.ts`.
+- **Todo el código en inglés** (ADR 0009): identificadores, archivos, comentarios, tests, ramas,
+  commits y las fronteras (protocolo BLE, endpoints de la placa, esquema de Supabase). **En español
+  queda lo que una persona lee o escucha**: los valores de `app/src/i18n/es.ts` —las claves son
+  inglesas—, el prompt de supermercado y **toda la documentación**, ADRs y skill incluidos.
+- Conventional Commits con scope, asunto en inglés; toda cadena visible va en `app/src/i18n/es.ts`.
 - **La accesibilidad es EL criterio de diseño**, no una capa: la voz es la interfaz. Offline-first:
   el modo ómnibus (OCR local) tiene que funcionar sin internet (ADR 0001/0006).
 - Verificación mínima antes de un PR: `cd app && npm run lint && npm run typecheck && npm test`.

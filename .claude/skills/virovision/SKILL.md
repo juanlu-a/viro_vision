@@ -64,8 +64,11 @@ documento:
 | skill **`virovision-marca`** | Ante cualquier cosa visual: colores, tokens de tema, íconos, tipografía, material de la tesis. |
 
 ## Cross-cutting conventions & constraints
-- **Language:** the project and its documentation are in **Spanish**. Prefer Spanish for
-  user-facing strings, thesis docs and comments where the surrounding context is Spanish.
+- **Language (ADR 0009, 2026-09-09):** **all code is English** — identifiers, file names, comments,
+  tests, branches, commits, and the wire (BLE protocol, the device's HTTP endpoints, the Supabase
+  schema). **Spanish is for what a person reads or hears**: the *values* in `app/src/i18n/es.ts`
+  (the keys are English), the supermarket prompt (its answer is spoken aloud), the model labels in
+  the selector, and **all documentation** — `docs/`, the ADRs, this skill and the thesis.
 - **Accessibility is a hard requirement**, not a nice-to-have. Every UI decision is evaluated
   against blind/low-vision usability and native screen readers (VoiceOver / TalkBack).
 - **Offline-first / self-contained (hard requirement).** The **essential features** — object

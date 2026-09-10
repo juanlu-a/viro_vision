@@ -37,6 +37,7 @@ el 02/09).
    coexistencia que pagaría el plan B.
 4. Para los otros tamaños, mandar el comando a mano (nRF Connect → `control`, texto) o cambiar
    `BYTES_FOTO_REFERENCIA` en un build local: `{"cmd":"medir","bytes":35000}`, `30000`, `15000`.
+   (El comando se llama `measure` desde el 2026-09-09, ADR 0009; la corrida original usó `medir`.)
 5. Si el mejor resultado da menos de ~15 KB/s, **antes de concluir** repetir con la variante
    `AcquireNotify` del daemon (ver caveat en el README de la placa): el cuello podría ser D-Bus y no
    la radio.
