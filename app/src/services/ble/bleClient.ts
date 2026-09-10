@@ -35,6 +35,13 @@ export interface BleClient {
   onAp(listener: (on: boolean) => void): () => void;
   /** Error notices sent by the device (`{t:'error', msg}`), to show and to speak. */
   onDeviceError(listener: (message: string) => void): () => void;
+  /**
+   * The physical button asked for a reading NOW (`{t:'read'}`, ADR 0007 2026-10 update). It is a
+   * separate signal from `onMode` because a double click in supermarket changes no mode and still
+   * has to take a photo — keying the capture off the transition is exactly what made the second
+   * double click do nothing.
+   */
+  onReadRequest(listener: () => void): () => void;
   /** Sets the mode on the device (0 idle, 1 bus, 2 supermarket). It turns its AP on or off. */
   writeMode(mode: number): Promise<void>;
   /** Credentials of the device's AP, or null when it has none. */
@@ -106,6 +113,9 @@ const stubClient: BleClient = {
     return () => {};
   },
   onDeviceError() {
+    return () => {};
+  },
+  onReadRequest() {
     return () => {};
   },
   async writeMode() {

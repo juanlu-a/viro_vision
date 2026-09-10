@@ -98,6 +98,47 @@ Queda abierto cómo pedir una **segunda** lectura de supermercado sin salir del 
 gestos (click largo y otra vez dos clicks). La opción natural —que repetir los dos clicks saque
 otra foto— exige que el dispositivo avise cada gesto y no sólo cada cambio de modo, porque el modo
 no cambia; se decide con el usuario antes de agregar superficie al protocolo.
+*(Cerrado el 2026-10, abajo: se decidió la opción natural y sí hubo que agregar el evento.)*
+
+## Actualización 2026-10 — dos clicks piden una lectura, siempre
+
+**La pregunta que la actualización anterior dejó abierta, decidida con el usuario probándolo.** Con
+la máquina de "un gesto nombra un modo", el segundo doble click frente a la góndola no hacía nada:
+el modo ya era supermercado, no había transición, y la captura se disparaba con la transición. Para
+leer el producto siguiente había que salir con un click largo y volver a entrar — dos gestos para
+repetir uno, con el mismo síntoma que ya habíamos arreglado un nivel más arriba: **el botón se
+siente muerto**.
+
+**Decisión: un gesto de dos clicks pide una lectura, cambie o no el modo.** Un click no: ómnibus es
+vigilancia y ya está mirando solo, así que repetirlo no pide nada nuevo — y si lo pidiera, cada
+click costaría una foto y una llamada a la nube.
+
+| Gesto | Desde | Efecto |
+|---|---|---|
+| 2 clicks | esperando u ómnibus | entra a supermercado **y lee** |
+| 2 clicks | **ya en supermercado** | **lee de nuevo** (no anuncia el modo otra vez) |
+| 1 click | ya en ómnibus | nada: el modo ya está vigilando |
+
+**Cómo se implementó, y por qué así.** Tal como anticipaba el párrafo de arriba, hubo que agregar
+superficie al protocolo: un evento nuevo **`{"t":"read","mode":N}`** en la característica `event`.
+Las dos alternativas que se descartaron:
+
+- *Re-anunciar el modo.* La app ignora un `mode` que nombra el modo en el que ya está —como debe,
+  o cada latido hablaría— así que se perdería en silencio. Y si no se perdiera, haría decir «Modo
+  supermercado activado» de nuevo: ruido para quien está leyendo tres productos seguidos.
+- *Que el dispositivo saque la foto por su cuenta.* Rompe ADR 0003: la app tira, el dispositivo
+  nunca empuja. Lo que viaja es la intención, no la imagen.
+
+**Consecuencia en la app**: el pedido de lectura deja de deducirse de la transición de modo y pasa a
+ser una señal explícita, con dos orígenes —el botón físico y la pantalla— que se sirven en un solo
+lugar. Los dos son contadores y lo que dispara es que el total *cambie*, nunca su valor: dos pedidos
+idénticos seguidos tienen que ser distinguibles, porque eso es exactamente leer dos productos
+seguidos. De paso desaparece una fragilidad: el efecto anterior dependía de `read`, cuya identidad
+cambia al cambiar de modelo, y llevaba una guarda para no disparar por un motivo ajeno al usuario.
+
+**Una lectura en curso no se encola**: si llega un pedido mientras hay otro andando, se ignora y se
+registra. Para cuando terminara, la foto extra sería de una escena que el usuario ya dejó atrás — y
+está por escuchar el resultado de la que sí está corriendo.
 
 ## Ver también
 

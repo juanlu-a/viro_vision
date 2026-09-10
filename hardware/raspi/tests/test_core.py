@@ -128,6 +128,41 @@ def test_ap_turns_on_for_a_bounded_time_and_says_so(loop):
     assert core._ap_off_timer is None
 
 
+def test_two_clicks_ask_for_a_reading_every_time(loop):
+    """The point of the 2026-09-10 update: in front of the shelf the user repeats the gesture to read
+    the next product. The first double click changes the mode AND asks for a reading; the second one
+    changes nothing and still has to ask, or the button reads as dead."""
+    core, n = build(loop)
+    core.from_button(2)
+    loop.run_until_complete(_drain(loop))
+    assert [e["t"] for e in n.events()] == ["mode", "read"]
+
+    core.from_button(2)
+    loop.run_until_complete(_drain(loop))
+    # No second "mode": it did not change, and re-announcing it would speak over the user.
+    assert [e["t"] for e in n.events()] == ["mode", "read", "read"]
+    assert n.events()[-1] == {"t": "read", "mode": 2}
+
+
+def test_one_click_does_not_ask_for_a_reading(loop):
+    """Bus mode is surveillance: it keeps watching on its own, so repeating the gesture asks for
+    nothing new. If this ever emitted `read`, every click would cost a photo and a cloud call."""
+    core, n = build(loop)
+    core.from_button(1)
+    core.from_button(1)
+    loop.run_until_complete(_drain(loop))
+    assert [e["t"] for e in n.events()] == ["mode"]
+
+
+def test_a_mode_set_over_ble_does_not_ask_for_a_reading(loop):
+    """Only the physical button asks. When the app sets the mode it already knows it has to read, so
+    an event here would take a second photo for the same gesture."""
+    core, n = build(loop)
+    core.write_control(b'{"cmd":"mode","value":2}')
+    loop.run_until_complete(_drain(loop))
+    assert [e["t"] for e in n.events()] == ["mode"]
+
+
 def test_changing_mode_does_not_touch_the_ap(loop):
     # Since 2026-09-07 the AP stays on at all times; the mode neither turns it on nor off.
     calls = []

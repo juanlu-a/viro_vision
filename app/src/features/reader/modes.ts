@@ -27,3 +27,19 @@ export function transition(mode: Mode, gesture: Gesture): Mode {
   if (gesture === 'doubleClick') return 'supermarket';
   return mode;
 }
+
+/**
+ * Whether the gesture also asks for a reading right now (ADR 0007, 2026-10 update).
+ *
+ * Two clicks mean "read what is in front of me", not "switch to a mode": in front of the shelf the
+ * user repeats the gesture to read the next product, and the second one has to take a photo even
+ * though the mode did not change. One click is the opposite kind of gesture — bus mode is
+ * surveillance and keeps watching on its own, so repeating it asks for nothing new.
+ *
+ * It is a separate question from `transition` because the two answers differ: a gesture can name a
+ * mode without asking for a reading, and can ask for one without changing the mode. The device
+ * mirrors this in `ModeMachine.requests_reading`, and answers it there for the physical button.
+ */
+export function requestsReading(gesture: Gesture): boolean {
+  return gesture === 'doubleClick';
+}

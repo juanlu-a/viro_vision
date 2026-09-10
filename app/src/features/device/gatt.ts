@@ -19,7 +19,7 @@ export const GATT = {
     mode: '4380c501-7ca3-4e37-b27d-f60e8d8d73d1',
     /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status', ... }`. */
     control: '4380c502-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** notify — JSON ≤ 180 bytes: `{ t: 'start' | 'end' | 'mode' | 'error' | 'result', ... }`. */
+    /** notify — JSON ≤ 180 bytes: `{ t: 'start' | 'end' | 'mode' | 'read' | 'ap' | 'error' | 'result', ... }`. */
     event: '4380c503-7ca3-4e37-b27d-f60e8d8d73d1',
     /**
      * notify — binary: a 4-byte header (`seq` u16 LE, `total` u16 LE) + data.

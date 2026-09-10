@@ -40,6 +40,7 @@ export type EventType =
   | 'device.warning'
   | 'device.mode'
   | 'device.modeFailed'
+  | 'device.readRequest'
   // Operating modes (ADR 0007)
   | 'mode.change'
   // One reading, end to end

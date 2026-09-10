@@ -33,6 +33,8 @@ const REQUESTED_MTU = 517;
 /** What the device notifies over `event`. A mirror of `hardware/raspi/virovision/gatt.py`. */
 type DeviceEvent =
   | { t: 'mode'; value: number }
+  /** The button asked for a reading now (ADR 0007, 2026-10 update). Carries the mode it was in. */
+  | { t: 'read'; mode: number }
   | { t: 'ap'; on: boolean; minutes: number }
   | { t: 'error'; msg: string }
   | { t: 'result'; event: RecognitionEvent };
@@ -78,6 +80,7 @@ class BleClientPlx implements BleClient {
   private readonly statusListeners = new Set<(status: DeviceStatus) => void>();
   private readonly modeListeners = new Set<(mode: number) => void>();
   private readonly apListeners = new Set<(on: boolean) => void>();
+  private readonly readRequestListeners = new Set<() => void>();
   private readonly errorListeners = new Set<(message: string) => void>();
 
   constructor(private readonly manager: BleManager) {}
@@ -160,6 +163,11 @@ class BleClientPlx implements BleClient {
   onDeviceError(listener: (message: string) => void): () => void {
     this.errorListeners.add(listener);
     return () => this.errorListeners.delete(listener);
+  }
+
+  onReadRequest(listener: () => void): () => void {
+    this.readRequestListeners.add(listener);
+    return () => this.readRequestListeners.delete(listener);
   }
 
   async writeMode(mode: number): Promise<void> {
@@ -248,6 +256,9 @@ class BleClientPlx implements BleClient {
         break;
       case 'ap':
         for (const listener of this.apListeners) listener(event.on);
+        break;
+      case 'read':
+        for (const listener of this.readRequestListeners) listener();
         break;
       case 'result':
         for (const listener of this.recognitionListeners) listener(event.event);

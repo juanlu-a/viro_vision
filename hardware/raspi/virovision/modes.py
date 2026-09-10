@@ -53,5 +53,20 @@ class ModeMachine:
             return Mode.SUPERMARKET
         return None
 
+    @staticmethod
+    def requests_reading(clicks: int) -> bool:
+        """Whether this gesture also asks for a reading right now (ADR 0007, 2026-09-10 update).
+
+        Two clicks mean "read what is in front of me", not "switch to a mode": in front of the shelf
+        the user repeats the gesture to read the next product, and the second one has to take a photo
+        even though the mode did not change. One click is the opposite kind of gesture — bus mode is
+        surveillance and keeps watching on its own, so repeating it asks for nothing new.
+
+        It is a separate question from `mode_for_clicks` because the two answers differ: the gesture
+        can name a mode without asking for a reading, and can ask for a reading without changing the
+        mode. `app/src/features/reader/modes.ts` mirrors this.
+        """
+        return clicks == 2
+
     def long_press(self) -> bool:
         return self.change(Mode.IDLE)
