@@ -122,8 +122,11 @@ tests via `jest-expo`.
   placa (`/health`, `/measure/<n>`, `/photos/latest`), los flags del daemon (`--no-ap`) y el esquema
   de Supabase (tabla `events`, vocabulario `reading.ok`). Sigue en español lo que una persona lee o
   escucha (los valores de `i18n/es.ts`, el prompt de supermercado) y **toda la documentación**.
-  ⚠️ **Paso manual pendiente en la placa**: el drop-in de systemd de la microSD pasa `--sin-ap` y hay
-  que editarlo a `--no-ap`, o el daemon no arranca.
+  ⚠️ **Paso manual pendiente en la microSD**: `/boot/firmware/modo-red.sh` tiene `--sin-ap`
+  hardcodeado (lo usa para escribir el drop-in de modo desarrollo cuando existe el archivo
+  `SIN-AP`). No urge, porque hoy la tarjeta está en modo producto y sin drop-in; pero volver a modo
+  desarrollo sin editarlo deja al daemon sin arrancar. Se arregla con la tarjeta puesta:
+  `sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh`.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a

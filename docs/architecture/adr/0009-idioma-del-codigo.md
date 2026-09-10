@@ -79,8 +79,10 @@ En español, porque lo lee o lo escucha una persona:
 - **La historia de `git blame` se corta** en los archivos renombrados. Se mitiga con `git mv` (Git
   sigue los renombres) y con `--follow`, pero los cambios dentro de cada archivo quedan bajo este
   commit.
-- **Un paso manual en la placa.** El drop-in de systemd de la microSD pasa `--sin-ap`; con el flag
-  renombrado el daemon no arranca hasta editarlo a `--no-ap`. Es un `sed` por unidad y sólo hay una.
+- **Un paso manual en la microSD.** El script de arranque `/boot/firmware/modo-red.sh` tiene
+  `--sin-ap` hardcodeado —lo usa para escribir el drop-in de modo desarrollo cuando existe el archivo
+  `SIN-AP`—, así que volver a ese modo sin editarlo deja al daemon sin arrancar. Está en FAT: se
+  arregla con la tarjeta puesta en cualquier computadora, sin entrar a la placa.
 - **Los comentarios pierden algo de matiz.** Estaban escritos por hablantes nativos de español y
   varios contaban un fallo concreto con precisión. La traducción conserva el hecho y la consecuencia;
   el tono, en parte.
