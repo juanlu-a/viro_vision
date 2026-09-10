@@ -1,11 +1,12 @@
 /**
- * Errores tipados de la capa de visión en la nube (modo supermercado, ADR 0006).
+ * Typed errors of the cloud vision layer (supermarket mode, ADR 0006).
  *
- * La UI decide qué mensaje mostrar y qué anunciar por voz por el TIPO del error, nunca parseando
- * strings — y cuando un error trae un dato accionable (cuánto esperar, qué falló), va como campo.
+ * The UI decides what message to show and what to announce by voice from the error's TYPE, never by
+ * parsing strings — and when an error carries actionable data (how long to wait, what failed), it
+ * travels as a field.
  */
 
-/** Se lanza cuando el proveedor del modelo elegido no tiene clave (ver app/.env.example). */
+/** Thrown when the chosen model's provider has no key (see app/.env.example). */
 export class VisionNotConfiguredError extends Error {
   constructor() {
     super('VISION_NOT_CONFIGURED');
@@ -13,7 +14,7 @@ export class VisionNotConfiguredError extends Error {
   }
 }
 
-/** Se lanza ante una respuesta HTTP no-2xx. `body` trae el detalle de la API. */
+/** Thrown on a non-2xx HTTP response. `body` carries the API's detail. */
 export class VisionHttpError extends Error {
   readonly status: number;
   readonly body: string;
@@ -27,9 +28,9 @@ export class VisionHttpError extends Error {
 }
 
 /**
- * Cuota agotada. Se distingue del resto porque **es esperable y se resuelve esperando**: el tier
- * gratuito de Gemini admite 20 requests por minuto por modelo. El proveedor informa cuánto esperar
- * y ese dato se conserva para decírselo al usuario.
+ * Quota exhausted. It is set apart from the rest because **it is expected and resolves by waiting**:
+ * Gemini's free tier allows 20 requests per minute per model. The provider reports how long to wait
+ * and that figure is kept so it can be told to the user.
  */
 export class VisionQuotaError extends Error {
   readonly retryAfterSeconds: number;
@@ -41,7 +42,7 @@ export class VisionQuotaError extends Error {
   }
 }
 
-/** Se lanza ante un evento de error a mitad de stream (llega con HTTP 200). */
+/** Thrown on an error event mid-stream (it arrives with HTTP 200). */
 export class VisionStreamError extends Error {
   readonly detail: string;
 
@@ -53,9 +54,9 @@ export class VisionStreamError extends Error {
 }
 
 /**
- * La red falló antes de que el proveedor respondiera (sin señal, DNS, TLS). `expo/fetch` rechaza
- * con un `TypeError` genérico; envolverlo permite que la UI anuncie "sin conexión" en vez de un
- * mensaje técnico — y que el modo supermercado degrade a un estado rotulado (ADR 0001).
+ * The network failed before the provider answered (no signal, DNS, TLS). `expo/fetch` rejects with
+ * a generic `TypeError`; wrapping it lets the UI announce "no connection" instead of a technical
+ * message — and lets supermarket mode degrade to a labelled state (ADR 0001).
  */
 export class VisionNetworkError extends Error {
   readonly detail: string;

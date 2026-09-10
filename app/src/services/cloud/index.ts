@@ -1,9 +1,9 @@
 /**
- * La frontera con la nube: por dónde sale un pedido y con qué claves (ADR 0008).
+ * The boundary with the cloud: where a request goes out and with which keys (ADR 0008).
  *
- * Único punto de import: `@/services/cloud`. Lo usan `services/vision` (lectura de producto) y
- * `services/audio` (síntesis de voz a archivo), que no se conocen entre sí.
+ * Single import surface: `@/services/cloud`. It is used by `services/vision` (product reading) and
+ * `services/audio` (speech synthesis to file), which do not know about each other.
  */
 export { isProxyConfigured, proxyUrl } from './config';
-export { resolverTransporte } from './transport';
+export { resolveTransport } from './transport';
 export type { CloudProviderId, CloudRequest } from './types';

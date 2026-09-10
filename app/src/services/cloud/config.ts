@@ -1,14 +1,14 @@
 /**
- * El proxy propio de claves (ADR 0008).
+ * Our own key proxy (ADR 0008).
  *
- * ⚠️ `EXPO_PUBLIC_*` se inlinea en el bundle en tiempo de build: no es una variable que el binario
- * lea al arrancar, es una constante compilada dentro del `.ipa`. Ésta en particular es una URL y no
- * un secreto, así que puede viajar; el punto del proxy es justamente que las CLAVES no lo hagan.
+ * ⚠️ `EXPO_PUBLIC_*` is inlined into the bundle at build time: it is not a variable the binary reads
+ * at startup, it is a constant compiled into the `.ipa`. This one in particular is a URL and not a
+ * secret, so it can travel; the point of the proxy is precisely that the KEYS do not.
  */
 export const proxyUrl = process.env.EXPO_PUBLIC_VISION_PROXY_URL ?? '';
 
 /**
- * Con el proxy activo la app no necesita ninguna clave: las guarda el servidor. Es lo que hace
- * distribuible un build.
+ * With the proxy on, the app needs no key at all: the server holds them. It is what makes a build
+ * distributable.
  */
 export const isProxyConfigured = proxyUrl.length > 0;

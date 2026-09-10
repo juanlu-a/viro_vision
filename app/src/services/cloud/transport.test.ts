@@ -1,66 +1,67 @@
 /**
- * Existe porque el punto entero del proxy (ADR 0008) es que la clave no salga del teléfono, y la
- * forma de romperlo no falla a la vista: si las cabeceras del proveedor se reenviaran junto al
- * cuerpo, la lectura seguiría funcionando **igual de bien** mientras la clave viaja igual que
- * antes. Un test es la única forma de que eso no pase inadvertido.
+ * Exists because the whole point of the proxy (ADR 0008) is that the key never leaves the phone, and
+ * the way to break it does not fail visibly: if the provider's headers were forwarded along with the
+ * body, the reading would keep working **just as well** while the key travels exactly as before. A
+ * test is the only way for that not to go unnoticed.
  *
- * También fija el sobre que la Edge Function espera (`supabase/functions/vision/index.ts`): son dos
- * archivos que no comparten código —uno corre en Hermes y el otro en Deno— y si el contrato se
- * desincroniza, el proxy responde 400 y nadie sabe por qué.
+ * It also pins the envelope the Edge Function expects (`supabase/functions/vision/index.ts`): they
+ * are two files that share no code —one runs on Hermes and the other on Deno— and if the contract
+ * drifts, the proxy answers 400 and nobody knows why.
  */
-import { resolverTransporte } from './transport';
+import { resolveTransport } from './transport';
 import type { CloudRequest } from './types';
 
-const directo: CloudRequest = {
+const direct: CloudRequest = {
   url: 'https://api.openai.com/v1/chat/completions',
-  headers: { 'content-type': 'application/json', authorization: 'Bearer sk-secreta' },
+  headers: { 'content-type': 'application/json', authorization: 'Bearer sk-secret' },
   body: { model: 'gpt-5.6-luna', stream: true },
 };
 
-const PROXY = 'https://proyecto.supabase.co/functions/v1/vision';
+const PROXY = 'https://project.supabase.co/functions/v1/vision';
 
-describe('resolverTransporte', () => {
-  it('sin proxy configurado deja el request intacto', () => {
-    // Es el camino de desarrollo, contra un .env local: tiene que seguir funcionando tal cual.
-    expect(resolverTransporte(directo, 'openai', '')).toBe(directo);
+describe('resolveTransport', () => {
+  it('leaves the request untouched when no proxy is configured', () => {
+    // It is the development path, against a local .env: it has to keep working as is.
+    expect(resolveTransport(direct, 'openai', '')).toBe(direct);
   });
 
-  it('con proxy, la clave NO viaja', () => {
-    const porProxy = resolverTransporte(directo, 'openai', PROXY);
+  it('with a proxy, the key does NOT travel', () => {
+    const throughProxy = resolveTransport(direct, 'openai', PROXY);
 
-    expect(JSON.stringify(porProxy)).not.toContain('sk-secreta');
-    expect(porProxy.headers).toEqual({ 'content-type': 'application/json' });
+    expect(JSON.stringify(throughProxy)).not.toContain('sk-secret');
+    expect(throughProxy.headers).toEqual({ 'content-type': 'application/json' });
   });
 
-  it('con proxy, el destino es el proxy y no el proveedor', () => {
-    expect(resolverTransporte(directo, 'openai', PROXY).url).toBe(PROXY);
+  it('with a proxy, the destination is the proxy and not the provider', () => {
+    expect(resolveTransport(direct, 'openai', PROXY).url).toBe(PROXY);
   });
 
-  it('manda el proveedor, la URL original y el cuerpo sin tocar', () => {
-    // La URL viaja para que el path lo siga eligiendo el módulo del proveedor; el servidor la
-    // valida contra la allowlist de hosts. El cuerpo se pasa tal cual: el proxy es tonto y no
-    // conoce los prompts ni el schema.
-    expect(resolverTransporte(directo, 'openai', PROXY).body).toEqual({
+  it('sends the provider, the original URL and the body untouched', () => {
+    // The URL travels so the path keeps being chosen by the provider module; the server validates it
+    // against the host allowlist. The body is passed as is: the proxy is dumb and knows neither the
+    // prompts nor the schema.
+    expect(resolveTransport(direct, 'openai', PROXY).body).toEqual({
       provider: 'openai',
       url: 'https://api.openai.com/v1/chat/completions',
-      body: directo.body,
+      body: direct.body,
     });
   });
 
-  it('el proveedor del sobre es el que se le pasa, no el que se adivine de la URL', () => {
-    // El servidor cruza los dos: si el sobre dijera un proveedor y la URL fuera de otro host,
-    // rechaza. Adivinarlo acá haría que ese cruce nunca pudiera fallar y la guarda sería inútil.
+  it('the envelope\'s provider is the one passed in, not one guessed from the URL', () => {
+    // The server cross-checks the two: if the envelope said one provider and the URL belonged to
+    // another host, it rejects. Guessing it here would mean that cross-check could never fail and
+    // the guard would be useless.
     const anthropic: CloudRequest = {
       url: 'https://api.anthropic.com/v1/messages',
-      headers: { 'x-api-key': 'sk-ant-secreta', 'anthropic-version': '2023-06-01' },
+      headers: { 'x-api-key': 'sk-ant-secret', 'anthropic-version': '2023-06-01' },
       body: { model: 'claude-haiku-4-5' },
     };
-    const porProxy = resolverTransporte(anthropic, 'anthropic', PROXY);
+    const throughProxy = resolveTransport(anthropic, 'anthropic', PROXY);
 
-    expect(porProxy.body).toMatchObject({ provider: 'anthropic' });
-    // `anthropic-version` la repone el servidor: es parte de con qué API hablamos, no de qué le
-    // preguntamos al modelo, y mandarla desde el cliente sería otra cosa que puede desincronizarse.
-    expect(JSON.stringify(porProxy)).not.toContain('anthropic-version');
-    expect(JSON.stringify(porProxy)).not.toContain('sk-ant-secreta');
+    expect(throughProxy.body).toMatchObject({ provider: 'anthropic' });
+    // `anthropic-version` is restored by the server: it is part of which API we talk to, not of what
+    // we ask the model, and sending it from the client would be one more thing that can drift.
+    expect(JSON.stringify(throughProxy)).not.toContain('anthropic-version');
+    expect(JSON.stringify(throughProxy)).not.toContain('sk-ant-secret');
   });
 });

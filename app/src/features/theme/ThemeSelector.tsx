@@ -1,14 +1,14 @@
 /**
- * Selector de tema: sistema / claro / oscuro.
+ * Theme selector: system / light / dark.
  *
- * Es un desplegable compacto y no tres bloques apilados. El motivo no es estético: ocupando media
- * pantalla, la apariencia parecía el ajuste más importante de la app, y no lo es. Un disparador de
- * una línea le da el peso que tiene.
+ * It is a compact dropdown and not three stacked blocks. The reason is not aesthetic: taking up half
+ * the screen, appearance looked like the app's most important setting, and it is not. A one-line
+ * trigger gives it the weight it has.
  *
- * Para el lector de pantalla nada se pierde: el disparador es un `button` cuya etiqueta ya dice qué
- * opción rige ("Apariencia: Oscuro"), y el menú que abre es un `radiogroup` con `checked`, que es
- * lo que comunica que las opciones son excluyentes. Los íconos son decorativos y van ocultos — el
- * texto no depende de ellos.
+ * Nothing is lost for the screen reader: the trigger is a `button` whose label already says which
+ * option is in force ("Apariencia: Oscuro"), and the menu it opens is a `radiogroup` with `checked`,
+ * which is what communicates that the options are mutually exclusive. The icons are decorative and
+ * hidden — the text does not depend on them.
  */
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -22,14 +22,14 @@ import type { ThemePreference } from '@/services/storage/themePreference';
 
 import { useThemePreference } from './ThemePreferenceProvider';
 
-type Opcion = {
+type Option = {
   value: ThemePreference;
   label: string;
   hint: string;
   icon: keyof typeof Ionicons.glyphMap;
 };
 
-const OPTIONS: Opcion[] = [
+const OPTIONS: Option[] = [
   {
     value: 'system',
     label: strings.settings.themeSystem,
@@ -52,35 +52,35 @@ const OPTIONS: Opcion[] = [
 
 export function ThemeSelector() {
   const { preference, setPreference } = useThemePreference();
-  // `theme` sigue haciendo falta: el color de un ícono es una prop, no un estilo.
+  // `theme` is still needed: an icon's colour is a prop, not a style.
   const theme = useTheme();
-  const [abierto, setAbierto] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  const actual = OPTIONS.find((o) => o.value === preference) ?? OPTIONS[0];
+  const current = OPTIONS.find((o) => o.value === preference) ?? OPTIONS[0];
 
-  const elegir = (value: ThemePreference) => {
+  const choose = (value: ThemePreference) => {
     Haptics.selectionAsync().catch(() => {});
     setPreference(value);
-    setAbierto(false);
+    setOpen(false);
   };
 
   return (
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${strings.settings.appearance}: ${actual.label}`}
+        accessibilityLabel={`${strings.settings.appearance}: ${current.label}`}
         accessibilityHint={strings.settings.appearanceHint}
-        onPress={() => setAbierto(true)}
+        onPress={() => setOpen(true)}
         className="min-h-touch flex-row items-center gap-two rounded-md border border-border-strong bg-surface-elevated px-three active:opacity-85">
         <Ionicons
-          name={actual.icon}
+          name={current.icon}
           size={20}
           color={theme.primary}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         />
         <ThemedText type="smallBold" className="flex-1">
-          {actual.label}
+          {current.label}
         </ThemedText>
         <Ionicons
           name="chevron-down"
@@ -92,16 +92,16 @@ export function ThemeSelector() {
       </Pressable>
 
       <Modal
-        visible={abierto}
+        visible={open}
         transparent
         animationType="fade"
-        onRequestClose={() => setAbierto(false)}>
-        {/* El fondo cierra al tocarlo, pero se oculta del lector de pantalla: con VoiceOver el
-            gesto de cerrar es el propio del sistema, y un "botón" que ocupa toda la pantalla sólo
-            estorbaría al recorrer las opciones. */}
+        onRequestClose={() => setOpen(false)}>
+        {/* The backdrop closes on tap, but it is hidden from the screen reader: with VoiceOver the
+            closing gesture is the system's own, and a full-screen "button" would only get in the way
+            when walking the options. */}
         <Pressable
           className="absolute inset-0 bg-overlay"
-          onPress={() => setAbierto(false)}
+          onPress={() => setOpen(false)}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         />
@@ -120,7 +120,7 @@ export function ThemeSelector() {
                   accessibilityState={{ checked: selected }}
                   accessibilityLabel={option.label}
                   accessibilityHint={option.hint}
-                  onPress={() => elegir(option.value)}
+                  onPress={() => choose(option.value)}
                   className={`min-h-touch flex-row items-center gap-three rounded-md px-three active:opacity-85 ${
                     selected ? 'bg-primary' : ''
                   }`}>
@@ -137,8 +137,8 @@ export function ThemeSelector() {
                     className="flex-1">
                     {option.label}
                   </ThemedText>
-                  {/* El check es refuerzo del estado, no su único portador: el relleno cambia y
-                      `accessibilityState.checked` es lo que anuncia el lector. */}
+                  {/* The check reinforces the state, it is not its only carrier: the fill changes
+                      and `accessibilityState.checked` is what the reader announces. */}
                   {selected && (
                     <Ionicons
                       name="checkmark"

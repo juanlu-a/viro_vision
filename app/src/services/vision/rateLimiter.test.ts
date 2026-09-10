@@ -1,97 +1,97 @@
 /**
- * El reloj y la espera se inyectan en todos los casos: un test que dependa de `Date.now()` y de
- * `setTimeout` reales tendría que esperar un minuto de verdad para probar la ventana móvil.
+ * The clock and the wait are injected in every case: a test relying on the real `Date.now()` and
+ * `setTimeout` would have to wait an actual minute to exercise the sliding window.
  */
 import { acquireSlot, remainingSlots, resetRateLimiter } from './rateLimiter';
 
 afterEach(resetRateLimiter);
 
-/** Reloj falso: avanza sólo cuando se lo pide el test. */
-function relojFalso(inicio = 1_000_000) {
-  let t = inicio;
+/** Fake clock: it only advances when the test asks it to. */
+function fakeClock(start = 1_000_000) {
+  let t = start;
   return {
     now: () => t,
-    avanzar: (ms: number) => {
+    advance: (ms: number) => {
       t += ms;
     },
   };
 }
 
 describe('acquireSlot', () => {
-  it('deja pasar sin esperar mientras haya lugar en la ventana', async () => {
-    const reloj = relojFalso();
-    let esperas = 0;
+  it('lets calls through without waiting while there is room in the window', async () => {
+    const clock = fakeClock();
+    let waits = 0;
 
     for (let i = 0; i < 3; i += 1) {
-      await acquireSlot('modelo', { now: reloj.now, maxPerWindow: 3, onWait: () => (esperas += 1) });
+      await acquireSlot('model', { now: clock.now, maxPerWindow: 3, onWait: () => (waits += 1) });
     }
 
-    expect(esperas).toBe(0);
-    expect(remainingSlots('modelo', reloj.now(), 3)).toBe(0);
+    expect(waits).toBe(0);
+    expect(remainingSlots('model', clock.now(), 3)).toBe(0);
   });
 
-  it('cada modelo lleva su propia cuenta', async () => {
-    const reloj = relojFalso();
-    await acquireSlot('flash', { now: reloj.now, maxPerWindow: 1 });
+  it('each model keeps its own count', async () => {
+    const clock = fakeClock();
+    await acquireSlot('flash', { now: clock.now, maxPerWindow: 1 });
 
-    // Si las cuentas se mezclaran, acá habría que esperar en vez de pasar de largo.
-    let espero = false;
+    // If the counts got mixed up, this would have to wait instead of going straight through.
+    let waited = false;
     await acquireSlot('flash-lite', {
-      now: reloj.now,
+      now: clock.now,
       maxPerWindow: 1,
-      onWait: () => (espero = true),
+      onWait: () => (waited = true),
     });
 
-    expect(espero).toBe(false);
+    expect(waited).toBe(false);
   });
 
-  it('libera el cupo cuando el envío sale de la ventana', async () => {
-    const reloj = relojFalso();
-    await acquireSlot('modelo', { now: reloj.now, maxPerWindow: 1 });
-    expect(remainingSlots('modelo', reloj.now(), 1)).toBe(0);
+  it('frees the slot when the send leaves the window', async () => {
+    const clock = fakeClock();
+    await acquireSlot('model', { now: clock.now, maxPerWindow: 1 });
+    expect(remainingSlots('model', clock.now(), 1)).toBe(0);
 
-    reloj.avanzar(60_001);
+    clock.advance(60_001);
 
-    let espero = false;
-    await acquireSlot('modelo', {
-      now: reloj.now,
+    let waited = false;
+    await acquireSlot('model', {
+      now: clock.now,
       maxPerWindow: 1,
-      onWait: () => (espero = true),
+      onWait: () => (waited = true),
     });
 
-    expect(espero).toBe(false);
+    expect(waited).toBe(false);
   });
 
-  it('avisa cuánto hay que esperar y recién manda cuando se libera el cupo', async () => {
-    const reloj = relojFalso();
-    await acquireSlot('modelo', { now: reloj.now, maxPerWindow: 1 });
+  it('reports how long to wait and only sends once the slot frees up', async () => {
+    const clock = fakeClock();
+    await acquireSlot('model', { now: clock.now, maxPerWindow: 1 });
 
-    reloj.avanzar(20_000);
+    clock.advance(20_000);
 
-    const avisos: number[] = [];
-    await acquireSlot('modelo', {
-      now: reloj.now,
+    const notices: number[] = [];
+    await acquireSlot('model', {
+      now: clock.now,
       maxPerWindow: 1,
-      onWait: (ms) => avisos.push(ms),
-      // Al "dormir" adelantamos el reloj falso en vez de esperar de verdad.
-      sleep: async (ms) => reloj.avanzar(ms),
+      onWait: (ms) => notices.push(ms),
+      // "Sleeping" advances the fake clock instead of actually waiting.
+      sleep: async (ms) => clock.advance(ms),
     });
 
-    // Del minuto de la ventana ya pasaron 20 s: quedan ~40 s más el margen del limitador.
-    expect(avisos).toHaveLength(1);
-    expect(avisos[0]).toBeGreaterThan(39_000);
-    expect(avisos[0]).toBeLessThan(41_000);
+    // 20 s of the window's minute have already passed: ~40 s left plus the limiter's margin.
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toBeGreaterThan(39_000);
+    expect(notices[0]).toBeLessThan(41_000);
   });
 
-  it('corta la espera si se cancela la corrida', async () => {
-    const reloj = relojFalso();
+  it('cuts the wait short when the run is cancelled', async () => {
+    const clock = fakeClock();
     const controller = new AbortController();
-    await acquireSlot('modelo', { now: reloj.now, maxPerWindow: 1 });
+    await acquireSlot('model', { now: clock.now, maxPerWindow: 1 });
 
-    // Sin el chequeo de `aborted` al principio de cada vuelta, esto giraría para siempre: el
-    // reloj falso no avanza solo y nadie va a liberar el cupo.
-    await acquireSlot('modelo', {
-      now: reloj.now,
+    // Without the `aborted` check at the top of every turn, this would spin forever: the fake clock
+    // does not advance on its own and nobody is going to free the slot.
+    await acquireSlot('model', {
+      now: clock.now,
       maxPerWindow: 1,
       signal: controller.signal,
       onWait: () => controller.abort(),
@@ -101,7 +101,7 @@ describe('acquireSlot', () => {
 });
 
 describe('remainingSlots', () => {
-  it('arranca con la ventana entera disponible', () => {
-    expect(remainingSlots('modelo', 1_000_000)).toBe(17);
+  it('starts with the whole window available', () => {
+    expect(remainingSlots('model', 1_000_000)).toBe(17);
   });
 });

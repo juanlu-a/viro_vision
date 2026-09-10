@@ -1,20 +1,20 @@
 /**
- * El contrato compartido por todo lo que sale a la nube desde la app.
+ * The contract shared by everything that leaves the app for the cloud.
  *
- * Vive fuera de `services/vision/` porque el proxy de ADR 0008 no es de visión: la síntesis de voz
- * (`services/audio/sintesis.ts`) sale por el mismo camino, y hacerla depender de `services/vision`
- * sería una dependencia inventada entre dos cosas que sólo comparten el transporte.
+ * It lives outside `services/vision/` because the ADR 0008 proxy is not about vision: speech
+ * synthesis (`services/audio/synthesis.ts`) goes out the same way, and making it depend on
+ * `services/vision` would be an invented dependency between two things that only share transport.
  */
 
 /**
- * Los proveedores que el proxy sabe alcanzar. **Esta lista tiene que coincidir con la tabla
- * `PROVEEDORES` de `supabase/functions/vision/index.ts`**: son dos archivos que no comparten código
- * —uno corre en Hermes y el otro en Deno— y si se desincronizan, el proxy responde 400 y desde el
- * teléfono no se ve por qué.
+ * The providers the proxy knows how to reach. **This list has to match the `PROVIDERS` table in
+ * `supabase/functions/vision/index.ts`**: they are two files that share no code —one runs on Hermes
+ * and the other on Deno— and if they drift apart the proxy answers 400 and from the phone there is
+ * no way to see why.
  */
 export type CloudProviderId = 'gemini' | 'anthropic' | 'openai' | 'groq';
 
-/** Un pedido HTTP ya armado, listo para salir directo o para meterse en el sobre del proxy. */
+/** An HTTP request already built, ready to go out directly or to be wrapped in the proxy envelope. */
 export interface CloudRequest {
   url: string;
   headers: Record<string, string>;

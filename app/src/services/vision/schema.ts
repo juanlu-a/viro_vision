@@ -1,10 +1,10 @@
 /**
- * El paso común a los parsers de respuesta de modelo: texto → objeto JSON plano, tolerando
- * bloques ``` y truncamiento (un `stop_reason: "max_tokens"` corta el JSON). Structured outputs
- * hace improbable el JSON inválido, pero no imposible; devolver null en vez de tirar es lo que
- * permite que la voz caiga al texto crudo en lugar de a un error.
+ * The step every model-response parser shares: text → flat JSON object, tolerating ``` blocks and
+ * truncation (a `stop_reason: "max_tokens"` cuts the JSON short). Structured outputs make invalid
+ * JSON unlikely, but not impossible; returning null instead of throwing is what lets the voice fall
+ * back to the raw text rather than to an error.
  *
- * Módulo puro: sin red, sin estado. Ver schema.test.ts.
+ * Pure module: no network, no state. See schema.test.ts.
  */
 
 export function parseJsonRecord(text: string): Record<string, unknown> | null {

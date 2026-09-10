@@ -1,68 +1,68 @@
 /**
- * Limitador de tasa por modelo, con ventana móvil.
+ * Per-model rate limiter with a sliding window.
  *
- * El tier gratuito de Gemini admite 20 requests por minuto **por modelo**. Reaccionar al error de
- * cuota funciona pero es una mala experiencia: el modo supermercado se frena 30–60 s sin aviso
- * previo. Acá el límite se respeta *antes* de pedir, así que en el peor caso la app espera un
- * rato con un mensaje claro y nunca falla.
+ * Gemini's free tier allows 20 requests per minute **per model**. Reacting to the quota error works
+ * but is a bad experience: supermarket mode stalls for 30-60 s with no warning. Here the limit is
+ * honoured *before* asking, so in the worst case the app waits a while with a clear message and
+ * never fails.
  *
- * Usa `Date.now()` a propósito, no `performance.now()`: la ventana de cuota es tiempo de reloj del
- * lado del servidor, no una duración medida.
+ * It uses `Date.now()` on purpose, not `performance.now()`: the quota window is wall-clock time on
+ * the server side, not a measured duration.
  */
 import type { VisionProviderId } from './types';
 
-/** Ventana de la cuota. */
+/** The quota window. */
 const WINDOW_MS = 60_000;
 
 /**
- * Tope por minuto y por modelo, **según el proveedor**.
+ * Per-minute, per-model cap, **by provider**.
  *
- * Antes había un solo número, 17, calibrado al tier gratuito de Gemini. Imponérselo a un proveedor
- * pago desperdicia justamente la razón de haberlo pagado: le pone el techo del más restringido al
- * que no lo tiene.
+ * There used to be a single number, 17, calibrated to Gemini's free tier. Imposing it on a paid
+ * provider wastes exactly the reason for paying: it puts the most restricted one's ceiling on the
+ * one that has none.
  *
- * Los dos gratuitos llevan margen sobre el límite real, para cubrir los requests que el servidor
- * ya contó y nosotros no (un reintento suyo, una corrida abortada a mitad de vuelo). Los pagos
- * llevan un número alto a propósito: ahí el limitador **deja de ser la pared del tier gratuito y
- * pasa a ser un tope de seguridad** contra un bucle desbocado que queme crédito. El límite real de
- * una cuenta paga depende de su tier y no lo podemos saber desde acá.
+ * The two free ones carry headroom over the real limit, to cover requests the server already
+ * counted and we did not (a retry of its own, a run aborted mid-flight). The paid ones carry a high
+ * number on purpose: there the limiter **stops being the free tier's wall and becomes a safety cap**
+ * against a runaway loop burning credit. A paid account's real limit depends on its tier and cannot
+ * be known from here.
  */
-const LIMITE_POR_PROVEEDOR: Record<VisionProviderId, number> = {
-  gemini: 17, // 20/min por modelo en el tier gratuito, medido el 30/08/2026
-  // OJO: el tier gratuito de Groq limita por **tokens** por minuto, no por requests. Medido el
-  // 2026-09-02: el límite es 8000 TPM y una foto cuesta ~1974 tokens de entrada (Groq cobra la
-  // imagen a tarifa fija, así que achicarla no lo baja), o sea **~4 lecturas por minuto**. El 25
-  // que había acá era el número de un límite por requests que este proveedor no tiene, y hacía que
-  // el limitador no frenara nunca: la tercera lectura seguida ya daba 429.
+const LIMIT_PER_PROVIDER: Record<VisionProviderId, number> = {
+  gemini: 17, // 20/min per model on the free tier, measured 2026-08-30
+  // CAREFUL: Groq's free tier limits by **tokens** per minute, not by requests. Measured
+  // 2026-09-02: the limit is 8000 TPM and a photo costs ~1974 input tokens (Groq bills the image
+  // at a flat rate, so shrinking it does not lower that), i.e. **~4 readings per minute**. The 25
+  // that used to be here was the number for a request-based limit this provider does not have, and
+  // it meant the limiter never braked: the third reading in a row already returned 429.
   groq: 3,
-  openai: 100, // muy por encima de lo que alguien hace a mano: es freno de emergencia, no cuota
+  openai: 100, // far above what anyone does by hand: an emergency brake, not a quota
   anthropic: 40,
 };
 
-/** El tope por defecto si no se dice otra cosa: el más restrictivo, que nunca rompe. */
-const MAX_PER_WINDOW = LIMITE_POR_PROVEEDOR.gemini;
+/** The default cap when nothing else is said: the most restrictive one, which never breaks. */
+const MAX_PER_WINDOW = LIMIT_PER_PROVIDER.gemini;
 
-/** Cuántas lecturas por minuto tolera un proveedor. Lo pasa `reconocerProducto` al pedir cupo. */
-export function limitePorMinuto(provider: VisionProviderId): number {
-  return LIMITE_POR_PROVEEDOR[provider];
+/** How many readings per minute a provider tolerates. `recognizeProduct` passes it when asking for a slot. */
+export function perMinuteLimit(provider: VisionProviderId): number {
+  return LIMIT_PER_PROVIDER[provider];
 }
 
-/** Marcas de tiempo de los envíos recientes, por modelo: cada modelo tiene su propia cuota. */
+/** Timestamps of recent sends, per model: each model has its own quota. */
 const sends = new Map<string, number[]>();
 
 export interface SlotOptions {
-  /** Se llama si hay que esperar, con los milisegundos estimados. Para poder avisarlo en la UI. */
+  /** Called when a wait is needed, with the estimated milliseconds. So the UI can announce it. */
   onWait?: (waitMs: number) => void;
   signal?: AbortSignal;
-  /** Reloj inyectable para los tests. */
+  /** Injectable clock for tests. */
   now?: () => number;
   maxPerWindow?: number;
-  /** Espera inyectable para los tests: si no, un test de la ventana tardaría un minuto real. */
+  /** Injectable wait for tests: otherwise a window test would take a real minute. */
   sleep?: (ms: number) => Promise<void>;
 }
 
-/** Duerme `ms`, o corta antes si se cancela la corrida. */
-function dormir(ms: number, signal?: AbortSignal): Promise<void> {
+/** Sleeps `ms`, or cuts short when the run is cancelled. */
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const id = setTimeout(resolve, ms);
     signal?.addEventListener('abort', () => {
@@ -72,7 +72,7 @@ function dormir(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-/** Descarta las marcas que ya salieron de la ventana. */
+/** Drops the timestamps that already left the window. */
 function prune(modelId: string, now: number): number[] {
   const recent = (sends.get(modelId) ?? []).filter((t) => now - t < WINDOW_MS);
   sends.set(modelId, recent);
@@ -80,19 +80,19 @@ function prune(modelId: string, now: number): number[] {
 }
 
 /**
- * Espera, si hace falta, hasta que haya lugar en la ventana; después registra el envío.
- * Llamarla **antes** de tomar la marca de inicio: la espera no debe contarse como latencia.
+ * Waits, if needed, until there is room in the window; then records the send.
+ * Call it **before** taking the start timestamp: the wait must not be counted as latency.
  */
 export async function acquireSlot(modelId: string, options: SlotOptions = {}): Promise<void> {
   const now = options.now ?? (() => Date.now());
   const max = options.maxPerWindow ?? MAX_PER_WINDOW;
 
-  const sleep = options.sleep ?? ((ms: number) => dormir(ms, options.signal));
+  const sleep = options.sleep ?? ((ms: number) => delay(ms, options.signal));
 
   for (;;) {
-    // Antes de nada: si ya se canceló, no tiene sentido ni pedir cupo ni esperar por él. Sin este
-    // chequeo, una señal abortada *antes* de llegar acá dormiría el minuto entero, porque el
-    // evento 'abort' ya pasó y el listener de `dormir` nunca se dispara.
+    // First of all: if it is already cancelled, there is no point asking for a slot or waiting for
+    // one. Without this check, a signal aborted *before* reaching here would sleep the whole
+    // minute, because the 'abort' event already fired and `delay`'s listener never triggers.
     if (options.signal?.aborted) return;
 
     const t = now();
@@ -103,14 +103,14 @@ export async function acquireSlot(modelId: string, options: SlotOptions = {}): P
       return;
     }
 
-    // Hay que esperar a que la marca más vieja salga de la ventana.
+    // We have to wait for the oldest timestamp to leave the window.
     const waitMs = WINDOW_MS - (t - recent[0]) + 250;
     options.onWait?.(waitMs);
     await sleep(waitMs);
   }
 }
 
-/** Cuántos envíos quedan disponibles en la ventana actual. Para mostrarlo en la UI. */
+/** How many sends remain available in the current window. To show it in the UI. */
 export function remainingSlots(
   modelId: string,
   now: number = Date.now(),
@@ -119,7 +119,7 @@ export function remainingSlots(
   return Math.max(0, maxPerWindow - prune(modelId, now).length);
 }
 
-/** Sólo para tests: olvida el historial. */
+/** Tests only: forget the history. */
 export function resetRateLimiter(): void {
   sends.clear();
 }

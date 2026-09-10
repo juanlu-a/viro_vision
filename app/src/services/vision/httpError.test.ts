@@ -1,15 +1,15 @@
 /**
- * Existe por un defecto real encontrado midiendo contra la API (2026-09-02): la cuota de Groq llega
- * como **HTTP 429 con cuerpo JSON**, no como evento SSE, y por ese camino el usuario escuchaba "La
- * nube no respondió" en vez de "Cuota agotada, reintentá en N s" — con el dato de cuánto esperar
- * llegando y nadie leyéndolo. Los payloads de abajo son los reales, no inventados a partir de los
- * docs: la redacción del tiempo de reintento cambia entre proveedores y es lo que se está parseando.
+ * Exists because of a real defect found while measuring against the API (2026-09-02): Groq's quota
+ * arrives as **HTTP 429 with a JSON body**, not as an SSE event, and down that path the user heard
+ * "the cloud did not answer" instead of "quota exhausted, retry in N s" — with the how-long-to-wait
+ * figure arriving and nobody reading it. The payloads below are the real ones, not invented from the
+ * docs: the wording of the retry time changes between providers and it is what is being parsed.
  */
 import { VisionHttpError, VisionQuotaError } from './errors';
-import { ESPERA_POR_DEFECTO_S, interpretarErrorHttp } from './httpError';
+import { DEFAULT_RETRY_WAIT_S, interpretHttpError } from './httpError';
 
-/** Capturado de la API real el 2026-09-02, agotando el límite de tokens por minuto de Groq. */
-const CUOTA_GROQ = JSON.stringify({
+/** Captured from the real API on 2026-09-02, exhausting Groq's tokens-per-minute limit. */
+const GROQ_QUOTA = JSON.stringify({
   error: {
     message:
       'Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_01m1` service tier ' +
@@ -20,16 +20,16 @@ const CUOTA_GROQ = JSON.stringify({
   },
 });
 
-describe('interpretarErrorHttp', () => {
-  it('convierte el 429 de Groq en un error de cuota, con los segundos del mensaje', () => {
-    const err = interpretarErrorHttp(429, CUOTA_GROQ);
+describe('interpretHttpError', () => {
+  it('turns Groq\'s 429 into a quota error, with the seconds from the message', () => {
+    const err = interpretHttpError(429, GROQ_QUOTA);
 
     expect(err).toBeInstanceOf(VisionQuotaError);
-    expect((err as VisionQuotaError).retryAfterSeconds).toBe(2); // 1,17 s redondeado hacia arriba
+    expect((err as VisionQuotaError).retryAfterSeconds).toBe(2); // 1.17 s rounded up
   });
 
-  it('entiende la redacción de Gemini, que dice "retry" y no "try again"', () => {
-    const err = interpretarErrorHttp(
+  it('understands Gemini\'s wording, which says "retry" and not "try again"', () => {
+    const err = interpretHttpError(
       429,
       JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Please retry in 29.22s.' } }),
     );
@@ -38,10 +38,10 @@ describe('interpretarErrorHttp', () => {
     expect((err as VisionQuotaError).retryAfterSeconds).toBe(30);
   });
 
-  it('nunca devuelve 0 segundos cuando el proveedor contesta en milisegundos', () => {
-    // OpenAI puede decir "in 20ms". Redondeado a 0 s sería reintentar de inmediato contra un
-    // límite todavía activo, y el reintento vuelve a fallar.
-    const err = interpretarErrorHttp(
+  it('never returns 0 seconds when the provider answers in milliseconds', () => {
+    // OpenAI can say "in 20ms". Rounded down to 0 s it would retry immediately against a limit that
+    // is still active, and the retry fails again.
+    const err = interpretHttpError(
       429,
       JSON.stringify({ error: { message: 'Rate limit reached. Please try again in 20ms.', code: 'rate_limit_exceeded' } }),
     );
@@ -49,21 +49,21 @@ describe('interpretarErrorHttp', () => {
     expect((err as VisionQuotaError).retryAfterSeconds).toBe(1);
   });
 
-  it('el header Retry-After le gana al texto del mensaje', () => {
-    // Es un número y no una frase: no se rompe si el proveedor reescribe el mensaje.
-    const err = interpretarErrorHttp(429, CUOTA_GROQ, '7');
+  it('the Retry-After header beats the message text', () => {
+    // It is a number and not a phrase: it does not break if the provider rewrites the message.
+    const err = interpretHttpError(429, GROQ_QUOTA, '7');
 
     expect((err as VisionQuotaError).retryAfterSeconds).toBe(7);
   });
 
-  it('si el 429 no dice cuánto esperar, usa la espera por defecto en vez de reintentar ya', () => {
-    const err = interpretarErrorHttp(429, JSON.stringify({ error: { message: 'Too many requests' } }));
+  it('when the 429 does not say how long to wait, it uses the default instead of retrying now', () => {
+    const err = interpretHttpError(429, JSON.stringify({ error: { message: 'Too many requests' } }));
 
-    expect((err as VisionQuotaError).retryAfterSeconds).toBe(ESPERA_POR_DEFECTO_S);
+    expect((err as VisionQuotaError).retryAfterSeconds).toBe(DEFAULT_RETRY_WAIT_S);
   });
 
-  it('reconoce la cuota por el código aunque el status no sea 429', () => {
-    const err = interpretarErrorHttp(
+  it('recognizes quota by its code even when the status is not 429', () => {
+    const err = interpretHttpError(
       403,
       JSON.stringify({ error: { status: 'RESOURCE_EXHAUSTED', message: 'quota' } }),
     );
@@ -71,18 +71,18 @@ describe('interpretarErrorHttp', () => {
     expect(err).toBeInstanceOf(VisionQuotaError);
   });
 
-  it('cualquier otro error sigue siendo VisionHttpError, con el body intacto', () => {
-    // El body entero se conserva porque es lo único que dice qué parámetro rechazó la API.
+  it('any other error stays a VisionHttpError, with the body intact', () => {
+    // The whole body is kept because it is the only thing that says which parameter the API rejected.
     const body = JSON.stringify({ error: { message: 'Unsupported parameter: max_tokens' } });
-    const err = interpretarErrorHttp(400, body);
+    const err = interpretHttpError(400, body);
 
     expect(err).toBeInstanceOf(VisionHttpError);
     expect((err as VisionHttpError).status).toBe(400);
     expect((err as VisionHttpError).body).toBe(body);
   });
 
-  it('no se rompe con un cuerpo que no es JSON (un HTML de proxy, por ejemplo)', () => {
-    const err = interpretarErrorHttp(502, '<html>Bad Gateway</html>');
+  it('does not break on a body that is not JSON (a proxy HTML page, for instance)', () => {
+    const err = interpretHttpError(502, '<html>Bad Gateway</html>');
 
     expect(err).toBeInstanceOf(VisionHttpError);
   });

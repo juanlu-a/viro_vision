@@ -1,36 +1,36 @@
 /**
  * ViroVision design system — tokens.
  *
- * Fuente: `docs/brand/virovision-marca.md` (manual v1.0). El manual define los dos modos con
- * nombre y hex, y acá se siguen **al pie de la letra** salvo donde se aclara lo contrario:
+ * Source: `docs/brand/virovision-marca.md` (manual v1.0). The manual defines both modes by name and
+ * hex, and here they are followed **to the letter** except where stated otherwise:
  *
- *   claro   fondo `#F4F6F8` · texto `#061D3A` / `#33475E` · acento `#1FB57A` · 2.º `#1256D4`
- *   oscuro  fondo `#061D3A` · superficie `#0E2B4F` · texto `#E8EFF7` / `#9FB8D4` · acento `#2BD69A`
+ *   light  background `#F4F6F8` · text `#061D3A` / `#33475E` · accent `#1FB57A` · 2nd `#1256D4`
+ *   dark   background `#061D3A` · surface `#0E2B4F` · text `#E8EFF7` / `#9FB8D4` · accent `#2BD69A`
  *
- * Dos reglas del manual mandan sobre todo lo demás:
+ * Two rules from the manual override everything else:
  *
- *   1. **El verde es el primario**: botones, foco y estado confirmado. El azul es secundario —
- *      superficies, enlaces y datos. Proporción buscada: 70 % neutros, 20 % verde, 10 % azul.
- *   2. **El acento apunta a 4.5:1**, no a 7:1. Por eso `#1FB57A` va como *relleno* con texto
- *      `#061D3A` encima (6.39:1) y nunca como color de texto: sobre el fondo claro da 2.44:1.
+ *   1. **Green is the primary**: buttons, focus and confirmed state. Blue is secondary — surfaces,
+ *      links and data. Target proportion: 70 % neutrals, 20 % green, 10 % blue.
+ *   2. **The accent targets 4.5:1**, not 7:1. That is why `#1FB57A` goes as a *fill* with `#061D3A`
+ *      text on top (6.39:1) and never as a text colour: on the light background it gives 2.44:1.
  *
- * De ahí la separación de roles que puede sorprender: `primary` es un color de **relleno** y
- * `success` un color de **texto**. En oscuro coinciden (`#2BD69A` da 8.99:1 y sirve para las dos
- * cosas); en claro no pueden coincidir, porque ningún verde cumple los dos roles a la vez.
+ * Hence the role split that can be surprising: `primary` is a **fill** colour and `success` a
+ * **text** colour. In dark they coincide (`#2BD69A` gives 8.99:1 and works for both); in light they
+ * cannot, because no green satisfies both roles at once.
  *
- * Objetivo: **AAA (7:1)** para texto, 4.5:1 para el acento, 3:1 para bordes de control
- * (WCAG 1.4.11). `theme.test.ts` lo verifica automáticamente.
+ * Target: **AAA (7:1)** for text, 4.5:1 for the accent, 3:1 for control borders (WCAG 1.4.11).
+ * `theme.test.ts` verifies it automatically.
  */
-// La tabla vive en `colors.js`, en JavaScript plano, porque `tailwind.config.js` también la
-// necesita y es CommonJS. Una sola fuente: `bg-surface` y este token son el mismo hex, y
-// `theme.test.ts` verifica el que la app realmente usa.
+// The table lives in `colors.js`, in plain JavaScript, because `tailwind.config.js` needs it too and
+// is CommonJS. A single source: `bg-surface` and this token are the same hex, and `theme.test.ts`
+// checks the one the app actually uses.
 export { Colors } from './colors';
 
 
 /**
- * Los roles de color del sistema. Se enumeran a mano porque la tabla ahora vive en JavaScript
- * plano y no puede tiparse sola — a cambio, esta lista es el contrato que Tailwind y la app
- * comparten, y agregar un token sin nombrarlo acá da error de compilación.
+ * The system's colour roles. They are listed by hand because the table now lives in plain JavaScript
+ * and cannot type itself — in exchange, this list is the contract Tailwind and the app share, and
+ * adding a token without naming it here is a compile error.
  */
 export type ThemeColor =
   | 'background'
@@ -50,29 +50,29 @@ export type ThemeColor =
   | 'tabInactive'
   | 'overlay';
 /**
- * Un tema cualquiera. Deliberadamente `string` y no los literales de un tema concreto: si no,
- * el tema oscuro no sería asignable a `Theme` y nada podría tratarlos de forma intercambiable.
+ * Any theme. Deliberately `string` and not one concrete theme's literals: otherwise the dark theme
+ * would not be assignable to `Theme` and nothing could treat them interchangeably.
  */
 export type Theme = Record<ThemeColor, string>;
 
 /**
- * Familias tipográficas de la marca (manual, sección 04). Se embeben en el binario con el plugin
- * `expo-font` de `app.json`, no se cargan en runtime: un cambio de fuente a mitad del arranque es
- * un salto de layout, y en una app para baja visión eso desorienta más que en cualquier otra.
+ * The brand's type families (manual, section 04). They are embedded in the binary with `app.json`'s
+ * `expo-font` plugin, not loaded at runtime: a font swap mid-startup is a layout jump, and in an app
+ * for low vision that disorients more than in any other.
  *
- * Los nombres son los PostScript names de los archivos, que es lo que iOS exige. Android toma el
- * nombre del archivo salvo que se declare, así que en `app.json` se declaran **iguales**: un solo
- * string de `fontFamily` sirve en las dos plataformas y no hay un camino por sistema.
+ * The names are the files' PostScript names, which is what iOS demands. Android takes the file name
+ * unless it is declared, so in `app.json` they are declared **identical**: a single `fontFamily`
+ * string works on both platforms and there is no per-system path.
  *
- * `fontWeight` NO se combina con estas familias: cada peso es un archivo propio, y pedirle además
- * un peso al sistema dispara negrita sintética (Android) o lo ignora (iOS).
+ * `fontWeight` is NOT combined with these families: each weight is its own file, and additionally
+ * asking the system for a weight triggers synthetic bold (Android) or is ignored (iOS).
  */
 export const Fonts = {
-  /** Títulos. El manual pide tracking −2 %, aplicado en `themed-text`. */
+  /** Titles. The manual asks for −2 % tracking, applied in `themed-text`. */
   display: 'SpaceGrotesk-Bold',
   sans: 'IBMPlexSans-Regular',
   sansBold: 'IBMPlexSans-SemiBold',
-  /** Datos: números de línea, latencias, identificadores. */
+  /** Data: line numbers, latencies, identifiers. */
   mono: 'IBMPlexMono-Regular',
 } as const;
 

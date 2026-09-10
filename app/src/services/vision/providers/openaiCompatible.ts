@@ -1,14 +1,14 @@
 /**
- * Proveedor de **dialecto OpenAI**: un solo módulo para OpenAI y Groq (y mañana para el modelo
- * que hosteemos nosotros — ver [ADR 0008]).
+ * The **OpenAI-dialect** provider: a single module for OpenAI and Groq (and tomorrow for the model
+ * we host ourselves — see [ADR 0008]).
  *
- * Los tres hablan el mismo protocolo —`POST /v1/chat/completions`, `Authorization: Bearer`,
- * imagen como data URI en un content part `image_url`, deltas en `choices[0].delta.content`— así
- * que se parametriza por URL en vez de escribir tres proveedores casi idénticos. vLLM, Ollama y
- * TGI exponen ese mismo dialecto, que es la razón por la que sumar el endpoint de Arnaldo Castro
- * va a ser configuración y no código.
+ * All three speak the same protocol —`POST /v1/chat/completions`, `Authorization: Bearer`, the
+ * image as a data URI in an `image_url` content part, deltas in `choices[0].delta.content`— so it
+ * is parameterized by URL instead of writing three nearly identical providers. vLLM, Ollama and TGI
+ * expose that same dialect, which is why adding the Arnaldo Castro endpoint will be configuration
+ * and not code.
  *
- * Módulo puro: arma y traduce, no toca la red. Ver openaiCompatible.test.ts.
+ * Pure module: it builds and translates, it does not touch the network. See providers.test.ts.
  */
 import type {
   BuildRequestInput,
@@ -20,24 +20,24 @@ import type {
 } from '../types';
 
 /**
- * Traduce nuestro `ThinkingMode`/`EffortLevel` al parámetro del dialecto.
+ * Translates our `ThinkingMode`/`EffortLevel` into the dialect's parameter.
  *
- * **Medido el 2026-09-02, y el resultado corrige lo que decía este comentario.** Se escribió
- * asumiendo que acá pasaría lo mismo que en Gemini —donde no apagar el pensamiento lleva la lectura
- * de 3 s a decenas de segundos— y sobre estos modelos **no pasa**: `gpt-5.6-luna` tarda lo mismo
- * con `none` (1,5-2,1 s) que con `medium` (1,5 s) que sin mandar nada (2,0 s), y devuelve los
- * mismos 35 tokens de salida en los tres casos. Sobre una tarea de tres campos cortos no gasta
- * tokens de razonamiento aunque se lo permitas.
+ * **Measured 2026-09-02, and the result corrects what this comment used to say.** It was written
+ * assuming the same thing would happen here as in Gemini —where not turning thinking off takes the
+ * reading from 3 s to tens of seconds— and on these models **it does not**: `gpt-5.6-luna` takes the
+ * same with `none` (1.5-2.1 s) as with `medium` (1.5 s) as with nothing sent at all (2.0 s), and
+ * returns the same 35 output tokens in all three cases. On a three-short-field task it spends no
+ * reasoning tokens even when allowed to.
  *
- * Se sigue mandando `'none'` igual, por dos motivos que no son la latencia de hoy: es la intención
- * correcta (no queremos que razone) y es seguro gratis si la tarea crece — el objetivo opcional de
- * OCR de etiqueta la haría más larga. Lo que se corrige es la **justificación**: acá no compra los
- * segundos que compra en Gemini.
+ * `'none'` is still sent, for two reasons that are not today's latency: it is the correct intent (we
+ * do not want it to reason) and it is free insurance if the task grows — the optional label-OCR goal
+ * would make it longer. What gets corrected is the **justification**: here it does not buy the
+ * seconds it buys in Gemini.
  *
- * OJO al agregar un modelo: los valores válidos difieren por proveedor. OpenAI documenta
- * `none | low | medium | high | xhigh | max`. Groq documenta sólo `none | default`, **pero aceptó
- * `low` con 200** en la misma medición — o sea que su documentación no es la lista real. `'none'`
- * es el único que los dos garantizan, y es el que usa el modo supermercado.
+ * CAREFUL when adding a model: valid values differ by provider. OpenAI documents
+ * `none | low | medium | high | xhigh | max`. Groq documents only `none | default`, **but it
+ * accepted `low` with a 200** in that same measurement — i.e. its documentation is not the real
+ * list. `'none'` is the only one both guarantee, and it is what supermarket mode uses.
  */
 function reasoningEffort(input: BuildRequestInput): string {
   return input.thinking === 'off' ? 'none' : input.effort;
@@ -53,10 +53,10 @@ function buildRequest(url: string, input: BuildRequestInput): ProviderRequest {
     body: {
       model: input.model.id,
       stream: true,
-      // Sin esto el stream no trae el uso de tokens en ningún evento.
+      // Without this the stream carries token usage in no event at all.
       stream_options: { include_usage: true },
-      // `max_tokens` está deprecado en el dialecto y es incompatible con los modelos de
-      // razonamiento, que son justamente los que usamos.
+      // `max_tokens` is deprecated in the dialect and incompatible with reasoning models, which are
+      // exactly the ones we use.
       max_completion_tokens: input.maxTokens,
       reasoning_effort: reasoningEffort(input),
       messages: [
@@ -64,8 +64,8 @@ function buildRequest(url: string, input: BuildRequestInput): ProviderRequest {
         {
           role: 'user',
           content: [
-            // La imagen viaja como data URI, no como campo aparte: es la única forma que el
-            // dialecto acepta para bytes locales.
+            // The image travels as a data URI, not as a separate field: it is the only form the
+            // dialect accepts for local bytes.
             {
               type: 'image_url',
               image_url: { url: `data:${input.mediaType};base64,${input.imageBase64}` },
@@ -74,36 +74,36 @@ function buildRequest(url: string, input: BuildRequestInput): ProviderRequest {
           ],
         },
       ],
-      // `strict: true` hace decodificación restringida: el modelo no *puede* devolver otra forma.
-      // Es más fuerte que `{ type: 'json_object' }`, que sólo garantiza JSON sintáctico y deja los
-      // nombres de campo a criterio del modelo — con eso, `parseProductoLeido` rebota una respuesta
-      // correcta por haberla llamado "producto" en vez de "tipo".
+      // `strict: true` does constrained decoding: the model *cannot* return another shape. It is
+      // stronger than `{ type: 'json_object' }`, which only guarantees syntactic JSON and leaves
+      // field names to the model's discretion — with that, `parseProductReading` bounces a correct
+      // answer for having called it "producto" instead of "kind".
       response_format: {
         type: 'json_schema',
-        json_schema: { name: 'lectura_de_producto', schema: input.schema, strict: true },
+        json_schema: { name: 'product_reading', schema: input.schema, strict: true },
       },
     },
   };
 }
 
 /**
- * El dialecto no tiene tipos de evento: todos los frames son `chat.completion.chunk` y lo que
- * cambia es qué campos vienen llenos. Por eso se lee por presencia de campo y no por un
- * discriminador, al revés que Gemini y Anthropic.
+ * The dialect has no event types: every frame is a `chat.completion.chunk` and what changes is
+ * which fields come filled in. That is why it is read by field presence and not by a discriminator,
+ * unlike Gemini and Anthropic.
  */
 function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
   const error = payload.error as { message?: string; code?: string; type?: string } | undefined;
   if (error) {
-    const message = error.message ?? 'error de stream';
-    // El dialecto marca la cuota con `code: 'rate_limit_exceeded'`. Se normaliza al
-    // `quota_exceeded` que el motor ya entiende, y se aprovecha el "try again in 1.5s" que ambos
-    // proveedores meten en el propio texto, en vez de adivinar un backoff.
-    const esCuota = error.code === 'rate_limit_exceeded' || error.type === 'rate_limit_exceeded';
+    const message = error.message ?? 'stream error';
+    // The dialect marks quota with `code: 'rate_limit_exceeded'`. It is normalized to the
+    // `quota_exceeded` the engine already understands, and the "try again in 1.5s" both providers
+    // put in the text itself is used instead of guessing a backoff.
+    const isQuota = error.code === 'rate_limit_exceeded' || error.type === 'rate_limit_exceeded';
     const match = /try again in ([\d.]+)s/i.exec(message);
     return {
       kind: 'error',
       message,
-      code: esCuota ? 'quota_exceeded' : error.code,
+      code: isQuota ? 'quota_exceeded' : error.code,
       retryAfterSeconds: match ? Math.ceil(Number(match[1])) : undefined,
     };
   }
@@ -111,7 +111,7 @@ function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
   const usage = readUsage(payload);
   const choice = (payload.choices as { delta?: { content?: unknown }; finish_reason?: unknown }[])?.[0];
 
-  // El frame final de `include_usage` viene con `choices: []` y sólo el uso: es el cierre.
+  // `include_usage`'s final frame arrives with `choices: []` and only the usage: it is the close.
   if (!choice) return usage ? { kind: 'stop', usage } : null;
 
   if (typeof choice.finish_reason === 'string') {
@@ -120,7 +120,7 @@ function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
   if (typeof choice.delta?.content === 'string' && choice.delta.content.length > 0) {
     return { kind: 'text', text: choice.delta.content };
   }
-  // El primer delta trae sólo `role: 'assistant'`: es el arranque del texto visible.
+  // The first delta carries only `role: 'assistant'`: it is the start of the visible text.
   if (choice.delta) return { kind: 'text-start' };
   return null;
 }
@@ -134,16 +134,16 @@ function readUsage(payload: Record<string, unknown>): TokenUsage | undefined {
   return { input_tokens: input ?? 0, output_tokens: output ?? 0 };
 }
 
-/** Arma un proveedor del dialecto apuntando a una base URL concreta. */
-export function crearProveedorOpenAiCompatible(opciones: {
+/** Builds a dialect provider pointing at a concrete base URL. */
+export function createOpenAiCompatibleProvider(options: {
   id: VisionProviderId;
   label: string;
   url: string;
 }): VisionProvider {
   return {
-    id: opciones.id,
-    label: opciones.label,
-    buildRequest: (input) => buildRequest(opciones.url, input),
+    id: options.id,
+    label: options.label,
+    buildRequest: (input) => buildRequest(options.url, input),
     readEvent,
   };
 }

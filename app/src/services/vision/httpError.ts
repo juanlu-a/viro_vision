@@ -1,85 +1,85 @@
 /**
- * Traduce una respuesta HTTP de error de un proveedor al error tipado que la UI sabe leer.
+ * Translates a provider's HTTP error response into the typed error the UI knows how to read.
  *
- * Existe por un defecto encontrado midiendo contra la API real (2026-09-02): la cuota **no siempre
- * llega como evento SSE**. Groq la devuelve como **HTTP 429 con cuerpo JSON**, antes de abrir el
- * stream, y por ese camino `reconocerProducto` lanzaba `VisionHttpError` — que la UI no distingue,
- * así que el usuario escuchaba "La nube no respondió" en vez de "Cuota agotada, reintentá en N s".
- * El dato de cuánto esperar llegaba y nadie lo leía; es exactamente el bug que los errores tipados
- * de esta base existen para evitar, repetido en otro camino.
+ * It exists because of a defect found while measuring against the real API (2026-09-02): quota
+ * **does not always arrive as an SSE event**. Groq returns it as **HTTP 429 with a JSON body**,
+ * before opening the stream, and down that path `recognizeProduct` threw `VisionHttpError` — which
+ * the UI does not distinguish, so the user heard "the cloud did not answer" instead of "quota
+ * exhausted, retry in N s". The how-long-to-wait figure was arriving and nobody read it; it is
+ * exactly the bug the typed errors of this codebase exist to prevent, repeated on another path.
  *
- * Módulo puro: no toca la red. Ver httpError.test.ts.
+ * Pure module: it does not touch the network. See httpError.test.ts.
  */
 import { VisionHttpError, VisionQuotaError } from './errors';
 
-/** Espera por defecto cuando el proveedor no dice cuánto. Conservador a propósito. */
-export const ESPERA_POR_DEFECTO_S = 30;
+/** Default wait when the provider does not say how long. Deliberately conservative. */
+export const DEFAULT_RETRY_WAIT_S = 30;
 
 /**
- * Los tres proveedores meten el tiempo de reintento **en el texto del mensaje**, con redacciones
- * distintas: Groq y OpenAI dicen "Please try again in 1.17s", Gemini "Please retry in 29.2s".
- * OpenAI además puede darlo en milisegundos ("in 20ms"), que redondeado a 0 s sería un reintento
- * inmediato contra un límite todavía activo.
+ * All three providers put the retry time **inside the message text**, worded differently: Groq and
+ * OpenAI say "Please try again in 1.17s", Gemini "Please retry in 29.2s". OpenAI can also give it
+ * in milliseconds ("in 20ms"), which rounded down to 0 s would be an immediate retry against a
+ * limit that is still active.
  */
-const REINTENTO = /(?:try again|retry) in ([\d.]+)\s*(ms|s)\b/i;
+const RETRY_IN = /(?:try again|retry) in ([\d.]+)\s*(ms|s)\b/i;
 
-function segundosDelMensaje(mensaje: string): number | null {
-  const m = REINTENTO.exec(mensaje);
+function secondsFromMessage(message: string): number | null {
+  const m = RETRY_IN.exec(message);
   if (!m) return null;
-  const valor = Number(m[1]);
-  if (!Number.isFinite(valor)) return null;
-  return Math.max(1, Math.ceil(m[2].toLowerCase() === 'ms' ? valor / 1000 : valor));
+  const value = Number(m[1]);
+  if (!Number.isFinite(value)) return null;
+  return Math.max(1, Math.ceil(m[2].toLowerCase() === 'ms' ? value / 1000 : value));
 }
 
-/** `Retry-After` es el estándar y le gana al texto: es un número, no una frase que puede cambiar. */
-function segundosDelHeader(retryAfter: string | null | undefined): number | null {
+/** `Retry-After` is the standard and beats the text: it is a number, not a phrase that can change. */
+function secondsFromHeader(retryAfter: string | null | undefined): number | null {
   if (!retryAfter) return null;
-  const valor = Number(retryAfter);
-  return Number.isFinite(valor) && valor >= 0 ? Math.max(1, Math.ceil(valor)) : null;
+  const value = Number(retryAfter);
+  return Number.isFinite(value) && value >= 0 ? Math.max(1, Math.ceil(value)) : null;
 }
 
-interface CuerpoDeError {
+interface ErrorBody {
   error?: { message?: unknown; code?: unknown; status?: unknown; type?: unknown };
 }
 
-/** Los tres envuelven el detalle en `{ error: { message, code } }`, con variantes en el resto. */
-function leerMensaje(body: string): { mensaje: string; code: string } {
+/** All three wrap the detail in `{ error: { message, code } }`, with variations in the rest. */
+function readMessage(body: string): { message: string; code: string } {
   try {
-    const parsed = JSON.parse(body) as CuerpoDeError;
-    const mensaje = typeof parsed.error?.message === 'string' ? parsed.error.message : body;
+    const parsed = JSON.parse(body) as ErrorBody;
+    const message = typeof parsed.error?.message === 'string' ? parsed.error.message : body;
     const code = [parsed.error?.code, parsed.error?.status, parsed.error?.type]
       .filter((v): v is string => typeof v === 'string')
       .join(' ');
-    return { mensaje, code };
+    return { message, code };
   } catch {
-    return { mensaje: body, code: '' };
+    return { message: body, code: '' };
   }
 }
 
 /**
- * `VisionQuotaError` si es cuota —que **se resuelve esperando** y por eso se anuncia distinto—,
- * `VisionHttpError` para todo lo demás.
+ * `VisionQuotaError` when it is quota —which **resolves by waiting** and is therefore announced
+ * differently— and `VisionHttpError` for everything else.
  *
- * Se decide por el **status 429**, no por el código del proveedor: el 429 es lo único que los tres
- * garantizan igual, y los códigos difieren (`rate_limit_exceeded` en el dialecto OpenAI,
- * `RESOURCE_EXHAUSTED` en Gemini). El código se mira sólo como refuerzo, para el caso de un
- * proveedor que informe cuota con otro status.
+ * The decision is made on **status 429**, not on the provider's code: the 429 is the only thing all
+ * three guarantee identically, and the codes differ (`rate_limit_exceeded` in the OpenAI dialect,
+ * `RESOURCE_EXHAUSTED` in Gemini). The code is only looked at as reinforcement, for a provider that
+ * reports quota with some other status.
  */
-export function interpretarErrorHttp(
+export function interpretHttpError(
   status: number,
   body: string,
   retryAfterHeader?: string | null,
 ): VisionHttpError | VisionQuotaError {
-  const { mensaje, code } = leerMensaje(body);
-  const esCuota =
+  const { message, code } = readMessage(body);
+  const isQuota =
     status === 429 || /rate_limit|quota|resource_exhausted/i.test(code);
 
-  if (!esCuota) return new VisionHttpError(status, body);
+  if (!isQuota) return new VisionHttpError(status, body);
 
-  const segundos =
-    segundosDelHeader(retryAfterHeader) ??
-    segundosDelMensaje(mensaje) ??
-    ESPERA_POR_DEFECTO_S;
+  const seconds =
+    secondsFromHeader(retryAfterHeader) ??
+    secondsFromMessage(message) ??
+    DEFAULT_RETRY_WAIT_S;
 
-  return new VisionQuotaError(mensaje, segundos);
+  return new VisionQuotaError(message, seconds);
 }

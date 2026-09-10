@@ -1,5 +1,6 @@
 /**
- * Spanish strings for ViroVision. Spanish is the project's primary language.
+ * Spanish strings for ViroVision. The app speaks Spanish to its users; the code around it is
+ * English, so keys are English and values are Spanish.
  * Keep every user-facing string here so screen-reader labels stay consistent and translatable.
  */
 export const es = {
@@ -18,9 +19,9 @@ export const es = {
   reader: {
     section: 'Reconocimiento',
     modeLabel: 'Modo actual',
-    modeEsperando: 'Esperando',
-    modeOmnibus: 'Modo ómnibus',
-    modeSupermercado: 'Modo supermercado',
+    modeIdle: 'Esperando',
+    modeBus: 'Modo ómnibus',
+    modeSupermarket: 'Modo supermercado',
     modeBusOn: 'Activar modo ómnibus',
     modeBusOnHint:
       'Equivale a un click del botón del dispositivo. Lee el cartel de un ómnibus con el OCR local, sin internet.',
@@ -31,9 +32,9 @@ export const es = {
     modeSuperOff: 'Desactivar modo supermercado',
     modeOffHint: 'Equivale a un click largo del botón: vuelve a esperando y apaga el reconocimiento.',
     modeBlockedHint: 'Para cambiar de modo, primero desactivá el modo actual.',
-    announceEsperando: 'Esperando. Reconocimiento apagado.',
-    announceOmnibus: 'Modo ómnibus activado.',
-    announceSupermercado: 'Modo supermercado activado.',
+    announceIdle: 'Esperando. Reconocimiento apagado.',
+    announceBus: 'Modo ómnibus activado.',
+    announceSupermarket: 'Modo supermercado activado.',
     readWithDeviceButton: 'Leer con el dispositivo',
     readWithDeviceHint:
       'La cámara del dispositivo saca la foto y la manda al teléfono por WiFi; el resultado se anuncia en voz alta.',
@@ -102,9 +103,9 @@ export const es = {
     noAddress:
       'La placa no informó una dirección de red. Tiene que estar conectada a un WiFi y con el servidor corriendo.',
     wifiLabel: 'Red con el dispositivo',
-    wifiSinRed: 'apagada hasta activar un modo',
-    wifiUniendose: 'conectando…',
-    wifiListo: 'lista',
+    wifiOff: 'apagada hasta activar un modo',
+    wifiJoining: 'conectando…',
+    wifiReady: 'lista',
     wifiError: 'sin respuesta',
     wifiReadyAnnounce: 'Red con el dispositivo lista.',
     wifiFailedAnnounce: 'No se pudo usar la red del dispositivo.',
@@ -157,7 +158,7 @@ export const es = {
     error: 'Error de conexión',
     notFound: 'No encontré el dispositivo. Fijate que esté prendido y cerca.',
     lost: 'Se perdió la conexión con el dispositivo. Buscalo de nuevo.',
-    // Expo Go y web no tienen el módulo nativo de Bluetooth; el cliente real necesita un development build.
+    // Expo Go and web lack the native Bluetooth module; the real client needs a development build.
     unavailable: 'Este build no tiene Bluetooth. Hace falta un development build.',
   },
 } as const;

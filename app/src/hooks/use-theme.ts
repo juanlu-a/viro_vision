@@ -1,8 +1,8 @@
 /**
- * Devuelve los tokens de color del esquema efectivo.
+ * Returns the colour tokens of the effective scheme.
  *
- * "Efectivo" = lo que el usuario eligió en Ajustes, ya resuelto contra el sistema cuando la
- * preferencia es `system`. Ver ThemePreferenceProvider.
+ * "Effective" = what the user chose in Settings, already resolved against the system when the
+ * preference is `system`. See ThemePreferenceProvider.
  */
 import { Colors } from '@/constants/theme';
 import { useThemePreference } from '@/features/theme/ThemePreferenceProvider';

@@ -1,29 +1,29 @@
 /**
- * Configuración de la visión en la nube (modo supermercado, ADR 0006 + ADR 0008), leída de env
- * vars públicas (ver app/.env.example).
+ * Cloud vision configuration (supermarket mode, ADR 0006 + ADR 0008), read from public env vars
+ * (see app/.env.example).
  *
- * ⚠️ Las `EXPO_PUBLIC_*` se inlinean en el bundle en tiempo de build: un build compilado sin clave
- * no puede recuperarla en runtime, y —al revés— un build compilado CON clave la lleva legible
- * dentro del `.ipa`. Por eso el destino de las claves es el proxy de ADR 0008; este camino directo
- * queda como el de desarrollo, contra un `.env` local.
+ * ⚠️ `EXPO_PUBLIC_*` vars are inlined into the bundle at build time: a build compiled without a key
+ * cannot recover it at runtime and —the other way around— a build compiled WITH a key carries it
+ * readable inside the `.ipa`. That is why the keys' destination is the ADR 0008 proxy; this direct
+ * path stays as the development one, against a local `.env`.
  *
- * Cuando no hay ninguna clave, el modo supermercado avisa que no está configurado en vez de
- * romper — mismo patrón que el stub de Supabase.
+ * When there is no key at all, supermarket mode says it is not configured instead of breaking —
+ * the same pattern as the Supabase stub.
  */
 import { isProxyConfigured } from '@/services/cloud';
 
 import type { ModelProfile, VisionProviderId } from './types';
 
-/** Gemini: tier gratuito sin tarjeta (aistudio.google.com). Es el default del modo. */
+/** Gemini: free tier with no card (aistudio.google.com). It is the mode's default. */
 export const geminiApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 
-/** OpenAI: requiere crédito con tarjeta. */
+/** OpenAI: requires credit with a card. */
 export const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 
-/** Anthropic: requiere crédito con tarjeta (una suscripción a Claude NO habilita la API). */
+/** Anthropic: requires credit with a card (a Claude subscription does NOT enable the API). */
 export const anthropicApiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 
-/** Groq: tier gratuito sin tarjeta (console.groq.com). */
+/** Groq: free tier with no card (console.groq.com). */
 export const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 
 
@@ -45,18 +45,18 @@ export function apiKeyFor(provider: VisionProviderId): string {
 }
 
 /**
- * Con el proxy activo, **todos** los proveedores están disponibles aunque el build no traiga
- * ninguna clave: precisamente porque las tiene el servidor. Sin esto, un build correcto —el que
- * queremos distribuir— mostraría el modo supermercado como "no configurado".
+ * With the proxy on, **every** provider is available even when the build ships no key at all:
+ * precisely because the server holds them. Without this, a correct build —the one we want to
+ * distribute— would show supermarket mode as "not configured".
  *
- * Que el servidor tenga o no el secret de un proveedor concreto no se puede saber desde acá; si le
- * falta, la función responde 503 nombrando el secret que falta.
+ * Whether the server holds a given provider's secret cannot be known from here; if it is missing,
+ * the function answers 503 naming the missing secret.
  */
 export function isProviderConfigured(provider: VisionProviderId): boolean {
   return isProxyConfigured || apiKeyFor(provider).length > 0;
 }
 
-/** Sin proxy y sin ninguna clave, el modo supermercado no puede leer: la UI lo dice en vez de fallar. */
+/** With no proxy and no key at all, supermarket mode cannot read: the UI says so instead of failing. */
 export const isVisionConfigured =
   isProxyConfigured || (Object.keys(API_KEYS) as VisionProviderId[]).some(isProviderConfigured);
 
@@ -69,46 +69,46 @@ export const ANTHROPIC_VERSION = '2023-06-01';
 
 export const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
 
-/** Groq expone el dialecto de OpenAI bajo `/openai/v1`, con su propio host. */
+/** Groq exposes the OpenAI dialect under `/openai/v1`, on its own host. */
 export const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 /**
- * Los modelos que ofrece el selector de Inicio (sólo los de proveedores con clave). El orden es el
- * del selector.
+ * The models the Home selector offers (only those whose provider has a key). The order is the
+ * selector's order.
  *
- * **Están elegidos por latencia medida, no por capacidad ni por catálogo**: el usuario está parado
- * frente a la góndola esperando escuchar qué agarró, y la lectura son tres campos cortos que no
- * necesitan un modelo grande. Los números que sostienen esta lista están en
+ * **They are chosen by measured latency, not by capability or catalogue**: the user is standing in
+ * front of the shelf waiting to hear what they picked up, and the reading is three short fields
+ * that do not need a large model. The numbers backing this list are in
  * `docs/mediciones/2026-09-02-modelos-supermercado.md`.
  *
- * **Son dos, y eso es deliberado.** El selector es un `radiogroup` que se recorre con VoiceOver:
- * cada opción de más es un swipe más entre la persona y la lectura. Dos opciones cubren la elección
- * real que existe —el equilibrado sin cuota apretada, y el más rápido con cuota apretada— y
- * cualquier tercera habría que justificarla contra ese costo.
+ * **There are two, and that is deliberate.** The selector is a `radiogroup` walked with VoiceOver:
+ * every extra option is one more swipe between the person and the reading. Two options cover the
+ * real choice that exists —the balanced one without a tight quota, and the fastest one with a tight
+ * quota— and any third would have to be justified against that cost.
  *
- * **Qué salió, y por qué se puede volver.** `gemini-3.5-flash-lite` (el default hasta el
- * 2026-09-02) salió por la medición: mediana 10 649 ms y rango 2820-32 586 ms, contra 1668 ms del
- * default actual. `claude-haiku-4-5` salió por no estar verificado y no tener clave;
- * `gemini-flash-lite-latest` y `claude-opus-5` habían salido el 2026-09-01 por el costo de
- * accesibilidad de un selector largo. **Los módulos de sus proveedores siguen acá**
- * (`providers/gemini.ts`, `providers/anthropic.ts`), verificados y con sus hallazgos comentados:
- * volver a ofrecer uno es agregar su perfil a esta lista, no reescribir código.
+ * **What left, and why it can come back.** `gemini-3.5-flash-lite` (the default until 2026-09-02)
+ * left over the measurement: 10 649 ms median and a 2820-32 586 ms range, against 1668 ms for the
+ * current default. `claude-haiku-4-5` left for being unverified and keyless; `gemini-flash-lite-latest`
+ * and `claude-opus-5` had left on 2026-09-01 over the accessibility cost of a long selector. **Their
+ * providers' modules are still here** (`providers/gemini.ts`, `providers/anthropic.ts`), verified
+ * and with their findings commented: offering one again is adding its profile to this list, not
+ * rewriting code.
  *
- * El modelo hosteado en Arnaldo Castro está decidido pero **no implementado**: falta el endpoint
+ * The model hosted at Arnaldo Castro is decided but **not implemented**: the endpoint is missing
  * (ADR 0008).
  */
 export const MODEL_PROFILES: readonly ModelProfile[] = [
   {
-    // Default desde el 2026-09-02. No es el más rápido —Groq lo es— sino **el más rápido que
-    // aguanta un recorrido de góndola**: la cuota gratuita de Groq son ~4 lecturas por minuto y
-    // alguien eligiendo productos hace del orden de 2 a 4, así que como default chocaría el límite.
+    // Default since 2026-09-02. It is not the fastest —Groq is— but **the fastest one that survives
+    // a walk down the aisle**: Groq's free quota is ~4 readings per minute and someone picking
+    // products makes on the order of 2 to 4, so as a default it would hit the limit.
     //
-    // Medido contra la API real (5 corridas, 2026-09-02): mediana 1668 ms, rango 1410-2490 ms, con
-    // acierto de tipo, marca y detalle en todas. Cuesta ~USD 0,0003 por lectura (1138 tokens de
-    // entrada + 35 de salida): mil lecturas, menos de medio dólar.
+    // Measured against the real API (5 runs, 2026-09-02): 1668 ms median, 1410-2490 ms range, with
+    // kind, brand and detail correct in all of them. It costs ~USD 0.0003 per reading (1138 input
+    // tokens + 35 output): a thousand readings, under half a dollar.
     //
-    // Es un modelo de razonamiento y su default es `medium`. Se le manda `reasoning_effort: 'none'`
-    // por intención, no por latencia: la medición mostró que en esta tarea da lo mismo (ver
+    // It is a reasoning model and its default is `medium`. It is sent `reasoning_effort: 'none'` out
+    // of intent, not for latency: the measurement showed it makes no difference on this task (see
     // `providers/openaiCompatible.ts`).
     provider: 'openai',
     id: 'gpt-5.6-luna',
@@ -118,19 +118,20 @@ export const MODEL_PROFILES: readonly ModelProfile[] = [
     maxTokens: 256,
   },
   {
-    // El más rápido de los medidos y el único gratuito sin tarjeta que quedó: mediana 846 ms, rango
-    // 764-1087 ms — la mitad que el default y con menos dispersión. No es el default por la cuota:
-    // el tier gratuito limita por **tokens** por minuto (8000 TPM) y una foto cuesta ~1974 fijos, o
-    // sea ~4 lecturas por minuto. Achicar la imagen no lo baja: Groq la cobra a tarifa plana.
+    // The fastest of those measured and the only free-without-a-card one left: 846 ms median,
+    // 764-1087 ms range — half the default's and with less spread. It is not the default because of
+    // the quota: the free tier limits by **tokens** per minute (8000 TPM) and a photo costs ~1974
+    // fixed, i.e. ~4 readings per minute. Shrinking the image does not lower it: Groq bills it flat.
     //
-    // El interés para la tesis no es que sea otro modelo grande sino **otro hardware**: las LPU de
-    // Groq contra las GPU de los propietarios. Que un modelo abierto de 27B les gane por 2x en
-    // latencia es un resultado reportable.
+    // The interest for the thesis is not that it is another large model but **another kind of
+    // hardware**: Groq's LPUs against the proprietary vendors' GPUs. That an open 27B model beats
+    // them 2x on latency is a reportable result.
     //
-    // Es el 3.8 y no el 3.6, aun siendo éste más rápido en el papel (500 contra 450 tok/s): el 3.6
-    // sólo admite `json_object`, que garantiza JSON sintáctico pero deja los nombres de campo a
-    // criterio del modelo, y `parseProductoLeido` rebotaría una lectura correcta por venir como
-    // "producto" en vez de "tipo". El 3.8 admite `json_schema` con `strict`. Ambos están en preview.
+    // It is the 3.8 and not the 3.6, even though the latter is faster on paper (500 vs 450 tok/s):
+    // the 3.6 only supports `json_object`, which guarantees syntactic JSON but leaves field names to
+    // the model's discretion, and `parseProductReading` would bounce a correct reading for arriving
+    // as "producto" instead of "kind". The 3.8 supports `json_schema` with `strict`. Both are in
+    // preview.
     provider: 'groq',
     id: 'qwen/qwen3.8-27b',
     label: 'Qwen 3.8 27B en Groq (el más rápido)',
@@ -141,25 +142,25 @@ export const MODEL_PROFILES: readonly ModelProfile[] = [
 ];
 
 /**
- * Perfiles **retirados del selector**, cuyos proveedores siguen implementados y testeados.
+ * Profiles **retired from the selector**, whose providers are still implemented and tested.
  *
- * No es código muerto ni nostalgia: `providers/gemini.ts` y `providers/anthropic.ts` siguen en el
- * binario, con sus hallazgos comentados (el discriminador `event_type` de Gemini, el 400 de
- * `output_config.effort` en Haiku), y sus tests necesitan un perfil contra el cual armar el
- * request. Tenerlos acá hace que **volver a ofrecer uno sea mover una entrada a `MODEL_PROFILES`**,
- * en vez de reescribir un perfil de memoria y perder por el camino la medición que lo describe.
+ * This is neither dead code nor nostalgia: `providers/gemini.ts` and `providers/anthropic.ts` are
+ * still in the binary, with their findings commented (Gemini's `event_type` discriminator, Haiku's
+ * 400 on `output_config.effort`), and their tests need a profile to build a request against. Having
+ * them here makes **offering one again a matter of moving an entry into `MODEL_PROFILES`**, instead
+ * of rewriting a profile from memory and losing the measurement that describes it along the way.
  *
- * Deliberadamente **no** los busca `findModelProfile`: un id retirado tiene que caer al default,
- * que es lo que hace `resolveProductoModel` con la preferencia guardada de alguien que eligió un
- * modelo que ya no está.
+ * `findModelProfile` deliberately does **not** look them up: a retired id has to fall back to the
+ * default, which is what `resolveProductModel` does with the stored preference of someone who chose
+ * a model that is no longer there.
  */
-export const PERFILES_RETIRADOS: readonly ModelProfile[] = [
+export const RETIRED_PROFILES: readonly ModelProfile[] = [
   {
-    // Fue el default hasta el 2026-09-02. Sale por la medición contra la API real: mediana
-    // 10 649 ms con un rango de 2820 a 32 586 ms, contra 1668 ms del default actual. Lo que lo
-    // descarta no es la mediana sino la dispersión — 11,6x entre el mejor y el peor caso, con la
-    // cuota fresca y las corridas espaciadas. Conserva la mejor cuota de las tres (20/min) y la
-    // peor latencia, así que si algún día la cuota pesara más que el tiempo, es el candidato.
+    // It was the default until 2026-09-02. It leaves over the measurement against the real API:
+    // 10 649 ms median with a 2820 to 32 586 ms range, against 1668 ms for the current default.
+    // What rules it out is not the median but the spread — 11.6x between best and worst case, with a
+    // fresh quota and spaced-out runs. It keeps the best quota of the three (20/min) and the worst
+    // latency, so if some day quota mattered more than time, it is the candidate.
     provider: 'gemini',
     id: 'gemini-3.5-flash-lite',
     label: 'Gemini 3.5 Flash Lite',
@@ -168,9 +169,9 @@ export const PERFILES_RETIRADOS: readonly ModelProfile[] = [
     maxTokens: 256,
   },
   {
-    // Nunca llegó a verificarse contra su API: requiere tarjeta y no hubo clave. No sale por malo,
-    // sale por desconocido — es la tercera familia de modelos y sigue siendo el término de
-    // comparación que ADR 0006 quería.
+    // It never got verified against its API: it requires a card and there was no key. It does not
+    // leave for being bad, it leaves for being unknown — it is the third model family and remains
+    // the point of comparison ADR 0006 wanted.
     provider: 'anthropic',
     id: 'claude-haiku-4-5',
     label: 'Haiku 4.5',
@@ -180,12 +181,12 @@ export const PERFILES_RETIRADOS: readonly ModelProfile[] = [
   },
 ];
 
-/** Sólo los modelos cuyo proveedor tiene clave cargada. */
+/** Only the models whose provider has a key loaded. */
 export function availableModels(): readonly ModelProfile[] {
   return MODEL_PROFILES.filter((profile) => isProviderConfigured(profile.provider));
 }
 
-/** El primer modelo utilizable, o el primero del registro si no hay ninguna clave. */
+/** The first usable model, or the first in the registry when there is no key at all. */
 export function defaultModel(): ModelProfile {
   return availableModels()[0] ?? MODEL_PROFILES[0];
 }

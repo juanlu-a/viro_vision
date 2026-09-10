@@ -1,11 +1,11 @@
 /**
- * Texto de la app, con la tipografía de la marca (manual, sección 04).
+ * The app's text, with the brand typography (manual, section 04).
  *
- * Cada variante fija **familia** y no peso: los pesos son archivos distintos y pedir además un
- * `font-bold` produce negrita sintética en Android. Se cambia de familia, no de peso.
+ * Each variant sets a **family** and not a weight: the weights are separate files and additionally
+ * asking for a `font-bold` produces synthetic bold on Android. You change family, not weight.
  *
- * El manual pide **17 px como mínimo** para texto, y se respeta incluso en los rótulos chicos: el
- * piso de tamaño es lo que más se nota en baja visión.
+ * The manual asks for **17 px minimum** for text, and it is honoured even in the small labels: the
+ * size floor is what shows the most in low vision.
  */
 import { Text, type TextProps } from 'react-native';
 
@@ -38,7 +38,7 @@ const VARIANTS: Record<ThemedTextType, string> = {
   code: 'font-mono text-code',
 };
 
-/** Los roles de color, como clases. Tailwind necesita el nombre completo para no purgarlo. */
+/** The colour roles, as classes. Tailwind needs the full name so it does not purge them. */
 const COLORS: Record<ThemeColor, string> = {
   background: 'text-background',
   surface: 'text-surface',

@@ -1,9 +1,9 @@
 /**
- * Provee la preferencia de tema (sistema / claro / oscuro) a toda la app.
+ * Provides the theme preference (system / light / dark) to the whole app.
  *
- * La preferencia se lee del almacenamiento al arrancar. Mientras se lee, `isReady` es false para
- * que el layout raíz no pinte primero con un esquema y salte al otro: un flash de tema es molesto
- * para cualquiera y desorientador para alguien con baja visión.
+ * The preference is read from storage at startup. While it is being read, `isReady` is false so the
+ * root layout does not paint with one scheme first and jump to the other: a theme flash is annoying
+ * for anyone and disorienting for someone with low vision.
  */
 import { colorScheme as nativewindColorScheme } from 'nativewind';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -19,12 +19,12 @@ import type { ThemePreference } from '@/services/storage/themePreference';
 export type ColorScheme = 'light' | 'dark';
 
 interface ThemePreferenceValue {
-  /** Lo que el usuario eligió. */
+  /** What the user chose. */
   preference: ThemePreference;
-  /** El esquema efectivo, ya resuelto contra el sistema. */
+  /** The effective scheme, already resolved against the system. */
   scheme: ColorScheme;
   setPreference: (preference: ThemePreference) => void;
-  /** False hasta que se leyó la preferencia guardada. */
+  /** False until the stored preference has been read. */
   isReady: boolean;
 }
 
@@ -48,8 +48,8 @@ export function ThemePreferenceProvider({ children }: { children: React.ReactNod
   }, []);
 
   const setPreference = useCallback((next: ThemePreference) => {
-    // Se aplica de inmediato y se persiste en segundo plano: la respuesta de la UI no espera al
-    // disco, y si la escritura falla la elección igual vale para esta sesión.
+    // Applied immediately and persisted in the background: the UI's response does not wait for the
+    // disk, and if the write fails the choice still holds for this session.
     setPreferenceState(next);
     void saveThemePreference(next);
   }, []);
@@ -60,10 +60,10 @@ export function ThemePreferenceProvider({ children }: { children: React.ReactNod
     return { preference, scheme: resolved, setPreference, isReady };
   }, [preference, systemScheme, setPreference, isReady]);
 
-  // NativeWind lleva su propio esquema, y por defecto sigue al del sistema. Si no se lo empujamos,
-  // el usuario elige "Claro" y todo lo que use `dark:` se queda oscuro — el selector de tema
-  // dejaría de funcionar en silencio, sólo para las partes migradas a Tailwind. Es el precio de
-  // tener dos sistemas de estilos y hay que pagarlo en un solo lugar: acá.
+  // NativeWind keeps its own scheme, and by default it follows the system's. If we do not push it,
+  // the user picks "Claro" and everything using `dark:` stays dark — the theme selector would stop
+  // working silently, only for the parts migrated to Tailwind. It is the price of having two styling
+  // systems and it has to be paid in a single place: here.
   useEffect(() => {
     nativewindColorScheme.set(preference);
   }, [preference]);
@@ -76,7 +76,7 @@ export function ThemePreferenceProvider({ children }: { children: React.ReactNod
 export function useThemePreference(): ThemePreferenceValue {
   const value = useContext(ThemePreferenceContext);
   if (!value) {
-    throw new Error('useThemePreference debe usarse dentro de ThemePreferenceProvider');
+    throw new Error('useThemePreference must be used within a ThemePreferenceProvider');
   }
   return value;
 }

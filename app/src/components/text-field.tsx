@@ -1,6 +1,6 @@
 /**
- * Campo de texto etiquetado y accesible: etiqueta visible + pista, objetivo generoso, y un estado
- * de error que se anuncia. Sobre el `TextInput` estándar de RN.
+ * A labelled, accessible text field: visible label + hint, a generous target, and an error state
+ * that gets announced. On top of RN's standard `TextInput`.
  */
 import { useState } from 'react';
 import { Text, TextInput, type TextInputProps, View } from 'react-native';
@@ -15,12 +15,12 @@ export type TextFieldProps = TextInputProps & {
 };
 
 export function TextField({ label, hint, error, className, ...rest }: TextFieldProps) {
-  // `placeholderTextColor` es una prop, no un estilo: NativeWind no la alcanza.
+  // `placeholderTextColor` is a prop, not a style: NativeWind does not reach it.
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
 
-  // Sólo el borde depende del estado; el resto de la caja es siempre igual.
-  const borde = error ? 'border-danger' : focused ? 'border-primary' : 'border-border-strong';
+  // Only the border depends on state; the rest of the box is always the same.
+  const border = error ? 'border-danger' : focused ? 'border-primary' : 'border-border-strong';
 
   return (
     <View className="gap-one">
@@ -38,7 +38,7 @@ export function TextField({ label, hint, error, className, ...rest }: TextFieldP
         accessibilityLabel={label}
         accessibilityHint={hint}
         placeholderTextColor={theme.textSecondary}
-        className={`min-h-touch rounded-md border-[1.5px] px-three py-two font-sans text-small text-text ${borde} ${className ?? ''}`}
+        className={`min-h-touch rounded-md border-[1.5px] px-three py-two font-sans text-small text-text ${border} ${className ?? ''}`}
       />
       {error ? (
         <Text accessibilityLiveRegion="polite" className="font-sans text-small text-danger">

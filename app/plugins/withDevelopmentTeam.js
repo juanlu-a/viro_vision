@@ -1,26 +1,26 @@
 /**
- * Fija el equipo de firma de iOS en el prebuild.
+ * Pins the iOS signing team during prebuild.
  *
- * `app/ios/` es un artefacto regenerable (continuous native generation): cada
- * `expo prebuild --clean` lo recrea desde cero y **se pierde el equipo seleccionado a mano en
- * Xcode**. El síntoma es siempre el mismo y no se parece a la causa:
+ * `app/ios/` is a regenerable artefact (continuous native generation): every
+ * `expo prebuild --clean` recreates it from scratch and **the team selected by hand in Xcode is
+ * lost**. The symptom is always the same and looks nothing like the cause:
  *
  *     error: Signing for "ViroVision" requires a development team.
  *
- * El equipo es el del Apple ID del proyecto, inscripto en el Apple Developer Program desde
- * 2026-08 (antes, el "Personal Team" gratuito del mismo ID — el identificador se conserva).
- * Fijarlo acá hace que el prebuild sea reproducible en vez de dejar un paso manual en Xcode que
- * hay que recordar cada vez. EAS Build no pasa por acá: firma con sus propias credenciales.
+ * The team is the project's Apple ID one, enrolled in the Apple Developer Program since 2026-08
+ * (before that, the same ID's free "Personal Team" — the identifier is preserved). Pinning it here
+ * makes the prebuild reproducible instead of leaving a manual Xcode step to remember every time.
+ * EAS Build does not go through here: it signs with its own credentials.
  *
- * Si alguien clona el repo con otro Apple ID, esto hay que cambiarlo — o sacarlo y volver a
- * seleccionar el equipo a mano. El identificador propio sale de:
+ * If someone clones the repo with another Apple ID, this has to change — or be removed and the team
+ * selected by hand again. Your own identifier comes from:
  *
  *     security cms -D -i ~/Library/Developer/Xcode/UserData/Provisioning\\ Profiles/<algo>.mobileprovision \
  *       | plutil -extract TeamIdentifier.0 raw -
  */
 const { withXcodeProject } = require('expo/config-plugins');
 
-/** Team del Apple ID del proyecto (Developer Program). Ver la nota de arriba si cambia el ID. */
+/** The project's Apple ID team (Developer Program). See the note above if the ID changes. */
 const DEVELOPMENT_TEAM = 'VPNXQ8K2P8';
 
 module.exports = function withDevelopmentTeam(config) {
@@ -30,20 +30,20 @@ module.exports = function withDevelopmentTeam(config) {
 
     for (const key of Object.keys(configurations)) {
       const buildSettings = configurations[key].buildSettings;
-      // Las entradas de comentario del pbxproj no tienen buildSettings; saltearlas.
+      // The pbxproj's comment entries have no buildSettings; skip them.
       if (!buildSettings) continue;
-      // Sólo el target de la app: tocar los Pods no hace falta y puede romper su firma.
+      // The app target only: touching the Pods is unnecessary and can break their signing.
       if (buildSettings.PRODUCT_NAME === undefined) continue;
 
       buildSettings.DEVELOPMENT_TEAM = DEVELOPMENT_TEAM;
       if (process.env.IOS_SIGNING_PROFILE) {
-        // Firma MANUAL, sólo en CI (el workflow exporta IOS_SIGNING_PROFILE tras instalar el
-        // certificado y el perfil). Va en el pbxproj y sólo en el target de la app, no por línea de
-        // comandos de xcodebuild: pasada globalmente alcanzaría a los Pods y sus bundles de recursos
-        // no se pueden firmar con el perfil de la app. Motivo de la firma manual: el archive sin
-        // firmar exportaba sin los entitlements del proyecto (2026-09-06, docs/dev-build-ios.md).
+        // MANUAL signing, in CI only (the workflow exports IOS_SIGNING_PROFILE after installing the
+        // certificate and the profile). It goes in the pbxproj and only on the app target, not on
+        // xcodebuild's command line: passed globally it would reach the Pods, whose resource bundles
+        // cannot be signed with the app's profile. Reason for manual signing: the unsigned archive
+        // exported without the project's entitlements (2026-09-06, docs/dev-build-ios.md).
         buildSettings.CODE_SIGN_STYLE = 'Manual';
-        // Sin la variante `[sdk=iphoneos*]`: el parser del pbxproj que usa expo rechaza esa clave.
+        // Without the `[sdk=iphoneos*]` variant: the pbxproj parser expo uses rejects that key.
         buildSettings.CODE_SIGN_IDENTITY = '"Apple Distribution"';
         buildSettings.PROVISIONING_PROFILE_SPECIFIER = `"${process.env.IOS_SIGNING_PROFILE}"`;
       } else {

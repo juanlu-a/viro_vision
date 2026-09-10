@@ -1,16 +1,16 @@
 /**
- * Contenedor estándar de pantalla: fondo del tema, safe area, ancho máximo centrado, espaciado
- * consistente, un modo scroll opcional y pull-to-refresh opcional.
+ * The standard screen container: theme background, safe area, centred maximum width, consistent
+ * spacing, an optional scroll mode and optional pull-to-refresh.
  *
- * **Los insets, en iOS, los maneja UIKit** (`contentInsetAdjustmentBehavior="automatic"`), no
- * `SafeAreaView`. Es la única forma de que el contenido termine POR ENCIMA de la barra de
- * pestañas flotante de iOS 26: la barra no es parte del safe area clásico, pero sí del
- * `adjustedContentInset` que UIKit calcula por scroll view. Con el manejo manual anterior, el
- * final de la pantalla quedaba escondido detrás de la barra.
+ * **On iOS the insets are handled by UIKit** (`contentInsetAdjustmentBehavior="automatic"`), not by
+ * `SafeAreaView`. It is the only way for the content to end up ABOVE iOS 26's floating tab bar: the
+ * bar is not part of the classic safe area, but it is part of the `adjustedContentInset` UIKit
+ * computes per scroll view. With the previous manual handling, the bottom of the screen ended up
+ * hidden behind the bar.
  *
- * Por eso en iOS el `SafeAreaView` no aplica el borde superior en modo scroll: lo aplica UIKit, y
- * aplicarlo dos veces era el bug del scroll que saltaba. En Android (donde `automatic` no existe
- * y la barra de pestañas no flota sobre el contenido) se mantiene el safe area clásico.
+ * That is why on iOS `SafeAreaView` does not apply the top edge in scroll mode: UIKit applies it,
+ * and applying it twice was the jumping-scroll bug. On Android (where `automatic` does not exist and
+ * the tab bar does not float over the content) the classic safe area is kept.
  */
 import { useCallback, useState } from 'react';
 import { Platform, RefreshControl, ScrollView, View } from 'react-native';
@@ -24,20 +24,20 @@ type ScreenProps = {
   scroll?: boolean;
   edges?: readonly Edge[];
   /**
-   * Tirar hacia abajo para refrescar. Sólo tiene sentido con `scroll`; el spinner gira hasta que
-   * la promesa resuelva.
+   * Pull down to refresh. It only makes sense with `scroll`; the spinner keeps spinning until the
+   * promise resolves.
    */
   onRefresh?: () => Promise<void>;
 };
 
-/** El bloque de contenido: ancho máximo, centrado, con el padding y el ritmo de la app. */
+/** The content block: maximum width, centred, with the app's padding and rhythm. */
 const CONTENT = 'w-full max-w-content self-center gap-four p-four';
 
 export function Screen({ children, scroll = false, edges, onRefresh }: ScreenProps) {
   const theme = useTheme();
   const [refreshing, setRefreshing] = useState(false);
 
-  const refrescar = useCallback(async () => {
+  const refresh = useCallback(async () => {
     if (!onRefresh) return;
     setRefreshing(true);
     try {
@@ -47,7 +47,7 @@ export function Screen({ children, scroll = false, edges, onRefresh }: ScreenPro
     }
   }, [onRefresh]);
 
-  // En iOS con scroll, el inset superior lo pone UIKit; en el resto de los casos, SafeAreaView.
+  // On iOS with scroll, UIKit supplies the top inset; in every other case, SafeAreaView.
   const resolvedEdges = edges ?? (scroll && Platform.OS === 'ios' ? [] : ['top']);
 
   return (
@@ -55,12 +55,12 @@ export function Screen({ children, scroll = false, edges, onRefresh }: ScreenPro
       <SafeAreaView className="flex-1" edges={resolvedEdges}>
         {scroll ? (
           <ScrollView
-            // Sin `justify-center`: centraba verticalmente el contenido corto y el título de una
-            // pantalla con scroll caía más abajo que el de una sin scroll.
+            // No `justify-center`: it vertically centred short content and the title of a
+            // scrolling screen fell lower than that of a non-scrolling one.
             contentContainerClassName="grow"
-            // Sin barra de desplazamiento: en un teléfono la posición ya la da el gesto, y acá
-            // aparecía sobre el borde de las tarjetas cada vez que alguien deslizaba. No se pierde
-            // información: ninguna pantalla comunica nada por el largo del scroll.
+            // No scroll bar: on a phone the gesture already gives the position, and here it showed
+            // up over the cards' edge every time someone swiped. No information is lost: no screen
+            // communicates anything through the scroll length.
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
@@ -69,8 +69,8 @@ export function Screen({ children, scroll = false, edges, onRefresh }: ScreenPro
               onRefresh ? (
                 <RefreshControl
                   refreshing={refreshing}
-                  onRefresh={refrescar}
-                  // El spinner hereda el acento para verse sobre ambos temas.
+                  onRefresh={refresh}
+                  // The spinner inherits the accent so it shows on both themes.
                   tintColor={theme.primary}
                   colors={[theme.primary]}
                 />
