@@ -1,6 +1,6 @@
 # ViroVision — Project status & session handoff
 
-_Living status/continuation doc. Last updated: 2026-09-02._
+_Living status/continuation doc. Last updated: 2026-09-09._
 
 This captures where the project stands so anyone (including a fresh Claude Code session, together with
 the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
@@ -97,33 +97,40 @@ tests via `jest-expo`.
   proveedores Gemini / OpenAI / Anthropic / Groq, SSE, schema, limitador de cuota por proveedor).
   Sin clave o sin internet, supermercado avisa. El modelo se elige en **Ajustes** (modal accesible,
   persistido y revalidado contra los disponibles del build; el estado lo comparte
-  `ModeloSupermercadoProvider`, que es quien alimenta la lectura en Inicio). **El selector ofrece dos modelos desde
+  `ProductModelProvider`, que es quien alimenta la lectura en Inicio). **El selector ofrece dos modelos desde
   el 2026-09-02**: `gpt-5.6-luna` (default, mediana 1668 ms) y `qwen/qwen3.8-27b` en Groq (846 ms,
   gratis, pero ~4 lecturas/min). Gemini salió por la medición — rango 2820-32 586 ms. Ver
   [`docs/mediciones/`](mediciones/README.md). El laboratorio del spike se retiró
   (2026-08-30) y vive en la rama `spike/laboratorio-vision-local`.
 - **Captura (2026-09-08)**: `services/camera/` — la foto la saca **siempre la cámara de la placa** y
-  baja por WiFi (`GET /fotos/ultima`, ADR 0003), ya a 1024 px y calidad 70. La cámara del teléfono y
+  baja por WiFi (`GET /photos/latest`, ADR 0003), ya a 1024 px y calidad 70. La cámara del teléfono y
   la fototeca, que ocupaban ese lugar mientras no había hardware, se retiraron junto con
   `expo-image-picker` y los permisos de cámara y fotos: el producto tiene una sola fuente de imagen
   y sostener dos era mantener un camino que nadie recorre. **Consecuencia abierta**: el dataset de
   evaluación (pasos 8-9 de la QA) ya no se puede correr desde la app pasándole la misma foto a
   varios modelos; hay que correrlo fuera de la app o volver a habilitar una entrada de prueba.
-- **Telemetría (2026-09-09)**: `services/telemetria/` + la función `telemetria` → tabla `eventos`.
+- **Telemetría (2026-09-09)**: `services/telemetry/` + la función `telemetry` → tabla `events`.
   Es el reemplazo del diagnóstico que salió de las pantallas el 2026-09-08: arranque, BLE, red con la
   placa, estado de la placa, modos, la lectura de punta a punta con tiempos separados (foto vs.
-  pipeline) y los crashes por el manejador global de RN. `registrar()` es sincrónico y no lanza —
+  pipeline) y los crashes por el manejador global de RN. `record()` es sincrónico y no lanza —
   ADR 0001 le prohíbe estorbar al reconocimiento, y el linter le prohíbe entrar a `features/audio/` y
   `features/recognition/`. Cola con tope que descarta lo viejo, porque unido al AP de la placa hay
   WiFi sin internet y los envíos fallan seguido. Se enciende con `EXPO_PUBLIC_TELEMETRY_URL`; vacía,
   queda apagada entera. Detalle en [`docs/supabase.md`](supabase.md).
+- **Idioma del código (2026-09-09, ADR 0009)**: todo el código pasó a inglés — identificadores,
+  archivos, comentarios, tests, y también las **fronteras**: el protocolo BLE, los endpoints de la
+  placa (`/health`, `/measure/<n>`, `/photos/latest`), los flags del daemon (`--no-ap`) y el esquema
+  de Supabase (tabla `events`, vocabulario `reading.ok`). Sigue en español lo que una persona lee o
+  escucha (los valores de `i18n/es.ts`, el prompt de supermercado) y **toda la documentación**.
+  ⚠️ **Paso manual pendiente en la placa**: el drop-in de systemd de la microSD pasa `--sin-ap` y hay
+  que editarlo a `--no-ap`, o el daemon no arranca.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a
   punta con la clave del cliente en vacío. `EXPO_PUBLIC_VISION_PROXY_URL` es secret del repo: **los
   builds ya no llevan ninguna clave de proveedor**. Sin esa variable el camino directo de desarrollo
   sigue igual. ⚠️ El tier gratuito pausa el proyecto por inactividad — ver el riesgo en ADR 0008.
-- **Audio a archivo (apagado)**: `services/audio/sintesis.ts` deja un `.mp3` por lectura para el
+- **Audio a archivo (apagado)**: `services/audio/synthesis.ts` deja un `.mp3` por lectura para el
   parlante del dispositivo. Detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED` porque hoy nada lo consume.
 - **QA**: `docs/qa-modo-supermercado.md` — checklist de punta a punta, partido por qué necesita cada
   bloque. Los pasos 8 y 9 son la corrida del dataset de evaluación.
@@ -141,7 +148,7 @@ tests via `jest-expo`.
 opcional — la distribución real va por TestFlight desde Xcode.
 
 **Hardware**: firmware inicial en `hardware/raspi/` (daemon BLE + cámara + modos; `setup.sh` por SSH),
-con **emulador para la Mac** (`python -m virovision.emulador`, mismo núcleo por CoreBluetooth) para
+con **emulador para la Mac** (`python -m virovision.emulator`, mismo núcleo por CoreBluetooth) para
 probar la app sin placa. Sin verificar en la placa todavía. **ML**: not started (README stub only).
 
 ## Verificado en dispositivo (2026-09-02)
@@ -190,7 +197,7 @@ Pick a track (see the skill for pillar detail):
   TFLite/edge.
 - **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). **Alimentación
   comprada el 2026-09-07**: Waveshare UPS HAT (C) + LiPo 1000 mAh (`hardware/README.md`, *Alimentación*).
-  **Botón físico hecho el 2026-09-07** (`raspi/virovision/boton.py`, GPIO 5 / pin 29).
+  **Botón físico hecho el 2026-09-07** (`raspi/virovision/button.py`, GPIO 5 / pin 29).
   Siguen: DAC I2S + anuncios pregrabados, leer el INA219 del HAT → `estado.bateria`, medir
   el consumo real, pipeline de ómnibus en el Coral, carcasa.
 

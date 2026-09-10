@@ -19,7 +19,7 @@ hardware/
 | Acelerador | **Coral TPU** (USB) | Corre modelos TFLite en una placa chica. Rol: el pipeline de ómnibus (ADR 0006). |
 | Cámara | **Raspberry Pi Camera Module 3** (IMX708, 12 MP, autofoco) | Calidad para leer carteles a distancia; va por **CSI** y deja el USB libre para el Coral. |
 | Audio | **DAC I2S con amplificador** (MAX98357A o PCM5102A) → auricular cableado | La Zero 2 W no tiene jack; USB está ocupado; A2DP desde la placa compartiría antena con BLE + WiFi y cortaría el audio (ADR 0003). |
-| Entrada | **Un botón** en GPIO 5 (pin 29, GND en el 30) | 1 click ómnibus, 2 clicks supermercado, largo = esperando (ADR 0007). Implementado en `raspi/virovision/boton.py`. |
+| Entrada | **Un botón** en GPIO 5 (pin 29, GND en el 30) | 1 click ómnibus, 2 clicks supermercado, largo = esperando (ADR 0007). Implementado en `raspi/virovision/button.py`. |
 | Carcasa | impresa en 3D, en la patilla | Portátil; tiene que proteger el flex de la cámara. |
 | Alimentación | **Waveshare UPS HAT (C)** + LiPo 1S (**comprada el 2026-09-07**; viene con la 803040 de 1000 mAh) | Misma huella que la Zero, carga con el equipo prendido, da 1,8 A y trae un INA219 para anunciar la batería por voz. La 103450 de 2000 mAh queda como upgrade si la autonomía medida no alcanza. Ver [Alimentación](#alimentación). |
 
@@ -55,7 +55,7 @@ antes de enchufar (las genéricas vienen a veces invertidas). Nada de celdas pel
 1000C. Misma huella que la Zero (65 × 30), se apila debajo con pogo pins (la Pi necesita el header
 GPIO soldado o ser una Zero 2 WH), da hasta 1,8 A, alimenta la Pi mientras carga, y trae un
 **INA219** por I2C: tensión y corriente de la celda. Eso llena el `bateria: null` de la característica
-`estado` del GATT y permite que la app **anuncie la batería por voz**, que es un requisito de
+`status` del GATT y permite que la app **anuncie la batería por voz**, que es un requisito de
 accesibilidad y hoy no se puede. El PowerBoost da 1 A, no mide nada y hay que importarlo.
 
 **Comprado** (2026-09-07): la UPS HAT (C) con su 803040. **Falta**: el **medidor USB en línea** (UM25C o

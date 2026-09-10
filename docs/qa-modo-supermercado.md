@@ -45,7 +45,7 @@ npx expo run:ios --device "iPhone de Juan"
 ### 3. El tamaño de la foto
 
 - [ ] La placa entrega el JPEG ya a 1024 px y calidad 70; la app no la vuelve a tocar. Si la lectura
-      empeora o encarece, el lugar de mirar es `hardware/raspi/virovision/camara.py`, no la app.
+      empeora o encarece, el lugar de mirar es `hardware/raspi/virovision/camera.py`, no la app.
 
 ### 4. Con VoiceOver
 

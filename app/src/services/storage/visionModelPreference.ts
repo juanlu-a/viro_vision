@@ -1,21 +1,22 @@
 /**
- * Persistencia del modelo de nube elegido para el modo supermercado (ADR 0006).
+ * Persistence of the cloud model chosen for supermarket mode (ADR 0006).
  *
- * Se guarda en AsyncStorage y no en Supabase a propósito: es configuración del modo y tiene que
- * sobrevivir sin red y sin cuenta (la app no tiene login). Se guarda el **id** del modelo, no el
- * perfil entero: el registro de modelos vive en el código y puede cambiar entre versiones — el id
- * guardado se revalida contra los disponibles en `features/reader/modeloSupermercado.ts`.
+ * It is stored in AsyncStorage and not in Supabase on purpose: it is mode configuration and it has to
+ * survive without network and without an account (the app has no login). The model's **id** is
+ * stored, not the whole profile: the model registry lives in the code and can change between
+ * versions — the stored id is revalidated against the available ones in
+ * `features/reader/productModel.ts`.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const VISION_MODEL_PREFERENCE_KEY = 'virovision.visionModel';
 
-/** Un id plausible de modelo: string no vacío. La validez real la decide el resolver. */
+/** A plausible model id: a non-empty string. Real validity is decided by the resolver. */
 export function isVisionModelId(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
-/** Lee el id guardado, o null si no hay nada (o el storage falla): el resolver decide el default. */
+/** Reads the stored id, or null when there is nothing (or storage fails): the resolver picks the default. */
 export async function loadVisionModelPreference(): Promise<string | null> {
   try {
     const stored = await AsyncStorage.getItem(VISION_MODEL_PREFERENCE_KEY);
@@ -25,11 +26,11 @@ export async function loadVisionModelPreference(): Promise<string | null> {
   }
 }
 
-/** Guarda el id elegido. Un fallo de escritura no debe tumbar la app ni bloquear el cambio. */
+/** Stores the chosen id. A write failure must not take the app down nor block the change. */
 export async function saveVisionModelPreference(id: string): Promise<void> {
   try {
     await AsyncStorage.setItem(VISION_MODEL_PREFERENCE_KEY, id);
   } catch {
-    // El cambio ya se aplicó en memoria; sin persistencia, el próximo arranque vuelve al default.
+    // The change is already applied in memory; without persistence, the next start returns to the default.
   }
 }

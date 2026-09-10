@@ -1,25 +1,25 @@
 /**
- * Después de subir un build (scripts/testflight.sh): esperar a que Apple lo procese, asignarlo a
- * un grupo de TestFlight y mandarlo a Beta App Review. Es lo que convierte "subí un .ipa" en
- * "los testers lo tienen".
+ * After uploading a build (scripts/testflight.sh): wait for Apple to process it, assign it to a
+ * TestFlight group and send it to Beta App Review. It is what turns "I uploaded an .ipa" into "the
+ * testers have it".
  *
- * Uso:
+ * Usage:
  *   node scripts/testflight-distribute.mjs --build-number 202608291230 \
- *     --group "Testers ViroVision" --notes "Qué cambió en este build"          # grupo externo
+ *     --group "Testers ViroVision" --notes "What changed in this build"        # external group
  *   node scripts/testflight-distribute.mjs --build-number … --group "Equipo ViroVision" --internal
  *
- * Una app, dos grupos (decisión del 2026-08-30):
- *   - `staging` → grupo **interno** (`--internal`): sus testers son usuarios de App Store Connect
- *     (los devs), reciben cada build en minutos y **sin Beta App Review**.
- * Cada grupo muestra **un solo build** (pedido del equipo: "no quiero ver tres builds"): al asignar
- * el nuevo se quitan los anteriores del grupo. En el externo se conservan además el último
- * aprobado (para que el link no quede vacío mientras Apple revisa) y cualquier build en revisión
- * (quitarlo a mitad de revisión confunde a Apple y a nosotros).
- *   - `main` → grupo **externo** con link público — nadie agrega testers a mano — y por eso cada
- *     build pasa por Beta App Review: el primero de cada versión con revisión real, los siguientes
- *     se aprueban en minutos.
- * El grupo y el tipo los pasa el workflow. `APP_VARIANT=beta` (app.config.js) queda reservado para
- * publicar una β como app aparte si algún día hace falta; hoy no se usa.
+ * One app, two groups (decision of 2026-08-30):
+ *   - `staging` → the **internal** group (`--internal`): its testers are App Store Connect users
+ *     (the devs), they get every build in minutes and **with no Beta App Review**.
+ * Each group shows **a single build** (a team request: "I do not want to see three builds"): when
+ * the new one is assigned, the previous ones are removed from the group. In the external one the
+ * last approved build is also kept (so the link is not empty while Apple reviews) along with any
+ * build under review (removing it mid-review confuses Apple and us).
+ *   - `main` → the **external** group with a public link — nobody adds testers by hand — and that is
+ *     why every build goes through Beta App Review: the first of each version with a real review,
+ *     the following ones approved in minutes.
+ * The group and the type are passed by the workflow. `APP_VARIANT=beta` (app.config.js) is reserved
+ * for publishing a β as a separate app if it is ever needed; it is not used today.
  */
 import { readFileSync } from 'node:fs';
 
@@ -37,22 +37,22 @@ const buildNumber = args['build-number'];
 const groupName = args.group;
 const notes = args.notes || `Build ${buildNumber}`;
 if (!buildNumber || !groupName) {
-  console.error('Uso: --build-number N --group "Nombre" [--notes "texto"]');
+  console.error('Usage: --build-number N --group "Name" [--notes "text"]');
   process.exit(2);
 }
 
 const appJson = JSON.parse(readFileSync(new URL('../app.json', import.meta.url)));
-// Espejo de app.config.js: la variante beta es otra app en App Store Connect.
+// A mirror of app.config.js: the beta variant is another app in App Store Connect.
 const bundleId = appJson.expo.ios.bundleIdentifier + (process.env.APP_VARIANT === 'beta' ? '.beta' : '');
 const locale = 'es-MX';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const apps = await asc('GET', `/v1/apps?filter[bundleId]=${bundleId}`);
 const appId = apps.data[0]?.id;
-if (!appId) throw new Error(`No hay app en App Store Connect con bundle ${bundleId}`);
+if (!appId) throw new Error(`No app in App Store Connect with bundle ${bundleId}`);
 
-// Apple procesa el build entre 5 y 20 minutos después de subirlo. Hasta que aparece con
-// processingState VALID no se puede asignar a nadie.
+// Apple processes the build between 5 and 20 minutes after it is uploaded. Until it shows up with
+// processingState VALID it cannot be assigned to anyone.
 let build = null;
 const deadline = Date.now() + 40 * 60 * 1000;
 while (Date.now() < deadline) {
@@ -62,21 +62,21 @@ while (Date.now() < deadline) {
   );
   build = r.data[0] ?? null;
   const state = build?.attributes.processingState;
-  console.log(`build ${buildNumber}: ${state ?? 'todavía no aparece'}`);
+  console.log(`build ${buildNumber}: ${state ?? 'not there yet'}`);
   if (state === 'VALID') break;
-  if (state === 'FAILED' || state === 'INVALID') throw new Error(`Apple rechazó el procesamiento: ${state}`);
+  if (state === 'FAILED' || state === 'INVALID') throw new Error(`Apple rejected the processing: ${state}`);
   await sleep(60_000);
 }
-if (build?.attributes.processingState !== 'VALID') throw new Error('El build no terminó de procesarse en 40 minutos.');
+if (build?.attributes.processingState !== 'VALID') throw new Error('The build did not finish processing within 40 minutes.');
 
-// app.json ya declara ITSAppUsesNonExemptEncryption=false; esto cubre builds anteriores a eso.
+// app.json already declares ITSAppUsesNonExemptEncryption=false; this covers builds from before that.
 if (build.attributes.usesNonExemptEncryption == null) {
   await asc('PATCH', `/v1/builds/${build.id}`, {
     data: { type: 'builds', id: build.id, attributes: { usesNonExemptEncryption: false } },
   });
 }
 
-// "Qué probar": lo que ven los testers en TestFlight. Obligatorio para la revisión.
+// "What to test": what the testers see in TestFlight. Mandatory for the review.
 const locs = await asc('GET', `/v1/builds/${build.id}/betaBuildLocalizations?fields[betaBuildLocalizations]=locale`);
 const existing = locs.data.find((l) => l.attributes.locale === locale);
 if (existing) {
@@ -93,16 +93,16 @@ if (existing) {
   });
 }
 
-// El grupo, creándolo si no existe: interno con acceso automático a todos los builds, o externo
-// con link público.
+// The group, created if it does not exist: internal with automatic access to every build, or
+// external with a public link.
 const groups = await asc(
   'GET',
   `/v1/betaGroups?filter[app]=${appId}&fields[betaGroups]=name,publicLink,isInternalGroup,hasAccessToAllBuilds`,
 );
 let group = groups.data.find((g) => g.attributes.name === groupName);
 if (!group) {
-  // hasAccessToAllBuilds en false a propósito (y no se puede cambiar después: hay que recrear el
-  // grupo): con true, los testers ven todos los builds y el grupo deja de mostrar "el" beta.
+  // hasAccessToAllBuilds is false on purpose (and it cannot be changed afterwards: the group has to
+  // be recreated): with true, testers see every build and the group stops showing "the" beta.
   const attributes = internal
     ? { name: groupName, isInternalGroup: true, hasAccessToAllBuilds: false, feedbackEnabled: true }
     : { name: groupName, publicLinkEnabled: true, publicLinkLimitEnabled: true, publicLinkLimit: 200, feedbackEnabled: true };
@@ -115,7 +115,7 @@ if (!group.attributes.hasAccessToAllBuilds) {
   await asc('POST', `/v1/betaGroups/${group.id}/relationships/builds`, { data: [{ type: 'builds', id: build.id }] });
 }
 
-// Un solo build visible por grupo (ver el encabezado).
+// A single visible build per group (see the header).
 const inGroup = (await asc('GET', `/v1/betaGroups/${group.id}/relationships/builds`)).data.filter((b) => b.id !== build.id);
 const keep = new Set();
 if (!internal && inGroup.length) {
@@ -135,35 +135,35 @@ if (!internal && inGroup.length) {
 const toRemove = inGroup.filter((b) => !keep.has(b.id));
 if (toRemove.length) {
   await asc('DELETE', `/v1/betaGroups/${group.id}/relationships/builds`, { data: toRemove });
-  console.log(`quitados del grupo ${toRemove.length} build(s) anteriores`);
+  console.log(`removed ${toRemove.length} previous build(s) from the group`);
 }
 
 if (internal) {
-  // Testers internos: sin revisión de Apple. TestFlight les avisa solo.
-  console.log(`✓ build ${buildNumber} → grupo interno "${groupName}" (sin revisión; llega en minutos)`);
+  // Internal testers: no Apple review. TestFlight notifies them on its own.
+  console.log(`✓ build ${buildNumber} → internal group "${groupName}" (no review; arrives in minutes)`);
   process.exit(0);
 }
 
-// Beta App Review. Dos respuestas de Apple que NO son fallas de la pipeline:
-//   - 409: el build ya estaba enviado.
-//   - 422 ANOTHER_BUILD_IN_REVIEW: Apple admite un solo build por versión en revisión a la vez
-//     (pasó en el primer run automático, con el build manual del mismo día todavía en revisión).
-//     El build ya quedó en el grupo; se envía a mano —o lo hace el próximo run— cuando el
-//     anterior termine. Fallar acá haría rojo un build que llegó bien.
+// Beta App Review. Two answers from Apple that are NOT pipeline failures:
+//   - 409: the build had already been submitted.
+//   - 422 ANOTHER_BUILD_IN_REVIEW: Apple allows a single build per version under review at a time
+//     (it happened on the first automatic run, with the same day's manual build still under review).
+//     The build is already in the group; it is submitted by hand —or by the next run— once the
+//     previous one finishes. Failing here would turn a build that arrived fine red.
 try {
   await asc('POST', '/v1/betaAppReviewSubmissions', {
     data: { type: 'betaAppReviewSubmissions', relationships: { build: { data: { type: 'builds', id: build.id } } } },
   });
-  console.log('enviado a Beta App Review');
+  console.log('submitted to Beta App Review');
 } catch (err) {
   const code = err instanceof AscError ? err.body?.errors?.[0]?.code : undefined;
   if (err instanceof AscError && err.status === 409) {
-    console.log('ya estaba en Beta App Review');
+    console.log('it was already in Beta App Review');
   } else if (code === 'ENTITY_UNPROCESSABLE.ANOTHER_BUILD_IN_REVIEW') {
-    console.log('⚠ otro build de esta versión está en Beta App Review; este queda en el grupo a la espera de ser enviado.');
+    console.log('⚠ another build of this version is in Beta App Review; this one stays in the group waiting to be submitted.');
   } else {
     throw err;
   }
 }
 
-console.log(`✓ build ${buildNumber} → grupo "${groupName}" · link: ${group.attributes.publicLink}`);
+console.log(`✓ build ${buildNumber} → group "${groupName}" · link: ${group.attributes.publicLink}`);

@@ -2,19 +2,19 @@ import { GROQ_CHAT_URL, OPENAI_CHAT_URL } from '../config';
 import type { VisionProvider, VisionProviderId } from '../types';
 import { anthropicProvider } from './anthropic';
 import { geminiProvider } from './gemini';
-import { crearProveedorOpenAiCompatible } from './openaiCompatible';
+import { createOpenAiCompatibleProvider } from './openaiCompatible';
 
 /**
- * OpenAI y Groq son el MISMO módulo con distinta URL: el dialecto es idéntico y escribir dos
- * proveedores casi iguales sólo crea dos lugares donde arreglar el mismo bug.
+ * OpenAI and Groq are the SAME module with a different URL: the dialect is identical and writing
+ * two near-identical providers only creates two places to fix the same bug.
  */
-export const openaiProvider = crearProveedorOpenAiCompatible({
+export const openaiProvider = createOpenAiCompatibleProvider({
   id: 'openai',
   label: 'OpenAI',
   url: OPENAI_CHAT_URL,
 });
 
-export const groqProvider = crearProveedorOpenAiCompatible({
+export const groqProvider = createOpenAiCompatibleProvider({
   id: 'groq',
   label: 'Groq',
   url: GROQ_CHAT_URL,
@@ -32,5 +32,5 @@ export function getProvider(id: VisionProviderId): VisionProvider {
 }
 
 export { anthropicProvider, geminiProvider };
-export { crearProveedorOpenAiCompatible } from './openaiCompatible';
-export { PRODUCTO_SYSTEM_PROMPT, PRODUCTO_USER_PROMPT } from './prompts';
+export { createOpenAiCompatibleProvider } from './openaiCompatible';
+export { PRODUCT_SYSTEM_PROMPT, PRODUCT_USER_PROMPT } from './prompts';

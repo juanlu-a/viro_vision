@@ -12,6 +12,7 @@ Format: short Markdown, numbered `NNNN-title.md`, status one of Proposed / Accep
 | [0006](0006-pipelines-por-caso-de-uso.md) | Pipelines por caso de uso: bondis local (TPU preprocesadora), supermercado LLM en la nube | Proposed — a validar con tutor (actualizado 2026-09-01 — cinco modelos, cae la gratuidad) |
 | [0007](0007-botones-fisicos-modos-de-operacion.md) | Botones físicos y modos de operación del dispositivo | Proposed — a validar con tutor |
 | [0008](0008-proxy-propio-para-claves-de-nube.md) | Un proxy propio para las claves de los modelos de nube | Accepted |
+| [0009](0009-idioma-del-codigo.md) | El código en inglés, la app y la tesis en español | Accepted |
 
 ### To backfill (decisions already made in the thesis, not yet written as ADRs)
 - Hardware platform: **Raspberry Pi Zero 2 W + Coral TPU + Camera Module 3**.

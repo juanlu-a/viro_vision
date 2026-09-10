@@ -1,170 +1,172 @@
 /**
- * Proxy de visión: la app pide una lectura, esta función le pone la clave (ADR 0008).
+ * Vision proxy: the app asks for a reading, this function adds the key (ADR 0008).
  *
- * Es un **proxy tonto a propósito**. No interpreta la respuesta, no arma el request y no conoce
- * los prompts: recibe el cuerpo que el proveedor del cliente ya armó, le agrega la cabecera de
- * autenticación desde los secrets y devuelve el body upstream tal cual. Así la lógica de proveedor
- * NO se duplica del lado del servidor —no hay dos copias que se desincronicen— y agregar un modelo
- * sigue siendo un cambio en la app, no un despliegue acá.
+ * It is a **deliberately dumb proxy**. It does not interpret the answer, does not build the request
+ * and does not know the prompts: it receives the body the client's provider already built, adds the
+ * authentication header from the secrets and returns the upstream body untouched. That way the
+ * provider logic is NOT duplicated on the server side —there are no two copies to drift apart— and
+ * adding a model remains a change in the app, not a deployment here.
  *
- * Lo que sí vive acá, porque no puede vivir en el cliente:
- *   - las claves;
- *   - la allowlist de hosts, que es lo que impide que esto sea un SSRF que le regale la clave al
- *     primero que pida;
- *   - un freno por IP.
+ * What does live here, because it cannot live in the client:
+ *   - the keys;
+ *   - the host allowlist, which is what keeps this from being an SSRF that hands the key to the
+ *     first one who asks;
+ *   - a per-IP brake.
  *
- * Despliegue y secrets: `docs/supabase.md`.
+ * Deployment and secrets: `docs/supabase.md`.
  *
- * ⚠️ NO está autenticado (`verify_jwt = false`): la app no tiene login (ADR 0002) y la anon key
- * viajaría igual en el bundle, así que exigirla sería una indirección, no una defensa. El endpoint
- * es abusable y eso está aceptado a conciencia en ADR 0008: lo que compra el proxy no es volverlo
- * inabusable, es poder rotar o cortar la clave en segundos sin publicar una versión de la app. Las
- * defensas reales son el freno de acá abajo y el TOPE DE GASTO en la consola de cada proveedor.
+ * ⚠️ It is NOT authenticated (`verify_jwt = false`): the app has no login (ADR 0002) and the anon key
+ * would travel in the bundle anyway, so requiring it would be an indirection, not a defence. The
+ * endpoint is abusable and that is knowingly accepted in ADR 0008: what the proxy buys is not
+ * making it unabusable, it is being able to rotate or cut the key in seconds without shipping a
+ * version of the app. The real defences are the brake below and the SPENDING CAP in each provider's
+ * console.
  */
 
 /**
- * Qué proveedores se pueden alcanzar, y con qué clave.
+ * Which providers can be reached, and with which key.
  *
- * El cliente manda a **qué proveedor** va y la URL que armó su módulo, pero sólo se acepta si el
- * host de esa URL es el que este cuadro dice. Es la guarda central: un proxy que reenvía a la URL
- * que le pasen le entrega la clave a cualquiera que le pida un redirect a su propio servidor.
+ * The client says **which provider** it is going to and the URL its module built, but it is only
+ * accepted if that URL's host is the one this table names. It is the central guard: a proxy that
+ * forwards to whatever URL it is given hands the key to anyone who asks for a redirect to their own
+ * server.
  *
- * Se valida por **host** y no por URL exacta a propósito: el path lo elige el módulo del cliente
- * (que sabe si el proveedor usa `/v1/messages` o `/v1/chat/completions`), y así este archivo no
- * tiene que enterarse cada vez que la app agrega un modelo.
+ * It validates by **host** and not by exact URL on purpose: the path is chosen by the client's
+ * module (which knows whether the provider uses `/v1/messages` or `/v1/chat/completions`), so this
+ * file does not have to find out every time the app adds a model.
  */
-const PROVEEDORES: Record<
+const PROVIDERS: Record<
   string,
-  { host: string; secret: string; headers: (clave: string) => Record<string, string> }
+  { host: string; secret: string; headers: (key: string) => Record<string, string> }
 > = {
   gemini: {
     host: 'generativelanguage.googleapis.com',
     secret: 'GEMINI_API_KEY',
-    headers: (clave) => ({ 'x-goog-api-key': clave }),
+    headers: (key) => ({ 'x-goog-api-key': key }),
   },
   openai: {
     host: 'api.openai.com',
     secret: 'OPENAI_API_KEY',
-    headers: (clave) => ({ authorization: `Bearer ${clave}` }),
+    headers: (key) => ({ authorization: `Bearer ${key}` }),
   },
   anthropic: {
     host: 'api.anthropic.com',
     secret: 'ANTHROPIC_API_KEY',
-    // La versión la pone el servidor y no el cliente: es parte de con qué API hablamos, no de qué
-    // le preguntamos al modelo.
-    headers: (clave) => ({ 'x-api-key': clave, 'anthropic-version': '2023-06-01' }),
+    // The version is set by the server and not by the client: it is part of which API we talk to,
+    // not of what we ask the model.
+    headers: (key) => ({ 'x-api-key': key, 'anthropic-version': '2023-06-01' }),
   },
   groq: {
     host: 'api.groq.com',
     secret: 'GROQ_API_KEY',
-    headers: (clave) => ({ authorization: `Bearer ${clave}` }),
+    headers: (key) => ({ authorization: `Bearer ${key}` }),
   },
 };
 
-/** Ventana y tope del freno por IP. */
-const VENTANA_MS = 60_000;
-const MAX_POR_VENTANA = 30;
+/** Window and cap of the per-IP brake. */
+const WINDOW_MS = 60_000;
+const MAX_PER_WINDOW = 30;
 
 /**
- * Freno por IP, en memoria del isolate.
+ * A per-IP brake, in the isolate's memory.
  *
- * Es **un badén, no una pared**: Supabase puede levantar varios isolates y cada uno cuenta lo suyo,
- * así que un atacante decidido pasa. Sirve para lo que sí pasa en la práctica —un bucle de la app
- * o un curl repetido— y cuesta cero. La defensa real contra el abuso sostenido es el tope de gasto
- * en cada proveedor, más poder apagar esta función.
+ * It is **a speed bump, not a wall**: Supabase can spin up several isolates and each one counts its
+ * own, so a determined attacker gets through. It is there for what actually happens in practice —a
+ * loop in the app or a repeated curl— and costs nothing. The real defence against sustained abuse is
+ * the spending cap at each provider, plus being able to switch this function off.
  */
-const golpes = new Map<string, number[]>();
+const hits = new Map<string, number[]>();
 
-function superaElFreno(ip: string, ahora: number): boolean {
-  const recientes = (golpes.get(ip) ?? []).filter((t) => ahora - t < VENTANA_MS);
-  if (recientes.length >= MAX_POR_VENTANA) {
-    golpes.set(ip, recientes);
+function overTheBrake(ip: string, now: number): boolean {
+  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+  if (recent.length >= MAX_PER_WINDOW) {
+    hits.set(ip, recent);
     return true;
   }
-  recientes.push(ahora);
-  golpes.set(ip, recientes);
+  recent.push(now);
+  hits.set(ip, recent);
   return false;
 }
 
-function json(status: number, cuerpo: unknown): Response {
-  return new Response(JSON.stringify(cuerpo), {
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json' },
   });
 }
 
-Deno.serve(async (peticion: Request): Promise<Response> => {
-  if (peticion.method !== 'POST') return json(405, { error: { message: 'Sólo POST.' } });
+Deno.serve(async (request: Request): Promise<Response> => {
+  if (request.method !== 'POST') return json(405, { error: { message: 'POST only.' } });
 
   const ip =
-    peticion.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'desconocida';
-  if (superaElFreno(ip, Date.now())) {
-    // Mismo código que usan los proveedores para la cuota: el cliente ya sabe distinguirlo y
-    // esperar en vez de abortar la serie.
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  if (overTheBrake(ip, Date.now())) {
+    // The same code providers use for quota: the client already knows how to tell it apart and wait
+    // instead of aborting the series.
     return json(429, {
-      error: { code: 'rate_limit_exceeded', message: 'Demasiadas lecturas. Try again in 60s.' },
+      error: { code: 'rate_limit_exceeded', message: 'Too many readings. Try again in 60s.' },
     });
   }
 
-  let sobre: { provider?: unknown; url?: unknown; body?: unknown };
+  let envelope: { provider?: unknown; url?: unknown; body?: unknown };
   try {
-    sobre = await peticion.json();
+    envelope = await request.json();
   } catch {
-    return json(400, { error: { message: 'Cuerpo no es JSON.' } });
+    return json(400, { error: { message: 'Body is not JSON.' } });
   }
 
-  const proveedor = typeof sobre.provider === 'string' ? PROVEEDORES[sobre.provider] : undefined;
-  if (!proveedor) {
-    return json(400, { error: { message: `Proveedor desconocido: ${String(sobre.provider)}` } });
+  const provider = typeof envelope.provider === 'string' ? PROVIDERS[envelope.provider] : undefined;
+  if (!provider) {
+    return json(400, { error: { message: `Unknown provider: ${String(envelope.provider)}` } });
   }
 
-  if (typeof sobre.url !== 'string' || typeof sobre.body !== 'object' || sobre.body === null) {
-    return json(400, { error: { message: 'Faltan `url` o `body`.' } });
+  if (typeof envelope.url !== 'string' || typeof envelope.body !== 'object' || envelope.body === null) {
+    return json(400, { error: { message: '`url` or `body` missing.' } });
   }
 
-  // LA guarda. Sin esto, `url` es un agujero por el que la clave sale hacia donde el atacante
-  // quiera: basta con pedir el reenvío a su propio host.
-  let destino: URL;
+  // THE guard. Without it, `url` is a hole through which the key leaves towards wherever the
+  // attacker wants: asking for a forward to their own host is enough.
+  let target: URL;
   try {
-    destino = new URL(sobre.url);
+    target = new URL(envelope.url);
   } catch {
-    return json(400, { error: { message: 'URL inválida.' } });
+    return json(400, { error: { message: 'Invalid URL.' } });
   }
-  if (destino.protocol !== 'https:' || destino.host !== proveedor.host) {
+  if (target.protocol !== 'https:' || target.host !== provider.host) {
     return json(400, {
-      error: { message: `El destino no corresponde al proveedor: ${destino.host}` },
+      error: { message: `The target does not match the provider: ${target.host}` },
     });
   }
 
-  const clave = Deno.env.get(proveedor.secret) ?? '';
-  if (clave === '') {
-    // 503 y no 500: no está roto, está sin configurar. El mensaje nombra el secret que falta para
-    // que el arreglo sea obvio sin abrir los logs.
+  const key = Deno.env.get(provider.secret) ?? '';
+  if (key === '') {
+    // 503 and not 500: it is not broken, it is unconfigured. The message names the missing secret so
+    // the fix is obvious without opening the logs.
     return json(503, {
-      error: { message: `El proxy no tiene ${proveedor.secret} configurado (supabase secrets set).` },
+      error: { message: `The proxy does not have ${provider.secret} configured (supabase secrets set).` },
     });
   }
 
-  let respuesta: Response;
+  let response: Response;
   try {
-    respuesta = await fetch(destino, {
+    response = await fetch(target, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...proveedor.headers(clave) },
-      body: JSON.stringify(sobre.body),
+      headers: { 'content-type': 'application/json', ...provider.headers(key) },
+      body: JSON.stringify(envelope.body),
     });
   } catch (err) {
     return json(502, {
-      error: { message: `No se pudo alcanzar al proveedor: ${(err as Error).message}` },
+      error: { message: `Could not reach the provider: ${(err as Error).message}` },
     });
   }
 
-  // El pasamanos: el cuerpo del proveedor se devuelve SIN tocar, incluido el stream SSE. Leerlo
-  // acá para reenviarlo obligaría a duplicar el parseo de eventos de cada proveedor y mataría el
-  // streaming — el cliente vería la respuesta entera de golpe en vez de a medida que llega.
-  return new Response(respuesta.body, {
-    status: respuesta.status,
+  // The pass-through: the provider's body is returned UNTOUCHED, SSE stream included. Reading it
+  // here to forward it would force duplicating each provider's event parsing and would kill the
+  // streaming — the client would see the whole answer at once instead of as it arrives.
+  return new Response(response.body, {
+    status: response.status,
     headers: {
-      'content-type': respuesta.headers.get('content-type') ?? 'text/event-stream',
+      'content-type': response.headers.get('content-type') ?? 'text/event-stream',
       'cache-control': 'no-cache',
     },
   });

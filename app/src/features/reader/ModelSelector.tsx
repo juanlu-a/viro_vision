@@ -1,11 +1,11 @@
 /**
- * Selector del modelo de nube para el modo supermercado: un disparador de una línea que abre un
- * modal, calcado de `features/theme/ThemeSelector.tsx` — mismo motivo (un desplegable no infla la
- * pantalla) y misma gramática accesible: el disparador es un `button` cuya etiqueta ya dice qué
- * modelo rige, y el menú es un `radiogroup` con `checked`.
+ * Selector of the cloud model for supermarket mode: a one-line trigger that opens a modal, traced
+ * from `features/theme/ThemeSelector.tsx` — same reason (a dropdown does not inflate the screen) and
+ * the same accessible grammar: the trigger is a `button` whose label already says which model is in
+ * force, and the menu is a `radiogroup` with `checked`.
  *
- * A diferencia del de tema, es **controlado por props**: no sabe de storage ni de dónde salen los
- * modelos, así lo que decide (ModeloSupermercadoProvider y su resolver) se testea sin UI.
+ * Unlike the theme one, it is **controlled by props**: it knows nothing about storage or where the
+ * models come from, so what decides (ProductModelProvider and its resolver) is tested without UI.
  */
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -29,12 +29,12 @@ type Props = {
 
 export function ModelSelector({ value, options, onChange, disabled = false }: Props) {
   const theme = useTheme();
-  const [abierto, setAbierto] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  const elegir = (id: string) => {
+  const choose = (id: string) => {
     Haptics.selectionAsync().catch(() => {});
     onChange(id);
-    setAbierto(false);
+    setOpen(false);
   };
 
   return (
@@ -45,7 +45,7 @@ export function ModelSelector({ value, options, onChange, disabled = false }: Pr
         accessibilityHint={t.modelHint}
         accessibilityState={{ disabled }}
         disabled={disabled}
-        onPress={() => setAbierto(true)}
+        onPress={() => setOpen(true)}
         className={`min-h-touch flex-row items-center gap-two rounded-md border border-border-strong bg-surface-elevated px-three active:opacity-85 ${
           disabled ? 'opacity-50' : ''
         }`}>
@@ -68,12 +68,12 @@ export function ModelSelector({ value, options, onChange, disabled = false }: Pr
         />
       </Pressable>
 
-      <Modal visible={abierto} transparent animationType="fade" onRequestClose={() => setAbierto(false)}>
-        {/* El fondo cierra al tocarlo pero se oculta del lector: con VoiceOver el gesto de cerrar
-            es el del sistema, y un "botón" de pantalla completa sólo estorba al recorrer. */}
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        {/* The backdrop closes on tap but is hidden from the screen reader: with VoiceOver the
+            closing gesture is the system's, and a full-screen "button" only gets in the way. */}
         <Pressable
           className="absolute inset-0 bg-overlay"
-          onPress={() => setAbierto(false)}
+          onPress={() => setOpen(false)}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         />
@@ -92,7 +92,7 @@ export function ModelSelector({ value, options, onChange, disabled = false }: Pr
                   accessibilityState={{ checked: selected }}
                   accessibilityLabel={option.label}
                   accessibilityHint={`${t.modelProvider}: ${getProvider(option.provider).label}`}
-                  onPress={() => elegir(option.id)}
+                  onPress={() => choose(option.id)}
                   className={`min-h-touch flex-row items-center gap-three rounded-md px-three active:opacity-85 ${
                     selected ? 'bg-primary' : ''
                   }`}>
@@ -102,7 +102,7 @@ export function ModelSelector({ value, options, onChange, disabled = false }: Pr
                     className="flex-1">
                     {option.label}
                   </ThemedText>
-                  {/* El check es refuerzo: el relleno cambia y `checked` es lo que anuncia el lector. */}
+                  {/* The check is reinforcement: the fill changes and `checked` is what the reader announces. */}
                   {selected && (
                     <Ionicons
                       name="checkmark"

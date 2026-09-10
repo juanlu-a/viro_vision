@@ -149,7 +149,7 @@ strings app/ios/build/.../ViroVision | grep -E 'AIza|sk-'
 # Esperado: nada.
 ```
 
-# Telemetría: la función `telemetria` y la tabla `eventos`
+# Telemetría: la función `telemetry` y la tabla `events`
 
 La segunda función del proyecto, y la única razón por la que hoy se puede saber qué pasó cuando algo
 falla. Desde el **2026-09-08** la información técnica no está en las pantallas de la app (era una
@@ -160,16 +160,16 @@ app registra esos eventos acá.
 
 | Pieza | Dónde |
 |---|---|
-| Función | [`supabase/functions/telemetria/index.ts`](../supabase/functions/telemetria/index.ts) |
-| Cliente | `app/src/services/telemetria/` (barrel: `@/services/telemetria`) |
-| Tabla | `public.eventos` — **su DDL vive sólo en el dashboard**, ver el pendiente de abajo |
+| Función | [`supabase/functions/telemetry/index.ts`](../supabase/functions/telemetry/index.ts) |
+| Cliente | `app/src/services/telemetry/` (barrel: `@/services/telemetry`) |
+| Tabla | `public.events` — versionada en `supabase/migrations/` |
 | Variable | `EXPO_PUBLIC_TELEMETRY_URL`, **opcional**: si falta se deriva de `EXPO_PUBLIC_VISION_PROXY_URL` |
 
 La app **no tiene clave de la base**: manda lotes a la función, que inserta con el `service_role`.
 Mismo criterio que el proxy de visión, `verify_jwt = false` (ADR 0008): sin login, exigir la anon key
 sería pedir algo que ya viaja dentro del bundle.
 
-**La URL se deriva del proxy** (`…/functions/v1/vision` → `…/functions/v1/telemetria`) cuando no hay
+**La URL se deriva del proxy** (`…/functions/v1/vision` → `…/functions/v1/telemetry`) cuando no hay
 variable propia: las dos funciones viven en el mismo proyecto, y pedirlas por separado es pedir dos
 veces el mismo dato y dejar que se desincronicen. Sin eso, un build con proxy pero sin el secret
 nuevo sale **sin ninguna telemetría** y nadie se entera hasta que hace falta diagnosticar algo. La
@@ -179,45 +179,45 @@ fuerza daría 404 en cada lote — apagada y sabida es mejor que encendida y rot
 ## El contrato, y su trampa
 
 ```jsonc
-POST https://<proyecto>.supabase.co/functions/v1/telemetria
+POST https://<proyecto>.supabase.co/functions/v1/telemetry
 {
-  "telefono": "tel-…",   // id anónimo de la instalación, generado por la app
-  "sesion":   "ses-…",   // cambia en cada arranque: es lo que agrupa "qué pasó esa vez"
-  "app":      "1.0.0+42 ios",
-  "eventos": [
-    { "tipo": "lectura.ok", "momento": "2026-09-09T12:00:00.000Z", "ms": 1668,
-      "detalle": { "modo": "supermercado", "modelo": "gpt-5.6-luna" } }
+  "phone":   "phone-…",  // id anónimo de la instalación, generado por la app
+  "session": "ses-…",    // cambia en cada arranque: es lo que agrupa "qué pasó esa vez"
+  "app":     "1.0.0+42 ios",
+  "events": [
+    { "type": "reading.ok", "at": "2026-09-09T12:00:00.000Z", "ms": 1668,
+      "detail": { "mode": "supermarket", "model": "gpt-5.6-luna" } }
   ]
 }
 ```
 
-⚠️ **Un evento sin `tipo` o sin `momento` se descarta y la respuesta sigue siendo `200`**, con
-`{"guardados": 0}`. O sea que una app que arma mal el cuerpo se ve idéntica a una que anda, y el
-defecto recién aparece cuando alguien consulta la tabla después de una falla y no encuentra nada. Por
-eso `registrar()` pone el `momento` él mismo y los tipos son una unión cerrada
-(`services/telemetria/tipos.ts`), y por eso hay un test que arma el cuerpo y lo compara campo a campo.
+⚠️ **Un evento sin `type` o sin `at` se descarta y la respuesta sigue siendo `200`**, con
+`{"stored": 0}`. O sea que una app que arma mal el cuerpo se ve idéntica a una que anda, y el defecto
+recién aparece cuando alguien consulta la tabla después de una falla y no encuentra nada. Por eso
+`record()` pone el `at` él mismo y los tipos son una unión cerrada
+(`services/telemetry/types.ts`), y por eso hay un test que arma el cuerpo y lo compara campo a campo.
 
 Los otros dos topes: **100 eventos por lote** (lo de más se recorta del lado del servidor) y **8 KB
-de `detalle`**, que al pasarse se reemplaza **entero** por `{"recortado": true}` — no la parte de
-más. Nada de imágenes ni textos largos en `detalle`.
+de `detail`**, que al pasarse se reemplaza **entero** por `{"trimmed": true}` — no la parte de más.
+Nada de imágenes ni textos largos en `detail`.
 
 ## Qué se registra
 
-Ciclo de vida (`app.inicio`, `app.fondo`, `app.error`), enlace BLE (`ble.buscando`, `ble.conectado`,
-`ble.fallo`, `ble.perdido`, `ble.reintento`, `ble.desconectado`), red con la placa (`wifi.uniendose`,
-`wifi.listo`, `wifi.fallo`), lo que informa la placa (`placa.estado`, `placa.aviso`, `placa.modo`,
-`placa.modoFallo`), modos (`modo.cambio`) y la lectura entera (`lectura.inicio`, `foto.ok`,
-`foto.fallo`, `ocr.carga`, `nube.espera`, `lectura.ok`, `lectura.fallo`, `audio.sintesis`,
-`audio.envio`).
+Ciclo de vida (`app.start`, `app.background`, `app.error`), enlace BLE (`ble.scanning`,
+`ble.connected`, `ble.failed`, `ble.lost`, `ble.retry`, `ble.disconnected`), red con la placa
+(`wifi.joining`, `wifi.ready`, `wifi.failed`), lo que informa la placa (`device.status`,
+`device.warning`, `device.mode`, `device.modeFailed`), modos (`mode.change`) y la lectura entera
+(`reading.start`, `photo.ok`, `photo.failed`, `ocr.load`, `cloud.wait`, `reading.ok`,
+`reading.failed`, `audio.synthesis`, `audio.send`).
 
-`audio.sintesis` (la llamada al TTS de nube) va **separada** de `audio.envio` (la subida al parlante
+`audio.synthesis` (la llamada al TTS de nube) va **separada** de `audio.send` (la subida al parlante
 de la placa): son dos cosas que fallan y tardan por motivos distintos, y juntas se ven como un solo
 «tardó». Mismo criterio que separar los ms de la foto de los del pipeline.
 
 `app.error` incluye el **manejador global de errores** de React Native: un crash es el evento más
 útil que esta tabla puede tener y es justo el que ningún `try` de la app registra.
 
-`placa.estado` llega cada 15 s desde la placa pero **sólo se registra cuando cambia algo** (AP, wifi,
+`device.status` llega cada 15 s desde la placa pero **sólo se registra cuando cambia algo** (AP, wifi,
 cámara, ip, versión, o la batería por tramos de 5 %): registrarlo entero serían 240 filas por hora de
 las cuales 239 son idénticas.
 
@@ -227,7 +227,7 @@ Mientras el teléfono está unido al **AP de la placa** hay WiFi pero no interne
 una sesión de uso real los envíos fallan y los lotes se acumulan. La cola tiene tope (500) y **tira
 lo más viejo**, porque cuando alguien reporta una falla lo que hay que mirar son los últimos
 segundos. Lo descartado se cuenta y viaja en el siguiente lote como `app.error` con
-`eventosPerdidos`: un hueco silencioso se leería como "eso no pasó".
+`droppedEvents`: un hueco silencioso se leería como "eso no pasó".
 
 Un lote se reintenta **como mucho tres veces** y después se da por perdido. Sin ese tope, un lote que
 el servidor no puede aceptar volvería a la cola para siempre y —como siempre se sube lo más viejo
@@ -239,40 +239,50 @@ justo cuando hace falta.
 ```sh
 # Un evento de prueba (la función no pide auth)
 curl -sS -X POST "$EXPO_PUBLIC_TELEMETRY_URL" -H 'content-type: application/json' \
-  -d '{"telefono":"prueba","sesion":"prueba","app":"curl","eventos":[
-       {"tipo":"app.inicio","momento":"2026-09-09T00:00:00.000Z"}]}'
-# Esperado: {"guardados":1}. Si dice {"guardados":0}, al evento le falta `tipo` o `momento`.
+  -d '{"phone":"test","session":"test","app":"curl","events":[
+       {"type":"app.start","at":"2026-09-09T00:00:00.000Z"}]}'
+# Esperado: {"stored":1}. Si dice {"stored":0}, al evento le falta `type` o `at`.
 ```
 
-## Un solo vocabulario de `tipo`, y así conviene que siga
+## Un solo vocabulario de `type`, y así conviene que siga
 
-Los `tipo` son **`punto.separado`**: `app.inicio`, `ble.conectado`, `wifi.listo`, `foto.fallo`,
-`modo.cambio`, `lectura.ok`. La lista completa y vigente está en
-`app/src/services/telemetria/tipos.ts`, que es una **unión cerrada de TypeScript** a propósito: con
-strings libres, un `lectura.fallo` y un `lectura_fallo` conviven felices y ninguna consulta los ve a
-los dos. Agregar un tipo es agregar una línea ahí.
+Los `type` son **`punto.separado`**: `app.start`, `ble.connected`, `wifi.ready`, `photo.failed`,
+`mode.change`, `reading.ok`. La lista completa y vigente está en
+`app/src/services/telemetry/types.ts`, que es una **unión cerrada de TypeScript** a propósito: con
+strings libres, un `reading.failed` y un `reading_failed` conviven felices y ninguna consulta los ve
+a los dos. Agregar un tipo es agregar una línea ahí.
 
 > **Ya pasó una vez.** Hasta el 2026-09-09 la tabla tenía además ~28 filas en `snake_case`
 > (`app_abierta`, `ble_conectado`, `wifi_lista`) de un build manual de `feat/telemetria-supabase`,
 > una rama que nunca se mergeó. Se **borraron** ese día para dejar un solo vocabulario: una consulta
-> que filtre por `tipo` sin contemplar las dos formas muestra de menos **sin avisar**, que es la
+> que filtre por `type` sin contemplar las dos formas muestra de menos **sin avisar**, que es la
 > peor forma de estar mal. La tabla arranca limpia desde ahí.
+
+> **El vocabulario pasó a inglés el 2026-09-09** (ADR 0009), y las filas viejas se tradujeron en la
+> misma migración (`app.inicio` → `app.start`, y así con los 25 tipos). No quedaron dos formas
+> conviviendo: por eso una consulta no necesita contemplar las dos.
 
 ## Esquema versionado (2026-09-09)
 
-[`supabase/migrations/20260907190000_eventos.sql`](../supabase/migrations/20260907190000_eventos.sql).
-Es el archivo original de la rama que creó la tabla, recuperado con su fecha, y **verificado contra
-la base real** con `supabase db dump`: coincide campo por campo e índice por índice.
+Dos migraciones, en este orden:
 
-Lo que conviene saber al leerlo:
+1. [`20260907190000_eventos.sql`](../supabase/migrations/20260907190000_eventos.sql) — el archivo
+   original de la rama que creó la tabla, recuperado con su fecha y **verificado contra la base real**
+   con `supabase db dump`: coincide campo por campo e índice por índice. **No se toca**: ya está
+   aplicada, y un log de migraciones se agrega, no se edita.
+2. [`20260909120000_rename_eventos_to_events.sql`](../supabase/migrations/20260909120000_rename_eventos_to_events.sql)
+   — el pase a inglés (ADR 0009). **Renombra en vez de recrear**, así que las filas de las primeras
+   sesiones de campo se quedan donde están; traduce además los `type` históricos.
 
-- **RLS encendido y sin ninguna política**, a propósito: con la anon key un `GET /rest/v1/eventos`
+Lo que conviene saber al leerlas:
+
+- **RLS encendido y sin ninguna política**, a propósito: con la anon key un `GET /rest/v1/events`
   devuelve `[]`, no filas (verificado el 2026-09-09). La función entra con el `service_role`, que
   salta RLS. **No agregar una política de lectura sin pensarlo**: la anon key viaja dentro del bundle
   de la app, así que una política para `anon` es una política para cualquiera que la extraiga.
-- Tres índices, por los tres accesos que se usan: lo último que pasó (`creado_en desc`), una sesión
-  entera en orden (`sesion, momento`) y todas las veces que pasó una cosa (`tipo, creado_en desc`).
-- El `check` de `detalle` mide **bytes del jsonb ya comprimido** (≤ 8192) y el corte de la función
+- Tres índices, por los tres accesos que se usan: lo último que pasó (`created_at desc`), una sesión
+  entera en orden (`session, occurred_at`) y todas las veces que pasó una cosa (`type, created_at desc`).
+- El `check` de `detail` mide **bytes del jsonb ya comprimido** (≤ 8192) y el corte de la función
   mide **caracteres de JSON** (≤ 8000): son medidas distintas. En la práctica la de la función es
   más estricta —se probó con 7900 caracteres incompresibles y entró sin problema—, y ese margen es
   el que evita que un evento gigante haga fallar el insert del lote entero.

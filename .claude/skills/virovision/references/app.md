@@ -88,7 +88,7 @@ ViroVision:
 2. **La foto (supermercado):** por BLE en chunks, o por un AP WiFi de la placa con HTTP plano si la
    medición de throughput lo pide (umbral: 53 KB en < 2 s). Se decide midiendo.
 3. **Audio:** sale por la placa (DAC I2S cableado, no A2DP). Para supermercado la app manda el MP3
-   que ya sintetiza (`services/audio/sintesis.ts`); no hay que enrutar la salida del teléfono.
+   que ya sintetiza (`services/audio/synthesis.ts`); no hay que enrutar la salida del teléfono.
 
 ### Audio routing
 The app must **explicitly route its output** to the device's audio endpoint instead of the system

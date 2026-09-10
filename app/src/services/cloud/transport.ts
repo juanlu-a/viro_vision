@@ -1,38 +1,37 @@
 /**
- * Por dónde sale el request de visión: directo al proveedor, o por el proxy propio (ADR 0008).
+ * Where the vision request goes out: straight to the provider, or through our own proxy (ADR 0008).
  *
- * REGLA DE FRONTERA (ADR 0001 + ADR 0006): esto es parte del camino de supermercado y **no puede
- * llamarse desde el camino de ómnibus**, que corre local sobre la TPU y el OCR. Un proxy en el
- * medio agrega un salto de red a un camino que ADR 0001 exige que funcione sin internet.
+ * BOUNDARY RULE (ADR 0001 + ADR 0006): this is part of the supermarket path and **must not be
+ * called from the bus path**, which runs locally on the TPU and the OCR. A proxy in the middle adds
+ * a network hop to a path ADR 0001 requires to work without internet.
  *
- * TENSIÓN A NOMBRAR, para que nadie la lea como una violación: el boundary rule de
- * `services/supabase/client.ts` prohíbe **la cuenta online** en el camino de reconocimiento. Esto
- * usa la *infraestructura* de Supabase, no la cuenta: no hay sesión, ni usuario, ni tabla. Es una
- * función HTTP que da la casualidad de estar hospedada en el mismo proveedor. La regla sigue
- * vigente tal como está escrita.
+ * A TENSION WORTH NAMING, so nobody reads it as a violation: the boundary rule in
+ * `services/supabase/client.ts` forbids **the online account** on the recognition path. This uses
+ * Supabase's *infrastructure*, not the account: there is no session, no user, no table. It is an
+ * HTTP function that happens to be hosted at the same provider. The rule stands exactly as written.
  *
- * Módulo puro: decide una URL y un sobre, no toca la red. Ver transport.test.ts.
+ * Pure module: it decides a URL and an envelope, it does not touch the network. See transport.test.ts.
  */
-import { proxyUrl as proxyPorDefecto } from './config';
+import { proxyUrl as defaultProxyUrl } from './config';
 import type { CloudProviderId, CloudRequest } from './types';
 
 /**
- * Reescribe el request hacia el proxy, o lo deja pasar si no hay proxy configurado.
+ * Rewrites the request towards the proxy, or lets it through when no proxy is configured.
  *
- * Las cabeceras del proveedor **se descartan**: son las que llevan la clave, y el punto entero del
- * proxy es que la clave no salga del servidor. El proxy las reconstruye desde sus secrets — por eso
- * también reconstruye `anthropic-version`, que es parte de con qué API hablamos y no de qué le
- * preguntamos al modelo.
+ * The provider's headers **are dropped**: they are the ones carrying the key, and the whole point of
+ * the proxy is that the key never leaves the server. The proxy rebuilds them from its secrets — which
+ * is also why it rebuilds `anthropic-version`, which is part of which API we talk to and not of what
+ * we ask the model.
  *
- * La URL sí viaja, y el proxy la valida contra la allowlist de hosts del proveedor declarado. Va
- * desde acá y no desde una tabla del servidor para que el path lo siga eligiendo el módulo del
- * proveedor —que es el que sabe si su API es `/v1/messages` o `/v1/chat/completions`— y agregar un
- * modelo no obligue a redesplegar la función.
+ * The URL does travel, and the proxy validates it against the declared provider's host allowlist. It
+ * goes from here and not from a server-side table so that the path keeps being chosen by the
+ * provider module —which is the one that knows whether its API is `/v1/messages` or
+ * `/v1/chat/completions`— and adding a model does not force a redeploy of the function.
  */
-export function resolverTransporte(
+export function resolveTransport(
   request: CloudRequest,
   provider: CloudProviderId,
-  proxyUrl: string = proxyPorDefecto,
+  proxyUrl: string = defaultProxyUrl,
 ): CloudRequest {
   if (proxyUrl === '') return request;
 

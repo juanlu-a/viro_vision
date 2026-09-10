@@ -38,7 +38,7 @@ dos radios en el mismo chip (BCM43436/8: WiFi 2,4 GHz, Bluetooth 4.2) y comparte
 | lo mismo a 768 / 640 / 384 px | ~35 / 30 / 15 KB | ídem |
 | latencia del LLM | mediana 1,7 s (Luna, default) / 0,85 s (Qwen) | ídem, Resultado 1 |
 | latencia del LLM según tamaño de foto | **no baja** con la foto más chica: las medianas no ordenan | ídem, Resultado 4 |
-| TTS a MP3 en la nube (`gpt-4o-mini-tts`) | ~1 a 1,5 s; MP3 de ~12 KB | ADR 0006, `services/audio/sintesis.ts` |
+| TTS a MP3 en la nube (`gpt-4o-mini-tts`) | ~1 a 1,5 s; MP3 de ~12 KB | ADR 0006, `services/audio/synthesis.ts` |
 | throughput BLE de la Zero 2 W hacia un iPhone | **sin medir** | — |
 
 Throughput BLE típico de este chip (Bluetooth 4.2, sin 2M PHY) con notificaciones GATT hacia iOS:
@@ -93,12 +93,17 @@ placeholders `0000fffX` que había en la app eran del rango de 16 bits reservado
 
 | característica | props | contenido |
 |---|---|---|
-| `modo` | read · notify · write | uint8: 0 esperando, 1 ómnibus, 2 supermercado (ADR 0007) |
-| `control` | write | JSON `{cmd: medir \| foto \| modo \| estado, …}` |
-| `evento` | notify | JSON ≤ 180 bytes: inicio/fin de transferencia, cambio de modo, error, resultado |
-| `transferencia` | notify | binario: header de 4 bytes (`seq` u16 LE, `total` u16 LE) + datos |
-| `estado` | read · notify | JSON: versión, temperatura, uptime, batería (null hoy), cámara, wifi |
-| `wifi` | read | **reservada** para el plan B: SSID, clave, IP y puerto del AP de la placa |
+| `mode` | read · notify · write | uint8: 0 esperando, 1 ómnibus, 2 supermercado (ADR 0007) |
+| `control` | write | JSON `{cmd: measure \| photo \| mode \| status, …}` |
+| `event` | notify | JSON ≤ 180 bytes: inicio/fin de transferencia, cambio de modo, error, resultado |
+| `transfer` | notify | binario: header de 4 bytes (`seq` u16 LE, `total` u16 LE) + datos |
+| `status` | read · notify | JSON: versión, temperatura, uptime, batería (null hoy), cámara, wifi |
+| `wifi` | read | **reservada** para el plan B: SSID, contraseña, IP y puerto del AP de la placa |
+
+> Los nombres de las características y de los comandos pasaron a inglés el **2026-09-09**
+> ([ADR 0009](0009-idioma-del-codigo.md)); los UUIDs y la semántica no cambiaron. La tabla está
+> actualizada: cuando se decidió, se llamaban `modo`, `evento`, `transferencia`, `estado` y los
+> comandos `medir`/`foto`/`modo`/`estado`.
 
 El perfil está duplicado a mano en `hardware/raspi/virovision/gatt.py` y
 `app/src/features/device/gatt.ts`, con el aviso en los dos lados.
@@ -128,7 +133,7 @@ Si el umbral no se cumple:
   Android, que además mantiene datos móviles para internet). Requiere `NSLocalNetworkUsageDescription`
   y la excepción ATS `NSAllowsLocalNetworking`.
 - **HTTP plano en la placa**, sin TLS: `GET /fotos/{id}` (JPEG ya reducido), `POST /audio` (MP3 a
-  reproducir), `GET /salud`. WPA2 ya cifra el aire; la app usa `fetch` sin dependencias nuevas. **La
+  reproducir), `GET /health`. WPA2 ya cifra el aire; la app usa `fetch` sin dependencias nuevas. **La
   app siempre tira, la placa nunca empuja**: así el teléfono no necesita servidor HTTP.
 - El AP puede levantarse sólo con un modo activo y apagarse en *esperando*, para no gastar batería
   anunciando una red que nadie usa.
@@ -290,7 +295,7 @@ pestaña Dispositivo, y con ellos el módulo de reensamblado por chunks del lado
 (`services/ble/transferencia.ts`) y `medirDescargaHttp`. Del módulo viejo sobrevive sólo el base64,
 que usa cada característica del GATT y se mudó a `services/ble/base64.ts`.
 
-**La placa sigue publicando la característica `transferencia` y el comando `medir`**: sacarlos del
+**La placa sigue publicando la característica `transfer` y el comando `measure`**: sacarlos del
 firmware es un PR del pilar de hardware. El espejo de `features/device/gatt.ts` los documenta con
 una nota que dice que la app ya no los usa, para que nadie los vuelva a cablear creyendo que son el
 camino de la foto.

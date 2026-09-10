@@ -11,9 +11,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
 import { isProxyConfigured } from '@/services/cloud';
-import { registrar, iniciarTelemetria, isTelemetriaConfigurada } from '@/services/telemetria';
-import { DispositivoProvider } from '@/features/device/DispositivoProvider';
-import { ModeloSupermercadoProvider } from '@/features/reader/ModeloSupermercadoProvider';
+import { record, startTelemetry, isTelemetryConfigured } from '@/services/telemetry';
+import { DeviceProvider } from '@/features/device/DeviceProvider';
+import { ProductModelProvider } from '@/features/reader/ProductModelProvider';
 import {
   ThemePreferenceProvider,
   useThemePreference,
@@ -21,8 +21,8 @@ import {
 
 SplashScreen.preventAutoHideAsync();
 
-// ExecuTorch descarga sus modelos por su cuenta y necesita saber con qué. Se configura una sola
-// vez, al arrancar: hacerlo al usarlo dejaría la primera llamada compitiendo con la inicialización.
+// ExecuTorch downloads its models on its own and needs to know with what. It is configured once, at
+// startup: doing it on first use would leave that call competing with the initialization.
 initExecutorch({ resourceFetcher: ExpoResourceFetcher });
 
 function buildNavTheme(scheme: 'light' | 'dark') {
@@ -43,33 +43,33 @@ function buildNavTheme(scheme: 'light' | 'dark') {
 }
 
 export default function RootLayout() {
-  // La telemetría arranca una sola vez y se apaga al desmontar. Va acá arriba de todo para que el
-  // manejador global de errores quede puesto antes de que se monte cualquier pantalla: un crash del
-  // arranque es justo el que nadie puede registrar a mano.
+  // Telemetry starts once and is switched off on unmount. It goes at the very top so the global
+  // error handler is installed before any screen mounts: a startup crash is exactly the one nobody
+  // can record by hand.
   useEffect(() => {
-    const parar = iniciarTelemetria();
-    // El contexto de la sesión, una vez: sin esto, cada evento posterior hay que interpretarlo sin
-    // saber contra qué build ni con qué configuración corría.
-    registrar('app.inicio', {
-      detalle: {
-        plataforma: Platform.OS,
+    const stop = startTelemetry();
+    // The session's context, once: without it, every later event has to be interpreted without
+    // knowing which build or which configuration it was running under.
+    record('app.start', {
+      detail: {
+        platform: Platform.OS,
         version: Platform.Version,
-        conProxy: isProxyConfigured,
-        conTelemetria: isTelemetriaConfigurada,
+        withProxy: isProxyConfigured,
+        withTelemetry: isTelemetryConfigured,
       },
     });
-    return parar;
+    return stop;
   }, []);
 
   return (
     <ThemePreferenceProvider>
-      {/* El modelo de supermercado se elige en Ajustes y se usa en Inicio: el estado tiene que ser
-          uno solo, arriba de las dos pestañas. */}
-      <ModeloSupermercadoProvider>
-        <DispositivoProvider>
+      {/* The supermarket model is chosen in Settings and used on Home: the state has to be a single
+          one, above both tabs. */}
+      <ProductModelProvider>
+        <DeviceProvider>
         <RootNavigator />
-        </DispositivoProvider>
-      </ModeloSupermercadoProvider>
+        </DeviceProvider>
+      </ProductModelProvider>
     </ThemePreferenceProvider>
   );
 }
@@ -78,8 +78,8 @@ function RootNavigator() {
   const { scheme, isReady } = useThemePreference();
 
   useEffect(() => {
-    // El splash se mantiene hasta saber qué tema aplicar: si no, la app pinta con un esquema y
-    // salta al otro, un parpadeo desorientador para alguien con baja visión.
+    // The splash is held until we know which theme to apply: otherwise the app paints with one
+    // scheme and jumps to the other, a disorienting flash for someone with low vision.
     if (isReady) SplashScreen.hideAsync();
   }, [isReady]);
 

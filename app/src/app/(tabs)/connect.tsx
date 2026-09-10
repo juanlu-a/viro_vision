@@ -1,11 +1,12 @@
 /**
- * Dispositivo: en qué anda la placa y los dos controles que el usuario tiene sobre ella.
+ * Device: what the device is doing and the two controls the user has over it.
  *
- * Hasta el 2026-09-08 esta pantalla era además la consola del proyecto: dos botones para medir la
- * transferencia (el spike del ADR 0003, ya decidido a favor de WiFi) y el volcado crudo de lo que
- * la placa informa de sí misma. Con los logs en Supabase eso se lee donde se lee un log, no en la
- * pantalla de alguien que no la ve. Queda lo que el usuario puede usar o necesita saber: si el
- * dispositivo está, cómo está su red, su batería, y los avisos cuando algo le falla.
+ * Until 2026-09-08 this screen was also the project's console: two buttons to measure the transfer
+ * (the ADR 0003 spike, already decided in favour of WiFi) and the raw dump of what the device
+ * reports about itself. With the logs in Supabase that is read where a log is read, not on the
+ * screen of someone who does not see it. What stays is what the user can use or needs to know:
+ * whether the device is there, how its network is doing, its battery, and the notices when
+ * something fails on it.
  */
 import { View } from 'react-native';
 
@@ -15,30 +16,30 @@ import { DeviceSummary } from '@/features/device/DeviceSummary';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { useDispositivo } from '@/features/device/DispositivoProvider';
+import { useDevice } from '@/features/device/DeviceProvider';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
 
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { conexion, wifi, wifiDetalle, ultimoAviso, connect, disconnect } = useDispositivo();
-  const wifiTexto = { 'sin-red': t.wifiSinRed, uniendose: t.wifiUniendose, listo: t.wifiListo, error: t.wifiError }[wifi];
-  // El detalle sólo aparece cuando la red falló, y dice qué hacer: no es diagnóstico, es el motivo
-  // por el que no se puede leer.
-  const wifiCompleto = wifiDetalle ? `${wifiTexto}. ${wifiDetalle}` : wifiTexto;
+  const { connection, wifi, wifiDetail, lastNotice, connect, disconnect } = useDevice();
+  const wifiText = { off: t.wifiOff, joining: t.wifiJoining, ready: t.wifiReady, error: t.wifiError }[wifi];
+  // The detail only shows up when the network failed, and it says what to do: it is not diagnostics,
+  // it is the reason reading is not possible.
+  const wifiFull = wifiDetail ? `${wifiText}. ${wifiDetail}` : wifiText;
 
-  const isConnected = conexion.status === 'connected';
-  const isBusy = conexion.status === 'scanning' || conexion.status === 'connecting';
+  const isConnected = connection.status === 'connected';
+  const isBusy = connection.status === 'scanning' || connection.status === 'connecting';
   const dotColor =
-    isConnected ? theme.success : conexion.status === 'error' ? theme.danger : theme.textSecondary;
+    isConnected ? theme.success : connection.status === 'error' ? theme.danger : theme.textSecondary;
 
   return (
     <Screen
       scroll
-      // Tirar hacia abajo = buscar/actualizar el dispositivo: el gesto estándar de "traeme la
-      // información fresca", aplicado a lo único que esta pantalla informa. Si ya hay una
-      // operación en vuelo, el gesto no la pisa.
+      // Pull down = search for / refresh the device: the standard "bring me fresh information"
+      // gesture, applied to the only thing this screen reports. If an operation is already in
+      // flight, the gesture does not step on it.
       onRefresh={async () => {
         if (!isBusy) await connect();
       }}>
@@ -50,34 +51,34 @@ export default function ConnectScreen() {
           accessible
           accessibilityRole="text"
           accessibilityLiveRegion="polite"
-          accessibilityLabel={`${t.statusLabel}: ${conexion.message}`}>
+          accessibilityLabel={`${t.statusLabel}: ${connection.message}`}>
           <View className="h-[12px] w-[12px] rounded-pill" style={{ backgroundColor: dotColor }} />
           <View className="flex-1 gap-[2px]">
             <ThemedText type="small" themeColor="textSecondary">
               {t.statusLabel.toUpperCase()}
             </ThemedText>
             <ThemedText type="default" className="font-sans-bold">
-              {conexion.message}
+              {connection.message}
             </ThemedText>
           </View>
         </View>
       </Card>
 
-      {isConnected && conexion.device && (
+      {isConnected && connection.device && (
         <Card>
-          <DeviceSummary device={conexion.device} />
-          <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.wifiLabel}: ${wifiCompleto}`}>
+          <DeviceSummary device={connection.device} />
+          <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.wifiLabel}: ${wifiFull}`}>
             <ThemedText type="small" themeColor="textSecondary">
               {t.wifiLabel}
             </ThemedText>
-            <ThemedText type="small">{wifiCompleto}</ThemedText>
+            <ThemedText type="small">{wifiFull}</ThemedText>
           </View>
-          {ultimoAviso && (
-            <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.deviceErrorLabel}: ${ultimoAviso}`}>
+          {lastNotice && (
+            <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.deviceErrorLabel}: ${lastNotice}`}>
               <ThemedText type="small" themeColor="danger">
                 {t.deviceErrorLabel}
               </ThemedText>
-              <ThemedText type="small">{ultimoAviso}</ThemedText>
+              <ThemedText type="small">{lastNotice}</ThemedText>
             </View>
           )}
         </Card>

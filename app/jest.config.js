@@ -3,7 +3,7 @@ module.exports = {
   preset: 'jest-expo',
   // Mirror the TS path alias from tsconfig.json so tests can import via `@/…`.
   moduleNameMapper: {
-    // El CSS va primero: `@/global.css` matchearía también la regla de alias de abajo.
+    // CSS goes first: `@/global.css` would also match the alias rule below.
     '\\.css$': '<rootDir>/jest/styleMock.js',
     '^@/(.*)$': '<rootDir>/src/$1',
   },

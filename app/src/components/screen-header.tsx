@@ -1,19 +1,19 @@
 /**
- * Encabezado de pantalla: símbolo de marca a la izquierda, título al lado, subtítulo debajo.
+ * Screen header: brand symbol on the left, title beside it, subtitle underneath.
  *
- * **El símbolo va sólo en Inicio.** Repetirlo en cada pantalla lo convertía en decoración: la
- * marca deja de decir "esta es la app" y pasa a ser ruido que se saltea. Lo que sí tienen que
- * compartir todas es la *estructura*, y de eso se encarga `minHeight` en la fila del título: con
- * o sin símbolo, el título cae siempre a la misma altura. Sin eso, el alto de la fila lo decidiría
- * el elemento más alto —el símbolo en Inicio, la línea de texto en el resto— y los títulos
- * quedarían desalineados entre pantallas.
+ * **The symbol appears only on Home.** Repeating it on every screen turned it into decoration: the
+ * brand stops saying "this is the app" and becomes noise to skip past. What every screen does have
+ * to share is the *structure*, and that is what `minHeight` on the title row takes care of: with or
+ * without the symbol, the title always lands at the same height. Without it, the row's height would
+ * be decided by its tallest element —the symbol on Home, the line of text elsewhere— and the titles
+ * would end up misaligned across screens.
  *
- * Hay **dos archivos de símbolo**, no uno recoloreado: el manual define la pupila azul profundo
- * sobre claro y blanca sobre oscuro, y una sola imagen no puede cumplir las dos cosas — con la
- * pupila blanca sobre fondo claro el ojo se ve hueco.
+ * There are **two symbol files**, not one recoloured: the brand manual defines the pupil as deep
+ * blue on light and white on dark, and a single image cannot do both — with a white pupil on a light
+ * background the eye looks hollow.
  *
- * El símbolo es decorativo para el lector de pantalla — el título ya dice en qué pantalla estás,
- * y anunciar "imagen" antes de cada encabezado sería ruido en cada navegación.
+ * The symbol is decorative for the screen reader — the title already says which screen you are on,
+ * and announcing "image" before every header would be noise on every navigation.
  */
 import { Image } from 'expo-image';
 import { View } from 'react-native';
@@ -21,7 +21,7 @@ import { View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useThemePreference } from '@/features/theme/ThemePreferenceProvider';
 
-/** `large` sólo en Inicio. El resto de las pantallas va sin marca. */
+/** `large` only on Home. Every other screen goes without the mark. */
 export type HeaderMark = 'large' | 'none';
 
 const MARK_SIZE = 48;
@@ -39,8 +39,8 @@ export function ScreenHeader({
 
   return (
     <View className="gap-two">
-      {/* `min-h-[48px]`: el alto fijo hace que el título caiga a la misma altura lleve
-          símbolo o no. Sin eso lo decidiría el elemento más alto de cada pantalla. */}
+      {/* `min-h-[48px]`: the fixed height makes the title land at the same height whether it
+          carries a symbol or not. Without it, each screen's tallest element would decide. */}
       <View className="min-h-[48px] flex-row items-center gap-three">
         {mark !== 'none' && (
           <Image
@@ -55,8 +55,8 @@ export function ScreenHeader({
             importantForAccessibility="no-hide-descendants"
           />
         )}
-        {/* `flex: 1` para que el título envuelva en dos líneas en vez de empujar al símbolo
-            fuera de pantalla cuando el usuario agranda el tipo del sistema. */}
+        {/* `flex: 1` so the title wraps onto two lines instead of pushing the symbol off screen
+            when the user enlarges the system type. */}
         <ThemedText type="title" accessibilityRole="header" className="flex-1">
           {title}
         </ThemedText>

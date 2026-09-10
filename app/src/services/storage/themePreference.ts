@@ -1,13 +1,13 @@
 /**
- * Persistencia de la preferencia de tema.
+ * Persistence of the theme preference.
  *
- * Se guarda en AsyncStorage y no en Supabase a propósito: es una preferencia de accesibilidad y
- * tiene que sobrevivir sin red y sin cuenta. Alguien que necesita el tema claro para poder leer la
- * app no puede depender de que haya internet para que se respete.
+ * It is stored in AsyncStorage and not in Supabase on purpose: it is an accessibility preference and
+ * it has to survive without network and without an account. Someone who needs the light theme to be
+ * able to read the app cannot depend on there being internet for it to be honoured.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-/** `system` sigue al sistema operativo; los otros dos lo fuerzan. */
+/** `system` follows the operating system; the other two force it. */
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 export const THEME_PREFERENCE_KEY = 'virovision.themePreference';
@@ -18,7 +18,7 @@ export function isThemePreference(value: unknown): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark';
 }
 
-/** Lee la preferencia guardada. Ante cualquier error devuelve el default en vez de romper. */
+/** Reads the stored preference. On any error it returns the default instead of breaking. */
 export async function loadThemePreference(): Promise<ThemePreference> {
   try {
     const stored = await AsyncStorage.getItem(THEME_PREFERENCE_KEY);
@@ -28,11 +28,11 @@ export async function loadThemePreference(): Promise<ThemePreference> {
   }
 }
 
-/** Guarda la preferencia. Un fallo de escritura no debe tumbar la app ni bloquear el cambio. */
+/** Stores the preference. A write failure must not take the app down nor block the change. */
 export async function saveThemePreference(preference: ThemePreference): Promise<void> {
   try {
     await AsyncStorage.setItem(THEME_PREFERENCE_KEY, preference);
   } catch {
-    /* la preferencia sigue aplicada en memoria durante esta sesión */
+    /* the preference stays applied in memory for this session */
   }
 }

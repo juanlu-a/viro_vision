@@ -1,31 +1,31 @@
 /**
- * Errores tipados de la síntesis de voz a archivo.
+ * Typed errors of speech-synthesis-to-file.
  *
- * Mismo criterio que en `services/vision/errors.ts`: quien llama decide qué hacer por el TIPO, no
- * parseando strings, y el dato accionable viaja como campo. Acá el motivo importa porque separa
- * "está apagado a propósito" de "está prendido y se rompió": lo primero no es una falla y no se
- * reporta como tal.
+ * Same criterion as in `services/vision/errors.ts`: the caller decides what to do from the TYPE, not
+ * by parsing strings, and the actionable datum travels as a field. Here the reason matters because it
+ * separates "it is off on purpose" from "it is on and it broke": the first is not a failure and is
+ * not reported as one.
  */
 
-/** La síntesis no está habilitada, o no hay ni clave ni proxy con qué pedirla. */
-export class SintesisNoConfiguradaError extends Error {
-  readonly motivo: string;
+/** Synthesis is not enabled, or there is neither a key nor a proxy to ask with. */
+export class SpeechNotConfiguredError extends Error {
+  readonly reason: string;
 
-  constructor(motivo: string) {
-    super('SINTESIS_NO_CONFIGURADA');
-    this.name = 'SintesisNoConfiguradaError';
-    this.motivo = motivo;
+  constructor(reason: string) {
+    super('SPEECH_NOT_CONFIGURED');
+    this.name = 'SpeechNotConfiguredError';
+    this.reason = reason;
   }
 }
 
-/** El TTS respondió con un status no-2xx. `body` trae el detalle de la API. */
-export class SintesisRemotaError extends Error {
+/** The TTS answered with a non-2xx status. `body` carries the API's detail. */
+export class SpeechHttpError extends Error {
   readonly status: number;
   readonly body: string;
 
   constructor(status: number, body: string) {
-    super(`SINTESIS_HTTP_${status}`);
-    this.name = 'SintesisRemotaError';
+    super(`SPEECH_HTTP_${status}`);
+    this.name = 'SpeechHttpError';
     this.status = status;
     this.body = body;
   }

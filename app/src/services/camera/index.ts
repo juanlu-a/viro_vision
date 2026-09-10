@@ -1,13 +1,13 @@
 /**
- * La imagen del lector: la saca la cámara de la placa y baja por WiFi (ADR 0003).
+ * The reader's image: taken by the device's camera and downloaded over WiFi (ADR 0003).
  *
- * Hasta el 2026-09-08 acá vivía además la cámara del teléfono (`expo-image-picker`), que ocupaba
- * ese lugar mientras no había hardware, y la fototeca, que servía para pasarle la misma foto a
- * varios modelos. Las dos se fueron con el hardware andando: la única fuente de imagen del producto
- * es el dispositivo, y sostener una segunda dejaba `expo-image-picker` y los permisos de cámara y
- * fotos en el binario para un camino que ya nadie recorre.
+ * Until 2026-09-08 the phone's camera (`expo-image-picker`) also lived here, holding that place
+ * while there was no hardware, along with the photo library, which was useful for handing the same
+ * photo to several models. Both left once the hardware worked: the product's only image source is
+ * the device, and keeping a second one left `expo-image-picker` and the camera and photo permissions
+ * in the binary for a path nobody walks any more.
  *
- * Barrel puro: única superficie de import (`@/services/camera`).
+ * Pure barrel: the single import surface (`@/services/camera`).
  */
-export { descargarFotoDeLaPlaca } from './fotoDeLaPlaca';
-export type { FotoDeLaPlaca, ImagenParaLaNube } from './fotoDeLaPlaca';
+export { downloadDevicePhoto } from './devicePhoto';
+export type { DevicePhoto, CloudImage } from './devicePhoto';

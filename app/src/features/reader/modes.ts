@@ -1,25 +1,25 @@
 /**
- * La máquina de modos de operación de ADR 0007, en su versión app.
+ * The operating-mode state machine of ADR 0007, in its app flavour.
  *
- * El diagrama canónico vive en `docs/architecture/README.md`; esta función lo transcribe y el
- * firmware del dispositivo implementará la misma máquina sobre el botón físico. La app modela los
- * gestos del botón (click, doble click, click largo) en lugar de "cambiar de pestaña de modo"
- * porque cuando exista hardware el modo lo fija el botón y la app sólo lo refleja — si la app
- * tuviera transiciones propias que el botón no tiene, las dos superficies divergirían.
+ * The canonical diagram lives in `docs/architecture/README.md`; this function transcribes it and
+ * the device firmware implements the same machine on top of the physical button. The app models
+ * button gestures (click, double click, long press) instead of "switch mode tab" because once the
+ * hardware exists the button is what sets the mode and the app only mirrors it — if the app had
+ * transitions the button does not, the two surfaces would drift apart.
  *
- * Nota deliberada del diagrama: NO hay salto directo entre modos. De un modo sólo se vuelve a
- * esperando (click largo); cualquier otro gesto deja el estado donde está.
+ * Deliberate note from the diagram: there is NO direct jump between modes. From a mode you can
+ * only go back to idle (long press); any other gesture leaves the state where it is.
  */
 
-export const MODOS = ['esperando', 'omnibus', 'supermercado'] as const;
-export type Modo = (typeof MODOS)[number];
+export const MODES = ['idle', 'bus', 'supermarket'] as const;
+export type Mode = (typeof MODES)[number];
 
-export const GESTOS = ['click', 'dobleClick', 'clickLargo'] as const;
-export type Gesto = (typeof GESTOS)[number];
+export const GESTURES = ['click', 'doubleClick', 'longPress'] as const;
+export type Gesture = (typeof GESTURES)[number];
 
-export function transicionar(modo: Modo, gesto: Gesto): Modo {
-  if (gesto === 'clickLargo') return 'esperando';
-  if (modo === 'esperando' && gesto === 'click') return 'omnibus';
-  if (modo === 'esperando' && gesto === 'dobleClick') return 'supermercado';
-  return modo;
+export function transition(mode: Mode, gesture: Gesture): Mode {
+  if (gesture === 'longPress') return 'idle';
+  if (mode === 'idle' && gesture === 'click') return 'bus';
+  if (mode === 'idle' && gesture === 'doubleClick') return 'supermarket';
+  return mode;
 }

@@ -1,12 +1,12 @@
 /**
- * Variantes de la app sobre el mismo app.json. **Reservado, hoy no lo usa la pipeline.**
+ * App variants on top of the same app.json. **Reserved, the pipeline does not use it today.**
  *
- * `APP_VARIANT=beta` produce otra app para Apple — bundle `com.virovision.app.beta` (registrado
- * en la cuenta), nombre "ViroVision β", ícono con franja BETA. Sirve para tener una β y la oficial
- * **instaladas a la vez** (iOS no instala dos builds del mismo bundle). Se evaluó el 2026-08-30 y se
- * descartó: con tres devs alcanza con cambiar de build desde TestFlight, y una segunda app exige su
- * propia ficha en App Store Connect y su propia revisión. Queda listo por si cambia la necesidad;
- * sin la variable, devuelve app.json intacto.
+ * `APP_VARIANT=beta` produces another app for Apple — bundle `com.virovision.app.beta` (registered
+ * in the account), name "ViroVision β", icon with a BETA band. It is useful for having a β and the
+ * official one **installed at the same time** (iOS does not install two builds of the same bundle).
+ * It was evaluated on 2026-08-30 and dropped: with three devs, switching build from TestFlight is
+ * enough, and a second app requires its own App Store Connect listing and its own review. It stays
+ * ready in case the need changes; without the variable, it returns app.json untouched.
  */
 const IS_BETA = process.env.APP_VARIANT === 'beta';
 

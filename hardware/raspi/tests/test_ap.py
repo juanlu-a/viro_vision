@@ -1,5 +1,6 @@
-"""Existe porque el AP se maneja por nmcli y un argumento mal puesto deja a la placa sin red y sin
-SSH en la calle: el orden y el contenido de las llamadas es el contrato con NetworkManager."""
+"""Exists because the AP is driven through nmcli and a misplaced argument leaves the device with no
+network and no SSH out on the street: the order and the content of the calls are the contract with
+NetworkManager."""
 
 import os
 import subprocess
@@ -9,59 +10,59 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from virovision.ap import NOMBRE_CONEXION, PuntoDeAcceso  # noqa: E402
+from virovision.ap import CONNECTION_NAME, AccessPoint  # noqa: E402
 
 
-class NmcliFalso:
-    def __init__(self, existente=False):
-        self.llamadas = []
-        self.existente = existente
+class FakeNmcli:
+    def __init__(self, existing=False):
+        self.calls = []
+        self.existing = existing
 
     def __call__(self, args):
-        self.llamadas.append(list(args))
+        self.calls.append(list(args))
         if args[:1] == ["-t"] and "--active" in args:
             return subprocess.CompletedProcess(args, 0, stdout="netplan-wlan0-Jack_2.4:wlan0\nlo:lo\n", stderr="")
         if args[:1] == ["-t"]:
-            return subprocess.CompletedProcess(args, 0, stdout=(NOMBRE_CONEXION + "\n") if self.existente else "Jack_2.4\n", stderr="")
+            return subprocess.CompletedProcess(args, 0, stdout=(CONNECTION_NAME + "\n") if self.existing else "Jack_2.4\n", stderr="")
         return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
 
 
-def test_encender_crea_la_conexion_una_sola_vez_y_la_levanta():
-    nm = NmcliFalso(existente=False)
-    ap = PuntoDeAcceso(nm)
-    ap.encender()
-    assert ap.encendido
-    verbos = [l[:2] for l in nm.llamadas]
-    assert ["con", "add"] in verbos and ["con", "modify"] in verbos and ["con", "up"] in verbos
-    modificar = next(l for l in nm.llamadas if l[:2] == ["con", "modify"])
-    assert "802-11-wireless.mode" in modificar and "ap" in modificar
-    assert "ipv4.method" in modificar and "shared" in modificar
-    assert "802-11-wireless.band" in modificar and "bg" in modificar  # la Zero 2 W es sólo 2,4 GHz
+def test_turning_on_creates_the_connection_once_and_brings_it_up():
+    nm = FakeNmcli(existing=False)
+    ap = AccessPoint(nm)
+    ap.turn_on()
+    assert ap.on
+    verbs = [c[:2] for c in nm.calls]
+    assert ["con", "add"] in verbs and ["con", "modify"] in verbs and ["con", "up"] in verbs
+    modify = next(c for c in nm.calls if c[:2] == ["con", "modify"])
+    assert "802-11-wireless.mode" in modify and "ap" in modify
+    assert "ipv4.method" in modify and "shared" in modify
+    assert "802-11-wireless.band" in modify and "bg" in modify  # the Zero 2 W is 2.4 GHz only
 
 
-def test_encender_con_la_conexion_ya_creada_solo_la_levanta():
-    nm = NmcliFalso(existente=True)
-    PuntoDeAcceso(nm).encender()
-    assert [l[:2] for l in nm.llamadas] == [["-t", "-f"], ["con", "up"]]
+def test_turning_on_with_the_connection_already_created_only_brings_it_up():
+    nm = FakeNmcli(existing=True)
+    AccessPoint(nm).turn_on()
+    assert [c[:2] for c in nm.calls] == [["-t", "-f"], ["con", "up"]]
 
 
-def test_apagar_baja_la_conexion_y_reconecta_a_la_red_conocida():
-    nm = NmcliFalso(existente=True)
-    ap = PuntoDeAcceso(nm)
-    ap.encender()
-    ap.apagar()
-    assert not ap.encendido
-    assert nm.llamadas[-2] == ["con", "down", NOMBRE_CONEXION]
-    assert nm.llamadas[-1][:3] == ["-w", "25", "device"] and nm.llamadas[-1][-1] == "wlan0"
+def test_turning_off_brings_the_connection_down_and_reconnects_to_the_known_network():
+    nm = FakeNmcli(existing=True)
+    ap = AccessPoint(nm)
+    ap.turn_on()
+    ap.turn_off()
+    assert not ap.on
+    assert nm.calls[-2] == ["con", "down", CONNECTION_NAME]
+    assert nm.calls[-1][:3] == ["-w", "25", "device"] and nm.calls[-1][-1] == "wlan0"
 
 
-def test_conexion_activa_devuelve_la_de_wlan0():
-    assert PuntoDeAcceso(NmcliFalso()).conexion_activa() == "netplan-wlan0-Jack_2.4"
+def test_active_connection_returns_the_one_on_wlan0():
+    assert AccessPoint(FakeNmcli()).active_connection() == "netplan-wlan0-Jack_2.4"
 
 
-def test_un_nmcli_que_falla_lanza_con_el_motivo():
+def test_an_nmcli_that_fails_raises_with_the_reason():
     def nm(args):
-        return subprocess.CompletedProcess(args, 1, stdout="", stderr="Error: wlan0 no existe")
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="Error: wlan0 does not exist")
 
-    with pytest.raises(RuntimeError, match="wlan0 no existe"):
-        PuntoDeAcceso(nm).encender()
+    with pytest.raises(RuntimeError, match="wlan0 does not exist"):
+        AccessPoint(nm).turn_on()

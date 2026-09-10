@@ -1239,6 +1239,61 @@ margen, no como riesgo.
 
 Limpieza: se borraron las filas de sonda (`sonda-claude`, `sonda-limite`, `prueba`) de `eventos`.
 
+## 2026-09-09 (cont. 2) — El código entero pasa a inglés, fronteras incluidas (ADR 0009)
+
+La regla vieja era mixta —identificadores en inglés, comentarios y cadenas en español— y **la
+frontera nunca quedó donde decía**. Había empezado en los identificadores y para hoy estaba en los
+nombres de archivo (`reconocerProducto.ts`, `nucleo.py`), en los métodos (`escribirModo`), en los
+campos (`direccion.puerto`), en los tipos de evento (`lectura.fallo`) y en los flags del daemon
+(`--sin-camara`). No había una línea: había una pendiente, y ya se había deslizado dos veces.
+
+Se decidió y se ejecutó el pase completo (**[ADR 0009](architecture/adr/0009-idioma-del-codigo.md)**),
+con el criterio que sí se puede sostener: **¿lo lee una persona o lo lee una máquina?** Lo que lee
+una persona sigue en español —los *valores* de `i18n/es.ts` (las claves son inglesas), el prompt de
+supermercado porque su respuesta se lee en voz alta, las etiquetas del selector, y **toda la
+documentación**, ADRs y skill incluidos—. Todo el resto, inglés.
+
+**Las fronteras también**, que era la decisión cara y la que se tomó a conciencia:
+
+- **Protocolo BLE**: `{"cmd":"measure"|"photo"|"mode"|"status"|"ap"}`, eventos
+  `{"t":"start"|"end"|"mode"|"ap"|"error"}`, `device_ms` en vez de `ms_placa`; el payload de `status`
+  con `battery`/`camera`/`port`/`network` y las credenciales con `password`.
+- **HTTP de la placa**: `/salud` → `/health`, `/medir/<n>` → `/measure/<n>`, `/fotos/ultima` →
+  `/photos/latest`.
+- **Flags del daemon**: `--sin-camara`/`--sin-ap`/`--sin-boton`/`--nombre`/`--puerto`/`--gpio-boton`
+  → `--no-camera`/`--no-ap`/`--no-button`/`--name`/`--port`/`--button-gpio`.
+- **Supabase**: tabla `eventos` → `events`, columnas `creado_en`/`momento`/`telefono`/`sesion`/
+  `tipo`/`detalle` → `created_at`/`occurred_at`/`phone`/`session`/`type`/`detail`, función
+  `telemetria` → `telemetry`, y el vocabulario de eventos (`app.inicio` → `app.start`, y los otros 24).
+
+Por eso fue **un solo PR y no tres**: las dos puntas del protocolo tienen que moverse juntas, y una
+migración por partes deja ventanas donde la app y la placa hablan distinto. Lo mismo con el esquema.
+
+**La migración renombra, no recrea** (`20260909120000_rename_eventos_to_events.sql`): las filas de
+las primeras sesiones de campo se quedan donde están — son la única evidencia que hay de esas
+salidas, y perderlas por prolijidad habría sido pagar caro. La migración original (`20260907190000`)
+**no se toca**: ya está aplicada, y un log de migraciones se agrega, no se edita. Los `type`
+históricos se traducen en la misma migración: la unión es cerrada y el mapeo es uno a uno, así que
+una consulta no queda arrastrando `type in ('reading.ok','lectura.ok')` para siempre.
+
+Lo que **no** se tocó, a propósito: los 71 commits anteriores (reescribir la historia por cosmética
+no vale la pena) y las entradas viejas de este log, que cuentan lo que pasó cuando pasó — los nombres
+que citan eran los nombres de entonces, y esta entrada es la que los conecta con los de ahora.
+
+Verificación: `npm run lint`, `npm run typecheck` y **205 tests** del lado de la app; **46 tests**
+de la placa (1 skip, el de BlueZ que sólo corre ahí). El linter de la regla de frontera de ADR 0001
+se actualizó para seguir al módulo renombrado — sin eso habría pasado a aprobar en silencio lo que
+existe para prohibir, que es la peor forma de tener un linter.
+
+**Dos cosas que hay que hacer a mano al mergear**, y en este orden:
+
+1. **La base y las funciones antes que el build.** Aplicar la migración, desplegar `telemetry` y
+   `vision`, y recién después dejar salir el build. Una app con el vocabulario nuevo contra la
+   función vieja no guarda nada y contesta `200` — el modo de falla que este contrato siempre tuvo.
+2. **La microSD.** El drop-in de systemd de la placa pasa `--sin-ap`; con el flag renombrado el
+   daemon no arranca ("unrecognized arguments"). Es un `sed` en la unidad, pero hay que acordarse
+   antes de reinstalar el daemon.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1285,6 +1340,8 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
   registro; con el AP siempre encendido la placa no está en la red de casa: para desplegar, apagar el
   AP por BLE desde la Mac con la app cerrada.
+- **Editar el drop-in de systemd de la microSD**: pasa `--sin-ap` y el flag ahora es `--no-ap`
+  (ADR 0009). Hasta que se edite, el daemon no arranca en esa placa.
 - **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.

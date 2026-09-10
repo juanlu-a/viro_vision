@@ -1,10 +1,9 @@
 /**
- * Visión en la nube: el camino del modo supermercado (ADR 0006).
+ * Cloud vision: the supermarket-mode path (ADR 0006).
  *
- * Cinco modelos elegidos por latencia, de cuatro proveedores; cada uno aparece en el selector de
- * Inicio sólo si el build trae su clave, y Gemini es el default por ser el único gratuito sin
- * tarjeta. El camino de ómnibus NO importa nada de acá: corre local (OCR sobre el banner recortado
- * por la TPU) porque la latencia manda. Único punto de import: `@/services/vision`.
+ * Models chosen by measured latency, each showing up in the Home selector only when the build
+ * carries its key. The bus path imports NOTHING from here: it runs locally (OCR over the banner
+ * cropped by the TPU) because latency rules. Single import surface: `@/services/vision`.
  */
 export {
   VisionHttpError,
@@ -14,19 +13,19 @@ export {
   VisionStreamError,
 } from './errors';
 export {
-  DEFAULT_PRODUCTO_MODEL_ID,
-  PRODUCTO_MODEL,
-  PRODUCTO_PROMPTS,
-  buildProductoRequest,
-  parseProductoLeido,
-  productoSchema,
-} from './producto';
-export type { ProductoLeido } from './producto';
-export { reconocerProducto } from './reconocerProducto';
-export type { ReconocimientoProducto } from './reconocerProducto';
+  DEFAULT_PRODUCT_MODEL_ID,
+  PRODUCT_MODEL,
+  PRODUCT_PROMPTS,
+  buildProductRequest,
+  parseProductReading,
+  productSchema,
+} from './product';
+export type { ProductReading } from './product';
+export { recognizeProduct } from './recognizeProduct';
+export type { ProductRecognition } from './recognizeProduct';
 export {
   MODEL_PROFILES,
-  PERFILES_RETIRADOS,
+  RETIRED_PROFILES,
   availableModels,
   defaultModel,
   findModelProfile,
@@ -38,9 +37,9 @@ export {
   isVisionConfigured,
 } from './config';
 export { anthropicProvider, geminiProvider, getProvider, groqProvider, openaiProvider } from './providers';
-export { PRODUCTO_SYSTEM_PROMPT, PRODUCTO_USER_PROMPT } from './providers/prompts';
-export { acquireSlot, limitePorMinuto, remainingSlots, resetRateLimiter } from './rateLimiter';
-export { ESPERA_POR_DEFECTO_S, interpretarErrorHttp } from './httpError';
+export { PRODUCT_SYSTEM_PROMPT, PRODUCT_USER_PROMPT } from './providers/prompts';
+export { acquireSlot, perMinuteLimit, remainingSlots, resetRateLimiter } from './rateLimiter';
+export { DEFAULT_RETRY_WAIT_S, interpretHttpError } from './httpError';
 export { parseJsonRecord } from './schema';
 export type {
   EffortLevel,

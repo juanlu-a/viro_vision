@@ -80,7 +80,7 @@ falta.
 Un módulo que **no debe ser llamado desde cierto camino** lleva un comentario que lo dice, cita el
 ADR y explica la consecuencia. Dos vivos:
 
-- `services/vision/reconocerProducto.ts` — *REGLA DE FRONTERA (ADR 0001 + ADR 0006)*: la nube sólo
+- `services/vision/recognizeProduct.ts` — *REGLA DE FRONTERA (ADR 0001 + ADR 0006)*: la nube sólo
   desde el modo supermercado; nunca desde el camino de ómnibus, que corre local. El linter lo fuerza
   (`eslint.config.js`).
 - `services/supabase/client.ts` — *BOUNDARY RULE (ADR 0001 + 0002)*: la cuenta online no puede estar
@@ -117,10 +117,10 @@ y el detalle quedaba en un campo que nadie miraba.
 - **Y la configuración de entorno también inyectable, por el mismo motivo.** Un test que lee
   `process.env` mide dónde corre, no qué hace el código. La suite se ejecuta en **dos entornos
   distintos**: el CI de PRs corre sin secrets, y los workflows de publicación corren con todos en
-  el `env` del job. Un test de `services/audio/sintesis.ts` que asumía "no hay proxy configurado"
+  el `env` del job. Un test de `services/audio/synthesis.ts` que asumía "no hay proxy configurado"
   pasaba en local —jest no carga `.env`— y **rompió el build de TestFlight** el 2026-09-02. Pasá la
   URL del proxy, la clave y cualquier bandera como parámetro con default, como ya hacen
-  `resolverTransporte` y el limitador de cuota, y cubrí los dos caminos en vez de asumir uno.
+  `resolveTransport` y el limitador de cuota, y cubrí los dos caminos en vez de asumir uno.
 
 ## i18n
 
@@ -130,10 +130,16 @@ solo lugar. Los componentes importan `strings` de `@/i18n`.
 
 ## Idioma
 
-Identificadores en **inglés**; comentarios y cadenas en **español** en todo lo escrito desde
-2026-08-10. Los sustantivos del dominio quedan en español aun en código inglés (`BusReading.numero`,
-`BusReading.nombre`). **Al tocar un archivo, seguí el idioma que ya tiene** — hay archivos de julio
-enteramente en inglés y no se traducen porque sí.
+**Todo el código va en inglés** desde el 2026-09-09 (ADR 0009): identificadores, nombres de archivo,
+comentarios, mensajes de test, ramas y commits. También las fronteras — el protocolo BLE, los
+endpoints HTTP de la placa, los flags del daemon y el esquema de Supabase.
+
+**Lo que sigue en español es lo que una persona lee o escucha**: los *valores* de `src/i18n/es.ts`
+(las claves son inglesas), las etiquetas de los modelos del selector, el prompt del modo supermercado
+—porque su respuesta se lee en voz alta— y **toda la documentación**: `docs/`, los ADRs, esta skill y
+la tesis. Los nombres propios de marca (Azul Profundo, Verde Lectura) tampoco se traducen.
+
+Si encontrás un identificador en español, es un resto: renombralo al tocarlo.
 
 ## Accesibilidad
 
@@ -170,8 +176,9 @@ Trampas ya pisadas, que no hay que repetir:
   reimplementaron enteros la telemetría y el sacar lo técnico de las pantallas sin ver que
   `feat/telemetria-supabase` ya los tenía, con su migración, desde el 07/09. Si el nombre de una
   rama se parece a lo que vas a hacer, mirala (`git log --oneline origin/<rama> -3`) antes.
-- **Conventional Commits con scope**, asunto en español: `fix(vision):`, `feat(marca):`,
-  `docs:`. El cuerpo explica **el razonamiento**, no el diff — se lee dentro de seis meses.
+- **Conventional Commits con scope**, asunto en inglés desde el 2026-09-09 (ADR 0009): `fix(vision):`,
+  `feat(brand):`, `docs:`. El cuerpo explica **el razonamiento**, no el diff — se lee dentro de seis
+  meses. Los 71 commits anteriores están en español y se dejan como están.
 - **Nunca agregues un trailer de co-autoría de IA.** Los commits son del autor humano.
 - **Una rama por cambio, desde un `staging` al día. Sin apilar PRs.** La lección viene de los PRs
   #1–#4. Si hay dos temas, son dos ramas en secuencia: se mergea la primera, se actualiza

@@ -1,18 +1,18 @@
 /**
- * Verificación automática de contraste WCAG de los tokens de color.
+ * Automatic WCAG contrast verification of the colour tokens.
  *
- * Existe porque el manual de marca y la accesibilidad tiran para lados distintos: los hex del
- * manual son perfectos como marca y varios fallan como color de texto (Verde Lectura sobre Gris
- * Niebla da 2.44:1). Sin este test, cualquiera puede "corregir" un token para que coincida con el
- * manual y degradar la app sin enterarse.
+ * It exists because the brand manual and accessibility pull in different directions: the manual's
+ * hex values are perfect as brand and several fail as a text colour (Verde Lectura on Gris Niebla
+ * gives 2.44:1). Without this test, anyone can "fix" a token so it matches the manual and degrade
+ * the app without noticing.
  *
- * Objetivo AAA (7:1) para texto; 4.5:1 para el acento —el piso que fija el propio manual—; 3:1
- * para bordes de control e íconos (WCAG 1.4.11).
+ * Target AAA (7:1) for text; 4.5:1 for the accent —the floor the manual itself sets—; 3:1 for
+ * control borders and icons (WCAG 1.4.11).
  */
 import { Colors } from './theme';
 import type { Theme } from './theme';
 
-/** Luminancia relativa según WCAG 2.1. */
+/** Relative luminance per WCAG 2.1. */
 function luminance(hex: string): number {
   const h = hex.replace('#', '');
   const channels = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
@@ -27,130 +27,132 @@ export function contrastRatio(a: string, b: string): number {
 
 const AAA = 7;
 /**
- * Piso del color de acento. Es **4.5:1 y no AAA**, y lo fija el manual: "el verde es el acento de
- * acción en los dos modos y se aclara a `#2BD69A` en oscuro para mantener 4.5:1". El acento se usa
- * como relleno de botón, no como texto corrido; el texto sigue exigiendo AAA.
+ * The accent colour's floor. It is **4.5:1 and not AAA**, and the manual sets it: "green is the
+ * action accent in both modes and is lightened to `#2BD69A` in dark to keep 4.5:1". The accent is
+ * used as a button fill, not as running text; text still demands AAA.
  */
-const ACENTO = 4.5;
-/** Piso para elementos de interfaz y texto grande (WCAG 1.4.11 / 1.4.3). */
+const ACCENT = 4.5;
+/** Floor for interface elements and large text (WCAG 1.4.11 / 1.4.3). */
 const UI = 3;
 
 const themes: [string, Theme][] = [
-  ['oscuro', Colors.dark],
-  ['claro', Colors.light],
+  ['dark', Colors.dark],
+  ['light', Colors.light],
 ];
 
 describe('contrastRatio', () => {
-  it('da 21:1 entre blanco y negro', () => {
+  it('gives 21:1 between white and black', () => {
     expect(contrastRatio('#FFFFFF', '#000000')).toBeCloseTo(21, 1);
   });
 
-  it('da 1:1 para un color contra sí mismo', () => {
+  it('gives 1:1 for a colour against itself', () => {
     expect(contrastRatio('#1256D4', '#1256D4')).toBeCloseTo(1, 5);
   });
 });
 
-describe.each(themes)('tema %s', (_name, theme) => {
-  it('texto principal alcanza AAA sobre el fondo', () => {
+describe.each(themes)('%s theme', (_name, theme) => {
+  it('primary text reaches AAA on the background', () => {
     expect(contrastRatio(theme.text, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('texto principal alcanza AAA sobre las superficies', () => {
+  it('primary text reaches AAA on the surfaces', () => {
     expect(contrastRatio(theme.text, theme.surface)).toBeGreaterThanOrEqual(AAA);
     expect(contrastRatio(theme.text, theme.surfaceElevated)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('texto secundario alcanza AAA sobre el fondo', () => {
-    // Secundario no significa ilegible: es la etiqueta de cada métrica y de cada estado.
+  it('secondary text reaches AAA on the background', () => {
+    // Secondary does not mean illegible: it is the label of every metric and every state.
     expect(contrastRatio(theme.textSecondary, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('el límite del control primario alcanza 3:1 (WCAG 1.4.11)', () => {
-    // Lo que la norma exige es que el **límite** del control se distinga de lo que tiene al lado,
-    // no que el relleno lo haga. En claro el verde de marca da 2.44:1 contra el fondo y quien
-    // cumple es el borde; en oscuro el relleno ya cumple y el borde es del mismo color.
-    const limite = Math.max(
+  it('the primary control boundary reaches 3:1 (WCAG 1.4.11)', () => {
+    // What the standard demands is that the control's **boundary** stands out from what is beside
+    // it, not that the fill does. In light the brand green gives 2.44:1 against the background and
+    // the one that complies is the border; in dark the fill already complies and the border is the
+    // same colour.
+    const boundary = Math.max(
       contrastRatio(theme.primary, theme.background),
       contrastRatio(theme.primaryEdge, theme.background),
     );
-    expect(limite).toBeGreaterThanOrEqual(UI);
+    expect(boundary).toBeGreaterThanOrEqual(UI);
     expect(contrastRatio(theme.primaryEdge, theme.surface)).toBeGreaterThanOrEqual(UI);
   });
 
-  it('el ícono sobre el relleno primario alcanza 3:1', () => {
-    // Los chips de Inicio son un glifo sobre el verde: es un ícono, así que le aplica 1.4.11.
+  it('the icon on the primary fill reaches 3:1', () => {
+    // Home's chips are a glyph over the green: it is an icon, so 1.4.11 applies to it.
     expect(contrastRatio(theme.onPrimary, theme.primary)).toBeGreaterThanOrEqual(UI);
   });
 
-  it('el texto sobre el relleno primario alcanza el piso del acento', () => {
-    // El error clásico con esta paleta: blanco sobre el verde da 2.64:1. El manual dibuja el botón
-    // con texto Azul Profundo encima justamente por esto.
-    expect(contrastRatio(theme.onPrimary, theme.primary)).toBeGreaterThanOrEqual(ACENTO);
+  it('the text on the primary fill reaches the accent floor', () => {
+    // The classic mistake with this palette: white on the green gives 2.64:1. The manual draws the
+    // button with Azul Profundo text on top precisely because of this.
+    expect(contrastRatio(theme.onPrimary, theme.primary)).toBeGreaterThanOrEqual(ACCENT);
   });
 
-  it('el color de peligro alcanza AAA sobre el fondo', () => {
+  it('the danger colour reaches AAA on the background', () => {
     expect(contrastRatio(theme.danger, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('el color de éxito alcanza AAA sobre el fondo', () => {
+  it('the success colour reaches AAA on the background', () => {
     expect(contrastRatio(theme.success, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('el color de éxito alcanza AAA sobre las superficies', () => {
-    // Es el rótulo "Conectado" dentro de una tarjeta: si sólo se verificara contra el fondo, un
-    // cambio de superficie podría dejarlo por debajo sin que nadie se entere.
-    expect(contrastRatio(theme.success, theme.surface)).toBeGreaterThanOrEqual(ACENTO);
+  it('the success colour reaches AAA on the surfaces', () => {
+    // It is the "Conectado" label inside a card: if it were only checked against the background, a
+    // surface change could drop it below without anyone noticing.
+    expect(contrastRatio(theme.success, theme.surface)).toBeGreaterThanOrEqual(ACCENT);
   });
 
-  it('el borde de controles alcanza 3:1 también sobre la superficie', () => {
+  it('the control border reaches 3:1 on the surface too', () => {
     expect(contrastRatio(theme.borderStrong, theme.surface)).toBeGreaterThanOrEqual(UI);
   });
 
-  it('la pestaña inactiva sigue siendo legible (AAA)', () => {
-    // Una pestaña inactiva sigue siendo un destino de navegación, no decoración.
+  it('the inactive tab is still legible (AAA)', () => {
+    // An inactive tab is still a navigation destination, not decoration.
     expect(contrastRatio(theme.tabInactive, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
-  it('el borde de controles alcanza 3:1 (WCAG 1.4.11)', () => {
-    // `borderStrong` es el borde de un campo o del anillo de foco: identifica el control, así que
-    // sí le aplica el mínimo. `border` a secas es decorativo (tarjetas) y no lo necesita —
-    // separarlos evita tanto sub-cumplir como sobre-aplicar la regla.
+  it('the control border reaches 3:1 (WCAG 1.4.11)', () => {
+    // `borderStrong` is the border of a field or of the focus ring: it identifies the control, so
+    // the minimum does apply to it. Plain `border` is decorative (cards) and does not need it —
+    // separating them avoids both under-complying and over-applying the rule.
     expect(contrastRatio(theme.borderStrong, theme.background)).toBeGreaterThanOrEqual(UI);
   });
 
-  it('el borde decorativo al menos se percibe', () => {
+  it('the decorative border is at least perceptible', () => {
     expect(contrastRatio(theme.border, theme.background)).toBeGreaterThan(1.2);
   });
 
-  it('la superficie se distingue del fondo', () => {
-    // Basta con que sea perceptible: la jerarquía no depende sólo de este contraste.
+  it('the surface is distinguishable from the background', () => {
+    // Being perceptible is enough: the hierarchy does not rest on this contrast alone.
     expect(contrastRatio(theme.surface, theme.background)).toBeGreaterThan(1);
   });
 });
 
-describe('el manual de marca, verificado', () => {
-  // Lo que el manual afirma y la app da por bueno. Si alguno cambiara, hay que revisar los tokens.
-  it('el botón del manual —texto Azul Profundo sobre Verde Lectura— cumple el piso del acento', () => {
-    expect(contrastRatio('#061D3A', '#1FB57A')).toBeGreaterThanOrEqual(ACENTO);
+describe('the brand manual, verified', () => {
+  // What the manual claims and the app takes as given. If any of these changed, the tokens have to
+  // be revisited.
+  it("the manual's button —Azul Profundo text on Verde Lectura— meets the accent floor", () => {
+    expect(contrastRatio('#061D3A', '#1FB57A')).toBeGreaterThanOrEqual(ACCENT);
   });
 
-  it('la variante para oscuro del verde cumple sobre Azul Profundo', () => {
-    expect(contrastRatio('#2BD69A', '#061D3A')).toBeGreaterThanOrEqual(ACENTO);
+  it("the green's dark-mode variant complies on Azul Profundo", () => {
+    expect(contrastRatio('#2BD69A', '#061D3A')).toBeGreaterThanOrEqual(ACCENT);
   });
 });
 
-describe('límites conocidos de la paleta de marca', () => {
-  // No son defectos del manual: un logo no es texto y WCAG no le exige contraste a un símbolo.
-  // Están acá para que nadie use estos hex donde no van.
-  it('Verde Lectura como TEXTO sobre Gris Niebla falla — por eso `success` se oscurece', () => {
+describe('known limits of the brand palette', () => {
+  // These are not defects of the manual: a logo is not text and WCAG demands no contrast of a
+  // symbol. They are here so nobody uses these hex values where they do not belong.
+  it('Verde Lectura as TEXT on Gris Niebla fails — that is why `success` is darkened', () => {
     expect(contrastRatio('#1FB57A', '#F4F6F8')).toBeLessThan(3);
   });
 
-  it('blanco sobre Verde Lectura falla — por eso `onPrimary` es Azul Profundo', () => {
+  it('white on Verde Lectura fails — that is why `onPrimary` is Azul Profundo', () => {
     expect(contrastRatio('#FFFFFF', '#1FB57A')).toBeLessThan(3);
   });
 
-  it('Azul Sensor sobre Azul Profundo falla — por eso el azul no se usa de botón en oscuro', () => {
+  it('Azul Sensor on Azul Profundo fails — that is why blue is not used as a button in dark', () => {
     expect(contrastRatio('#1256D4', '#061D3A')).toBeLessThan(3);
   });
 });

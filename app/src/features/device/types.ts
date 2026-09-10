@@ -10,18 +10,18 @@ export interface DeviceInfo {
   id: string;
   name: string | null;
   /**
-   * Nivel de batería 0–100, o null si el dispositivo todavía no lo reportó. Llega por la
-   * característica `status` del GATT (ver features/device/gatt.ts).
+   * Battery level 0-100, or null when the device has not reported it yet. It arrives through the
+   * GATT `status` characteristic (see features/device/gatt.ts).
    */
   batteryLevel: number | null;
-  /** Versión de firmware informada por el dispositivo, o null. */
+  /** Firmware version reported by the device, or null. */
   firmwareVersion: string | null;
   /**
-   * Dirección HTTP de la placa en la red local (ADR 0003, plan B), o null si la placa no está en
-   * una red o no corre el servidor. Llega por la característica `estado`.
+   * The device's HTTP address on the local network (ADR 0003, plan B), or null when the device is
+   * not on a network or is not running the server. It arrives through the `status` characteristic.
    */
-  direccion: { ip: string; puerto: number } | null;
-  /** True si la placa está siendo punto de acceso en este momento (ADR 0003, plan B). */
+  address: { ip: string; port: number } | null;
+  /** True when the device is acting as an access point right now (ADR 0003, plan B). */
   ap: boolean;
 }
 

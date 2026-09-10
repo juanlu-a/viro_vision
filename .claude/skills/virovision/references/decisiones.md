@@ -149,6 +149,22 @@ Las defensas reales: allowlist de hosts (sin ella es un SSRF que regala la clave
 
 **Estado: escrito, sin desplegar.** Falta crear el proyecto Supabase.
 
+### ADR 0009 — El código en inglés, la app y la tesis en español · **Accepted (2026-09-09)**
+
+Antes la regla era mixta: identificadores en inglés, comentarios y cadenas en español, con los
+sustantivos del dominio en español (`BusReading.numero`). **Qué cambió**: todo el código pasa a
+inglés, y eso incluye las **fronteras** — el protocolo BLE (`{"cmd":"measure"}`, `{"t":"start"}`,
+`device_ms`), los endpoints de la placa (`/health`, `/measure/<n>`, `/photos/latest`), los flags del
+daemon (`--no-ap`) y el esquema de Supabase (tabla `events`, y el vocabulario `reading.ok`,
+`ble.connected`).
+
+**Qué NO cambió**: sigue en español todo lo que una persona lee o escucha — los *valores* de
+`i18n/es.ts` (las claves son inglesas), el prompt de supermercado, las etiquetas del selector y
+**toda la documentación**, ADRs y skill incluidos.
+
+**El criterio para no volver a deslizarse**: *¿lo lee una persona o lo lee una máquina?* La regla
+anterior no era enunciable así, y por eso se corrió dos veces.
+
 ## Decisiones sin ADR, pero vigentes
 
 **Ojo al medir cualquier cosa contra estas APIs: hay que espaciar las corridas.** Sostener pedidos
@@ -177,7 +193,7 @@ salió del selector por eso. El default es Luna y no Groq porque la cuota gratui
 el límite a la cuarta lectura es peor que uno 800 ms más lento. Ver
 `docs/mediciones/2026-09-02-modelos-supermercado.md`.
 
-**Los modelos retirados viven en `PERFILES_RETIRADOS`, no se borran.** Con la medición que los
+**Los modelos retirados viven en `RETIRED_PROFILES`, no se borran.** Con la medición que los
 descartó, y con sus proveedores implementados y testeados: volver a ofrecer uno es mover una entrada
 de lista, no reescribir código.
 

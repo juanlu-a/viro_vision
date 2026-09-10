@@ -82,7 +82,7 @@ Hardware selection is decided (above). **Firmware inicial en `hardware/raspi/`**
 periférico BLE con el perfil GATT, transferencia medible en chunks, captura con picamera2 (1024 px,
 JPEG q70, espejo de la app) y la máquina de modos de ADR 0007. Instalación por SSH con `setup.sh`;
 tests puros con pytest en la Mac. **Alimentación comprada** (2026-09-07): Waveshare UPS HAT (C) con su
-LiPo de 1000 mAh. **Botón físico hecho** (2026-09-07): `boton.py`, GPIO 5 / pin físico 29, con los
+LiPo de 1000 mAh. **Botón físico hecho** (2026-09-07): `button.py`, GPIO 5 / pin físico 29, con los
 gestos de ADR 0007 y los tiempos a calibrar. Faltan: DAC y anuncios pregrabados, leer el INA219 del HAT hacia
 `estado.bateria`, medir el consumo real, pipeline de ómnibus en el Coral, carcasa, y **correr la
 medición** que decide el transporte de la foto (cierra además la comparación de protocolos marcada

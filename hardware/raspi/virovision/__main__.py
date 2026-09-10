@@ -1,7 +1,7 @@
-"""Punto de entrada: `python -m virovision [--sin-camara] [--nombre ViroVision] [-v]`.
+"""Entry point: `python -m virovision [--no-camera] [--name ViroVision] [-v]`.
 
-Arranca BlueZ como periférico (agente sin IO, servicio GATT, anuncio) y se queda corriendo. Lo
-lanza systemd (`virovision.service`); a mano sirve para depurar con `-v`.
+It starts BlueZ as a peripheral (no-IO agent, GATT service, advertisement) and keeps running. systemd
+launches it (`virovision.service`); by hand it is useful for debugging with `-v`.
 """
 
 from __future__ import annotations
@@ -15,160 +15,160 @@ from bluez_peripheral.advert import Advertisement
 from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
-from .ap import IP_AP, PuntoDeAcceso
-from .boton import GPIO_POR_DEFECTO, intentar_conectar
-from .camara import Camara, payload_sintetico
-from .estado import ip_local, leer_estado
-from .http_servidor import PUERTO_POR_DEFECTO, ServidorHttp
-from .gatt import NOMBRE_ANUNCIADO, SERVICE_UUID, ViroVisionService
+from .ap import AP_IP, AccessPoint
+from .button import DEFAULT_GPIO, try_connect
+from .camera import Camera, synthetic_payload
+from .state import local_ip, read_status
+from .http_server import DEFAULT_PORT, HttpServer
+from .gatt import ADVERTISED_NAME, SERVICE_UUID, ViroVisionService
 
 log = logging.getLogger("virovision")
 
-ESTADO_CADA_SEGUNDOS = 15
+STATUS_EVERY_SECONDS = 15
 
 
-def _argumentos() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="virovision", description="Daemon BLE de la placa ViroVision")
-    parser.add_argument("--sin-camara", action="store_true", help="no intentar abrir la cámara (sólo medir)")
-    parser.add_argument("--nombre", default=NOMBRE_ANUNCIADO, help="nombre BLE anunciado")
-    parser.add_argument("--hci", default="hci0", help="adaptador Bluetooth (default hci0)")
-    parser.add_argument("--puerto", type=int, default=PUERTO_POR_DEFECTO, help="puerto del servidor HTTP (plan B)")
-    parser.add_argument("--sin-http", action="store_true", help="no levantar el servidor HTTP")
-    parser.add_argument("--sin-ap", action="store_true", help="no levantar el punto de acceso al arrancar (desarrollo en la red de la casa)")
-    parser.add_argument("--sin-boton", action="store_true", help="no usar el botón físico (los modos entran sólo por BLE)")
-    parser.add_argument("--gpio-boton", type=int, default=GPIO_POR_DEFECTO, help=f"GPIO del botón de modo (default {GPIO_POR_DEFECTO} = pin físico 29)")
+def _arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog="virovision", description="ViroVision device BLE daemon")
+    parser.add_argument("--no-camera", action="store_true", help="do not try to open the camera (measure only)")
+    parser.add_argument("--name", default=ADVERTISED_NAME, help="advertised BLE name")
+    parser.add_argument("--hci", default="hci0", help="Bluetooth adapter (default hci0)")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="HTTP server port (plan B)")
+    parser.add_argument("--no-http", action="store_true", help="do not bring the HTTP server up")
+    parser.add_argument("--no-ap", action="store_true", help="do not bring the access point up at startup (development on the home network)")
+    parser.add_argument("--no-button", action="store_true", help="do not use the physical button (modes come in over BLE only)")
+    parser.add_argument("--button-gpio", type=int, default=DEFAULT_GPIO, help=f"GPIO of the mode button (default {DEFAULT_GPIO} = physical pin 29)")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args()
 
 
-async def _obtener_adaptador(bus, hci: str) -> Adapter:
-    """`Adapter.get_first` de bluez-peripheral 0.1.7 recorre todos los hijos de /org/bluez y asume
-    que cada uno es un adaptador; BlueZ 5.82 (Trixie) expone además `/org/bluez/test`, sin
-    `Adapter1`, y la librería explota con InterfaceNotFoundError. Se construye el adaptador a mano
-    desde su ruta."""
-    ruta = f"/org/bluez/{hci}"
-    introspeccion = await bus.introspect("org.bluez", ruta)
-    return Adapter(bus.get_proxy_object("org.bluez", ruta, introspeccion))
+async def _get_adapter(bus, hci: str) -> Adapter:
+    """`Adapter.get_first` in bluez-peripheral 0.1.7 walks every child of /org/bluez and assumes each
+    one is an adapter; BlueZ 5.82 (Trixie) also exposes `/org/bluez/test`, without `Adapter1`, and the
+    library blows up with InterfaceNotFoundError. The adapter is built by hand from its path."""
+    path = f"/org/bluez/{hci}"
+    introspection = await bus.introspect("org.bluez", path)
+    return Adapter(bus.get_proxy_object("org.bluez", path, introspection))
 
 
 async def _main(args: argparse.Namespace) -> None:
     loop = asyncio.get_running_loop()
 
-    camara = Camara()
-    hay_camara = False if args.sin_camara else camara.iniciar()
-    capturar = (lambda: loop.run_in_executor(None, camara.capturar_jpeg)) if hay_camara else None
+    camera = Camera()
+    has_camera = False if args.no_camera else camera.start()
+    capture = (lambda: loop.run_in_executor(None, camera.capture_jpeg)) if has_camera else None
 
-    # El servidor HTTP (plan B del ADR 0003) corre en su hilo; su puerto viaja por `estado` para que
-    # la app sepa de dónde bajar la foto. La captura es la misma función bloqueante que usa el BLE.
-    ap = PuntoDeAcceso()
+    # The HTTP server (ADR 0003's plan B) runs on its own thread; its port travels through `status` so
+    # the app knows where to download the photo from. The capture is the same blocking function BLE
+    # uses.
+    ap = AccessPoint()
 
-    def control_ap(encender: bool) -> None:
-        ap.encender() if encender else ap.apagar()
+    def ap_control(on: bool) -> None:
+        ap.turn_on() if on else ap.turn_off()
 
     http = None
-    if not args.sin_http:
-        http = ServidorHttp(
-            # `camara.disponible` y no `hay_camara`: si una captura se cuelga la cámara se reinicia, y
-            # si no vuelve, el estado tiene que decirlo.
-            leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto, ap=ap.encendido, red=ap.conexion_activa()),
-            payload_sintetico=payload_sintetico,
-            capturar=camara.capturar_jpeg if hay_camara else None,
-            puerto=args.puerto,
+    if not args.no_http:
+        http = HttpServer(
+            # `camera.available` and not `has_camera`: if a capture hangs the camera restarts, and if
+            # it does not come back, the status has to say so.
+            read_status=lambda: read_status(camera=camera.available, http_port=args.port, ap=ap.on, network=ap.active_connection()),
+            synthetic_payload=synthetic_payload,
+            capture=camera.capture_jpeg if has_camera else None,
+            port=args.port,
         )
-        http.iniciar()
+        http.start()
 
     bus = await get_message_bus()
     if not await is_bluez_available(bus):
-        raise SystemExit("BlueZ no está disponible en D-Bus: ¿está corriendo bluetooth.service?")
+        raise SystemExit("BlueZ is not available on D-Bus: is bluetooth.service running?")
 
-    adaptador = await _obtener_adaptador(bus, args.hci)
+    adapter = await _get_adapter(bus, args.hci)
 
-    servicio = ViroVisionService(
+    service = ViroVisionService(
         loop=loop,
-        leer_estado=lambda: leer_estado(camara=camara.disponible, puerto_http=args.puerto if http else None, ap=ap.encendido, red=ap.conexion_activa()),
-        capturar=capturar,
-        payload_sintetico=payload_sintetico,
-        control_ap=control_ap,
-        leer_wifi=lambda: {**ap.credenciales(), "puerto": args.puerto if http else None},
+        read_status=lambda: read_status(camera=camera.available, http_port=args.port if http else None, ap=ap.on, network=ap.active_connection()),
+        capture=capture,
+        synthetic_payload=synthetic_payload,
+        ap_control=ap_control,
+        read_wifi=lambda: {**ap.credentials(), "port": args.port if http else None},
     )
-    await servicio.register(bus, adapter=adaptador)
+    await service.register(bus, adapter=adapter)
 
-    # El botón físico (ADR 0007) va contra el mismo núcleo que el BLE: es un gesto del usuario, no
-    # un transporte. Si no hay botón (o gpiozero, o permisos sobre el pin) el daemon arranca igual y
-    # los modos siguen entrando por la app; una placa sin daemon sería mucho peor.
-    boton = None if args.sin_boton else intentar_conectar(
+    # The physical button (ADR 0007) goes against the same core as BLE: it is a user gesture, not a
+    # transport. If there is no button (or no gpiozero, or no permissions on the pin) the daemon starts
+    # all the same and modes keep coming in from the app; a board without a daemon would be far worse.
+    button = None if args.no_button else try_connect(
         loop,
-        al_hacer_clicks=servicio.nucleo.desde_boton,
-        al_mantener=servicio.nucleo.boton_largo,
-        gpio=args.gpio_boton,
+        on_clicks=service.core.from_button,
+        on_hold=service.core.button_long_press,
+        gpio=args.button_gpio,
     )
 
-    # Sin agente, BlueZ rechaza cualquier intento de emparejar. NoIo = "just works", sin PIN: el
-    # usuario no puede leer un PIN en la placa, y ADR 0003 no cifra el payload a propósito.
-    agente = NoIoAgent()
-    await agente.register(bus)
+    # Without an agent, BlueZ rejects any pairing attempt. NoIo = "just works", no PIN: the user cannot
+    # read a PIN on the device, and ADR 0003 deliberately does not encrypt the payload.
+    agent = NoIoAgent()
+    await agent.register(bus)
 
-    await adaptador.set_powered(True)
-    await adaptador.set_alias(args.nombre)
+    await adapter.set_powered(True)
+    await adapter.set_alias(args.name)
 
-    # AP siempre encendido mientras la placa esté prendida (ADR 0003, actualización 2026-09-07): el
-    # teléfono se une al conectarse por BLE y la foto está disponible en el instante en que se activa
-    # un modo. Sin tope de tiempo: el usuario no configura nada y no puede "reactivarlo". Cuesta
-    # batería; se mide. `--sin-ap` para desarrollar con la placa en la red de la casa (con el AP
-    # arriba la placa deja cualquier otra red y se pierde el SSH).
-    if not args.sin_ap:
-        # Al arrancar, NetworkManager puede no estar listo todavía (el 2026-09-07 la placa quedó
-        # «sin red» tras el primer arranque con AP): se reintenta con espera creciente y se verifica
-        # que la interfaz tenga la IP del AP, no sólo que nmcli haya vuelto.
-        for intento, espera in enumerate((0, 5, 10, 20, 30), start=1):
-            if espera:
-                await asyncio.sleep(espera)
+    # The AP stays on while the device is powered (ADR 0003, 2026-09-07 update): the phone joins when
+    # it connects over BLE and the photo is available the instant a mode is activated. With no time
+    # cap: the user configures nothing and cannot "reactivate" it. It costs battery; that is measured.
+    # `--no-ap` is for developing with the device on the home network (with the AP up the device leaves
+    # any other network and SSH is lost).
+    if not args.no_ap:
+        # At startup NetworkManager may not be ready yet (on 2026-09-07 the device was left "with no
+        # network" after the first boot with the AP): it is retried with growing backoff and it is
+        # verified that the interface has the AP's IP, not just that nmcli returned.
+        for attempt, wait in enumerate((0, 5, 10, 20, 30), start=1):
+            if wait:
+                await asyncio.sleep(wait)
             try:
-                await loop.run_in_executor(None, ap.encender)
-                if ip_local() == IP_AP:
+                await loop.run_in_executor(None, ap.turn_on)
+                if local_ip() == AP_IP:
                     break
-                log.warning("AP levantado pero wlan0 no tiene %s (intento %d)", IP_AP, intento)
+                log.warning("AP up but wlan0 does not have %s (attempt %d)", AP_IP, attempt)
             except Exception as exc:  # noqa: BLE001
-                log.error("no pude levantar el AP (intento %d): %s", intento, exc)
+                log.error("could not bring the AP up (attempt %d): %s", attempt, exc)
         else:
-            log.error("el AP no quedó operativo tras varios intentos; sigo sin él (la app cae a la cámara del teléfono)")
+            log.error("the AP did not end up operational after several attempts; carrying on without it")
 
-    # timeout 0 = anunciar hasta que el proceso muera; el dispositivo tiene que ser encontrable
-    # siempre, porque la app reconecta sola cuando vuelve al alcance.
-    anuncio = Advertisement(args.nombre, [SERVICE_UUID], 0x0000, 0)
-    await anuncio.register(bus, adaptador)
-    log.info("anunciando «%s» con servicio %s (cámara: %s)", args.nombre, SERVICE_UUID, "sí" if hay_camara else "no")
+    # timeout 0 = advertise until the process dies; the device has to be discoverable always, because
+    # the app reconnects on its own when it comes back into range.
+    advert = Advertisement(args.name, [SERVICE_UUID], 0x0000, 0)
+    await advert.register(bus, adapter)
+    log.info("advertising \"%s\" with service %s (camera: %s)", args.name, SERVICE_UUID, "yes" if has_camera else "no")
 
-    parar = asyncio.Event()
-    for senal in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(senal, parar.set)
+    stop = asyncio.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop.set)
 
-    sin_red_desde = None
-    while not parar.is_set():
+    no_network_since = None
+    while not stop.is_set():
         try:
-            await asyncio.wait_for(parar.wait(), ESTADO_CADA_SEGUNDOS)
+            await asyncio.wait_for(stop.wait(), STATUS_EVERY_SECONDS)
         except asyncio.TimeoutError:
-            servicio.notificar_estado()
-            # Vigilante de red: si no es AP y lleva más de un minuto sin red, pedirle a NM que
-            # conecte. Una placa sin ninguna red no sirve para nada y no se puede arreglar a distancia.
-            if not ap.encendido and ap.conexion_activa() is None:
-                sin_red_desde = sin_red_desde or loop.time()
-                if loop.time() - sin_red_desde > 60:
-                    log.warning("sin red desde hace %d s: reconectando", int(loop.time() - sin_red_desde))
-                    await loop.run_in_executor(None, ap.reconectar)
-                    sin_red_desde = None
+            service.notify_status()
+            # Network watchdog: if it is not an AP and it has gone more than a minute with no network,
+            # ask NM to connect. A device on no network at all is useless and cannot be fixed remotely.
+            if not ap.on and ap.active_connection() is None:
+                no_network_since = no_network_since or loop.time()
+                if loop.time() - no_network_since > 60:
+                    log.warning("no network for %d s: reconnecting", int(loop.time() - no_network_since))
+                    await loop.run_in_executor(None, ap.reconnect)
+                    no_network_since = None
             else:
-                sin_red_desde = None
-    log.info("apagando")
-    if boton:
-        boton.cerrar()
+                no_network_since = None
+    log.info("shutting down")
+    if button:
+        button.close()
     if http:
-        http.parar()
+        http.stop()
     bus.disconnect()
 
 
 def main() -> None:
-    args = _argumentos()
+    args = _arguments()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",

@@ -8,7 +8,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { announce } from '@/features/audio/announcer';
 import { ModelSelector } from '@/features/reader/ModelSelector';
-import { useModeloSupermercado } from '@/features/reader/ModeloSupermercadoProvider';
+import { useProductModel } from '@/features/reader/ProductModelProvider';
 import { ThemeSelector } from '@/features/theme/ThemeSelector';
 import { strings } from '@/i18n';
 import { useTheme } from '@/hooks/use-theme';
@@ -29,8 +29,8 @@ function FeatureRow({
       accessible
       accessibilityRole="text"
       accessibilityLabel={`${title}. ${desc}`}>
-      {/* Relleno verde con el glifo oscuro encima, no al revés: el verde de marca sobre su
-          propio tinte claro da 2.24:1 y un ícono necesita 3:1 (WCAG 1.4.11). */}
+      {/* Green fill with the dark glyph on top, not the other way round: the brand green over its
+          own light tint gives 2.24:1 and an icon needs 3:1 (WCAG 1.4.11). */}
       <View className="h-[44px] w-[44px] items-center justify-center rounded-md bg-primary">
         <Ionicons name={icon} size={24} color={theme.onPrimary} />
       </View>
@@ -48,7 +48,7 @@ function FeatureRow({
 
 export default function SettingsScreen() {
   const t = strings.settings;
-  const { modelo, modelos, elegir } = useModeloSupermercado();
+  const { model, models, choose } = useProductModel();
 
   return (
     <Screen scroll>
@@ -61,12 +61,12 @@ export default function SettingsScreen() {
         <ThemeSelector />
       </Card>
 
-      {/* Sin rótulo alrededor a pedido: el disparador ya se anuncia como "Modelo seleccionado: X"
-          y el menú como "Seleccionar modelo". Sin ninguna clave en el build no hay nada que elegir
-          y se dice, porque un control ausente no comunica estado. */}
+      {/* No surrounding label, by request: the trigger already announces itself as "Modelo
+          seleccionado: X" and the menu as "Seleccionar modelo". With no key in the build there is
+          nothing to choose and it says so, because an absent control communicates no state. */}
       <Card>
-        {modelo ? (
-          <ModelSelector value={modelo} options={modelos} onChange={elegir} />
+        {model ? (
+          <ModelSelector value={model} options={models} onChange={choose} />
         ) : (
           <ThemedText type="small" themeColor="textSecondary">
             {strings.reader.cloudNotConfigured}

@@ -1,46 +1,47 @@
 /**
- * Cliente BLE del dispositivo ViroVision (canal de datos y control).
+ * BLE client of the ViroVision device (data and control channel).
  *
- * Patrón "interfaz + stub + selector" (ver convenciones): `getBleClient()` devuelve el cliente real
- * sobre `react-native-ble-plx` cuando el módulo nativo existe (development build / TestFlight), y
- * un stub que falla con un error tipado donde no existe (Expo Go, web, jest). Degrada a un estado
- * rotulado, nunca rompe ni finge.
+ * "Interface + stub + selector" pattern (see the conventions): `getBleClient()` returns the real
+ * client over `react-native-ble-plx` when the native module exists (development build / TestFlight),
+ * and a stub that fails with a typed error where it does not (Expo Go, web, jest). It degrades to a
+ * labelled state, it never breaks and never pretends.
  *
- * El perfil GATT vive en `features/device/gatt.ts`, espejo de `hardware/raspi/virovision/gatt.py`.
+ * The GATT profile lives in `features/device/gatt.ts`, a mirror of
+ * `hardware/raspi/virovision/gatt.py`.
  */
-import type { CredencialesWifi, EstadoDispositivo } from '@/features/device/gatt';
+import type { DeviceStatus, WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 
-import { crearBleClientPlx } from './bleClientPlx';
+import { createBleClientPlx } from './bleClientPlx';
 
 export interface BleClient {
-  /** Busca el dispositivo por el UUID del servicio y se conecta. Resuelve con sus datos. */
+  /** Looks for the device by service UUID and connects. Resolves with its data. */
   connect(): Promise<DeviceInfo>;
   disconnect(): Promise<void>;
-  /** Resultados de reconocimiento que manda la placa. Devuelve la función para desuscribirse. */
+  /** Recognition results sent by the device. Returns the unsubscribe function. */
   onRecognition(listener: (event: RecognitionEvent) => void): () => void;
   /**
-   * Avisa cuando el enlace se cae por fuera de `disconnect()` (la placa se reinició, se alejó, iOS
-   * cortó). Sin esto la pantalla siguió diciendo «Conectado» con el enlace muerto el 2026-09-05, y
-   * cada comando fallaba sin explicación.
+   * Reports when the link drops outside `disconnect()` (the device rebooted, went out of range, iOS
+   * cut it). Without this the screen kept saying "Connected" with the link dead on 2026-09-05, and
+   * every command failed without explanation.
    */
   onDisconnect(listener: () => void): () => void;
-  /** Cada notificación de `estado` (cada ~15 s, y al cambiar el AP). */
-  onEstado(listener: (estado: EstadoDispositivo) => void): () => void;
-  /** Cambios de modo que informa la placa (botón físico, o eco de `escribirModo`). 0/1/2 (ADR 0007). */
-  onModo(listener: (modo: number) => void): () => void;
-  /** La placa encendió o apagó su punto de acceso: su dirección de red está por cambiar. */
-  onAp(listener: (encendido: boolean) => void): () => void;
-  /** Avisos de error que manda la placa (`{t:'error', msg}`), para mostrarlos y decirlos. */
-  onErrorDispositivo(listener: (mensaje: string) => void): () => void;
-  /** Fija el modo en la placa (0 esperando, 1 ómnibus, 2 supermercado). Ella enciende o apaga su AP. */
-  escribirModo(modo: number): Promise<void>;
-  /** Credenciales del AP de la placa, o null si no tiene. */
-  leerWifi(): Promise<CredencialesWifi | null>;
+  /** Every `status` notification (roughly every 15 s, and whenever the AP changes). */
+  onStatus(listener: (status: DeviceStatus) => void): () => void;
+  /** Mode changes reported by the device (physical button, or an echo of `writeMode`). 0/1/2 (ADR 0007). */
+  onMode(listener: (mode: number) => void): () => void;
+  /** The device turned its access point on or off: its network address is about to change. */
+  onAp(listener: (on: boolean) => void): () => void;
+  /** Error notices sent by the device (`{t:'error', msg}`), to show and to speak. */
+  onDeviceError(listener: (message: string) => void): () => void;
+  /** Sets the mode on the device (0 idle, 1 bus, 2 supermarket). It turns its AP on or off. */
+  writeMode(mode: number): Promise<void>;
+  /** Credentials of the device's AP, or null when it has none. */
+  readWifi(): Promise<WifiCredentials | null>;
 }
 
-/** El build no tiene el módulo nativo de BLE (Expo Go, web). */
+/** The build lacks the native BLE module (Expo Go, web). */
 export class BleNotImplementedError extends Error {
   constructor() {
     super('BLE_NOT_IMPLEMENTED');
@@ -48,7 +49,7 @@ export class BleNotImplementedError extends Error {
   }
 }
 
-/** El escaneo venció sin ver el dispositivo. */
+/** The scan expired without seeing the device. */
 export class BleDeviceNotFoundError extends Error {
   constructor() {
     super('BLE_DEVICE_NOT_FOUND');
@@ -56,7 +57,7 @@ export class BleDeviceNotFoundError extends Error {
   }
 }
 
-/** Se pidió algo que necesita conexión y no la hay. */
+/** Something requiring a connection was asked for and there is none. */
 export class BleNotConnectedError extends Error {
   constructor() {
     super('BLE_NOT_CONNECTED');
@@ -65,19 +66,19 @@ export class BleNotConnectedError extends Error {
 }
 
 /**
- * Dispositivo simulado para poder ver y demostrar la pantalla de dispositivo conectado sin
- * hardware. Va detrás de una variable de entorno propia y no de `__DEV__` a propósito: así se puede
- * activar en un build de release para una demo, y es imposible que se cuele en un build normal. La
- * UI lo rotula como simulado; esto NO finge que el BLE funciona.
+ * A simulated device, so the connected-device screen can be seen and demoed without hardware. It
+ * sits behind an environment variable of its own and not behind `__DEV__` on purpose: that way it
+ * can be switched on in a release build for a demo, and it is impossible for it to slip into a
+ * normal build. The UI labels it as simulated; this does NOT pretend BLE works.
  */
 const SIMULATE_DEVICE = process.env.EXPO_PUBLIC_SIMULATE_DEVICE === '1';
 
 const simulatedDevice: DeviceInfo = {
-  id: 'simulado-0001',
+  id: 'simulated-0001',
   name: 'ViroVision (simulado)',
   batteryLevel: 76,
   firmwareVersion: '0.1.0-dev',
-  direccion: null,
+  address: null,
   ap: false,
 };
 
@@ -87,7 +88,7 @@ const stubClient: BleClient = {
     throw new BleNotImplementedError();
   },
   async disconnect() {
-    /* nada conectado */
+    /* nothing connected */
   },
   onRecognition() {
     return () => {};
@@ -95,34 +96,34 @@ const stubClient: BleClient = {
   onDisconnect() {
     return () => {};
   },
-  onEstado() {
+  onStatus() {
     return () => {};
   },
-  onModo() {
+  onMode() {
     return () => {};
   },
   onAp() {
     return () => {};
   },
-  onErrorDispositivo() {
+  onDeviceError() {
     return () => {};
   },
-  async escribirModo() {
+  async writeMode() {
     if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
   },
-  async leerWifi() {
+  async readWifi() {
     return null;
   },
 };
 
-let cliente: BleClient | null = null;
+let client: BleClient | null = null;
 
 /**
- * El cliente real se construye una sola vez y a demanda: `BleManager` abre el módulo nativo al
- * instanciarse y lanza donde no existe. Ese lanzamiento es la señal para caer al stub.
+ * The real client is built once and on demand: `BleManager` opens the native module on instantiation
+ * and throws where it does not exist. That throw is the signal to fall back to the stub.
  */
 export function getBleClient(): BleClient {
-  if (cliente) return cliente;
-  cliente = SIMULATE_DEVICE ? stubClient : (crearBleClientPlx() ?? stubClient);
-  return cliente;
+  if (client) return client;
+  client = SIMULATE_DEVICE ? stubClient : (createBleClientPlx() ?? stubClient);
+  return client;
 }

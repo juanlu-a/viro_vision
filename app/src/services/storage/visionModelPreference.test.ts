@@ -1,7 +1,8 @@
 /**
- * Existe porque el storage puede fallar o traer basura (versión vieja, clave corrupta) y el modo
- * supermercado no puede romperse por eso: ante cualquier problema se devuelve null y el resolver
- * cae al default. Primer test de la base que toca AsyncStorage: usa el mock oficial del paquete.
+ * Exists because storage can fail or bring back garbage (an old version, a corrupt key) and
+ * supermarket mode cannot break over it: on any problem null is returned and the resolver falls back
+ * to the default. The first test in this codebase to touch AsyncStorage: it uses the package's
+ * official mock.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -13,14 +14,14 @@ import {
 } from './visionModelPreference';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- la factory de jest.mock corre antes que los imports; require es la forma documentada del mock oficial.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock's factory runs before the imports; require is the documented form of the official mock.
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
 beforeEach(() => AsyncStorage.clear());
 
 describe('isVisionModelId', () => {
-  it('acepta un id no vacío y rechaza lo demás', () => {
+  it('accepts a non-empty id and rejects the rest', () => {
     expect(isVisionModelId('gemini-3.6-flash')).toBe(true);
     expect(isVisionModelId('')).toBe(false);
     expect(isVisionModelId(null)).toBe(false);
@@ -29,22 +30,22 @@ describe('isVisionModelId', () => {
 });
 
 describe('load/saveVisionModelPreference', () => {
-  it('devuelve null con el storage vacío', async () => {
+  it('returns null with empty storage', async () => {
     expect(await loadVisionModelPreference()).toBeNull();
   });
 
-  it('devuelve lo guardado', async () => {
+  it('returns what was stored', async () => {
     await saveVisionModelPreference('claude-haiku-4-5');
     expect(await loadVisionModelPreference()).toBe('claude-haiku-4-5');
   });
 
-  it('devuelve null si el storage tira, en vez de romper', async () => {
-    jest.spyOn(AsyncStorage, 'getItem').mockRejectedValueOnce(new Error('disco lleno'));
+  it('returns null when storage throws, instead of breaking', async () => {
+    jest.spyOn(AsyncStorage, 'getItem').mockRejectedValueOnce(new Error('disk full'));
     expect(await loadVisionModelPreference()).toBeNull();
   });
 
-  it('un fallo de escritura no tira', async () => {
-    jest.spyOn(AsyncStorage, 'setItem').mockRejectedValueOnce(new Error('disco lleno'));
+  it('a write failure does not throw', async () => {
+    jest.spyOn(AsyncStorage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
     await expect(saveVisionModelPreference('x')).resolves.toBeUndefined();
     expect(VISION_MODEL_PREFERENCE_KEY).toBe('virovision.visionModel');
   });

@@ -1,26 +1,27 @@
-import { MODEL_PROFILES, PERFILES_RETIRADOS, findModelProfile } from '../config';
-import { DEFAULT_PRODUCTO_MODEL_ID, PRODUCTO_PROMPTS, productoSchema } from '../producto';
+import { MODEL_PROFILES, RETIRED_PROFILES, findModelProfile } from '../config';
+import { DEFAULT_PRODUCT_MODEL_ID, PRODUCT_PROMPTS, productSchema } from '../product';
 import type { BuildRequestInput, ModelProfile } from '../types';
 import { anthropicProvider, geminiProvider, getProvider, groqProvider, openaiProvider } from './index';
 
 /**
- * Gemini y Anthropic salieron del selector el 2026-09-02, pero sus módulos de proveedor siguen en
- * el binario y hay que seguir testeándolos: el día que uno vuelva, vuelve por su perfil, no por
- * código nuevo. Los perfiles se toman de `PERFILES_RETIRADOS` y no de `findModelProfile`, que a
- * propósito NO busca ahí — un id retirado tiene que caer al default.
+ * Gemini and Anthropic left the selector on 2026-09-02, but their provider modules are still in the
+ * binary and have to keep being tested: the day one comes back, it comes back through its profile,
+ * not through new code. The profiles are taken from `RETIRED_PROFILES` and not from
+ * `findModelProfile`, which deliberately does NOT look there — a retired id has to fall back to the
+ * default.
  */
-const retirado = (id: string) => PERFILES_RETIRADOS.find((p) => p.id === id)!;
-const gemini = retirado('gemini-3.5-flash-lite');
-const haiku = retirado('claude-haiku-4-5');
+const retired = (id: string) => RETIRED_PROFILES.find((p) => p.id === id)!;
+const gemini = retired('gemini-3.5-flash-lite');
+const haiku = retired('claude-haiku-4-5');
 /**
- * Perfil sintético, no del registro: `claude-opus-5` salió del selector el 2026-09-01 (ADR 0006),
- * pero las dos ramas de capacidad del proveedor —mandar `effort` y mandar `thinking`— siguen
- * existiendo en el código y hay que cubrirlas. Atarlas a un modelo concreto del registro las hacía
- * romperse cada vez que cambia la lista, que es una razón ajena a lo que el test verifica.
+ * A synthetic profile, not one from the registry: `claude-opus-5` left the selector on 2026-09-01
+ * (ADR 0006), but the provider's two capability branches —sending `effort` and sending `thinking`—
+ * still exist in the code and have to be covered. Tying them to a concrete registry model made them
+ * break every time the list changes, which is a reason unrelated to what the test verifies.
  */
-const conThinking: ModelProfile = {
-  ...retirado('claude-haiku-4-5'),
-  id: 'modelo-con-thinking',
+const withThinking: ModelProfile = {
+  ...retired('claude-haiku-4-5'),
+  id: 'model-with-thinking',
   supportsEffort: true,
   supportsAdaptiveThinking: true,
 };
@@ -28,55 +29,55 @@ const conThinking: ModelProfile = {
 function inputFor(model: ModelProfile, overrides: Partial<BuildRequestInput> = {}) {
   return {
     model,
-    apiKey: 'clave-de-prueba',
+    apiKey: 'test-key',
     maxTokens: model.maxTokens,
     thinking: 'off' as const,
     effort: 'low' as const,
     imageBase64: 'QUJD',
     mediaType: 'image/jpeg' as const,
-    prompts: PRODUCTO_PROMPTS,
-    schema: productoSchema,
+    prompts: PRODUCT_PROMPTS,
+    schema: productSchema,
     ...overrides,
   };
 }
 
 describe('geminiProvider.buildRequest', () => {
-  it('pasa la clave por el header x-goog-api-key, no por query string', () => {
+  it('passes the key in the x-goog-api-key header, not in the query string', () => {
     const request = geminiProvider.buildRequest(inputFor(gemini));
 
-    expect(request.headers['x-goog-api-key']).toBe('clave-de-prueba');
-    expect(request.url).not.toContain('clave-de-prueba');
+    expect(request.headers['x-goog-api-key']).toBe('test-key');
+    expect(request.url).not.toContain('test-key');
   });
 
-  it('pide streaming — sin él no existe el time to first token', () => {
+  it('asks for streaming — without it there is no time to first token', () => {
     expect(geminiProvider.buildRequest(inputFor(gemini)).body.stream).toBe(true);
   });
 
-  it('pide JSON con el schema y los prompts que recibe, no con uno propio', () => {
+  it('asks for JSON with the schema and prompts it receives, not with its own', () => {
     const body = geminiProvider.buildRequest(inputFor(gemini)).body as {
       response_format: { mime_type: string; schema: unknown };
       input: { type: string; text?: string }[];
     };
 
     expect(body.response_format.mime_type).toBe('application/json');
-    expect(body.response_format.schema).toBe(productoSchema);
+    expect(body.response_format.schema).toBe(productSchema);
     expect(body.input.filter((b) => b.type === 'text').map((b) => b.text)).toEqual([
-      PRODUCTO_PROMPTS.system,
-      PRODUCTO_PROMPTS.user,
+      PRODUCT_PROMPTS.system,
+      PRODUCT_PROMPTS.user,
     ]);
   });
 
-  it('apaga el pensamiento: sin thinking_level la lectura pasa de 2-3 s a decenas de segundos', () => {
+  it('turns thinking off: without thinking_level the reading goes from 2-3 s to tens of seconds', () => {
     const { generation_config: gc } = geminiProvider.buildRequest(inputFor(gemini)).body as {
       generation_config: { thinking_level: string; max_output_tokens: number };
     };
 
-    // 'minimal' es el piso que aceptan los Flash Lite; los Flash grandes lo rechazan con 400.
+    // 'minimal' is the floor the Flash Lite models accept; the large Flash ones reject it with 400.
     expect(gc.thinking_level).toBe('minimal');
     expect(gc.max_output_tokens).toBe(gemini.maxTokens);
   });
 
-  it('con thinking adaptativo manda el effort como nivel, no un valor inventado', () => {
+  it('with adaptive thinking it sends the effort as the level, not an invented value', () => {
     const { generation_config: gc } = geminiProvider.buildRequest(
       inputFor(gemini, { thinking: 'adaptive', effort: 'medium' }),
     ).body as { generation_config: { thinking_level: string } };
@@ -84,7 +85,7 @@ describe('geminiProvider.buildRequest', () => {
     expect(gc.thinking_level).toBe('medium');
   });
 
-  it('manda la imagen con su mime type', () => {
+  it('sends the image with its mime type', () => {
     const { input } = geminiProvider.buildRequest(inputFor(gemini, { mediaType: 'image/png' }))
       .body as { input: { type: string; mime_type?: string; data?: string }[] };
     const image = input.find((block) => block.type === 'image');
@@ -95,9 +96,9 @@ describe('geminiProvider.buildRequest', () => {
 });
 
 /**
- * Payloads capturados de una corrida real contra la API (agosto 2026). No están inventados a
- * partir de los docs a propósito: los docs no muestran que el discriminador sea `event_type`,
- * y leerlo mal descarta todos los eventos en silencio.
+ * Payloads captured from a real run against the API (August 2026). They are deliberately not made
+ * up from the docs: the docs do not show that the discriminator is `event_type`, and reading it
+ * wrong drops every event silently.
  */
 const REAL_GEMINI_EVENTS = {
   created: { interaction: { status: 'in_progress' }, event_type: 'interaction.created' },
@@ -112,49 +113,49 @@ const REAL_GEMINI_EVENTS = {
   outputStart: { index: 1, step: { type: 'model_output' }, event_type: 'step.start' },
   textDelta: {
     index: 1,
-    delta: { text: '{\n  "numero": null,\n  "nombre": null\n}', type: 'text' },
+    delta: { text: '{\n  "kind": null,\n  "brand": null\n}', type: 'text' },
     event_type: 'step.delta',
   },
   completed: { event_type: 'interaction.completed' },
 };
 
 describe('geminiProvider.readEvent', () => {
-  it('lee el discriminador de event_type, no de type', () => {
-    // Si leyera `type`, este evento se descartaría y el TTFT quedaría en NaN.
+  it('reads the discriminator from event_type, not from type', () => {
+    // If it read `type`, this event would be dropped and the TTFT would end up NaN.
     expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.textDelta)).toEqual({
       kind: 'text',
-      text: '{\n  "numero": null,\n  "nombre": null\n}',
+      text: '{\n  "kind": null,\n  "brand": null\n}',
     });
   });
 
-  it('marca el arranque del texto sólo en el paso de salida, no en el de pensamiento', () => {
+  it('marks the text start only on the output step, not on the thinking one', () => {
     expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.outputStart)).toEqual({ kind: 'text-start' });
     expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.thoughtStart)).toEqual({ kind: 'start' });
   });
 
-  it('no cuenta el delta de pensamiento como texto de respuesta', () => {
+  it('does not count the thinking delta as answer text', () => {
     expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.thoughtDelta)).toBeNull();
   });
 
-  it('cierra en interaction.completed', () => {
+  it('closes on interaction.completed', () => {
     expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.completed)).toEqual({ kind: 'stop' });
   });
 
-  it('ignora step.stop y tipos futuros en vez de romper', () => {
+  it('ignores step.stop and future types instead of breaking', () => {
     expect(geminiProvider.readEvent(REAL_GEMINI_EVENTS.stepStop)).toBeNull();
-    expect(geminiProvider.readEvent({ event_type: 'algo.nuevo.del.futuro' })).toBeNull();
+    expect(geminiProvider.readEvent({ event_type: 'something.new.from.the.future' })).toBeNull();
   });
 
-  it('reporta el error de stream', () => {
+  it('reports the stream error', () => {
     const event = geminiProvider.readEvent({
       event_type: 'error',
-      error: { message: 'cuota agotada' },
+      error: { message: 'quota exhausted' },
     });
 
-    expect(event).toEqual({ kind: 'error', message: 'cuota agotada' });
+    expect(event).toEqual({ kind: 'error', message: 'quota exhausted' });
   });
 
-  it('recorre la secuencia real completa y produce exactamente un texto y un cierre', () => {
+  it('walks the whole real sequence and produces exactly one text and one close', () => {
     const kinds = Object.values(REAL_GEMINI_EVENTS)
       .map((payload) => geminiProvider.readEvent(payload))
       .filter((event) => event !== null)
@@ -167,19 +168,19 @@ describe('geminiProvider.readEvent', () => {
 });
 
 describe('anthropicProvider.buildRequest', () => {
-  it('usa el schema y los prompts que recibe — el mismo juego que Gemini', () => {
+  it('uses the schema and prompts it receives — the same set as Gemini', () => {
     const body = anthropicProvider.buildRequest(inputFor(haiku)).body as {
       output_config: { format: { type: string; schema: unknown } };
       system: string;
       messages: { content: { type: string; text?: string }[] }[];
     };
 
-    expect(body.output_config.format).toEqual({ type: 'json_schema', schema: productoSchema });
-    expect(body.system).toBe(PRODUCTO_PROMPTS.system);
-    expect(body.messages[0].content.find((c) => c.type === 'text')?.text).toBe(PRODUCTO_PROMPTS.user);
+    expect(body.output_config.format).toEqual({ type: 'json_schema', schema: productSchema });
+    expect(body.system).toBe(PRODUCT_PROMPTS.system);
+    expect(body.messages[0].content.find((c) => c.type === 'text')?.text).toBe(PRODUCT_PROMPTS.user);
   });
 
-  it('en Haiku 4.5 NO manda effort — la API lo rechaza con 400', () => {
+  it('on Haiku 4.5 it does NOT send effort — the API rejects it with 400', () => {
     const { output_config: outputConfig } = anthropicProvider.buildRequest(inputFor(haiku)).body as {
       output_config: Record<string, unknown>;
     };
@@ -187,18 +188,18 @@ describe('anthropicProvider.buildRequest', () => {
     expect(outputConfig).not.toHaveProperty('effort');
   });
 
-  it('en Haiku 4.5 NO manda thinking — el modelo no soporta el adaptativo', () => {
+  it('on Haiku 4.5 it does NOT send thinking — the model does not support the adaptive one', () => {
     expect(anthropicProvider.buildRequest(inputFor(haiku)).body).not.toHaveProperty('thinking');
   });
 
-  it('en Haiku 4.5 ignora un pedido de thinking adaptativo en vez de mandar un cuerpo inválido', () => {
+  it('on Haiku 4.5 it ignores a request for adaptive thinking instead of sending an invalid body', () => {
     const body = anthropicProvider.buildRequest(inputFor(haiku, { thinking: 'adaptive' })).body;
 
     expect(body).not.toHaveProperty('thinking');
   });
 
-  it('en un modelo que los soporta sí manda effort y thinking', () => {
-    const body = anthropicProvider.buildRequest(inputFor(conThinking, { thinking: 'adaptive' })).body as {
+  it('on a model that supports them it does send effort and thinking', () => {
+    const body = anthropicProvider.buildRequest(inputFor(withThinking, { thinking: 'adaptive' })).body as {
       output_config: { effort: string };
       thinking: unknown;
     };
@@ -207,7 +208,7 @@ describe('anthropicProvider.buildRequest', () => {
     expect(body.thinking).toEqual({ type: 'adaptive' });
   });
 
-  it('pone la imagen antes del texto', () => {
+  it('puts the image before the text', () => {
     const { messages } = anthropicProvider.buildRequest(inputFor(haiku)).body as {
       messages: { content: { type: string }[] }[];
     };
@@ -217,7 +218,7 @@ describe('anthropicProvider.buildRequest', () => {
 });
 
 describe('anthropicProvider.readEvent', () => {
-  it('lee el texto incremental de un content_block_delta', () => {
+  it('reads the incremental text of a content_block_delta', () => {
     const event = anthropicProvider.readEvent({
       type: 'content_block_delta',
       delta: { type: 'text_delta', text: '6' },
@@ -226,7 +227,7 @@ describe('anthropicProvider.readEvent', () => {
     expect(event).toEqual({ kind: 'text', text: '6' });
   });
 
-  it('marca el arranque del bloque de texto visible', () => {
+  it('marks the start of the visible text block', () => {
     const event = anthropicProvider.readEvent({
       type: 'content_block_start',
       content_block: { type: 'text' },
@@ -235,7 +236,7 @@ describe('anthropicProvider.readEvent', () => {
     expect(event).toEqual({ kind: 'text-start' });
   });
 
-  it('no marca arranque de texto para un bloque de thinking', () => {
+  it('does not mark a text start for a thinking block', () => {
     const event = anthropicProvider.readEvent({
       type: 'content_block_start',
       content_block: { type: 'thinking' },
@@ -244,7 +245,7 @@ describe('anthropicProvider.readEvent', () => {
     expect(event).toBeNull();
   });
 
-  it('lee el uso de tokens del message_start', () => {
+  it('reads token usage from message_start', () => {
     const event = anthropicProvider.readEvent({
       type: 'message_start',
       message: { usage: { input_tokens: 1200, output_tokens: 0 } },
@@ -253,56 +254,55 @@ describe('anthropicProvider.readEvent', () => {
     expect(event).toEqual({ kind: 'usage', usage: { input_tokens: 1200, output_tokens: 0 } });
   });
 
-  it('ignora el ping', () => {
+  it('ignores the ping', () => {
     expect(anthropicProvider.readEvent({ type: 'ping' })).toBeNull();
   });
 });
 
-describe('registro de modelos', () => {
-  it('cada perfil apunta a un proveedor con implementación', () => {
+describe('model registry', () => {
+  it('every profile points at a provider with an implementation', () => {
     for (const profile of MODEL_PROFILES) {
       expect(getProvider(profile.provider)).toBeDefined();
       expect(getProvider(profile.provider).id).toBe(profile.provider);
     }
   });
 
-  it('no ofrece dos modelos del mismo proveedor', () => {
-    // El selector es un radiogroup que se recorre con VoiceOver: cada opción de más es un swipe
-    // más entre la persona y la lectura, y dos escalones de la misma familia no aportan una
-    // comparación distinta. Por eso salieron `gemini-flash-lite-latest` y `claude-opus-5`
-    // (ADR 0006, actualización 2026-09-01). Si este test cae, la decisión hay que rediscutirla,
-    // no ajustarla.
-    const proveedores = MODEL_PROFILES.map((profile) => profile.provider);
+  it('does not offer two models from the same provider', () => {
+    // The selector is a radiogroup walked with VoiceOver: every extra option is one more swipe
+    // between the person and the reading, and two rungs of the same family do not add a different
+    // comparison. That is why `gemini-flash-lite-latest` and `claude-opus-5` left (ADR 0006,
+    // 2026-09-01 update). If this test fails, the decision has to be reopened, not adjusted.
+    const providers = MODEL_PROFILES.map((profile) => profile.provider);
 
-    expect(new Set(proveedores).size).toBe(proveedores.length);
+    expect(new Set(providers).size).toBe(providers.length);
   });
 
-  it('el primero del selector es el default', () => {
-    // Sin preferencia guardada la app usa DEFAULT_PRODUCTO_MODEL_ID, y el selector muestra el
-    // primero como marcado. Si dejaran de coincidir, el usuario vería marcado un modelo distinto
-    // del que efectivamente lee — un estado comunicado mal, que es lo peor que puede pasar en una
-    // interfaz que se recorre a ciegas.
-    expect(MODEL_PROFILES[0].id).toBe(DEFAULT_PRODUCTO_MODEL_ID);
+  it('the first one in the selector is the default', () => {
+    // With no stored preference the app uses DEFAULT_PRODUCT_MODEL_ID, and the selector shows the
+    // first one as checked. If they stopped matching, the user would see a model checked that is
+    // not the one actually reading — a state communicated wrong, which is the worst thing that can
+    // happen in an interface walked blind.
+    expect(MODEL_PROFILES[0].id).toBe(DEFAULT_PRODUCT_MODEL_ID);
   });
 
-  it('ningún perfil retirado sigue en el selector', () => {
-    // Las dos listas son disjuntas por definición. Si alguien devuelve un modelo al selector
-    // copiando su perfil en vez de moverlo, quedan dos fuentes que se desincronizan.
-    const enSelector = new Set(MODEL_PROFILES.map((p) => p.id));
-    for (const retirado of PERFILES_RETIRADOS) expect(enSelector.has(retirado.id)).toBe(false);
+  it('no retired profile is still in the selector', () => {
+    // The two lists are disjoint by definition. If someone returns a model to the selector by
+    // copying its profile instead of moving it, there are two sources left to drift apart.
+    const inSelector = new Set(MODEL_PROFILES.map((p) => p.id));
+    for (const profile of RETIRED_PROFILES) expect(inSelector.has(profile.id)).toBe(false);
   });
 
-  it('los perfiles retirados siguen apuntando a un proveedor implementado', () => {
-    // Es lo que hace verdadera la promesa de que volver a ofrecerlos es mover una entrada. Si
-    // alguien borra un módulo de proveedor, este test cae antes que la promesa.
-    for (const perfil of PERFILES_RETIRADOS) {
-      expect(getProvider(perfil.provider).id).toBe(perfil.provider);
+  it('retired profiles still point at an implemented provider', () => {
+    // This is what makes the promise true that offering them again is moving one entry. If someone
+    // deletes a provider module, this test falls before the promise does.
+    for (const profile of RETIRED_PROFILES) {
+      expect(getProvider(profile.provider).id).toBe(profile.provider);
     }
   });
 });
 
-describe('error de cuota de Gemini', () => {
-  // Payload real capturado de la API tras superar el límite del tier gratuito.
+describe('Gemini quota error', () => {
+  // Real payload captured from the API after exceeding the free tier's limit.
   const REAL_QUOTA_ERROR = {
     event_type: 'error',
     error: {
@@ -315,24 +315,24 @@ describe('error de cuota de Gemini', () => {
     },
   };
 
-  it('lo distingue por código para poder reintentar en vez de abortar la serie', () => {
+  it('tells it apart by code so it can retry instead of aborting the series', () => {
     const event = geminiProvider.readEvent(REAL_QUOTA_ERROR);
 
     expect(event?.kind).toBe('error');
     expect(event).toMatchObject({ code: 'quota_exceeded' });
   });
 
-  it('extrae del mensaje cuántos segundos esperar, redondeando hacia arriba', () => {
+  it('extracts from the message how many seconds to wait, rounding up', () => {
     const event = geminiProvider.readEvent(REAL_QUOTA_ERROR);
 
-    // Aprovechar el dato que da la API evita inventar un backoff arbitrario.
+    // Using the figure the API gives avoids inventing an arbitrary backoff.
     expect(event).toMatchObject({ retryAfterSeconds: 30 });
   });
 
-  it('un error sin espera sugerida no inventa una', () => {
+  it('an error with no suggested wait does not invent one', () => {
     const event = geminiProvider.readEvent({
       event_type: 'error',
-      error: { message: 'algo se rompió' },
+      error: { message: 'something broke' },
     });
 
     expect(event).toMatchObject({ kind: 'error', retryAfterSeconds: undefined });
@@ -340,72 +340,72 @@ describe('error de cuota de Gemini', () => {
 });
 
 /**
- * El dialecto de OpenAI cubre DOS proveedores del selector (OpenAI y Groq) y, el día que haya
- * endpoint, el modelo que hosteemos nosotros (ADR 0008). Un error acá rompe la mitad del selector
- * de una vez, así que se testea la forma que la API rechaza con 400 y la que devuelve texto vacío
- * en silencio — que es la falla cara, porque no se ve.
+ * The OpenAI dialect covers TWO providers in the selector (OpenAI and Groq) and, the day there is an
+ * endpoint, the model we host ourselves (ADR 0008). A mistake here breaks half the selector at once,
+ * so what gets tested is the shape the API rejects with 400 and the one that silently returns empty
+ * text — which is the expensive failure, because it cannot be seen.
  */
-describe('proveedores de dialecto OpenAI (buildRequest)', () => {
+describe('OpenAI-dialect providers (buildRequest)', () => {
   const luna = findModelProfile('gpt-5.6-luna');
   const qwen = findModelProfile('qwen/qwen3.8-27b');
 
-  it('OpenAI y Groq son el mismo dialecto apuntando a distinta URL', () => {
-    const deOpenai = openaiProvider.buildRequest(inputFor(luna));
-    const deGroq = groqProvider.buildRequest(inputFor(qwen));
+  it('OpenAI and Groq are the same dialect pointing at different URLs', () => {
+    const fromOpenai = openaiProvider.buildRequest(inputFor(luna));
+    const fromGroq = groqProvider.buildRequest(inputFor(qwen));
 
-    expect(deOpenai.url).toContain('api.openai.com');
-    expect(deGroq.url).toContain('api.groq.com');
-    // Misma forma de cuerpo: si dejan de coincidir, dejaron de ser el mismo proveedor.
-    expect(Object.keys(deOpenai.body).sort()).toEqual(Object.keys(deGroq.body).sort());
+    expect(fromOpenai.url).toContain('api.openai.com');
+    expect(fromGroq.url).toContain('api.groq.com');
+    // Same body shape: if they stop matching, they stopped being the same provider.
+    expect(Object.keys(fromOpenai.body).sort()).toEqual(Object.keys(fromGroq.body).sort());
   });
 
-  it('apaga el razonamiento — es lo que decide la latencia del modo', () => {
-    // `gpt-5.6-luna` razona en `medium` por defecto: sin esto, tres campos cortos se pagarían como
-    // decenas de segundos. Es la misma trampa que en Gemini con `thinking_level`.
+  it('turns reasoning off — it is what decides the mode latency', () => {
+    // `gpt-5.6-luna` reasons at `medium` by default: without this, three short fields would be paid
+    // for in tens of seconds. It is the same trap as Gemini's `thinking_level`.
     expect(openaiProvider.buildRequest(inputFor(luna)).body.reasoning_effort).toBe('none');
     expect(groqProvider.buildRequest(inputFor(qwen)).body.reasoning_effort).toBe('none');
   });
 
-  it('pasa la clave como Bearer, no por query string', () => {
+  it('passes the key as a Bearer, not in the query string', () => {
     const request = openaiProvider.buildRequest(inputFor(luna));
 
-    expect(request.headers.authorization).toBe('Bearer clave-de-prueba');
-    expect(request.url).not.toContain('clave-de-prueba');
+    expect(request.headers.authorization).toBe('Bearer test-key');
+    expect(request.url).not.toContain('test-key');
   });
 
-  it('usa max_completion_tokens: max_tokens está deprecado y los modelos de razonamiento lo rechazan', () => {
+  it('uses max_completion_tokens: max_tokens is deprecated and reasoning models reject it', () => {
     const body = openaiProvider.buildRequest(inputFor(luna)).body;
 
     expect(body.max_completion_tokens).toBe(luna.maxTokens);
     expect(body).not.toHaveProperty('max_tokens');
   });
 
-  it('pide el schema con strict, no json_object', () => {
-    // `json_object` sólo garantiza JSON sintáctico: los nombres de campo quedan a criterio del
-    // modelo, y `parseProductoLeido` rebotaría una lectura correcta por venir como "producto" en
-    // vez de "tipo". `strict` hace decodificación restringida: no *puede* devolver otra forma.
+  it('asks for the schema with strict, not json_object', () => {
+    // `json_object` only guarantees syntactic JSON: field names are left to the model's discretion,
+    // and `parseProductReading` would bounce a correct reading for arriving as "producto" instead
+    // of "kind". `strict` does constrained decoding: it *cannot* return another shape.
     const { response_format: rf } = openaiProvider.buildRequest(inputFor(luna)).body as {
       response_format: { type: string; json_schema: { schema: unknown; strict: boolean } };
     };
 
     expect(rf.type).toBe('json_schema');
     expect(rf.json_schema.strict).toBe(true);
-    expect(rf.json_schema.schema).toBe(productoSchema);
+    expect(rf.json_schema.schema).toBe(productSchema);
   });
 
-  it('manda la imagen como data URI con su mime type, y usa los prompts que recibe', () => {
+  it('sends the image as a data URI with its mime type, and uses the prompts it receives', () => {
     const { messages } = openaiProvider.buildRequest(inputFor(luna, { mediaType: 'image/png' }))
       .body as {
       messages: { role: string; content: string | { type: string; text?: string; image_url?: { url: string } }[] }[];
     };
 
-    expect(messages[0]).toEqual({ role: 'system', content: PRODUCTO_PROMPTS.system });
-    const partes = messages[1].content as { type: string; text?: string; image_url?: { url: string } }[];
-    expect(partes[0].image_url?.url).toBe('data:image/png;base64,QUJD');
-    expect(partes[1].text).toBe(PRODUCTO_PROMPTS.user);
+    expect(messages[0]).toEqual({ role: 'system', content: PRODUCT_PROMPTS.system });
+    const parts = messages[1].content as { type: string; text?: string; image_url?: { url: string } }[];
+    expect(parts[0].image_url?.url).toBe('data:image/png;base64,QUJD');
+    expect(parts[1].text).toBe(PRODUCT_PROMPTS.user);
   });
 
-  it('pide el uso de tokens en el stream: sin stream_options no llega en ningún evento', () => {
+  it('asks for token usage in the stream: without stream_options it arrives in no event', () => {
     expect(openaiProvider.buildRequest(inputFor(luna)).body.stream).toBe(true);
     expect(openaiProvider.buildRequest(inputFor(luna)).body.stream_options).toEqual({
       include_usage: true,
@@ -413,36 +413,36 @@ describe('proveedores de dialecto OpenAI (buildRequest)', () => {
   });
 });
 
-describe('proveedores de dialecto OpenAI (readEvent)', () => {
-  it('lee el texto incremental del delta', () => {
+describe('OpenAI-dialect providers (readEvent)', () => {
+  it('reads the incremental text from the delta', () => {
     expect(
-      openaiProvider.readEvent({ choices: [{ index: 0, delta: { content: '{"tipo"' } }] }),
-    ).toEqual({ kind: 'text', text: '{"tipo"' });
+      openaiProvider.readEvent({ choices: [{ index: 0, delta: { content: '{"kind"' } }] }),
+    ).toEqual({ kind: 'text', text: '{"kind"' });
   });
 
-  it('trata el primer delta (sólo role) como arranque del texto, no como texto vacío', () => {
+  it('treats the first delta (role only) as the text start, not as empty text', () => {
     expect(
       openaiProvider.readEvent({ choices: [{ index: 0, delta: { role: 'assistant' } }] }),
     ).toEqual({ kind: 'text-start' });
   });
 
-  it('cierra en finish_reason', () => {
+  it('closes on finish_reason', () => {
     expect(
       openaiProvider.readEvent({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }),
     ).toMatchObject({ kind: 'stop', stopReason: 'stop' });
   });
 
-  it('lee el uso del frame final, que viene con choices vacío', () => {
-    // Es el frame que habilita `stream_options.include_usage`. Si se descartara por no tener
-    // choices, el uso de tokens quedaría siempre en cero sin que nada falle a la vista.
+  it('reads the usage from the final frame, which arrives with empty choices', () => {
+    // It is the frame `stream_options.include_usage` enables. If it were dropped for having no
+    // choices, token usage would always stay at zero without anything visibly failing.
     expect(
       openaiProvider.readEvent({ choices: [], usage: { prompt_tokens: 1200, completion_tokens: 42 } }),
     ).toEqual({ kind: 'stop', usage: { input_tokens: 1200, output_tokens: 42 } });
   });
 
-  it('normaliza el error de cuota al código que el motor ya entiende, con los segundos del mensaje', () => {
-    // Aprovechar el dato que da la API evita inventar un backoff arbitrario — mismo criterio que
-    // con el "Please retry in 29.2s" de Gemini.
+  it('normalizes the quota error to the code the engine already understands, with the seconds from the message', () => {
+    // Using the figure the API gives avoids inventing an arbitrary backoff — the same criterion as
+    // with Gemini's "Please retry in 29.2s".
     const event = groqProvider.readEvent({
       error: {
         code: 'rate_limit_exceeded',
@@ -453,7 +453,7 @@ describe('proveedores de dialecto OpenAI (readEvent)', () => {
     expect(event).toMatchObject({ kind: 'error', code: 'quota_exceeded', retryAfterSeconds: 2 });
   });
 
-  it('reporta el resto de los errores sin marcarlos como cuota', () => {
+  it('reports the remaining errors without marking them as quota', () => {
     const event = openaiProvider.readEvent({
       error: { code: 'invalid_request_error', message: 'Unsupported parameter' },
     });
@@ -462,7 +462,7 @@ describe('proveedores de dialecto OpenAI (readEvent)', () => {
     expect(event).not.toMatchObject({ code: 'quota_exceeded' });
   });
 
-  it('ignora los frames que no traen nada en vez de romper', () => {
+  it('ignores frames that carry nothing instead of breaking', () => {
     expect(openaiProvider.readEvent({ id: 'chatcmpl-1', object: 'chat.completion.chunk' })).toBeNull();
   });
 });
