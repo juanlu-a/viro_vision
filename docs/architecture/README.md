@@ -33,12 +33,15 @@ stateDiagram-v2
     Esperando --> ModoSupermercado : 2 clicks
 
     ModoOmnibus : Modo detección de ómnibus
-    ModoOmnibus : detección en TPU → recorte del banner → OCR
+    ModoOmnibus : cámara en vigilancia: detección → recorte del banner → OCR
     ModoSupermercado : Modo supermercado
-    ModoSupermercado : LLM con visión en la nube, modelo elegible
+    ModoSupermercado : al activarse saca una foto y la procesa (LLM con visión en la nube)
 
-    ModoOmnibus --> ModoOmnibus : sin click largo
-    ModoSupermercado --> ModoSupermercado : sin click largo
+    ModoOmnibus --> ModoSupermercado : 2 clicks
+    ModoSupermercado --> ModoOmnibus : 1 click
+
+    ModoOmnibus --> ModoOmnibus : 1 click (ya está activo)
+    ModoSupermercado --> ModoSupermercado : 2 clicks (ya está activo)
 
     ModoOmnibus --> Esperando : click largo
     ModoSupermercado --> Esperando : click largo
@@ -46,6 +49,16 @@ stateDiagram-v2
 
 En reposo el dispositivo está **conectado y esperando**: ni captura ni anuncia. Cada transición de
 modo se anuncia por audio — el usuario no tiene otro indicador de estado.
+
+**Un gesto nombra un modo, no un paso** (actualización del 2026-09-09, ver ADR 0007): 1 click es
+siempre ómnibus y 2 clicks siempre supermercado, esté el dispositivo donde esté. Entrar a un modo
+desactiva el anterior. Hasta esa fecha los clicks sólo valían desde *esperando* y cambiar de modo
+exigía un click largo en el medio; probado en la mano, se sentía como que el botón estaba roto.
+
+Los dos modos se comportan distinto por naturaleza, y eso es deliberado: **ómnibus es continuo**
+—la cámara queda vigilando y anuncia cada ómnibus que aparece— mientras que **supermercado es
+puntual**: activarlo saca una foto y la procesa, porque el usuario está parado frente a la góndola
+apuntando a un producto.
 
 ## Flujos por caso de uso
 

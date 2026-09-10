@@ -7,8 +7,12 @@
  * hardware exists the button is what sets the mode and the app only mirrors it — if the app had
  * transitions the button does not, the two surfaces would drift apart.
  *
- * Deliberate note from the diagram: there is NO direct jump between modes. From a mode you can
- * only go back to idle (long press); any other gesture leaves the state where it is.
+ * Deliberate note from the diagram (2026-09-09 update of ADR 0007): a gesture names a MODE, not a
+ * step. One click is always bus and a double click always supermarket, from wherever the device is,
+ * and entering a mode leaves the previous one. Until that date jumping between modes needed a long
+ * press in between; with the button soldered, pressing twice and getting nothing reads as a broken
+ * button rather than as a missing gesture, and a control that sometimes answers is worse than a
+ * simpler one for someone who cannot see the screen.
  */
 
 export const MODES = ['idle', 'bus', 'supermarket'] as const;
@@ -19,7 +23,7 @@ export type Gesture = (typeof GESTURES)[number];
 
 export function transition(mode: Mode, gesture: Gesture): Mode {
   if (gesture === 'longPress') return 'idle';
-  if (mode === 'idle' && gesture === 'click') return 'bus';
-  if (mode === 'idle' && gesture === 'doubleClick') return 'supermarket';
+  if (gesture === 'click') return 'bus';
+  if (gesture === 'doubleClick') return 'supermarket';
   return mode;
 }

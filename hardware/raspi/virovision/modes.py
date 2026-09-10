@@ -1,9 +1,14 @@
 """Operating-mode state machine (ADR 0007).
 
-From *idle*: 1 click = bus mode, 2 clicks = supermarket mode; a long press from any mode = back to
-idle. Never "always on": announcing everything the camera sees, all the time, is overwhelming. The
-physical button's debounce (long-press threshold, double-click window) does not live here: it is
-defined with real hardware and calls `from_clicks` / `long_press`.
+1 click = bus mode, 2 clicks = supermarket mode, from any state; a long press from any mode = back
+to idle. Entering a mode leaves the previous one. Never "always on": announcing everything the
+camera sees, all the time, is overwhelming. The physical button's debounce (long-press threshold,
+double-click window) does not live here: it is defined with real hardware and calls `from_clicks` /
+`long_press`.
+
+The canonical diagram is in `docs/architecture/README.md` and `app/src/features/reader/modes.ts`
+mirrors this machine: if one of the three changes, the other two change in the same PR, or the app
+and the firmware tell the user different stories and no screen gives it away.
 """
 
 from __future__ import annotations
@@ -30,15 +35,23 @@ class ModeMachine:
         return True
 
     def from_clicks(self, clicks: int) -> bool:
-        # Clicks only pick a mode from idle; inside a mode the short click stays free to trigger a
-        # reading, and leaving is always the long press.
-        if self.current is not Mode.IDLE:
-            return False
+        # A gesture names a mode, not a step (ADR 0007, 2026-09-09 update): 1 click is always bus and
+        # 2 clicks always supermarket, from wherever the device is. Until that date clicks only
+        # counted from idle and switching modes needed a long press in between; with the button
+        # soldered, pressing twice and getting nothing reads as "the button is broken".
+        target = self.mode_for_clicks(clicks)
+        return self.change(target) if target is not None else False
+
+    @staticmethod
+    def mode_for_clicks(clicks: int) -> Mode | None:
+        """The mode a click count names, or None when it names none. Split out from `from_clicks` so
+        the caller can tell "not a mode gesture" from "already in that mode": both leave the state
+        untouched, but only the second one is worth announcing."""
         if clicks == 1:
-            return self.change(Mode.BUS)
+            return Mode.BUS
         if clicks == 2:
-            return self.change(Mode.SUPERMARKET)
-        return False
+            return Mode.SUPERMARKET
+        return None
 
     def long_press(self) -> bool:
         return self.change(Mode.IDLE)

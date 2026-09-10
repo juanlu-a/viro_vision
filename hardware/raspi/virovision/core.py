@@ -101,12 +101,18 @@ class Core:
     # mode was changed by the user's finger or by itself over BLE.
 
     def from_button(self, clicks: int) -> None:
-        """1 click = bus, 2 = supermarket, and only from idle. Inside a mode short clicks still do
-        nothing: leaving is always the long press."""
+        """1 click = bus, 2 clicks = supermarket, from wherever the device is (ADR 0007, 2026-09-09
+        update). Entering a mode leaves the previous one; leaving altogether is the long press."""
+        if self.modes.mode_for_clicks(clicks) is None:
+            log.debug("button: %d click(s) names no mode", clicks)
+            return
         if self.modes.from_clicks(clicks):
             self._announce_mode()
         else:
-            log.debug("button: %d click(s) with no effect in %s", clicks, self.modes.current.name)
+            # The gesture named the mode the device is already in. Nothing to announce: the app
+            # keys a supermarket capture off the transition, so re-announcing would take a second
+            # photo the user did not ask for.
+            log.debug("button: already in %s", self.modes.current.name)
 
     def button_long_press(self) -> None:
         """Hold it down: leave the current mode, from wherever."""

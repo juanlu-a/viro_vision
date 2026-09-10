@@ -352,6 +352,24 @@ export function useReader() {
     }
   }, [device, readBus, readSupermarket, model, update]);
 
+  /**
+   * Supermarket fires its reading the moment it is activated (ADR 0007, 2026-09-09 update): the user
+   * is standing in front of the shelf pointing at a product, so asking them for a second gesture to
+   * take the photo is asking them to hold the pose. Bus is the opposite kind of mode — the camera
+   * stays watching and announces each bus that shows up — so it does NOT auto-fire here.
+   *
+   * It reads the mode and not the gesture on purpose: this way it fires the same whether the mode
+   * came from the physical button or from the app, which is the whole point of having one machine.
+   */
+  const modeThatAutoRead = useRef<Mode>(initialState.mode);
+  useEffect(() => {
+    const previous = modeThatAutoRead.current;
+    modeThatAutoRead.current = state.mode;
+    // Only on the way IN: while it stays in supermarket, `read` changing identity must not take a
+    // second photo the user did not ask for.
+    if (state.mode === 'supermarket' && previous !== 'supermarket') void read();
+  }, [state.mode, read]);
+
   return {
     state,
     applyGesture,

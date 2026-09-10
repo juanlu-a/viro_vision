@@ -23,11 +23,12 @@ import { strings } from '@/i18n';
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { connection, wifi, wifiDetail, lastNotice, connect, disconnect } = useDevice();
-  const wifiText = { off: t.wifiOff, joining: t.wifiJoining, ready: t.wifiReady, error: t.wifiError }[wifi];
-  // The detail only shows up when the network failed, and it says what to do: it is not diagnostics,
-  // it is the reason reading is not possible.
-  const wifiFull = wifiDetail ? `${wifiText}. ${wifiDetail}` : wifiText;
+  const { connection, wifiDetail, lastNotice, connect, disconnect } = useDevice();
+  // The Wi-Fi status line (off / joining / ready) is gone since 2026-09-09: it was device console,
+  // and the app stopped being its own console. What stays is the REASON something did not work,
+  // because for someone who does not see the screen that is the only explanation of why the button
+  // did nothing. `wifiDetail` only appears when the network failed and it says what to do.
+  const problem = wifiDetail ?? lastNotice;
 
   const isConnected = connection.status === 'connected';
   const isBusy = connection.status === 'scanning' || connection.status === 'connecting';
@@ -67,18 +68,12 @@ export default function ConnectScreen() {
       {isConnected && connection.device && (
         <Card>
           <DeviceSummary device={connection.device} />
-          <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.wifiLabel}: ${wifiFull}`}>
-            <ThemedText type="small" themeColor="textSecondary">
-              {t.wifiLabel}
-            </ThemedText>
-            <ThemedText type="small">{wifiFull}</ThemedText>
-          </View>
-          {lastNotice && (
-            <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.deviceErrorLabel}: ${lastNotice}`}>
+          {problem && (
+            <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.deviceErrorLabel}: ${problem}`}>
               <ThemedText type="small" themeColor="danger">
                 {t.deviceErrorLabel}
               </ThemedText>
-              <ThemedText type="small">{lastNotice}</ThemedText>
+              <ThemedText type="small">{problem}</ThemedText>
             </View>
           )}
         </Card>

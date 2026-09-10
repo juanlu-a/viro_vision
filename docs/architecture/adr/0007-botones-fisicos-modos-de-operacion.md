@@ -71,6 +71,34 @@ referencia y no lo duplica.
   desarrollo de estos modos; cuando el dispositivo exista, el modo lo fija el botón y la app lo
   refleja.
 
+## Actualización 2026-09-09 — un gesto nombra un modo, no un paso
+
+**Probado con el botón soldado, la máquina original no se sostuvo en la mano.** La decisión de
+arriba restringía los clicks a *esperando*: dentro de un modo, el click corto quedaba reservado
+"para disparar una lectura" y cambiar de ómnibus a supermercado exigía un click largo en el medio.
+En la práctica el usuario hace dos clicks esperando supermercado, no pasa nada, y la lectura es que
+**el botón está roto** — no que falta un gesto intermedio. Para alguien que no ve la pantalla, un
+control que a veces responde y a veces no es peor que uno con menos funciones.
+
+| Gesto | Desde | Efecto |
+|---|---|---|
+| 1 click | **cualquier estado** | **Modo detección de ómnibus** |
+| 2 clicks | **cualquier estado** | **Modo supermercado** (saca una foto y la procesa) |
+| Click largo | Cualquier modo | Volver a **esperando** |
+
+Entrar a un modo desactiva el anterior; no hay dos modos activos a la vez, ni estado intermedio.
+
+Se cae con esto la reserva del click corto "para disparar una lectura" dentro de un modo. No se
+perdió nada: **los dos modos disparan su lectura al activarse**, cada uno según su naturaleza —
+ómnibus deja la cámara en **vigilancia continua** y anuncia cada ómnibus que aparece, mientras que
+supermercado es **puntual**, saca una foto en el momento y la procesa, porque el usuario está
+parado frente a la góndola apuntando a un producto.
+
+Queda abierto cómo pedir una **segunda** lectura de supermercado sin salir del modo. Hoy son dos
+gestos (click largo y otra vez dos clicks). La opción natural —que repetir los dos clicks saque
+otra foto— exige que el dispositivo avise cada gesto y no sólo cada cambio de modo, porque el modo
+no cambia; se decide con el usuario antes de agregar superficie al protocolo.
+
 ## Ver también
 
 [ADR 0006](0006-pipelines-por-caso-de-uso.md), el diagrama de modos en
