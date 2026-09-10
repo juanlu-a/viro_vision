@@ -202,9 +202,9 @@ git diff origin/staging <rama-vieja>   # vacío = todo el contenido está en sta
 
 | Evento | Efecto |
 |---|---|
-| merge a `staging` (cambios en `app/`) | build de TestFlight al grupo **interno** *Equipo ViroVision* (devs, sin revisión, minutos) y — cuando `PLAY_ENABLED=true` — `.aab` a *internal testing* de Google Play |
+| merge a `staging` (cambios en `app/`) | build de TestFlight al grupo **interno** *Equipo ViroVision* (devs, sin revisión, minutos), un `.apk` de sideload como artefacto del run (workflow `android-apk.yml`, mientras Play esté apagado) y — cuando `PLAY_ENABLED=true` — `.aab` a *internal testing* de Google Play |
 | PR `staging → main` mergeado (= release) | build al grupo **externo** *Testers ViroVision*, link público <https://testflight.apple.com/join/jbE7GDqV> (Beta App Review del 1.er build de cada versión) |
-| *Actions → TestFlight / Google Play → Run workflow* | publicar cualquier rama al destino que se elija |
+| *Actions → TestFlight / Google Play / Android APK → Run workflow* | publicar cualquier rama al destino que se elija; el `.apk` se baja del run y se manda por donde sea |
 
 Cada grupo de TestFlight muestra **un solo build** (el último; el externo conserva además el último
 aprobado). El grupo interno **no tiene link para compartir** (regla de Apple): sus testers son
