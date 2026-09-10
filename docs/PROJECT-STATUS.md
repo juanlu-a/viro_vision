@@ -122,11 +122,12 @@ tests via `jest-expo`.
   placa (`/health`, `/measure/<n>`, `/photos/latest`), los flags del daemon (`--no-ap`) y el esquema
   de Supabase (tabla `events`, vocabulario `reading.ok`). Sigue en español lo que una persona lee o
   escucha (los valores de `i18n/es.ts`, el prompt de supermercado) y **toda la documentación**.
-  ⚠️ **Paso manual pendiente en la microSD**: `/boot/firmware/modo-red.sh` tiene `--sin-ap`
-  hardcodeado (lo usa para escribir el drop-in de modo desarrollo cuando existe el archivo
-  `SIN-AP`). No urge, porque hoy la tarjeta está en modo producto y sin drop-in; pero volver a modo
-  desarrollo sin editarlo deja al daemon sin arrancar. Se arregla con la tarjeta puesta:
-  `sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh`.
+  ✅ **Placa al día desde el 2026-09-10**: el daemon nuevo está instalado y verificado (`/health`
+  con el payload en inglés, `/photos/latest` devolviendo la foto del IMX500, botón en GPIO 5, BLE
+  anunciando), los **dos** `--sin-ap` de `bootfs` corregidos —estaban en `modo-red.sh` y también en
+  `instalar-daemon.sh`— y el `.tgz` de la tarjeta refrescado con `staging`. La tarjeta quedó en modo
+  producto y el flujo completo anda de punta a punta con el build `202609101402`. El procedimiento de
+  despliegue está en [`hardware/raspi/README.md`](../hardware/raspi/README.md).
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a
