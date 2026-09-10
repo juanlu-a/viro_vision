@@ -52,16 +52,29 @@ archivo:
 Por eso **el drop-in no se edita a mano**: lo pisa el próximo arranque. Lo que se cambia es el
 archivo `SIN-AP`, y si hay que cambiar el flag, `modo-red.sh`.
 
-> ⚠️ **Deuda conocida:** `modo-red.sh` tiene el flag **hardcodeado** y quedó con el nombre viejo,
-> `--sin-ap`, que ADR 0009 renombró a `--no-ap`. Mientras la tarjeta esté en modo producto no pasa
-> nada (el script no escribe nada), pero **crear `SIN-AP` con el daemon nuevo instalado deja a
-> systemd fallando con `unrecognized arguments`**. Se arregla con la tarjeta puesta en cualquier
-> computadora: `sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh`.
+> ✅ **Resuelto el 2026-09-10.** El flag estaba hardcodeado con el nombre viejo (`--sin-ap`, que
+> ADR 0009 renombró a `--no-ap`) **en dos archivos, no en uno**: `modo-red.sh` y también
+> `instalar-daemon.sh`, que escribe el mismo drop-in por su cuenta después de instalar. Los dos
+> quedaron corregidos en la tarjeta. Queda una mención en `firstrun.sh`, pero es un comentario que
+> narra lo que pasaba antes y ese script ya no está enganchado en `cmdline.txt`.
+>
+> **La lección, si algún día se renombra otro flag:** buscarlo en TODO `bootfs`, no en el archivo
+> obvio — `grep -ro -- '--[a-z-]*' /Volumes/bootfs/*.sh`. Un flag repetido en dos scripts se corrige
+> en uno solo y vuelve en el próximo arranque.
 
 **Con el AP arriba sí se puede entrar.** `sshd` escucha en todas las interfaces: uniéndose a la red
 `ViroVision` (clave `virovision2026`) se llega a `ssh virovision@10.42.0.1`. Lo que se pierde en esa
-computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a propósito (ADR 0003), así
-que conviene hacerlo desde una máquina que tenga otra salida (cable, datos móviles).
+computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a propósito (ADR 0003).
+
+> ⚠️ **Aun así, no despliegues desde una máquina con una sola interfaz de red.** Si el equipo sólo
+> tiene WiFi, unirse al AP lo deja sin internet, y macOS además **se vuelve solo** a la red conocida
+> cuando detecta que la nueva no tiene salida: la conexión no se sostiene, y una copia de archivos
+> cortada por la mitad deja el daemon roto. Los dos caminos buenos, en orden:
+>
+> 1. **Cable Ethernet a la placa.** Esta Pi 3 B+ tiene RJ45 (la Zero 2 W no): queda en la red de
+>    casa, se la alcanza sin tocarle el WiFi a nadie y el AP sigue arriba para el teléfono.
+> 2. **Pasarla a modo desarrollo desde la tarjeta**: crear `/Volumes/bootfs/SIN-AP` desde cualquier
+>    computadora y arrancar. Es lo que se hizo el 2026-09-10.
 
 **El primer arranque.** Un `firstrun.sh` lanzado una sola vez desde `systemd.run=` en `cmdline.txt`
 (target mínimo, sin red) instala ese servicio, lo aplica para ese arranque y **se saca del
@@ -69,8 +82,45 @@ que conviene hacerlo desde una máquina que tenga otra salida (cable, datos móv
 
 **El daemon no se reinstala solo.** `instalar-daemon.sh` está detrás de
 `ConditionPathExists=!/var/lib/virovision-instalado`, y esa sentinela ya existe: descomprimir un
-`virovision-daemon.tgz` nuevo en `bootfs` **no alcanza**. Para desplegar hay que reemplazar el `.tgz`
-**y** borrar la sentinela, o copiar el daemon por `scp` a través del AP.
+`virovision-daemon.tgz` nuevo en `bootfs` **no alcanza**. Y la sentinela vive en **ext4**, no en
+`bootfs`, así que **no se borra desde macOS con la tarjeta puesta** — "meto la tarjeta en la Mac y
+reinstalo" no es un camino posible.
+
+Cómo se desplegó el 2026-09-10, que es el procedimiento probado:
+
+```sh
+# 1. Desde el Mac, con la tarjeta puesta: pasar la placa a modo desarrollo
+touch /Volumes/bootfs/SIN-AP        # NO corregir todavía el flag: el daemon viejo sólo entiende --sin-ap
+
+# 2. Arrancar la placa; se une a la WiFi de casa. Buscarla y entrar:
+ssh virovision@<ip-en-la-red-de-casa>
+
+# 3. En la PLACA: bajar staging de GitHub e instalar sobre el .venv ya armado.
+#    No hace falta setup.sh ni apt mientras no cambien las dependencias — y así se
+#    esquiva el apt que falla por el reloj sin RTC ("not live until") si NTP no sincronizó.
+curl -fsSL https://codeload.github.com/juanlu-a/viro_vision/tar.gz/refs/heads/staging -o /tmp/vv.tgz
+mkdir -p /tmp/vv-src && tar -xzf /tmp/vv.tgz -C /tmp/vv-src --strip-components=1 --wildcards '*/hardware/raspi/*'
+sudo systemctl stop virovision
+mv ~/virovision/virovision ~/virovision/virovision.old-$(date +%Y%m%d-%H%M%S)   # respaldo
+cp -r /tmp/vv-src/hardware/raspi/virovision ~/virovision/virovision
+~/virovision/.venv/bin/python -c 'import virovision.core'                        # que importe antes de arrancar
+
+# 4. AHORA sí, los flags (los dos archivos) y el .tgz de bootfs
+sudo sed -i 's/--sin-ap/--no-ap/g' /boot/firmware/modo-red.sh /boot/firmware/instalar-daemon.sh
+sudo sed -i 's/--sin-ap/--no-ap/g' /etc/systemd/system/virovision.service.d/10-sin-ap.conf
+tar -czf /tmp/vv-daemon.tgz -C /tmp/vv-src/hardware raspi && sudo cp /tmp/vv-daemon.tgz /boot/firmware/virovision-daemon.tgz
+
+# 5. Verificar y volver a modo producto
+sudo systemctl daemon-reload && sudo systemctl restart virovision
+curl -s http://localhost:8080/health
+sudo rm -f /boot/firmware/SIN-AP && sudo systemctl reboot
+```
+
+> ⚠️ **Si rehacés el `.tgz`, tiene que llevar `raspi/` ENTERO.** El instalador hace `tar xzf` y
+> después `mv /home/virovision/raspi /home/virovision/virovision`, así que necesita `raspi/setup.sh`,
+> `raspi/requirements.txt`, `raspi/virovision.service` y `raspi/virovision/`. Un `.tgz` armado sólo
+> con el paquete Python instala un daemon a medias, y el síntoma aparece meses después sin nada que
+> lo conecte con el día en que se armó mal. Verificá los cuatro antes de copiarlo a `bootfs`.
 
 **Por qué nada de esto usa cloud-init como corresponde.** En esta imagen cloud-init lee
 `network-config` y **no lo aplica** (`No network config applied. Neither a new instance nor

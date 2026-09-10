@@ -1290,7 +1290,9 @@ existe para prohibir, que es la peor forma de tener un linter.
 1. **La base y las funciones antes que el build.** Aplicar la migración, desplegar `telemetry` y
    `vision`, y recién después dejar salir el build. Una app con el vocabulario nuevo contra la
    función vieja no guarda nada y contesta `200` — el modo de falla que este contrato siempre tuvo.
-2. **La microSD.** El flag renombrado la deja en una trampa. *(Corregido el mismo día: la primera
+2. **La microSD.** El flag renombrado la deja en una trampa. *(Hecho el 2026-09-10 — ver la entrada
+   de ese día; además apareció un segundo `--sin-ap` en `instalar-daemon.sh` que esta nota no
+   contemplaba. Corregido el mismo día: la primera
    versión de esta nota decía "editar el drop-in `10-sin-ap.conf`", y ese archivo **no existe** en la
    tarjeta — se lo escribe y se lo borra un script de arranque, así que un `sed` contra él no habría
    hecho nada y habría dado la falsa sensación de estar arreglado.)*
@@ -1345,6 +1347,90 @@ existe para prohibir, que es la peor forma de tener un linter.
   `app/` (206). **Sin probar contra la placa**: el daemon instalado sigue siendo el pre-ADR-0009 y
   habla el protocolo viejo.
 
+## 2026-09-10 — El daemon nuevo en la placa: tres trampas y un desfasaje que se cerró
+
+Con ADR 0009 mergeado, la app de TestFlight hablaba el protocolo nuevo contra una placa que corría el
+daemon viejo en español: el BLE conectaba y la foto no llegaba nunca. Este es el día en que las dos
+puntas volvieron a hablar el mismo idioma, y el flujo completo quedó andando.
+
+**Cómo se llegó a la placa, después de dos intentos malos.** No por el AP. Unir el Mac a
+`ViroVision` lo deja sin internet —el AP no anuncia gateway ni DNS a propósito, ADR 0003— y con una
+sola interfaz de red eso **corta la sesión del agente a la mitad**; encima macOS se vuelve solo a la
+red conocida cuando detecta que la nueva no tiene salida, así que la conexión ni siquiera se sostiene.
+Lo que funcionó fue **pasar la placa a modo desarrollo desde la tarjeta**: crear
+`/Volumes/bootfs/SIN-AP` desde el Mac, arrancar, y la placa se une sola a la WiFi de casa. Quedó en
+`192.168.1.14`, alcanzable por SSH sin tocarle el WiFi a nadie.
+
+Detalle de orden que evitó un problema: **no se corrigió el flag `--sin-ap` en ese momento**. El
+daemon instalado todavía era el viejo, que sólo entiende ese nombre; arreglarlo antes de instalar el
+nuevo habría dejado a systemd sin poder arrancar nada en el arranque siguiente.
+
+**Cómo se instaló.** Bajando `staging` **directo desde GitHub en la propia placa**
+(`codeload.github.com/juanlu-a/viro_vision/tar.gz/refs/heads/staging`) en lugar de copiar la working
+copy del Mac. Empezó como necesidad —el sandbox del agente había dejado de leer el repo— y resultó
+mejor de todos modos: lo instalado es exactamente lo mergeado, no lo que hubiera quedado dando vueltas
+en un directorio local. Respaldo del anterior en `~/virovision/virovision.old-20260910-141514`. No
+hizo falta `setup.sh` ni `apt`: el refactor no agregó dependencias (`requirements.txt` sigue siendo
+sólo `bluez-peripheral==0.1.7`), así que alcanzó con reemplazar el paquete Python sobre el `.venv` ya
+armado — y de paso se esquivó la trampa del reloj sin RTC, que hace fallar `apt` con *"not live
+until"* cuando NTP todavía no sincronizó.
+
+**Trampa 1: el flag viejo estaba en DOS archivos, no en uno.** Además de `modo-red.sh`,
+**`instalar-daemon.sh` también escribe el drop-in** con `--sin-ap` hardcodeado. Se descubrió sólo
+porque el primer arranque del daemon nuevo falló con `unrecognized arguments: --sin-ap` y hubo que ir
+a buscar quién lo había escrito. La lección: cuando se renombra un flag, buscarlo en **todo** `bootfs`
+(`grep -ro -- '--[a-z-]*' /Volumes/bootfs/*.sh`), no en el archivo obvio. Queda una mención en
+`firstrun.sh`, pero es un comentario que narra lo que pasaba antes, y ese script ya está desenganchado
+del `cmdline.txt`.
+
+**Trampa 2: el `.tgz` de `bootfs` tiene que llevar `raspi/` entero.** `instalar-daemon.sh` hace
+`tar xzf` y después `mv /home/virovision/raspi /home/virovision/virovision`, así que necesita
+`raspi/setup.sh`, `raspi/requirements.txt`, `raspi/virovision.service` y `raspi/virovision/`. El
+primer intento se armó sólo con el paquete Python y quedó **incompleto** (21 KB contra 37 KB); se
+detectó verificando los cuatro archivos uno por uno antes de darlo por bueno. Sin ese chequeo, un
+reflasheo futuro habría instalado un daemon a medias y el síntoma habría aparecido meses después, sin
+nada que lo conectara con este día.
+
+**Trampa 3: la sentinela está en ext4.** `instalar-daemon.sh` corre detrás de
+`ConditionPathExists=!/var/lib/virovision-instalado`, y ese archivo **no se puede borrar desde macOS
+con la tarjeta puesta**: `bootfs` es FAT, el resto no. O sea que "meto la tarjeta en la Mac y
+reinstalo" no es un camino. Reemplazar el `.tgz` tampoco alcanza por sí solo.
+
+**Verificación, con la placa todavía en la red de casa y antes de devolverla a modo producto:**
+
+| chequeo | resultado |
+|---|---|
+| `GET /health` | payload nuevo: `battery`, `camera`, `port`, `network` |
+| `GET /salud` | 404 — el endpoint viejo ya no existe |
+| `GET /photos/latest` | 200 · 40 544 bytes · 0,14 s · JPEG 1024x766 del IMX500 |
+| log de arranque | cámara lista, HTTP en 8080, botón en GPIO 5, anunciando por BLE |
+
+Después se borró `SIN-AP`, se reinició, y la placa volvió a modo producto con su AP arriba.
+
+**El cierre, que costó más que el despliegue.** Con todo desplegado, la app seguía diciendo
+«conectado por Bluetooth, red apagada». La placa se descartó **con evidencia, no por descarte**: desde
+el celular unido al AP, `/health` devolvía `"ip":"10.42.0.1","port":8080,"ap":true` y
+`/photos/latest` devolvía la foto. O sea que publicaba bien su dirección y el HTTP andaba; lo que
+fallaba era que la app no llegaba a usarla. Por el código, «red apagada» sale sólo si el estado
+interno del wifi quedó en `off`, y a eso se llega por dos caminos: que `syncNetwork` haya recibido
+`target === null`, o que nunca haya corrido y el estado se haya quedado en su valor inicial. Como el
+`status` de la placa era correcto, el segundo era el sospechoso.
+
+Se destrabó del lado del teléfono, con los remedios que esta base ya tenía documentados: forzar el
+cierre de la app (el daemon se había reiniciado **con la app conectada**, y hay deuda conocida de que
+en ese caso la app puede quedar diciendo «Conectado» sobre un enlace muerto), olvidar el dispositivo
+en Ajustes → Bluetooth para que iOS suelte la caché de GATT, y confirmar el build instalado.
+**Cuál de los tres fue exactamente, no quedó aislado** — se probaron juntos y anduvo. Queda anotado
+así, sin elegir uno, porque decir cuál sin haberlo medido sería inventar la parte más útil.
+
+**Y una lección de herramientas que costó una hora y no es del proyecto:** a mitad de sesión macOS
+revocó por TCC el acceso a `~/Documents` a la terminal. El síntoma engaña — `ls -ld` del repo
+funciona, `ls` de su contenido da `Operation not permitted`, y `git` dice *"Unable to read current
+working directory"*, que parece un problema de git o de permisos de archivo. No lo es; lo delata que
+`~/Desktop` siga funcionando. Bloqueó a las **dos** sesiones a la vez y de paso al CLI de Supabase,
+cuyas credenciales viven dentro del repo, así que ni siquiera se pudo consultar la telemetría para
+diagnosticar. Se resuelve en Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1391,16 +1477,12 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
   registro; con el AP siempre encendido la placa no está en la red de casa: para desplegar, apagar el
   AP por BLE desde la Mac con la app cerrada.
-- **Editar `/boot/firmware/modo-red.sh` en la microSD**: tiene `--sin-ap` hardcodeado y el flag ahora
-  es `--no-ap` (ADR 0009). No urge —la tarjeta está en modo producto, sin el archivo `SIN-AP`, así
-  que el script no escribe ningún drop-in— pero el día que alguien quiera volver al modo desarrollo,
-  el daemon no va a arrancar. Se arregla con la tarjeta puesta en cualquier computadora:
-  `sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh`.
-- **Documentar el mecanismo de arranque de la microSD en `hardware/raspi/README.md`**: el
-  `virovision-modo-red.service`, el switch `SIN-AP`, el `virovision-daemon.tgz` de `bootfs` y la
-  sentinela `/var/lib/virovision-instalado` que impide que la reinstalación se dispare sola. Nada de
-  eso está en el repo, y es lo que explica por qué la placa se comporta distinto de lo que dice el
-  código.
+- **Aislar qué destrabó el «red apagada» del 2026-09-10**: se probaron juntos el cierre forzado de la
+  app, olvidar el dispositivo en Ajustes → Bluetooth y confirmar el build, y anduvo. Saber cuál fue
+  cambia el remedio que hay que documentar: si fue la caché de GATT, el README de la placa ya lo dice;
+  si fue el enlace muerto tras reiniciar el daemon con la app conectada, eso es **deuda de la app** y
+  se arregla en `DeviceProvider` detectando que el peer se reinició, no pidiéndole al usuario que
+  cicle el Bluetooth.
 - **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
