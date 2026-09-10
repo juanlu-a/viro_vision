@@ -1507,6 +1507,49 @@ intérprete de la placa antes de arrancar el servicio (`requests_reading(2) = Tr
 después `/health` y `/photos/latest` desde el Mac. **En ningún momento hubo que unirse al AP**, que
 era lo que cortaba la sesión las veces anteriores.
 
+## 2026-09-10 (cont. 3) — Un amigo con Android en la sala: el `.aab` no se instala
+
+Pedido simple y sin plan previo: **un `.apk` para un amigo que estaba ahí**, con Google Play para
+después. Lo interesante es que el repo parecía tenerlo resuelto y no lo tenía. Estaba el workflow de
+Play (`android-play.yml`), estaba la upload key cargada como secret, estaba `play.sh` — y nada de eso
+sirve para el caso: **un `.aab` no se instala en un teléfono**. Es formato de publicación; Google lo
+re-parte por dispositivo y lo firma él. Sin cuenta de Play (que sigue esperando la verificación de
+identidad) el `.aab` no va a ningún lado, y el teléfono lo rechaza.
+
+Tampoco había camino local: **el Mac del equipo no tiene JDK ni Android SDK** —está escrito en
+`play.sh` y es la razón de que Android compile en CI—, así que instalar la toolchain para un build
+suelto era el camino largo.
+
+Lo que se agregó es el hermano de sideload del pipeline de Play, y nada más: mismo runner Linux
+(gratis, el repo es público), mismo prebuild, mismo `versionCode` = minutos desde 1970, misma upload
+key. Cambia una palabra en Gradle: **`assembleRelease` en vez de `bundleRelease`**, que produce el
+`.apk` universal instalable. Queda como artefacto del run, con nombre `virovision-<versión>-<code>.apk`
+—porque «app-release.apk» no dice nada cuando hay dos en un chat de WhatsApp.
+
+**Tres decisiones que valen para el próximo:**
+
+1. **Corre en cada push a `staging`** mientras Play esté apagado. Eso lo vuelve el equivalente
+   Android del grupo interno de TestFlight, que era el agujero real: los devs con iPhone tienen un
+   canal desde el 2026-08-31 y los de Android no tenían ninguno. Se apaga solo con
+   `PLAY_ENABLED=true`, cuando *internal testing* haga ese trabajo mejor.
+2. **No corre lint/typecheck/tests.** `ci.yml` ya cubre lo que entra a `staging` y acá lo que importa
+   es tener el binario rápido. El chequeo de `npm run keys` sí quedó: son segundos y es lo que evitó
+   el build con modo supermercado muerto del 2026-09-02.
+3. **La firma es la trampa a recordar.** Este `.apk` va firmado con nuestra upload key y el de Play
+   irá firmado con la clave que guarda Google (Play App Signing). Son firmas distintas: **el día que
+   la app se publique, quien tenga este `.apk` tiene que desinstalarlo primero**. Está escrito en el
+   script, en el workflow y en `docs/android-play.md`, porque es exactamente el tipo de cosa que
+   aparece como «no me deja instalar» seis meses después.
+
+Salió el build `virovision-1.0.0-29817989.apk`, **175 MB**. Pesa eso porque es universal: las cuatro
+ABIs, y los `.so` de ExecuTorch son la mitad del bulto (`x86`/`x86_64`, que son sólo de emulador,
+aportan ~81 MB que ningún teléfono usa). Filtrar ABIs lo bajaría a la mitad; no se tocó porque el
+mismo `build.gradle` alimenta el `.aab` de Play y los emuladores del equipo. Anotado abajo.
+
+Detalle para quien lo reparta: el build sale con `EXPO_PUBLIC_SIMULATE_DEVICE=0`, así que «Buscar
+dispositivo» busca la placa real. Sin hardware al lado, esa pantalla no encuentra nada — el modo
+ómnibus (OCR local) y el de supermercado (por el proxy) andan igual.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1536,7 +1579,13 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   defensa**.
 - **Sumar a Magalí a TestFlight** (grupo interno) cuando pase su email; Francisco espera el canal
   Android.
-- **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; después: crear
+- **`.apk` universal de 175 MB** (2026-09-10). `x86`/`x86_64` son ~81 MB que ningún teléfono usa:
+  sólo están para emuladores. Filtrar ABIs (`abiFilters` por `expo-build-properties`) lo baja a la
+  mitad, pero toca el mismo `build.gradle` que alimenta el `.aab` de Play y los emuladores del
+  equipo — decidir cuándo molesta el tamaño más de lo que molesta perder el emulador x86.
+- **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; mientras tanto el
+  canal Android es el `.apk` de sideload (`android-apk.yml`, artefacto de cada push a `staging`);
+  después: crear
   la app (`com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`), `PLAY_ENABLED=true`
   y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
 

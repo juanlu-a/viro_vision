@@ -189,6 +189,9 @@ ADR 0008. Es el cierre práctico del pendiente (b) de ADR 0006.
    listos y gateados con `PLAY_ENABLED`. Falta la cuenta de Google Play Console (USD 25),
    crear la app, la service account y la primera subida manual. Ver
    [`android-play.md`](android-play.md).
+   **Mientras tanto hay canal Android (2026-09-10)**: `android-apk.yml` deja un `.apk` universal
+   firmado como artefacto de cada push a `staging` (y a mano desde cualquier rama), para instalarlo
+   a mano — el `.aab` de Play no se instala en un teléfono. Se apaga solo cuando `PLAY_ENABLED=true`.
 
 ## What's next — options (was mid-discussion)
 
