@@ -33,6 +33,50 @@ bluetoothctl show | grep -i powered   # Powered: yes
 Desde el iPhone, antes de tocar la app: **nRF Connect** o **LightBlue** (gratis) ven un periférico
 `ViroVision` con un servicio `4380c500-…` y cinco características. Si eso se ve, la placa está bien.
 
+## Cómo arranca la microSD que está en uso (y por qué no se parece a `setup.sh`)
+
+La tarjeta que está en la placa **no se instaló con los pasos de arriba** y su comportamiento no se
+deduce del repo. Escribirlo acá es la única forma de que alguien entienda por qué la placa hace algo
+distinto de lo que dice el código. Todo vive en `/boot/firmware`, que es **FAT**: se toca desde
+cualquier computadora con la tarjeta puesta, sin herramientas de ext4 y sin entrar a la placa.
+
+**El interruptor de modo de red.** Un `virovision-modo-red.service` (`Before=virovision.service`)
+corre `/boot/firmware/modo-red.sh` en **cada** arranque, y ese script decide según exista o no un
+archivo:
+
+| `/boot/firmware/SIN-AP` | qué hace `modo-red.sh` | consecuencia |
+|---|---|---|
+| **existe** | escribe el drop-in `/etc/systemd/system/virovision.service.d/10-sin-ap.conf` con `--no-ap` | desarrollo: la placa se queda en la WiFi conocida, **hay SSH**, y la app dice «red apagada» (`status.ip` llega null) |
+| **no existe** | borra ese drop-in | producto: la placa levanta su AP al arrancar (ADR 0003) y deja cualquier otra red, así que **no hay SSH** por la red de casa |
+
+Por eso **el drop-in no se edita a mano**: lo pisa el próximo arranque. Lo que se cambia es el
+archivo `SIN-AP`, y si hay que cambiar el flag, `modo-red.sh`.
+
+> ⚠️ **Deuda conocida:** `modo-red.sh` tiene el flag **hardcodeado** y quedó con el nombre viejo,
+> `--sin-ap`, que ADR 0009 renombró a `--no-ap`. Mientras la tarjeta esté en modo producto no pasa
+> nada (el script no escribe nada), pero **crear `SIN-AP` con el daemon nuevo instalado deja a
+> systemd fallando con `unrecognized arguments`**. Se arregla con la tarjeta puesta en cualquier
+> computadora: `sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh`.
+
+**Con el AP arriba sí se puede entrar.** `sshd` escucha en todas las interfaces: uniéndose a la red
+`ViroVision` (clave `virovision2026`) se llega a `ssh virovision@10.42.0.1`. Lo que se pierde en esa
+computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a propósito (ADR 0003), así
+que conviene hacerlo desde una máquina que tenga otra salida (cable, datos móviles).
+
+**El primer arranque.** Un `firstrun.sh` lanzado una sola vez desde `systemd.run=` en `cmdline.txt`
+(target mínimo, sin red) instala ese servicio, lo aplica para ese arranque y **se saca del
+`cmdline.txt`** para no repetir el arranque mínimo. Log en `/var/log/virovision-firstrun.log`.
+
+**El daemon no se reinstala solo.** `instalar-daemon.sh` está detrás de
+`ConditionPathExists=!/var/lib/virovision-instalado`, y esa sentinela ya existe: descomprimir un
+`virovision-daemon.tgz` nuevo en `bootfs` **no alcanza**. Para desplegar hay que reemplazar el `.tgz`
+**y** borrar la sentinela, o copiar el daemon por `scp` a través del AP.
+
+**Por qué nada de esto usa cloud-init como corresponde.** En esta imagen cloud-init lee
+`network-config` y **no lo aplica** (`No network config applied. Neither a new instance nor
+datasource network update allowed`; falta el módulo `cc_netplan_nm_patch`), así que el WiFi hay que
+escribirlo a mano como keyfile de NetworkManager. Todo el andamiaje de arriba existe por eso.
+
 ## Emular la placa desde la Mac (sin hardware)
 
 El mismo núcleo (`virovision/core.py`: comandos, modos, transferencias) se puede publicar por

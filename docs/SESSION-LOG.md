@@ -1290,9 +1290,22 @@ existe para prohibir, que es la peor forma de tener un linter.
 1. **La base y las funciones antes que el build.** Aplicar la migración, desplegar `telemetry` y
    `vision`, y recién después dejar salir el build. Una app con el vocabulario nuevo contra la
    función vieja no guarda nada y contesta `200` — el modo de falla que este contrato siempre tuvo.
-2. **La microSD.** El drop-in de systemd de la placa pasa `--sin-ap`; con el flag renombrado el
-   daemon no arranca ("unrecognized arguments"). Es un `sed` en la unidad, pero hay que acordarse
-   antes de reinstalar el daemon.
+2. **La microSD.** El flag renombrado la deja en una trampa. *(Corregido el mismo día: la primera
+   versión de esta nota decía "editar el drop-in `10-sin-ap.conf`", y ese archivo **no existe** en la
+   tarjeta — se lo escribe y se lo borra un script de arranque, así que un `sed` contra él no habría
+   hecho nada y habría dado la falsa sensación de estar arreglado.)*
+
+   El mecanismo real, que hasta hoy no estaba escrito en ningún lado: en la partición FAT de arranque
+   hay un `virovision-modo-red.service` que corre `/boot/firmware/modo-red.sh` antes que el daemon.
+   Ese script **mira si existe `/boot/firmware/SIN-AP`**: si existe, escribe el drop-in
+   `10-sin-ap.conf` con el flag de desarrollo; si no existe, lo borra y la placa levanta su AP. Hoy
+   la tarjeta está **sin** `SIN-AP`, o sea en modo producto y sin drop-in.
+
+   El problema es que `modo-red.sh` tiene `--sin-ap` **hardcodeado**. En cuanto alguien cree el
+   archivo `SIN-AP` con el daemon nuevo instalado, systemd falla con `unrecognized arguments`. Como
+   está en FAT, se arregla desde cualquier computadora con la tarjeta puesta, sin entrar a la placa:
+
+       sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh
 
 ## Open threads / next
 
@@ -1340,8 +1353,16 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
   registro; con el AP siempre encendido la placa no está en la red de casa: para desplegar, apagar el
   AP por BLE desde la Mac con la app cerrada.
-- **Editar el drop-in de systemd de la microSD**: pasa `--sin-ap` y el flag ahora es `--no-ap`
-  (ADR 0009). Hasta que se edite, el daemon no arranca en esa placa.
+- **Editar `/boot/firmware/modo-red.sh` en la microSD**: tiene `--sin-ap` hardcodeado y el flag ahora
+  es `--no-ap` (ADR 0009). No urge —la tarjeta está en modo producto, sin el archivo `SIN-AP`, así
+  que el script no escribe ningún drop-in— pero el día que alguien quiera volver al modo desarrollo,
+  el daemon no va a arrancar. Se arregla con la tarjeta puesta en cualquier computadora:
+  `sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh`.
+- **Documentar el mecanismo de arranque de la microSD en `hardware/raspi/README.md`**: el
+  `virovision-modo-red.service`, el switch `SIN-AP`, el `virovision-daemon.tgz` de `bootfs` y la
+  sentinela `/var/lib/virovision-instalado` que impide que la reinstalación se dispare sola. Nada de
+  eso está en el repo, y es lo que explica por qué la placa se comporta distinto de lo que dice el
+  código.
 - **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
