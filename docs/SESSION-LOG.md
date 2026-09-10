@@ -1307,6 +1307,44 @@ existe para prohibir, que es la peor forma de tener un linter.
 
        sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh
 
+## 2026-09-09 (cont.) — El botón probado en la mano: un gesto nombra un modo, no un paso
+
+- **La máquina de ADR 0007 no se sostuvo en la primera prueba real.** Con el botón soldado y
+  funcionando, los clicks sólo valían desde *esperando*: dentro de un modo el click corto quedaba
+  reservado "para disparar una lectura" y cambiar de ómnibus a supermercado exigía un click largo en
+  el medio. En la mano eso no se lee como "falta un gesto", se lee como **el botón está roto**.
+  Ahora **1 click es siempre ómnibus y 2 clicks siempre supermercado**, desde cualquier estado;
+  entrar a un modo desactiva el anterior. El click largo sigue siendo la salida.
+
+- **La decisión viajó con el código, no detrás.** El test de la app dice explícitamente que ante
+  desacuerdo manda el diagrama canónico, así que el mismo PR mueve las cinco superficies:
+  `docs/architecture/README.md` (el diagrama), ADR 0007 (sección de actualización), `modes.py`,
+  `modes.ts` y los dos tests. El test de la app que afirmaba lo contrario —*"does not allow jumping
+  from one mode to the other"*— quedó **invertido y no borrado**, porque la tentación ahora corre
+  al revés: quien reponga la guarda va a traer de vuelta en silencio el botón que se sentía roto.
+
+- **Los dos modos son de naturaleza distinta y ahora está escrito.** Ómnibus es **continuo**: deja
+  la cámara en vigilancia y anuncia cada ómnibus que aparece. Supermercado es **puntual**: al
+  activarse saca una foto y la procesa, porque el usuario está parado frente a la góndola apuntando
+  a un producto. Por eso el disparo automático de lectura al entrar existe **sólo** en supermercado,
+  y en `useReader` se dispara mirando el modo y no el gesto: así vale igual si el modo vino del
+  botón físico o de la app, que es todo el punto de tener una sola máquina.
+
+- **Se fue el bloque "Red con el dispositivo"** de la pantalla de conexión: era consola del
+  dispositivo, y la app dejó de ser su propia consola (PR #68). Lo que **queda** es el motivo cuando
+  algo falla (`wifiDetail` y `lastNotice`, unificados) — para quien no ve la pantalla, ése es el
+  único texto que explica por qué el botón no hizo nada. Cinco cadenas quedaron huérfanas en
+  `es.ts` y se borraron.
+
+- **Queda abierto** cómo pedir una **segunda** lectura de supermercado sin salir del modo: hoy son
+  dos gestos (click largo y otra vez dos clicks). Que repetir los dos clicks saque otra foto exige
+  que el dispositivo avise cada *gesto* y no sólo cada *cambio de modo* —porque el modo no cambia—,
+  o sea superficie nueva en el protocolo BLE. Se decide con el usuario antes de agregarla.
+
+- Verificado: `pytest` en `hardware/raspi` (48, 1 skip) y `npm run lint && typecheck && test` en
+  `app/` (206). **Sin probar contra la placa**: el daemon instalado sigue siendo el pre-ADR-0009 y
+  habla el protocolo viejo.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

@@ -102,11 +102,6 @@ export const es = {
     batteryLow: 'batería baja',
     noAddress:
       'La placa no informó una dirección de red. Tiene que estar conectada a un WiFi y con el servidor corriendo.',
-    wifiLabel: 'Red con el dispositivo',
-    wifiOff: 'apagada hasta activar un modo',
-    wifiJoining: 'conectando…',
-    wifiReady: 'lista',
-    wifiError: 'sin respuesta',
     wifiReadyAnnounce: 'Red con el dispositivo lista.',
     wifiFailedAnnounce: 'No se pudo usar la red del dispositivo.',
     wifiModuleMissing: 'Este build no puede unirse a redes WiFi. Hace falta un development build.',

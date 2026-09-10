@@ -1,9 +1,9 @@
 /**
  * Exists because the firmware implements THIS SAME machine on top of the physical button
- * (ADR 0007): if someone adds a transition to the app that the button does not have —the direct
- * jump between modes being the obvious temptation—, app and device start telling the user
- * different stories and no screen gives it away. The table replicates the canonical diagram in
- * `docs/architecture/README.md` case by case; on disagreement, the diagram wins.
+ * (ADR 0007): if the app and `hardware/raspi/virovision/modes.py` disagree on a single cell, app
+ * and device start telling the user different stories and no screen gives it away. The table
+ * replicates the canonical diagram in `docs/architecture/README.md` case by case; on disagreement,
+ * the diagram wins.
  */
 import { GESTURES, MODES, transition } from './modes';
 import type { Gesture, Mode } from './modes';
@@ -11,8 +11,8 @@ import type { Gesture, Mode } from './modes';
 describe('transition', () => {
   const expected: Record<Mode, Record<Gesture, Mode>> = {
     idle: { click: 'bus', doubleClick: 'supermarket', longPress: 'idle' },
-    bus: { click: 'bus', doubleClick: 'bus', longPress: 'idle' },
-    supermarket: { click: 'supermarket', doubleClick: 'supermarket', longPress: 'idle' },
+    bus: { click: 'bus', doubleClick: 'supermarket', longPress: 'idle' },
+    supermarket: { click: 'bus', doubleClick: 'supermarket', longPress: 'idle' },
   };
 
   for (const mode of MODES) {
@@ -23,8 +23,16 @@ describe('transition', () => {
     }
   }
 
-  it('does not allow jumping from one mode to the other without passing through idle', () => {
-    expect(transition('bus', 'doubleClick')).not.toBe('supermarket');
-    expect(transition('supermarket', 'click')).not.toBe('bus');
+  // 2026-09-09 update of ADR 0007. The previous version of this test asserted the opposite: that
+  // there was NO direct jump. It is kept inverted, and not deleted, because the temptation now runs
+  // the other way — someone restoring the guard would silently bring back the behaviour that read
+  // as a broken button in the user's hand.
+  it('jumps straight between modes: a gesture names a mode, not a step', () => {
+    expect(transition('bus', 'doubleClick')).toBe('supermarket');
+    expect(transition('supermarket', 'click')).toBe('bus');
+  });
+
+  it('a long press always leaves, from any mode', () => {
+    for (const mode of MODES) expect(transition(mode, 'longPress')).toBe('idle');
   });
 });
