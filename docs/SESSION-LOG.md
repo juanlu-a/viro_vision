@@ -1507,6 +1507,74 @@ intérprete de la placa antes de arrancar el servicio (`requests_reading(2) = Tr
 después `/health` y `/photos/latest` desde el Mac. **En ningún momento hubo que unirse al AP**, que
 era lo que cortaba la sesión las veces anteriores.
 
+## 2026-09-10 (cont. 2) — El teléfono bloqueado: el arreglo, y una premisa que llevaba días siendo falsa
+
+El usuario probó **lo que el producto realmente es**: teléfono bloqueado, doble click en el botón de
+la placa. **No pasaba nada.** Al desbloquear, ni lectura ni error en Inicio. Es la premisa entera del
+diseño (ADR 0003 §2: «el usuario lleva el teléfono bloqueado en el bolsillo»), así que se abrió el
+spike 1 que estaba anotado desde el 2026-09-04.
+
+**Lo primero que apareció no fue el defecto, fue un error nuestro.** El ADR y este mismo log decían
+que el modo de fondo estaba apagado «hasta el spike 1», porque el plugin de ble-plx tenía
+`isBackgroundEnabled: false`. Leyendo la fuente del plugin resultó que ese flag **no gatea iOS**:
+`withBLE.js` aplica `withBLEBackgroundModes(modes)` de forma incondicional, y `isBackgroundEnabled`
+sólo agrega un `<uses-feature bluetooth_le required>` en Android. Lo que escribe `bluetooth-central`
+es `modes: ["central"]`, que estaba desde el principio; `audio` lo agrega `expo-audio` por su
+default. Confirmado corriendo el prebuild y mirando el `Info.plist`, no de memoria:
+`UIBackgroundModes => [audio, bluetooth-central]`. **Durante casi una semana creímos tener apagado
+algo que estaba prendido**, y ese riesgo mal anotado es lo que cerró la búsqueda antes de empezarla.
+Las dos frases quedaron tachadas y corregidas en el ADR.
+
+**Qué faltaba de verdad**, tres cosas y ninguna es una clave del plist:
+
+1. **Ninguna sesión de audio.** `expo-audio` estaba instalado, estaba como plugin, y **no lo
+   importaba ni un archivo**. Sin `setAudioModeAsync` iOS deja la app en la categoría por defecto,
+   que no tiene permitido sonar con la pantalla bloqueada.
+2. **El botón de la placa viajaba por estado de React y lo servía una pantalla.** `onReadRequest` →
+   `setReadRequest(n+1)` → contexto → `useEffect` de `useReader`, que sólo monta Inicio. Una
+   interrupción de hardware no puede depender de qué pestaña está en pantalla; con la pantalla
+   apagada no hay ninguna.
+3. **No había forma de saber dónde moría la cadena.** Bloqueado no hay consola, y las filas de
+   `events` no decían en qué estado de la app se escribieron ni se subían hasta que algo vaciaba la
+   cola.
+
+**Lo que se hizo.** Una sesión de audio explícita (`services/audio/session.ts`, con la política
+aparte en `audioMode.ts` para poder afirmarla en un test sin dispositivo) con
+`interruptionMode: 'mixWithOthers'`, apartándose a propósito del ejemplo de la documentación de Expo
+que usa `doNotMix`: **VoiceOver es la interfaz de este usuario** y `doNotMix` y `duckOthers` lo
+pisan. Un tono inaudible de −50 dBFS sostenido mientras dura la lectura, porque audio realmente
+sonando es lo que mantiene vivo el proceso bajo el modo `audio` y el presupuesto de iOS al despertar
+por BLE es de unos pocos segundos. Un **chirp de 120 ms al empezar**, que es feedback que no existía
+—hoy el botón no suena nada durante el segundo y medio de la nube— y de paso el mejor diagnóstico
+desplegable que tenemos: bloqueado, o se escucha (despertó, la sesión anda, lo que falle es el
+pipeline) o no se escucha (nunca despertó). El pipeline entero salió de la pantalla a
+`features/reader/readingService.ts`, un módulo sin React que `ReaderBridge` suscribe **directo al
+cliente BLE**; `useReader` quedó como un `useSyncExternalStore` con la misma firma, así que Inicio no
+cambió una línea. `announce()` ahora se puede esperar (`speak()` resuelve en `onDone`) — sin eso,
+soltar la sesión en la línea siguiente cortaba el anuncio por la mitad. Y un tope de 12 s por lectura
+con `AbortController`, con la foto bajando en 4 s en vez de 20: una lectura que se pasa del punto
+donde iOS mata el proceso es una que el usuario nunca escucha **y** de la que nunca se entera.
+
+**La instrumentación es la mitad del PR, y a propósito.** Cada fila de `events` lleva ahora
+`detail.app` con el `AppState` del momento —sin eso una corrida bloqueada y una en pantalla son la
+misma línea de tiempo—; hay `ble.event` con el `t` crudo apenas la radio entrega la trama, incluso
+cuando el JSON no parsea, que antes se descartaba **en silencio**; y la cola se vacía también **al
+volver a primer plano** y al terminar una lectura que empezó en segundo plano, porque hasta ahora eso
+dependía de que un `setTimeout` de 15 s sobreviviera a la suspensión. El bloque E nuevo de
+`qa-modo-supermercado.md` dice cómo leer la tabla, y el discriminador que decide si hace falta
+`restoreStateIdentifier` es el `session`: si cambió entre antes y después de desbloquear, iOS no
+suspendió la app, **la mató**.
+
+Se aprovechó para sacar dos permisos que el producto no usa y que entraban por el default de
+`expo-audio`: `NSMicrophoneUsageDescription` (con texto en inglés, además) y `RECORD_AUDIO` en
+Android. Mismo criterio que el 2026-09-08 con la cámara y la fototeca.
+
+**Lo que este PR NO cierra**: el spike 1 sigue abierto hasta que el bloque E pase **en el teléfono**.
+Lo que se entrega es el arreglo más lo que lo hace verificable. Y queda el riesgo honesto de que
+`AVSpeechSynthesizer` no respete nuestra sesión: si el chirp se escucha y la voz no, la escalera de
+arreglos está escrita en el ADR y el último escalón es el `.mp3` que `services/audio/synthesis.ts` ya
+sabe producir.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1547,8 +1615,7 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Logs a Supabase — hecho (2026-09-09)**, esquema y limpieza de la tabla incluidos. Lo que queda es
   **mirar la tabla después de una salida real** y ver si lo que se registró alcanza para explicar una
   falla; si falta un evento, agregarlo es una línea en `tipos.ts`.
-- Después: **spike 1 de segundo plano en iOS** (la
-  notificación BLE despierta la app con la pantalla bloqueada y el ciclo termina); **parlante en la
+- Después: **parlante en la
   placa** (DAC I2S) para el audio que ya llega a `/tmp`; Android: API de
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
   registro; con el AP siempre encendido la placa no está en la red de casa: para desplegar, apagar el
@@ -1570,8 +1637,10 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
 - **Cámara**: resuelto (era hot-plug; y es la AI Camera). Ajustar el enfoque manual: las primeras fotos salieron desenfocadas.
-- **Spike 1**: segundo plano en iOS — con la pantalla bloqueada, una notificación BLE despierta la
-  app y el ciclo entero termina antes de que iOS la suspenda. Recién ahí `isBackgroundEnabled: true`.
+- **Spike 1**: segundo plano en iOS — **arreglado e instrumentado el 2026-09-10, falta correrlo en el
+  teléfono** (bloque E de `qa-modo-supermercado.md`). La frase que estaba acá («recién ahí
+  `isBackgroundEnabled: true`») era falsa: ese flag nunca gateó iOS. Lo que queda por decidir con la
+  corrida es si hace falta `restoreStateIdentifier`.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
 - **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
 - Placa: **calibrar los tiempos del botón** con el usuario (hecho el 2026-09-07, sin probar en

@@ -14,6 +14,8 @@
  * fifteen seconds per assertion, and one reading `process.env` would measure where it runs and not
  * what it does (the lesson of the TestFlight failure of 2026-09-02).
  */
+import { AppState } from 'react-native';
+
 import { MAX_QUEUED } from './queue';
 import { generateId, getPhoneId, PHONE_KEY } from './identity';
 import { startTelemetry, record, resetTelemetryForTests, flush } from './recorder';
@@ -50,6 +52,10 @@ function start(fetchImpl: typeof fetch, at = '2026-09-09T12:00:00.000Z') {
 
 afterEach(() => resetTelemetryForTests());
 
+beforeEach(() => {
+  (AppState as { currentState: unknown }).currentState = 'active';
+});
+
 describe('record', () => {
   it('builds every event with type and at: without those the function drops it and answers 200 all the same', async () => {
     const { impl, bodies } = recordingFetch();
@@ -66,7 +72,9 @@ describe('record', () => {
       type: 'reading.ok',
       at: '2026-09-09T12:00:00.000Z',
       ms: 1234.7,
-      detail: { mode: 'supermarket' },
+      // `app` travels on every row since 2026-09-10: without it a reading that happened with the
+      // screen locked and one that happened on screen are the same row.
+      detail: { app: 'active', mode: 'supermarket' },
     });
   });
 
@@ -200,5 +208,58 @@ describe('identity', () => {
 
   it('the id carries nothing from the system: it is randomness with a prefix', () => {
     expect(generateId('phone', () => 0)).toBe('phone-0000000000000000');
+  });
+});
+
+/**
+ * The app-state stamp and the two flush edges.
+ *
+ * These exist because of the failure of 2026-09-10: the physical button did nothing with the phone
+ * locked, and the table could not say why — every row looks the same whether it was written with
+ * the app on screen or with the screen off, and a whole background session's rows could sit in
+ * memory until somebody happened to open the app again. Both of those are the difference between
+ * diagnosing this and guessing.
+ */
+describe('the locked screen', () => {
+  it('stamps the app state on every event: a background run and a foreground one are otherwise the same timeline', async () => {
+    const { impl, bodies } = recordingFetch();
+    const stop = start(impl);
+    (AppState as { currentState: unknown }).currentState = 'background';
+    record('app.start');
+    await flush();
+    expect(bodies[0].events[0].detail.app).toBe('background');
+    stop();
+  });
+
+  it('does not clobber a caller that stamps its own app field', async () => {
+    const { impl, bodies } = recordingFetch();
+    const stop = start(impl);
+    record('reading.start', { detail: { app: 'mine', mode: 'supermarket' } });
+    await flush();
+    expect(bodies[0].events[0].detail).toEqual({ app: 'mine', mode: 'supermarket' });
+    stop();
+  });
+
+  it('drains the queue when the app comes back to the foreground, not only when it leaves', async () => {
+    const handlers: ((state: string) => void)[] = [];
+    const spy = jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation(((_event: string, handler: (state: string) => void) => {
+        handlers.push(handler);
+        return { remove: () => {} };
+      }) as any);
+    const { impl, bodies } = recordingFetch();
+    const stop = start(impl);
+
+    record('reading.ok');
+    handlers[0]('active');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const types = bodies.flatMap((b: any) => b.events.map((e: any) => e.type));
+    expect(types).toContain('reading.ok');
+    expect(types).toContain('app.foreground');
+    stop();
+    spy.mockRestore();
   });
 });

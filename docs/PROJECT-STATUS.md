@@ -1,6 +1,6 @@
 # ViroVision — Project status & session handoff
 
-_Living status/continuation doc. Last updated: 2026-09-09._
+_Living status/continuation doc. Last updated: 2026-09-10._
 
 This captures where the project stands so anyone (including a fresh Claude Code session, together with
 the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
@@ -135,6 +135,19 @@ tests via `jest-expo`.
   pide lectura: ómnibus es vigilancia y repetirlo costaría una foto y una llamada a la nube por toque.
   La app muestra además la foto que sacó la placa debajo del resultado. Placa y app desplegadas y
   verificadas juntas.
+- **Segundo plano en iOS (2026-09-10, spike 1 de ADR 0003)**: con la pantalla bloqueada el doble
+  click no hacía nada, que es exactamente el caso del producto. Resultó que **el modo de fondo nunca
+  estuvo apagado** —`isBackgroundEnabled` no gatea el `Info.plist`, sólo el manifiesto de Android; el
+  ADR y el log decían lo contrario y quedaron corregidos—. Lo que faltaba: **ninguna sesión de
+  audio** (`expo-audio` estaba instalado y no lo importaba nadie), el **disparo del botón viajando
+  por estado de React y servido por Inicio**, y **nada con qué diagnosticar** una corrida sin
+  pantalla. Ahora hay `services/audio/session.ts` (`mixWithOthers` para no pisar VoiceOver, tono de
+  mantenimiento mientras dura la lectura, chirp al empezar), el pipeline salió de la pantalla a
+  `features/reader/readingService.ts` con `ReaderBridge` suscrito directo al cliente BLE, `announce()`
+  se puede esperar, hay tope de 12 s por lectura, y la telemetría estampa el `AppState` en cada fila
+  y vacía la cola al volver a primer plano. ⚠️ **El spike no está cerrado**: falta correr el
+  **bloque E** de [`qa-modo-supermercado.md`](qa-modo-supermercado.md) en el teléfono. De esa corrida
+  sale si hace falta `restoreStateIdentifier`.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a
@@ -145,7 +158,7 @@ tests via `jest-expo`.
   parlante del dispositivo. Detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED` porque hoy nada lo consume.
 - **QA**: `docs/qa-modo-supermercado.md` — checklist de punta a punta, partido por qué necesita cada
   bloque. Los pasos 8 y 9 son la corrida del dataset de evaluación.
-- Tests: **169 en 14 suites**.
+- Tests: **226 en 24 suites**.
 
 **CI/CD** (`.github/workflows/`, gated EAS jobs):
 - `ci.yml` — on PRs to main / feature pushes: install → lint → typecheck → test → bundle (iOS+Android

@@ -190,11 +190,81 @@ propósito: hoy nada consume el archivo, y prenderlo es pagar una llamada por ca
 
 ---
 
+## Bloque E — con la pantalla bloqueada (el caso real del producto)
+
+Es **el** bloque: el usuario lleva el teléfono bloqueado en el bolsillo y opera con el botón de la
+placa. El 2026-09-10 esto no funcionaba y nadie lo había probado así. Ver la actualización de
+[ADR 0003](architecture/adr/0003-enlace-placa-telefono.md).
+
+Necesita **rebuild nativo** (cambió `app.json`) y el proyecto de Supabase con telemetría, porque
+**con el teléfono bloqueado no hay consola**: la única evidencia es la tabla `events`.
+
+```sh
+cd app
+npx expo run:ios --device "iPhone de Juan"
+```
+
+### 13. La preparación
+
+- [ ] Anotar la hora. En la tabla, buscar el `app.start` del arranque y **anotar su `session`**: es
+      lo que después distingue "iOS suspendió la app" de "iOS la mató".
+- [ ] Placa prendida, app abierta, línea *Dispositivo* en **listo, con su red**, modo supermercado
+      activo, un producto real frente a la cámara.
+- [ ] VoiceOver **encendido**.
+- [ ] Una lectura en primer plano que salga bien. Es la línea base: sin ella, un fallo bloqueado no
+      dice nada.
+
+### 14. La corrida
+
+- [ ] Botón de bloqueo. **Esperar 30 s** — probar enseguida no prueba nada, iOS todavía no suspendió.
+- [ ] **Dos clicks** en el botón físico, con el teléfono guardado y la pantalla apagada.
+- [ ] **Se escucha el chirp de inmediato** (< 0,5 s). Éste es el corte más importante de todo el
+      bloque: si suena, la app despertó y la sesión de audio anda, y lo que falle después es el
+      pipeline. Si no suena, nunca despertó y no tiene sentido mirar el resto.
+- [ ] A los ~3 s **se escucha el producto** por el parlante del teléfono, con la pantalla apagada.
+      **Éste es el criterio de aceptación del arreglo, y es el único.**
+- [ ] VoiceOver **no** se corta ni baja de volumen mientras habla la app. Es lo que compra
+      `mixWithOthers`; si se corta, el `interruptionMode` no quedó donde debía.
+- [ ] Repetir el doble click **dos veces más sin desbloquear**, con productos distintos. Las tres
+      tienen que salir: la segunda y la tercera son las que fallan si la app se suspende entre
+      despertares.
+- [ ] Desbloquear: en Inicio está la **última** lectura con su foto.
+
+### 15. Cómo se lee la tabla (esto **es** el diagnóstico, no un extra)
+
+- [ ] Todas las filas de la ventana bloqueada tienen `detail.app = "background"`. Si dicen
+      `"active"`, el teléfono no llegó a suspender: repetir esperando más.
+- [ ] Hay `ble.event` con `{t:"read"}` → **la radio despertó la app**. Si falta, el problema está en
+      el enlace o en el proceso, no en el pipeline.
+- [ ] Hay `reading.requested` → el orquestador entró. `ble.event` sin `reading.requested` significa
+      que el disparo se perdió entre la capa nativa y JS.
+- [ ] Hay `audio.session {ok:true}` → la sesión se pudo tomar. `ok:false` explica un chirp mudo.
+- [ ] Hay `photo.ok`, `reading.ok`, `audio.spoken`. **El primero que falte nombra la etapa.**
+- [ ] `reading.failed` con `stage:"deadline"` = se pasó de los 12 s. Mirar el `ms` de `photo.ok` y de
+      `reading.ok` para saber cuál de las dos mitades se lo comió.
+- [ ] **El `session` de las filas de después de desbloquear es el MISMO que el de antes de
+      bloquear.** Si cambió, **iOS terminó la app** y hace falta `restoreStateIdentifier` (ADR 0003,
+      pendiente anotado). Si no hay ninguna fila **y** el `session` cambió: mismo caso. Si no hay
+      ninguna fila y el `session` es el mismo, la app estuvo suspendida y CoreBluetooth no la
+      despertó — buscar un `ble.lost`.
+
+### 16. Las variantes que hay que correr al menos una vez
+
+- [ ] **En el bolsillo**, no apoyado en la mesa: descarta que fuera proximidad u orientación.
+- [ ] **Con música sonando** en otra app: la lectura **mezcla**, no corta la música.
+- [ ] **Bloqueado 5 minutos** antes del doble click: es el caso que distingue "suspendida" de
+      "terminada", y el que decide si hay que implementar `restoreStateIdentifier`.
+- [ ] **Con el chirp escuchado pero sin voz**: quiere decir que `AVSpeechSynthesizer` no respeta
+      nuestra sesión. La escalera de arreglos está en la actualización del 2026-09-10 de ADR 0003
+      (probar `useApplicationAudioSession`, y si no, el `.mp3` de `services/audio/synthesis.ts`).
+
+---
+
 ## Qué NO cubre este documento
 
 - **El hardware.** Los dos casos de ómnibus del diagrama
-  ([`documents/logicas-casos-de-uso.pdf`](../documents/logicas-casos-de-uso.pdf)) están en stand by y
-  el enlace BLE/WiFi no existe. Que el `.mp3` llegue al parlante del dispositivo no se puede probar
-  todavía, y puede terminar no haciendo falta: es materia de ADR 0003.
+  ([`documents/logicas-casos-de-uso.pdf`](../documents/logicas-casos-de-uso.pdf)) están en stand by.
+  Que el `.mp3` llegue al **parlante de la placa** no se puede probar todavía: falta el DAC I2S. Todo
+  el audio de hoy, incluido el del bloque E, sale por el parlante del teléfono.
 - **El fallback local de supermercado.** Sigue pendiente (Gemma 3 1B con visión). Hoy, sin internet,
   el modo avisa y no lee — excepción acotada y documentada a ADR 0001.

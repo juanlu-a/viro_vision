@@ -14,6 +14,8 @@ import { isProxyConfigured } from '@/services/cloud';
 import { record, startTelemetry, isTelemetryConfigured } from '@/services/telemetry';
 import { DeviceProvider } from '@/features/device/DeviceProvider';
 import { ProductModelProvider } from '@/features/reader/ProductModelProvider';
+import { ReaderBridge } from '@/features/reader/ReaderBridge';
+import { configureAudioSession } from '@/services/audio/session';
 import {
   ThemePreferenceProvider,
   useThemePreference,
@@ -61,13 +63,24 @@ export default function RootLayout() {
     return stop;
   }, []);
 
+  // The audio session, once, before anything can want to speak. Without it iOS leaves the app on a
+  // category that is not allowed to make a sound with the screen locked — and this app's interface
+  // IS the voice (ADR 0001), on a phone that lives in a pocket (ADR 0003 §2). It never throws.
+  useEffect(() => {
+    void configureAudioSession().then((ok) => record('audio.session', { detail: { ok, at: 'startup' } }));
+  }, []);
+
   return (
     <ThemePreferenceProvider>
       {/* The supermarket model is chosen in Settings and used on Home: the state has to be a single
           one, above both tabs. */}
       <ProductModelProvider>
         <DeviceProvider>
-        <RootNavigator />
+          {/* Renders nothing. It hands the reading pipeline the app's live values and subscribes it
+              to the device's button, above every screen: the button has to work whatever is on
+              screen, and with the screen off there is nothing on it at all. */}
+          <ReaderBridge />
+          <RootNavigator />
         </DeviceProvider>
       </ProductModelProvider>
     </ThemePreferenceProvider>
