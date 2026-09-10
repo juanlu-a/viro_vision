@@ -1,15 +1,15 @@
-# Configuración del proyecto Supabase. Ver docs/supabase.md.
+# Supabase project configuration. See docs/supabase.md.
 project_id = "virovision"
 
 [functions.vision]
-# El proxy de claves de ADR 0008 NO exige JWT: la app no tiene login (ADR 0002) y la anon key
-# viajaría igual dentro del bundle, así que exigirla sería una indirección y no una defensa.
-# Está aceptado a conciencia en ADR 0008; las defensas reales son el freno por IP de la función y
-# el tope de gasto en la consola de cada proveedor.
+# ADR 0008's key proxy does NOT require a JWT: the app has no login (ADR 0002) and the anon key would
+# travel inside the bundle anyway, so requiring it would be an indirection and not a defence. It is
+# knowingly accepted in ADR 0008; the real defences are the function's per-IP brake and the spending
+# cap in each provider's console.
 verify_jwt = false
 
-[functions.telemetria]
-# Mismo criterio que `vision` (ADR 0008): la app no tiene login, así que exigir JWT sería pedir una
-# anon key que ya viaja dentro del bundle. Lo peor que puede pasar acá es ruido en una tabla de
-# desarrollo, y el tope por lote y el de detalle lo acotan.
+[functions.telemetry]
+# Same criterion as `vision` (ADR 0008): the app has no login, so requiring a JWT would be asking for
+# an anon key that already travels inside the bundle. The worst that can happen here is noise in a
+# development table, and the per-batch and per-detail caps bound it.
 verify_jwt = false

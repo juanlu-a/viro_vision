@@ -1,19 +1,19 @@
 name: TestFlight
 
-# Sube un build a TestFlight desde un runner macOS de GitHub (gratis: el repo es público).
+# Uploads a build to TestFlight from a GitHub macOS runner (free: the repo is public).
 #
-# Una sola app, dos grupos de TestFlight (decisión del 2026-08-30 — ver docs/dev-build-ios.md):
-#   - push a staging → grupo INTERNO "Equipo ViroVision": los devs la reciben en minutos, sin
-#                      Beta App Review (son usuarios de App Store Connect).
-#   - push a main    → grupo EXTERNO "Testers ViroVision" con link público (Beta App Review, el
-#                      primero de cada versión). Se llega por el PR de release staging → main.
-#   - manual desde cualquier rama → el destino que se elija (interno por defecto).
-# Se descartó publicar la β como app aparte (bundle .beta): sólo hacía falta para tener las dos
-# instaladas a la vez, y con tres devs alcanza con cambiar de build desde TestFlight.
+# One app, two TestFlight groups (decision of 2026-08-30 — see docs/dev-build-ios.md):
+#   - push to staging → the INTERNAL group "Equipo ViroVision": the devs get it in minutes, with no
+#                       Beta App Review (they are App Store Connect users).
+#   - push to main    → the EXTERNAL group "Testers ViroVision" with a public link (Beta App Review,
+#                       the first of each version). Reached through the staging → main release PR.
+#   - manual from any branch → whichever destination is chosen (internal by default).
+# Publishing the β as a separate app (a .beta bundle) was dropped: it was only needed to have both
+# installed at once, and with three devs switching build from TestFlight is enough.
 #
-# Antes de compilar corre lint + typecheck + tests: un build que llega a los testers tiene que
-# haber pasado por lo mismo que un PR. Requiere los secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8
-# (API key de App Store Connect con rol Administración) y, opcionales, las EXPO_PUBLIC_*_API_KEY.
+# Before compiling it runs lint + typecheck + tests: a build that reaches the testers has to have
+# gone through the same as a PR. It requires the secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (an
+# App Store Connect API key with the Admin role) and, optionally, the EXPO_PUBLIC_*_API_KEY ones.
 on:
   push:
     branches: [main, staging]
@@ -22,13 +22,13 @@ on:
       - '.github/workflows/testflight.yml'
   workflow_dispatch:
     inputs:
-      destino:
-        description: Grupo de TestFlight que recibe el build
-        default: interno
+      destination:
+        description: TestFlight group that receives the build
+        default: internal
         type: choice
-        options: [interno, externo]
+        options: [internal, external]
       notes:
-        description: Qué probar (lo ven los testers). Vacío = asunto del último commit.
+        description: What to test (the testers see it). Empty = last commit's subject.
         default: ''
         type: string
 
@@ -41,36 +41,37 @@ defaults:
     working-directory: ./app
 
 env:
-  # 'interno' (Equipo ViroVision, sin revisión) o 'externo' (Testers ViroVision, link público).
-  # En push lo decide la rama (sólo main es externo); en manual, el input. Se calcula una sola vez
-  # acá porque el env de un job no puede leer `env` (GitHub rechaza el workflow al parsearlo — pasó).
-  DESTINO: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.destino == 'externo')) && 'externo' || 'interno' }}
+  # 'internal' (Equipo ViroVision, no review) or 'external' (Testers ViroVision, public link).
+  # On push the branch decides (only main is external); on manual, the input. It is computed once
+  # here because a job's env cannot read `env` (GitHub rejects the whole workflow while parsing — it
+  # happened).
+  DESTINATION: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.destination == 'external')) && 'external' || 'internal' }}
 
 jobs:
   testflight:
-    name: Build y subida (${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.destino == 'externo')) && 'externo · Testers ViroVision' || 'interno · Equipo ViroVision' }})
+    name: Build and upload (${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.destination == 'external')) && 'external · Testers ViroVision' || 'internal · Equipo ViroVision' }})
     runs-on: macos-latest
     timeout-minutes: 75
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      # Se inlinean en el bundle JS en el archive (EXPO_PUBLIC_*), igual que el .env local.
-      # Una clave por proveedor del selector (ADR 0006). Las que falten simplemente dejan a su
-      # modelo fuera del selector en ese build; no rompen nada. OJO: quedan legibles dentro del
-      # .ipa/.apk hasta que el proxy de ADR 0008 esté desplegado.
+      # They are inlined into the JS bundle during the archive (EXPO_PUBLIC_*), same as the local
+      # .env. One key per selector provider (ADR 0006). The missing ones simply leave their model out
+      # of the selector in that build; they break nothing. CAREFUL: they stay readable inside the
+      # .ipa/.apk until ADR 0008's proxy is deployed.
       EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
       EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
       EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
       EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
-      # Con el proxy desplegado (ADR 0008) las cuatro claves de arriba dejan de hacer falta acá:
-      # las guarda el servidor y el build sale sin ninguna. Ver docs/supabase.md.
+      # With the proxy deployed (ADR 0008) the four keys above stop being needed here: the server
+      # holds them and the build goes out with none. See docs/supabase.md.
       EXPO_PUBLIC_VISION_PROXY_URL: ${{ secrets.EXPO_PUBLIC_VISION_PROXY_URL }}
-      # La telemetría (tabla `eventos`). Desde el 2026-09-08 la información técnica NO está en las
-      # pantallas: sin este secret el build sale a TestFlight sin ningún diagnóstico. No es una
-      # clave, es una URL — está como secret sólo para no publicar el endpoint en el repo.
+      # Telemetry (the `events` table). Since 2026-09-08 the technical information is NOT on the
+      # screens: without this secret the build goes to TestFlight with no diagnosis at all. It is not
+      # a key, it is a URL — it is a secret only so the endpoint is not published in the repo.
       EXPO_PUBLIC_TELEMETRY_URL: ${{ secrets.EXPO_PUBLIC_TELEMETRY_URL }}
-      # Apagado salvo que el secret exista y valga 1: el .mp3 por lectura cuesta una llamada al TTS
-      # y hoy no lo consume nadie (ver app/.env.example).
+      # Off unless the secret exists and is 1: the per-reading .mp3 costs one TTS call and nobody
+      # consumes it today (see app/.env.example).
       EXPO_PUBLIC_AUDIO_FILE_ENABLED: ${{ secrets.EXPO_PUBLIC_AUDIO_FILE_ENABLED }}
       EXPO_PUBLIC_SIMULATE_DEVICE: ${{ vars.EXPO_PUBLIC_SIMULATE_DEVICE }}
     steps:
@@ -80,34 +81,35 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: app/package-lock.json
-      - name: Xcode más nuevo disponible en el runner
+      - name: Newest Xcode available on the runner
         run: |
           XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
       - name: Install dependencies
         run: npm ci
-      - name: Verificar que el build lleve algún modelo de nube
-        # Falla ANTES de los 30 minutos de build. Existe porque el 2026-09-02 salió un build con el
-        # modo supermercado muerto: el único secret de proveedor dejó de corresponder a un modelo del
-        # registro y no se supo hasta abrir la app. Ver app/scripts/verificar-claves.mjs.
-        run: npm run claves
+      - name: Check the build carries some cloud model
+        # It fails BEFORE the 30 minutes of build. It exists because on 2026-09-02 a build went out
+        # with supermarket mode dead: the only provider secret stopped corresponding to a model in the
+        # registry and nobody knew until opening the app. See app/scripts/check-keys.mjs.
+        run: npm run keys
       - name: Lint · Typecheck · Test
         run: npm run lint && npm run typecheck && npm test
-      - name: API key de App Store Connect
-        # ASC_KEY_PATH se fija acá y no en el env del job: el contexto `runner` no existe a nivel
-        # de job y GitHub rechaza el workflow entero al parsearlo (primer run, 2026-08-29).
+      - name: App Store Connect API key
+        # ASC_KEY_PATH is set here and not in the job's env: the `runner` context does not exist at job
+        # level and GitHub rejects the whole workflow while parsing it (first run, 2026-08-29).
         run: |
           printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
           echo "ASC_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
         env:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-      - name: Certificado de distribución y perfil (firma manual)
-        # Desde 2026-09-06 el archive se firma con un certificado propio y un perfil de App Store que
-        # trae las capacidades del App ID (Hotspot Configuration, wifi-info). Antes el archive iba sin
-        # firmar y la firma automática en la nube exportaba sin los entitlements del proyecto: la app
-        # compilaba, subía, y en el teléfono NEHotspotConfiguration devolvía «internal error».
-        # Certificado y perfil se crearon por la API de ASC (docs/dev-build-ios.md).
+      - name: Distribution certificate and profile (manual signing)
+        # Since 2026-09-06 the archive is signed with our own certificate and an App Store profile
+        # that carries the App ID's capabilities (Hotspot Configuration, wifi-info). Before, the
+        # archive went unsigned and cloud automatic signing exported without the project's
+        # entitlements: the app compiled, uploaded, and on the phone NEHotspotConfiguration returned
+        # "internal error". Certificate and profile were created through the ASC API
+        # (docs/dev-build-ios.md).
         run: |
           KEYCHAIN="$RUNNER_TEMP/virovision.keychain-db"
           security create-keychain -p "" "$KEYCHAIN"
@@ -118,27 +120,27 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$KEYCHAIN"
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          printf '%s' "$IOS_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/perfil.mobileprovision"
-          UUID=$(security cms -D -i "$RUNNER_TEMP/perfil.mobileprovision" | plutil -extract UUID raw -o - -)
-          cp "$RUNNER_TEMP/perfil.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID.mobileprovision"
+          printf '%s' "$IOS_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          UUID=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" | plutil -extract UUID raw -o - -)
+          cp "$RUNNER_TEMP/profile.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID.mobileprovision"
           echo "IOS_SIGNING_PROFILE=ViroVision App Store" >> "$GITHUB_ENV"
-          echo "IOS_SIGNING_TEAM=$(security cms -D -i "$RUNNER_TEMP/perfil.mobileprovision" | plutil -extract TeamIdentifier.0 raw -o - -)" >> "$GITHUB_ENV"
+          echo "IOS_SIGNING_TEAM=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" | plutil -extract TeamIdentifier.0 raw -o - -)" >> "$GITHUB_ENV"
           security find-identity -v -p codesigning "$KEYCHAIN" | head -3
         env:
           IOS_DIST_P12_B64: ${{ secrets.IOS_DIST_P12_B64 }}
           IOS_DIST_P12_PASSWORD: ${{ secrets.IOS_DIST_P12_PASSWORD }}
           IOS_PROFILE_B64: ${{ secrets.IOS_PROFILE_B64 }}
-      - name: Proyecto nativo (prebuild + pods)
+      - name: Native project (prebuild + pods)
         run: npx expo prebuild --platform ios --no-install && (cd ios && pod install)
-      - name: Número de build
+      - name: Build number
         run: echo "BUILD_NUMBER=$(date +%Y%m%d%H%M)" >> "$GITHUB_ENV"
-      - name: Archive, export y subida
+      - name: Archive, export and upload
         run: bash scripts/testflight.sh
-      - name: Asignar al grupo y enviar a Beta App Review
+      - name: Assign to the group and submit to Beta App Review
         run: |
           NOTES="${{ inputs.notes }}"
-          if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · rama ${GITHUB_REF_NAME}"; fi
-          if [ "$DESTINO" = interno ]; then EXTRA=(--group "Equipo ViroVision" --internal); else EXTRA=(--group "Testers ViroVision"); fi
+          if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · branch ${GITHUB_REF_NAME}"; fi
+          if [ "$DESTINATION" = internal ]; then EXTRA=(--group "Equipo ViroVision" --internal); else EXTRA=(--group "Testers ViroVision"); fi
           node scripts/testflight-distribute.mjs \
             --build-number "$BUILD_NUMBER" \
             --notes "$NOTES" "${EXTRA[@]}"

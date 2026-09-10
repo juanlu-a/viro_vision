@@ -1,15 +1,15 @@
 name: Google Play
 
-# Sube un .aab a Google Play desde un runner Linux (gratis: el repo es público). Espejo del
-# workflow TestFlight para el dev del equipo con Android:
-#   - push a staging → pista "internal": testers por email, sin revisión de Google, minutos.
-#   - push a main    → pista "alpha" (closed testing): link de opt-in; la primera release pasa por
-#                      revisión de Google.
-#   - manual desde cualquier rama → la pista que se elija.
+# Uploads an .aab to Google Play from a Linux runner (free: the repo is public). A mirror of the
+# TestFlight workflow for the team's dev on Android:
+#   - push to staging → the "internal" track: testers by email, no Google review, minutes.
+#   - push to main    → the "alpha" track (closed testing): an opt-in link; the first release goes
+#                       through Google's review.
+#   - manual from any branch → whichever track is chosen.
 #
-# Gateado por la variable PLAY_ENABLED=true: hasta que exista la cuenta de Google Play y la
-# service account, el job se salta (no falla). Secrets: PLAY_UPLOAD_KEYSTORE_B64 (el .p12 de la
-# upload key en base64), PLAY_UPLOAD_KEYSTORE_PASSWORD, PLAY_SERVICE_ACCOUNT_JSON.
+# Gated by the PLAY_ENABLED=true variable: until the Google Play account and the service account
+# exist, the job is skipped (it does not fail). Secrets: PLAY_UPLOAD_KEYSTORE_B64 (the upload key's
+# .p12 in base64), PLAY_UPLOAD_KEYSTORE_PASSWORD, PLAY_SERVICE_ACCOUNT_JSON.
 on:
   push:
     branches: [main, staging]
@@ -18,13 +18,13 @@ on:
       - '.github/workflows/android-play.yml'
   workflow_dispatch:
     inputs:
-      pista:
-        description: Pista de Google Play que recibe el build
+      track:
+        description: Google Play track that receives the build
         default: internal
         type: choice
         options: [internal, alpha]
       notes:
-        description: Notas de la versión (las ven los testers). Vacío = asunto del último commit.
+        description: Release notes (the testers see them). Empty = last commit's subject.
         default: ''
         type: string
 
@@ -37,32 +37,32 @@ defaults:
     working-directory: ./app
 
 env:
-  # Mismo cálculo y misma trampa que en testflight.yml: una sola vez, a nivel workflow.
-  PISTA: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.pista == 'alpha')) && 'alpha' || 'internal' }}
+  # The same computation and the same trap as in testflight.yml: once, at workflow level.
+  TRACK: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.track == 'alpha')) && 'alpha' || 'internal' }}
 
 jobs:
   play:
-    name: Build y subida (${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.pista == 'alpha')) && 'alpha · closed testing' || 'internal testing' }})
+    name: Build and upload (${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.track == 'alpha')) && 'alpha · closed testing' || 'internal testing' }})
     if: ${{ vars.PLAY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # Una clave por proveedor del selector (ADR 0006). Las que falten simplemente dejan a su
-      # modelo fuera del selector en ese build; no rompen nada. OJO: quedan legibles dentro del
-      # .ipa/.apk hasta que el proxy de ADR 0008 esté desplegado.
+      # One key per selector provider (ADR 0006). The missing ones simply leave their model out of
+      # the selector in that build; they break nothing. CAREFUL: they stay readable inside the
+      # .ipa/.apk until ADR 0008's proxy is deployed.
       EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
       EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
       EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
       EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
-      # Con el proxy desplegado (ADR 0008) las cuatro claves de arriba dejan de hacer falta acá:
-      # las guarda el servidor y el build sale sin ninguna. Ver docs/supabase.md.
+      # With the proxy deployed (ADR 0008) the four keys above stop being needed here: the server
+      # holds them and the build goes out with none. See docs/supabase.md.
       EXPO_PUBLIC_VISION_PROXY_URL: ${{ secrets.EXPO_PUBLIC_VISION_PROXY_URL }}
-      # La telemetría (tabla `eventos`). Desde el 2026-09-08 la información técnica NO está en las
-      # pantallas: sin este secret el build sale a TestFlight sin ningún diagnóstico. No es una
-      # clave, es una URL — está como secret sólo para no publicar el endpoint en el repo.
+      # Telemetry (the `events` table). Since 2026-09-08 the technical information is NOT on the
+      # screens: without this secret the build goes out with no diagnosis at all. It is not a key, it
+      # is a URL — it is a secret only so the endpoint is not published in the repo.
       EXPO_PUBLIC_TELEMETRY_URL: ${{ secrets.EXPO_PUBLIC_TELEMETRY_URL }}
-      # Apagado salvo que el secret exista y valga 1: el .mp3 por lectura cuesta una llamada al TTS
-      # y hoy no lo consume nadie (ver app/.env.example).
+      # Off unless the secret exists and is 1: the per-reading .mp3 costs one TTS call and nobody
+      # consumes it today (see app/.env.example).
       EXPO_PUBLIC_AUDIO_FILE_ENABLED: ${{ secrets.EXPO_PUBLIC_AUDIO_FILE_ENABLED }}
       EXPO_PUBLIC_SIMULATE_DEVICE: ${{ vars.EXPO_PUBLIC_SIMULATE_DEVICE }}
     steps:
@@ -78,14 +78,14 @@ jobs:
           java-version: '17'
       - name: Install dependencies
         run: npm ci
-      - name: Verificar que el build lleve algún modelo de nube
-        # Falla ANTES de los 30 minutos de build. Existe porque el 2026-09-02 salió un build con el
-        # modo supermercado muerto: el único secret de proveedor dejó de corresponder a un modelo del
-        # registro y no se supo hasta abrir la app. Ver app/scripts/verificar-claves.mjs.
-        run: npm run claves
+      - name: Check the build carries some cloud model
+        # It fails BEFORE the 30 minutes of build. It exists because on 2026-09-02 a build went out
+        # with supermarket mode dead: the only provider secret stopped corresponding to a model in the
+        # registry and nobody knew until opening the app. See app/scripts/check-keys.mjs.
+        run: npm run keys
       - name: Lint · Typecheck · Test
         run: npm run lint && npm run typecheck && npm test
-      - name: Credenciales (upload key y service account)
+      - name: Credentials (upload key and service account)
         run: |
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.p12"
           printf '%s' "$SA_JSON" > "$RUNNER_TEMP/play-sa.json"
@@ -94,15 +94,15 @@ jobs:
         env:
           KEYSTORE_B64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}
           SA_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-      - name: Build .aab firmado
+      - name: Build the signed .aab
         run: bash scripts/play.sh
         env:
           PLAY_KEYSTORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
-      - name: Subir a Google Play
+      - name: Upload to Google Play
         run: |
           NOTES="${{ inputs.notes }}"
-          if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · rama ${GITHUB_REF_NAME}"; fi
-          node scripts/gplay.mjs --aab android/app/build/outputs/bundle/release/app-release.aab --track "$PISTA" --notes "$NOTES"
+          if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · branch ${GITHUB_REF_NAME}"; fi
+          node scripts/gplay.mjs --aab android/app/build/outputs/bundle/release/app-release.aab --track "$TRACK" --notes "$NOTES"
       - uses: actions/upload-artifact@v4
         with:
           name: app-release-aab
