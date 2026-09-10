@@ -185,6 +185,21 @@ y `{"t":"end","id":1,...,"device_ms":N}`. **`device_ms` no es la medición**: es
 en entregarle los chunks a BlueZ. El número que vale lo mide la app, del primer chunk al último.
 `status` se notifica solo cada 15 s.
 
+Los otros eventos que viajan por `event`:
+
+| evento | cuándo |
+|---|---|
+| `{"t":"mode","value":N}` | el modo cambió (por el botón o por BLE) |
+| `{"t":"read","mode":N}` | **el botón pide una lectura AHORA** (ADR 0007, act. 2026-10) |
+| `{"t":"ap","on":…,"minutes":…}` | el AP se encendió o se apagó |
+| `{"t":"error","msg":…}` | algo le falló a la placa y la app lo dice en voz alta |
+
+**`read` es un evento aparte y no un `mode` repetido**, a propósito: la app ignora un `mode` que
+nombra el modo en el que ya está —como debe, o cada latido hablaría—, así que un re-anuncio se
+perdería en silencio; y si no se perdiera, haría decir «Modo supermercado activado» otra vez a quien
+está leyendo tres productos seguidos. La placa **no** saca la foto por su cuenta: viaja la intención,
+y la app la busca por HTTP (ADR 0003).
+
 ## Plan B: la foto por WiFi (HTTP) y el punto de acceso
 
 Decidido el 2026-09-05 (ADR 0003, Actualización): por BLE la foto tarda 4,5 s; por WiFi, 46 ms. El
@@ -265,15 +280,20 @@ el intervalo de 15 ms de iOS.
 
 El único control en la placa. `virovision/button.py`; los modos que dispara viven en `modes.py`.
 
-| Gesto | Efecto |
-|---|---|
-| 1 click desde *esperando* | modo ómnibus |
-| 2 clicks desde *esperando* | modo supermercado |
-| mantenerlo apretado | volver a *esperando*, desde cualquier modo |
+| Gesto | Desde | Efecto |
+|---|---|---|
+| 1 click | cualquier estado | modo ómnibus. Si ya está en ómnibus, **nada**: es vigilancia y ya está mirando |
+| 2 clicks | cualquier estado | modo supermercado **y una lectura**. Si ya está en supermercado, **lee de nuevo** |
+| mantenerlo apretado | cualquier modo | volver a *esperando* |
 
-Dentro de un modo los clicks cortos no hacen nada todavía: salir es siempre el click largo. Cada
-transición se notifica por `mode` y `event` igual que si la hubiera pedido la app, así que **la app
-no distingue** si el modo lo cambió el dedo del usuario o ella misma.
+**Un gesto nombra un modo, no un paso** (ADR 0007, act. 2026-09-09): no hay que pasar por *esperando*
+para saltar de un modo al otro. Y **dos clicks piden una lectura siempre** (act. 2026-10), cambie o
+no el modo: frente a la góndola el usuario repite el gesto para leer el producto siguiente, y hasta
+esa fecha el segundo no hacía nada porque la captura se disparaba con la transición.
+
+Cada transición se notifica por `mode` y `event` igual que si la hubiera pedido la app, así que **la
+app no distingue** si el modo lo cambió el dedo del usuario o ella misma. El pedido de lectura viaja
+aparte, como `read`.
 
 **Cableado**: pulsador entre **GPIO 5 (pin físico 29)** y **GND (pin 30, el de al lado)**. Pull-up
 interno, sin resistencia externa. Con un tact switch de 4 patas hay que usar **dos patas en
