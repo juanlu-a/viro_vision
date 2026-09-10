@@ -40,8 +40,8 @@ stateDiagram-v2
     ModoOmnibus --> ModoSupermercado : 2 clicks
     ModoSupermercado --> ModoOmnibus : 1 click
 
-    ModoOmnibus --> ModoOmnibus : 1 click (ya está activo)
-    ModoSupermercado --> ModoSupermercado : 2 clicks (ya está activo)
+    ModoOmnibus --> ModoOmnibus : 1 click (ya está activo: no pasa nada)
+    ModoSupermercado --> ModoSupermercado : 2 clicks (ya está activo: LEE DE NUEVO)
 
     ModoOmnibus --> Esperando : click largo
     ModoSupermercado --> Esperando : click largo
@@ -54,6 +54,13 @@ modo se anuncia por audio — el usuario no tiene otro indicador de estado.
 siempre ómnibus y 2 clicks siempre supermercado, esté el dispositivo donde esté. Entrar a un modo
 desactiva el anterior. Hasta esa fecha los clicks sólo valían desde *esperando* y cambiar de modo
 exigía un click largo en el medio; probado en la mano, se sentía como que el botón estaba roto.
+
+**Dos clicks piden una lectura, siempre** (actualización del 2026-10, ver ADR 0007). Estando ya en
+supermercado, el doble click no cambia de modo y aun así saca una foto nueva: frente a la góndola el
+usuario repite el gesto para leer el producto siguiente. Hasta esa fecha la captura se disparaba con
+la *transición* de modo, así que el segundo doble click no hacía nada y el botón se sentía muerto —
+la misma queja que la actualización anterior arregló un nivel más arriba. El click simple es el gesto
+opuesto: ómnibus ya está vigilando solo, así que repetirlo no pide nada nuevo.
 
 Los dos modos se comportan distinto por naturaleza, y eso es deliberado: **ómnibus es continuo**
 —la cámara queda vigilando y anuncia cada ómnibus que aparece— mientras que **supermercado es

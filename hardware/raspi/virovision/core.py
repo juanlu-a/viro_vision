@@ -102,17 +102,22 @@ class Core:
 
     def from_button(self, clicks: int) -> None:
         """1 click = bus, 2 clicks = supermarket, from wherever the device is (ADR 0007, 2026-09-09
-        update). Entering a mode leaves the previous one; leaving altogether is the long press."""
+        update). Entering a mode leaves the previous one; leaving altogether is the long press.
+
+        Two clicks ALSO ask for a reading, every time (ADR 0007, 2026-09-10 update) — see
+        `_request_reading`. Until that date a repeated double click did nothing, because the capture
+        was keyed off the mode transition and there was none; in front of the shelf that reads as a
+        dead button, which is the same complaint the previous update fixed one level up.
+        """
         if self.modes.mode_for_clicks(clicks) is None:
             log.debug("button: %d click(s) names no mode", clicks)
             return
         if self.modes.from_clicks(clicks):
             self._announce_mode()
         else:
-            # The gesture named the mode the device is already in. Nothing to announce: the app
-            # keys a supermarket capture off the transition, so re-announcing would take a second
-            # photo the user did not ask for.
             log.debug("button: already in %s", self.modes.current.name)
+        if self.modes.requests_reading(clicks):
+            self._request_reading()
 
     def button_long_press(self) -> None:
         """Hold it down: leave the current mode, from wherever."""
@@ -201,6 +206,21 @@ class Core:
             return
         if self.modes.change(new):
             self._announce_mode()
+
+    def _request_reading(self) -> None:
+        """Tell the app to read NOW (ADR 0007, 2026-09-10 update).
+
+        It is its own event and not a re-announcement of the mode for two reasons. The app ignores a
+        `mode` event that names the mode it is already in —as it should, or every heartbeat would
+        speak— so re-announcing would be silently dropped. And even if it were not, it would make the
+        app say "Modo supermercado activado" a second time, which is noise for someone reading three
+        products in a row: they asked for a photo, not for a status report.
+
+        The device does not take the photo itself: the app pulls it over HTTP (ADR 0003), so what
+        travels here is the intent, not the image.
+        """
+        log.info("button: reading requested in %s", self.modes.current.name)
+        self._event({"t": "read", "mode": int(self.modes.current)})
 
     def _announce_mode(self) -> None:
         """The transition already happened: report it. The single announcement point, whether the app

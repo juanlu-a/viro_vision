@@ -56,6 +56,13 @@ interface DeviceValue {
   ap: boolean;
   /** The last mode reported by the device, or null when it reported none. */
   deviceMode: DeviceMode | null;
+  /**
+   * Counter of readings the physical button has asked for (ADR 0007, 2026-10 update). It is a
+   * counter and not a boolean because two identical requests in a row have to be distinguishable:
+   * in front of the shelf the user double-clicks once per product, and a flag would collapse the
+   * second one into the first. Whoever reads it reacts to the number CHANGING, never to its value.
+   */
+  readRequest: number;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   writeMode: (mode: DeviceMode) => Promise<void>;
@@ -85,6 +92,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [wifiDetail, setWifiDetail] = useState<string | null>(null);
   const [lastNotice, setLastNotice] = useState<string | null>(null);
   const [deviceMode, setDeviceMode] = useState<DeviceMode | null>(null);
+  const [readRequest, setReadRequest] = useState(0);
 
   const credentials = useRef<WifiCredentials | null>(null);
   const joinedTo = useRef<string | null>(null);
@@ -313,6 +321,13 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         setDeviceMode(MODE_FROM_GATT[value] ?? null);
       }),
       client.onAp(startNetworkTransition),
+      client.onReadRequest(() => {
+        // Recorded here and not where it is served: this is the moment the user's finger asked for
+        // it, and the gap against the `reading.start` that follows is what says whether the device
+        // or the app is the slow half.
+        record('device.readRequest');
+        setReadRequest((n) => n + 1);
+      }),
       client.onDeviceError((message) => {
         // The device has no screen: if something failed on it (bringing the AP up, the camera), the
         // app is the only place anyone can find out — and since telemetry exists, the table.
@@ -412,8 +427,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<DeviceValue>(
-    () => ({ connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, downloadPhoto, sendAudio }),
-    [connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, downloadPhoto, sendAudio]
+    () => ({ connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, readRequest, connect, disconnect, writeMode, downloadPhoto, sendAudio }),
+    [connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, readRequest, connect, disconnect, writeMode, downloadPhoto, sendAudio]
   );
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;

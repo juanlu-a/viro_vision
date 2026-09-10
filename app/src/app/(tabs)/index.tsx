@@ -5,13 +5,18 @@
  * same gestures (click, double click, long press) to the same state machine. Each button mutates
  * between activate and deactivate instead of being swapped for another one — if a button changed
  * identity, VoiceOver would lose focus (a trap already stepped on, see the conventions).
- * The opposite mode's button is disabled because the canonical diagram has no direct jump between
- * modes: you go through idle, here and in the firmware.
  *
- * The screen shows the RESULT and nothing else. The timings, which model answered, the OCR's raw
- * text and the photo the device took have been recorded in Supabase since 2026-09-07: they were a
+ * Neither is disabled by the other's mode: since ADR 0007's 2026-09-09 update a gesture names a
+ * mode from wherever the device is, and the firmware honours that. Until 2026-10 this screen still
+ * blocked the direct jump and said so in a hint, so the app was stricter than the device it mirrors
+ * — the exact drift `modes.test.ts` exists to catch, and it slipped through because the guard lived
+ * in a screen and not in the machine.
+ *
+ * The screen shows the RESULT and the photo behind it, nothing else. The timings, which model
+ * answered and the OCR's raw text are recorded in Supabase since 2026-09-07: they were a
  * diagnostics screen embedded in the interface of an app for people who do not see it.
  */
+import { Image } from 'expo-image';
 import { ActivityIndicator, View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
@@ -19,6 +24,7 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
+import { Radius } from '@/constants/theme';
 import type { Mode } from '@/features/reader/modes';
 import { busLineRows, productRows } from '@/features/reader/result';
 import { useReader } from '@/features/reader/useReader';
@@ -85,17 +91,17 @@ export default function HomeScreen() {
 
         <AccessibleButton
           label={inBus ? r.modeBusOff : r.modeBusOn}
-          hint={inSupermarket ? r.modeBlockedHint : inBus ? r.modeOffHint : r.modeBusOnHint}
+          hint={inBus ? r.modeOffHint : r.modeBusOnHint}
           variant="secondary"
           onPress={() => applyGesture(inBus ? 'longPress' : 'click')}
-          disabled={busy || inSupermarket}
+          disabled={busy}
         />
         <AccessibleButton
           label={inSupermarket ? r.modeSuperOff : r.modeSuperOn}
-          hint={inBus ? r.modeBlockedHint : inSupermarket ? r.modeOffHint : r.modeSuperOnHint}
+          hint={inSupermarket ? r.modeOffHint : r.modeSuperOnHint}
           variant="secondary"
           onPress={() => applyGesture(inSupermarket ? 'longPress' : 'doubleClick')}
-          disabled={busy || inBus}
+          disabled={busy}
         />
         {/* Choosing the model is a setting and lives in Settings; what stays here is only the notice
             that this build ships no key, and only with the mode that needs it active. It is said
@@ -156,6 +162,28 @@ export default function HomeScreen() {
                 </ThemedText>
               </View>
             ))}
+          </View>
+        )}
+
+        {/* La foto que sacó el dispositivo, debajo del resultado. No es diagnóstico —de eso se
+            encarga la telemetría— sino el contenido del producto: quien tiene algo de visión la usa
+            para ver qué encuadró la cámara, que es lo único que distingue «el modelo se equivocó» de
+            «la foto era del techo». Va DESPUÉS de los campos a propósito: la voz ya dijo el
+            resultado y el lector de pantalla llega primero a lo que se puede leer.
+
+            `aspect-ratio` fijo en 4:3, que es lo que entrega la placa (1024x766): sin él la altura la
+            decidiría la imagen al cargar y la tarjeta saltaría. */}
+        {state.photoUri && (
+          <View className="gap-two">
+            <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+              {r.photoLabel.toUpperCase()}
+            </ThemedText>
+            <Image
+              source={{ uri: state.photoUri }}
+              style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: Radius.md }}
+              contentFit="contain"
+              accessibilityLabel={r.photoHint}
+            />
           </View>
         )}
       </Card>

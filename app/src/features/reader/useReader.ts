@@ -31,7 +31,7 @@ import { announce } from '@/features/audio/announcer';
 import { useDevice } from '@/features/device/DeviceProvider';
 import { guessBusReading, phraseBusReading, phraseProduct } from '@/features/reader/reading';
 import type { BusReading } from '@/features/reader/reading';
-import { transition } from '@/features/reader/modes';
+import { requestsReading, transition } from '@/features/reader/modes';
 import type { Gesture, Mode } from '@/features/reader/modes';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
 import { strings } from '@/i18n';
@@ -64,6 +64,12 @@ export interface ReaderState {
   progress: number | null;
   reading: BusReading | null;
   product: ProductReading | null;
+  /**
+   * The photo the device took for the last reading, so it can be shown. It is the product's own
+   * content and not diagnostics: whoever has some sight uses it to check what the camera framed,
+   * and it is the only way to tell "the model was wrong" from "the photo was of the ceiling".
+   */
+  photoUri: string | null;
 }
 
 const initialState: ReaderState = {
@@ -73,6 +79,7 @@ const initialState: ReaderState = {
   progress: null,
   reading: null,
   product: null,
+  photoUri: null,
 };
 
 /**
@@ -145,6 +152,14 @@ export function useReader() {
     };
   }, []);
 
+  /**
+   * Readings the app itself has asked for. A counter for the same reason as the device's: two
+   * identical requests in a row have to be distinguishable, and a boolean would collapse the second
+   * double click into the first.
+   */
+  const [readRequest, setReadRequest] = useState(0);
+  const requestRead = useCallback(() => setReadRequest((n) => n + 1), []);
+
   const update = useCallback((patch: Partial<ReaderState>) => {
     ref.current = { ...ref.current, ...patch };
     if (alive.current) setState(ref.current);
@@ -158,7 +173,7 @@ export function useReader() {
     (next: Mode, source: 'app' | 'device') => {
       if (next === ref.current.mode) return;
       record('mode.change', { detail: { from: ref.current.mode, to: next, source } });
-      update({ mode: next, reading: null, product: null, message: '' });
+      update({ mode: next, reading: null, product: null, message: '', photoUri: null });
       announce(MODE_ANNOUNCEMENT[next]);
     },
     [update],
@@ -167,13 +182,18 @@ export function useReader() {
   const applyGesture = useCallback(
     (gesture: Gesture) => {
       const next = transition(ref.current.mode, gesture);
-      if (next === ref.current.mode) return;
-      changeMode(next, 'app');
-      // The device learns the mode over BLE and turns its AP on or off. If it is not there, nothing
-      // happens.
-      void device.writeMode(next);
+      if (next !== ref.current.mode) {
+        changeMode(next, 'app');
+        // The device learns the mode over BLE and turns its AP on or off. If it is not there,
+        // nothing happens.
+        void device.writeMode(next);
+      }
+      // Asked SEPARATELY from the mode change, because the two answers differ: a double click in
+      // supermarket changes no mode and still has to read. Keying the capture off the transition is
+      // exactly what made the second double click do nothing in front of the shelf.
+      if (requestsReading(gesture)) requestRead();
     },
-    [changeMode, device],
+    [changeMode, device, requestRead],
   );
 
   // The mode reported by the device (physical button) wins: the app mirrors and announces it.
@@ -307,6 +327,14 @@ export function useReader() {
   const read = useCallback(async () => {
     const { mode } = ref.current;
     if (mode === 'idle') return; // at rest nothing is captured and nothing is announced (ADR 0007)
+    if (ref.current.status !== 'idle') {
+      // A reading is already in flight. Ignored rather than queued: by the time this one finished,
+      // the extra photo would be of a scene the user has already moved past — and they are about to
+      // hear the result of the one that IS running. Recorded because a lot of these would mean the
+      // pipeline is too slow for how people actually use the button.
+      record('reading.start', { detail: { mode, ignored: 'already reading' } });
+      return;
+    }
     const t0 = Date.now();
     record('reading.start', { detail: { mode, model: model ?? null } });
     update({ status: 'reading', message: t.readingFromDevice, progress: null });
@@ -317,6 +345,9 @@ export function useReader() {
       // The photo's size and time separately from the total: it is what separates "the network is
       // slow" from "the model is slow", and both look the same as "it was slow".
       record('photo.ok', { ms: photo.ms, detail: { bytes: photo.bytes } });
+      // Shown on screen from here on: the previous reading's photo must not outlive it, or the
+      // screen would pair a fresh result with a stale image.
+      update({ photoUri: photo.uri });
     } catch (err) {
       const status = err instanceof HttpDownloadError ? err.status : null;
       record('photo.failed', {
@@ -353,22 +384,29 @@ export function useReader() {
   }, [device, readBus, readSupermarket, model, update]);
 
   /**
-   * Supermarket fires its reading the moment it is activated (ADR 0007, 2026-09-09 update): the user
-   * is standing in front of the shelf pointing at a product, so asking them for a second gesture to
-   * take the photo is asking them to hold the pose. Bus is the opposite kind of mode — the camera
-   * stays watching and announces each bus that shows up — so it does NOT auto-fire here.
+   * One place serves every reading request, whichever hand asked (ADR 0007, 2026-10 update).
    *
-   * It reads the mode and not the gesture on purpose: this way it fires the same whether the mode
-   * came from the physical button or from the app, which is the whole point of having one machine.
+   * Until then the capture was keyed off ENTERING supermarket, which had two costs. The second
+   * double click in front of the shelf did nothing —no transition, no photo, a button that reads as
+   * broken— and the effect had to depend on `read`, whose identity changes with the chosen model, so
+   * it carried a guard against firing twice for a reason unrelated to the user.
+   *
+   * Both sources are counters, and what fires the read is the total CHANGING, never its value: two
+   * identical requests in a row have to be distinguishable, because that is exactly what reading two
+   * products in a row is. `read` is reached through a ref so its identity is not a trigger.
    */
-  const modeThatAutoRead = useRef<Mode>(initialState.mode);
+  const readRef = useRef(read);
   useEffect(() => {
-    const previous = modeThatAutoRead.current;
-    modeThatAutoRead.current = state.mode;
-    // Only on the way IN: while it stays in supermarket, `read` changing identity must not take a
-    // second photo the user did not ask for.
-    if (state.mode === 'supermarket' && previous !== 'supermarket') void read();
-  }, [state.mode, read]);
+    readRef.current = read;
+  }, [read]);
+
+  const requests = readRequest + device.readRequest;
+  const servedRequests = useRef(0);
+  useEffect(() => {
+    if (requests === servedRequests.current) return;
+    servedRequests.current = requests;
+    void readRef.current();
+  }, [requests]);
 
   return {
     state,
