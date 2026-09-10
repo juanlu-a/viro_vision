@@ -5,7 +5,7 @@
  * It is implemented by hand and not with `atob`/`Buffer` because neither is guaranteed in all the
  * runtimes this module runs in (Hermes, jest, web), and it is fifteen lines.
  *
- * It used to live in `transferencia.ts` next to the chunk reassembly; that module left with the
+ * It used to live in the chunk-reassembly module (then `transferencia.ts`); that module left with the
  * ADR 0003 measurement (the photo goes over HTTP, not over GATT) and this stayed, which is the only
  * part still being used.
  */
