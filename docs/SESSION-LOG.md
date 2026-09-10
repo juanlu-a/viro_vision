@@ -1416,12 +1416,26 @@ interno del wifi quedó en `off`, y a eso se llega por dos caminos: que `syncNet
 `target === null`, o que nunca haya corrido y el estado se haya quedado en su valor inicial. Como el
 `status` de la placa era correcto, el segundo era el sospechoso.
 
-Se destrabó del lado del teléfono, con los remedios que esta base ya tenía documentados: forzar el
-cierre de la app (el daemon se había reiniciado **con la app conectada**, y hay deuda conocida de que
-en ese caso la app puede quedar diciendo «Conectado» sobre un enlace muerto), olvidar el dispositivo
-en Ajustes → Bluetooth para que iOS suelte la caché de GATT, y confirmar el build instalado.
-**Cuál de los tres fue exactamente, no quedó aislado** — se probaron juntos y anduvo. Queda anotado
-así, sin elegir uno, porque decir cuál sin haberlo medido sería inventar la parte más útil.
+Se destrabó del lado del teléfono, haciendo **tres cosas juntas**: forzar el cierre de la app,
+**olvidar la red WiFi `ViroVision`** y **olvidar el dispositivo en Ajustes → Bluetooth**. Después de
+eso, el flujo completo funcionó.
+
+**No quedó aislado cuál de las tres fue**, y se anota así a propósito: decir cuál sin haberlo medido
+sería inventar justo la parte que alguien va a usar dentro de seis meses. Lo que sí se puede afirmar:
+el conjunto incluye **el remedio que esta base ya tenía documentado** para el caso —olvidar el
+dispositivo en Bluetooth, que es lo que fuerza a iOS a soltar la caché de GATT— y el escenario era el
+exacto que lo dispara: se había reemplazado el daemon entero y reiniciado el servicio con la app
+conectada.
+
+**Lo que este episodio deja como deuda de la app, y es lo que de verdad hay que arreglar:** el
+usuario tuvo que hacer un ritual de tres pasos que la app nunca le pidió. La pantalla decía
+«conectado por Bluetooth, red apagada» y **no ofrecía ninguna salida**: ni un reintento, ni una
+explicación, ni el mensaje que la propia base ya tiene escrito para este caso
+(`strings.connect.wifiNoCredentials`, que dice textualmente que hay que apagar y prender el Bluetooth
+y volver a conectar). Ese mensaje hoy sólo se usa cuando faltan las credenciales del WiFi, no cuando
+la lectura de `status` falla o llega vacía — que es el camino por el que se llega a `off`. Para una
+app cuya interfaz es la voz, un estado sin salida es peor que un error: el usuario no tiene forma de
+saber que el remedio existe.
 
 **Y una lección de herramientas que costó una hora y no es del proyecto:** a mitad de sesión macOS
 revocó por TCC el acceso a `~/Documents` a la terminal. El síntoma engaña — `ls -ld` del repo
@@ -1477,12 +1491,19 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
   registro; con el AP siempre encendido la placa no está en la red de casa: para desplegar, apagar el
   AP por BLE desde la Mac con la app cerrada.
-- **Aislar qué destrabó el «red apagada» del 2026-09-10**: se probaron juntos el cierre forzado de la
-  app, olvidar el dispositivo en Ajustes → Bluetooth y confirmar el build, y anduvo. Saber cuál fue
-  cambia el remedio que hay que documentar: si fue la caché de GATT, el README de la placa ya lo dice;
-  si fue el enlace muerto tras reiniciar el daemon con la app conectada, eso es **deuda de la app** y
-  se arregla en `DeviceProvider` detectando que el peer se reinició, no pidiéndole al usuario que
-  cicle el Bluetooth.
+- **«Red apagada» sin salida: la app tiene que decir qué hacer** (del 2026-09-10). Cuando el estado
+  del wifi queda en `off` con el dispositivo conectado, la pantalla no ofrece nada: ni reintento, ni
+  explicación. El usuario tuvo que adivinar un ritual de tres pasos (cerrar la app, olvidar la red,
+  olvidar el dispositivo BT). El arreglo tiene dos mitades, las dos en `DeviceProvider`:
+  1. **Reintentar la lectura de `status` antes de rendirse.** Hoy `readStatus` traga cualquier error
+     y devuelve `null` una sola vez; con eso `address` queda en null y el estado se planta en `off`
+     hasta el próximo latido, que puede no llegar si la suscripción también quedó vieja.
+  2. **Si igual no hay `status`, decirlo con el mensaje que ya existe.** `strings.connect.wifiNoCredentials`
+     explica exactamente el remedio (apagar y prender el Bluetooth, reconectar) pero sólo se usa
+     cuando faltan las credenciales del WiFi. Ese mismo texto sirve para este camino.
+
+  Es accesibilidad, no pulido: en una app cuya interfaz es la voz, un estado sin salida deja al
+  usuario sin forma de saber que el remedio existe.
 - **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
