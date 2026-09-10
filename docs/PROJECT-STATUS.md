@@ -126,8 +126,15 @@ tests via `jest-expo`.
   con el payload en inglés, `/photos/latest` devolviendo la foto del IMX500, botón en GPIO 5, BLE
   anunciando), los **dos** `--sin-ap` de `bootfs` corregidos —estaban en `modo-red.sh` y también en
   `instalar-daemon.sh`— y el `.tgz` de la tarjeta refrescado con `staging`. La tarjeta quedó en modo
-  producto y el flujo completo anda de punta a punta con el build `202609101402`. El procedimiento de
-  despliegue está en [`hardware/raspi/README.md`](../hardware/raspi/README.md).
+  producto y el flujo completo anda de punta a punta. El procedimiento de despliegue está en
+  [`hardware/raspi/README.md`](../hardware/raspi/README.md).
+- **Botón físico y lecturas repetidas (2026-09-10, ADR 0007 act.)**: un gesto nombra un modo desde
+  cualquier estado, y **dos clicks piden una lectura siempre** — estando ya en supermercado, el doble
+  click saca otra foto en vez de no hacer nada. El pedido viaja como evento propio
+  (`{"t":"read","mode":N}`) y no como un cambio de modo, porque el modo no cambia. Un click **no**
+  pide lectura: ómnibus es vigilancia y repetirlo costaría una foto y una llamada a la nube por toque.
+  La app muestra además la foto que sacó la placa debajo del resultado. Placa y app desplegadas y
+  verificadas juntas.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a

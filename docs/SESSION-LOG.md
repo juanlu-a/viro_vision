@@ -1445,6 +1445,68 @@ working directory"*, que parece un problema de git o de permisos de archivo. No 
 cuyas credenciales viven dentro del repo, así que ni siquiera se pudo consultar la telemetría para
 diagnosticar. Se resuelve en Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas.
 
+## 2026-09-10 (cont.) — Dos clicks significan «leé esto», y la foto se ve en la pantalla
+
+Probando el botón soldado apareció lo que la actualización anterior de ADR 0007 había dejado
+explícitamente abierto: **el segundo doble click no hacía nada**. El modo ya era supermercado, no
+había transición, y la captura se disparaba con la transición. Para leer el producto siguiente había
+que salir con un click largo y volver a entrar — dos gestos para repetir uno, con el mismo síntoma
+que ya habíamos arreglado un nivel más arriba: el botón se siente muerto.
+
+**El arreglo de fondo no es un caso especial, es un cambio de modelo**: el pedido de lectura deja de
+deducirse de la transición de modo y pasa a ser una **señal explícita**. Es lo que el propio ADR 0007
+anticipaba que costaría (*«exige que el dispositivo avise cada gesto y no sólo cada cambio de
+modo»*), así que el protocolo creció un evento: `{"t":"read","mode":N}` en la característica `event`.
+
+Las dos alternativas más baratas se descartaron, y por qué:
+
+- **Re-anunciar el modo.** La app ignora un `mode` que nombra el modo en el que ya está —como debe, o
+  cada latido de 15 s hablaría— así que se perdería en silencio. Y si no se perdiera, diría «Modo
+  supermercado activado» de nuevo: ruido para quien está leyendo tres productos seguidos, que pidió
+  una foto y no un parte de estado.
+- **Que la placa saque la foto sola.** Rompe ADR 0003: la app tira, la placa nunca empuja. Lo que
+  viaja es la intención, no la imagen.
+
+**Un click sigue sin pedir lectura, y es deliberado.** Ómnibus es vigilancia: ya está mirando y
+anuncia lo que aparece. Si repetir el click pidiera una lectura, cada toque costaría una foto y una
+llamada a la nube. Por eso la pregunta se hace **separada** de la transición en los dos lados
+(`requestsReading` en la app, `ModeMachine.requests_reading` en la placa): las dos respuestas
+difieren — un gesto puede nombrar un modo sin pedir lectura, y puede pedir lectura sin cambiar el
+modo. Si alguna vez se colapsan en una sola, el doble click repetido vuelve a no hacer nada; hay un
+test en cada lado que lo dice.
+
+**Del lado de la app**, los dos orígenes del pedido —el botón físico y la pantalla— son contadores
+que se sirven en un solo lugar, y lo que dispara es que el total **cambie**, nunca su valor: dos
+pedidos idénticos seguidos tienen que ser distinguibles, porque eso es exactamente leer dos productos
+seguidos. De paso desaparece una fragilidad que el código anterior tenía anotada: el efecto dependía
+de `read`, cuya identidad cambia al cambiar de modelo, y llevaba una guarda para no dispararse por un
+motivo ajeno al usuario. **Un pedido que llega con una lectura en curso se ignora y se registra**, no
+se encola: para cuando terminara, esa foto sería de una escena que el usuario ya dejó atrás.
+
+**Dos cosas más que entraron en el mismo PR porque estaban rotas en el mismo lugar:**
+
+- **La pantalla contradecía a la máquina que espeja.** Los botones de modo se deshabilitaban entre sí
+  y un hint decía que había que apagar el modo actual primero — pero desde el 2026-09-09 un gesto
+  nombra un modo desde donde sea, y el firmware lo respetaba. La app era **más estricta que el
+  dispositivo**: exactamente la divergencia que `modes.test.ts` existe para atrapar, y se coló porque
+  la guarda vivía en una pantalla y no en la máquina. Es la lección que vale guardar: un invariante
+  que se sostiene en una pantalla no está sostenido.
+- **La lectura muestra la foto que sacó la placa**, debajo de los campos. No es diagnóstico —de eso
+  se encarga la telemetría desde el 2026-09-07— sino contenido del producto: con algo de visión es lo
+  único que distingue «el modelo se equivocó» de «la foto era del techo». Va *después* de los campos
+  a propósito: la voz ya dijo el resultado y el lector de pantalla llega primero a lo que se puede
+  leer, con `aspect-ratio` fijo para que la tarjeta no salte al cargar.
+
+**El despliegue, esta vez sin tropiezos**, siguiendo el procedimiento que había quedado escrito:
+`SIN-AP` desde la tarjeta → la placa arranca en la red de casa → instalar → verificar → borrar
+`SIN-AP` y reiniciar a modo producto. Dos mejoras sobre la vez anterior: el `.tgz` de `bootfs` se
+refrescó **antes** con `git archive` desde HEAD (verificando los cuatro archivos que el instalador
+necesita y que no hubiera `._` de macOS), y el despliegue se hizo **desde ese `.tgz`**, así el
+paquete que queda en la tarjeta quedó probado y no sólo escrito. Se verificó la lógica nueva en el
+intérprete de la placa antes de arrancar el servicio (`requests_reading(2) = True`, `(1) = False`), y
+después `/health` y `/photos/latest` desde el Mac. **En ningún momento hubo que unirse al AP**, que
+era lo que cortaba la sesión las veces anteriores.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
