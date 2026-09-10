@@ -1,7 +1,7 @@
 [Unit]
-Description=ViroVision — daemon BLE de la placa
-# NetworkManager listo antes de arrancar: el daemon levanta el AP WiFi al inicio (ADR 0003) y con
-# NM a medio arrancar nmcli fallaba o dejaba la interfaz sin IP (2026-09-07).
+Description=ViroVision — the device's BLE daemon
+# NetworkManager ready before starting: the daemon brings the WiFi AP up at startup (ADR 0003) and
+# with NM half-started nmcli failed or left the interface without an IP (2026-09-07).
 After=bluetooth.target NetworkManager.service network-online.target
 Wants=network-online.target
 Requires=bluetooth.service
@@ -9,18 +9,18 @@ Requires=bluetooth.service
 [Service]
 Type=simple
 WorkingDirectory=__INSTALL_DIR__
-# Pedirle al controlador el intervalo de conexión más corto que permite (7,5-15 ms): cada intervalo
-# lleva unas pocas notificaciones, así que el intervalo ES el throughput. iOS lo negocia hacia 15 ms.
-# El "-" hace que un debugfs ausente no impida arrancar.
+# Ask the controller for the shortest connection interval it allows (7.5-15 ms): each interval
+# carries a few notifications, so the interval IS the throughput. iOS negotiates it towards 15 ms.
+# The "-" makes a missing debugfs not prevent startup.
 ExecStartPre=-/bin/sh -c 'echo 6 > /sys/kernel/debug/bluetooth/hci0/conn_min_interval; echo 12 > /sys/kernel/debug/bluetooth/hci0/conn_max_interval'
-# Sin buffer: los errores que bluez-peripheral imprime con print() llegan al journal al instante y
-# no cuando el proceso muere (el 2026-09-05 se perdieron por esto).
+# Unbuffered: the errors bluez-peripheral prints with print() reach the journal instantly and not
+# when the process dies (they were lost this way on 2026-09-05).
 Environment=PYTHONUNBUFFERED=1
 ExecStart=__INSTALL_DIR__/.venv/bin/python -m virovision
 Restart=always
 RestartSec=2
-# root: BlueZ sólo acepta registrar aplicaciones GATT y anuncios desde el bus del sistema, y la
-# política por defecto de D-Bus se lo permite a root sin tocar /etc/dbus-1.
+# root: BlueZ only accepts registering GATT applications and advertisements from the system bus, and
+# D-Bus's default policy allows that to root without touching /etc/dbus-1.
 User=root
 
 [Install]

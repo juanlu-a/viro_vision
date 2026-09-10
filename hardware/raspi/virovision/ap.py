@@ -1,13 +1,13 @@
-"""Punto de acceso WiFi de la placa (plan B del ADR 0003) con NetworkManager.
+"""The device's WiFi access point (ADR 0003's plan B) with NetworkManager.
 
-El caso real es la calle o el supermercado, sin WiFi de infraestructura: la placa levanta su AP, el
-teléfono se une y baja la foto por HTTP; el teléfono conserva internet por datos móviles (spike de
-iOS pendiente). La Zero 2 W tiene UNA radio WiFi: mientras el AP está arriba, la placa no está en
-ninguna otra red (se pierde el SSH de desarrollo). Por eso el AP se enciende **por un tiempo
-acotado** y vuelve solo a la red conocida: si algo sale mal, la placa se recupera sin tocarla.
+The real case is the street or the supermarket, with no infrastructure WiFi: the device brings its AP
+up, the phone joins and downloads the photo over HTTP; the phone keeps its internet over cellular
+data (the iOS spike is pending). The Zero 2 W has ONE WiFi radio: while the AP is up, the device is on
+no other network (development SSH is lost). That is why the AP is turned on **for a bounded time** and
+returns to the known network on its own: if something goes wrong, the device recovers untouched.
 
-Todo por `nmcli`, que ya viene en Raspberry Pi OS. La conexión `virovision-ap` se crea la primera
-vez; `ipv4.method shared` da 10.42.0.1 y DHCP sin nada más.
+Everything through `nmcli`, which already ships with Raspberry Pi OS. The `virovision-ap` connection
+is created the first time; `ipv4.method shared` gives 10.42.0.1 and DHCP with nothing else.
 """
 
 from __future__ import annotations
@@ -18,77 +18,78 @@ from typing import Callable, Optional, Sequence
 
 log = logging.getLogger(__name__)
 
-NOMBRE_CONEXION = "virovision-ap"
+CONNECTION_NAME = "virovision-ap"
 SSID = "ViroVision"
-# Fija por ahora, y sin pretensión de secreto (ADR 0003: WPA2 cifra el aire, los datos no son
-# sensibles). Cuando haya varias unidades, por unidad y publicada por la característica `wifi`.
-CLAVE = "virovision2026"
-IP_AP = "10.42.0.1"
+# Fixed for now, and with no pretence of secrecy (ADR 0003: WPA2 encrypts the air, the data is not
+# sensitive). Once there are several units, one per unit and published through the `wifi`
+# characteristic.
+PASSWORD = "virovision2026"
+AP_IP = "10.42.0.1"
 
-Ejecutar = Callable[[Sequence[str]], subprocess.CompletedProcess]
-
-
-def _nmcli(argumentos: Sequence[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(["nmcli", *argumentos], capture_output=True, text=True, timeout=30)
+Run = Callable[[Sequence[str]], subprocess.CompletedProcess]
 
 
-class PuntoDeAcceso:
-    def __init__(self, ejecutar: Ejecutar = _nmcli, ssid: str = SSID, clave: str = CLAVE) -> None:
-        self._ejecutar = ejecutar
+def _nmcli(arguments: Sequence[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(["nmcli", *arguments], capture_output=True, text=True, timeout=30)
+
+
+class AccessPoint:
+    def __init__(self, run: Run = _nmcli, ssid: str = SSID, password: str = PASSWORD) -> None:
+        self._run = run
         self._ssid = ssid
-        self._clave = clave
-        self.encendido = False
+        self._password = password
+        self.on = False
 
-    def _asegurar_conexion(self) -> None:
-        existe = self._ejecutar(["-t", "-f", "NAME", "con", "show"])
-        if NOMBRE_CONEXION in (existe.stdout or "").splitlines():
+    def _ensure_connection(self) -> None:
+        existing = self._run(["-t", "-f", "NAME", "con", "show"])
+        if CONNECTION_NAME in (existing.stdout or "").splitlines():
             return
-        self._ok(self._ejecutar(["con", "add", "type", "wifi", "ifname", "wlan0", "con-name", NOMBRE_CONEXION,
-                                 "autoconnect", "no", "ssid", self._ssid]))
-        # 2,4 GHz (band bg): la placa no tiene 5 GHz; y `shared` = NAT + DHCP en 10.42.0.1.
-        self._ok(self._ejecutar(["con", "modify", NOMBRE_CONEXION,
-                                 "802-11-wireless.mode", "ap", "802-11-wireless.band", "bg",
-                                 "ipv4.method", "shared",
-                                 "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", self._clave]))
-        log.info("conexión %s creada (ssid %s)", NOMBRE_CONEXION, self._ssid)
+        self._ok(self._run(["con", "add", "type", "wifi", "ifname", "wlan0", "con-name", CONNECTION_NAME,
+                            "autoconnect", "no", "ssid", self._ssid]))
+        # 2.4 GHz (band bg): the device has no 5 GHz; and `shared` = NAT + DHCP on 10.42.0.1.
+        self._ok(self._run(["con", "modify", CONNECTION_NAME,
+                            "802-11-wireless.mode", "ap", "802-11-wireless.band", "bg",
+                            "ipv4.method", "shared",
+                            "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", self._password]))
+        log.info("connection %s created (ssid %s)", CONNECTION_NAME, self._ssid)
 
-    def encender(self) -> None:
-        self._asegurar_conexion()
-        self._ok(self._ejecutar(["con", "up", NOMBRE_CONEXION]))
-        self.encendido = True
-        log.info("AP «%s» arriba en %s; la placa dejó su red WiFi anterior", self._ssid, IP_AP)
+    def turn_on(self) -> None:
+        self._ensure_connection()
+        self._ok(self._run(["con", "up", CONNECTION_NAME]))
+        self.on = True
+        log.info("AP \"%s\" up on %s; the device left its previous WiFi network", self._ssid, AP_IP)
 
-    def apagar(self) -> None:
-        resultado = self._ejecutar(["con", "down", NOMBRE_CONEXION])
-        self.encendido = False
-        log.info("AP abajo (%s)", "ok" if resultado.returncode == 0 else (resultado.stderr or "").strip()[:120])
-        # No confiar en el autoconnect: el 2026-09-06 la placa quedó sin ninguna red después de bajar
-        # el AP (el teléfono seguía unido a un AP fantasma y `estado` decía "sin IP"). Se le pide a NM
-        # que conecte wlan0 a la mejor red conocida, explícitamente.
-        self.reconectar()
+    def turn_off(self) -> None:
+        result = self._run(["con", "down", CONNECTION_NAME])
+        self.on = False
+        log.info("AP down (%s)", "ok" if result.returncode == 0 else (result.stderr or "").strip()[:120])
+        # Do not trust autoconnect: on 2026-09-06 the device was left on no network at all after
+        # bringing the AP down (the phone was still joined to a ghost AP and `status` said "no IP").
+        # NM is explicitly asked to connect wlan0 to the best known network.
+        self.reconnect()
 
-    def reconectar(self) -> None:
-        """Conecta wlan0 a la red conocida con autoconnect (la de casa, la del laboratorio…)."""
-        resultado = self._ejecutar(["-w", "25", "device", "connect", "wlan0"])
-        log.info("reconexión a la red conocida: %s", "ok" if resultado.returncode == 0 else (resultado.stderr or resultado.stdout or "").strip()[:160])
+    def reconnect(self) -> None:
+        """Connects wlan0 to the known network with autoconnect (home, the lab…)."""
+        result = self._run(["-w", "25", "device", "connect", "wlan0"])
+        log.info("reconnection to the known network: %s", "ok" if result.returncode == 0 else (result.stderr or result.stdout or "").strip()[:160])
 
-    def conexion_activa(self) -> Optional[str]:
-        """Nombre de la conexión activa en wlan0, o None. Va al `estado` para que la app (y quien
-        depure) sepa en qué red está la placa sin entrar por SSH."""
+    def active_connection(self) -> Optional[str]:
+        """Name of the active connection on wlan0, or None. It goes into `status` so the app (and
+        whoever is debugging) knows which network the device is on without going in over SSH."""
         try:
-            salida = self._ejecutar(["-t", "-f", "NAME,DEVICE", "con", "show", "--active"]).stdout or ""
+            output = self._run(["-t", "-f", "NAME,DEVICE", "con", "show", "--active"]).stdout or ""
         except Exception:  # noqa: BLE001
             return None
-        for linea in salida.splitlines():
-            nombre, _, dispositivo = linea.rpartition(":")
-            if dispositivo == "wlan0":
-                return nombre
+        for line in output.splitlines():
+            name, _, device = line.rpartition(":")
+            if device == "wlan0":
+                return name
         return None
 
     @staticmethod
-    def _ok(resultado: subprocess.CompletedProcess) -> None:
-        if resultado.returncode != 0:
-            raise RuntimeError((resultado.stderr or resultado.stdout or "nmcli falló").strip()[:200])
+    def _ok(result: subprocess.CompletedProcess) -> None:
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout or "nmcli failed").strip()[:200])
 
-    def credenciales(self) -> dict:
-        return {"ssid": self._ssid, "clave": self._clave, "ip": IP_AP}
+    def credentials(self) -> dict:
+        return {"ssid": self._ssid, "password": self._password, "ip": AP_IP}

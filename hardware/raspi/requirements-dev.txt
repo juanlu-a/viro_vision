@@ -1,2 +1,2 @@
-# Sólo para correr los tests en la Mac/CI. No hace falta en la placa.
+# Only to run the tests on the Mac/CI. Not needed on the device.
 pytest>=7

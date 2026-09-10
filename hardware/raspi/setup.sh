@@ -1,54 +1,58 @@
 #!/bin/sh
-# Instala el daemon en una Raspberry Pi OS Lite (Bookworm) y lo deja corriendo como servicio.
-# Correr con sudo desde el directorio donde se copió hardware/raspi:  sudo ./setup.sh
+# Installs the daemon on a Raspberry Pi OS Lite (Bookworm) and leaves it running as a service.
+# Run it with sudo from the directory hardware/raspi was copied to:  sudo ./setup.sh
 set -eu
 
 if [ "$(id -u)" -ne 0 ]; then
-  echo "correlo con sudo" >&2
+  echo "run it with sudo" >&2
   exit 1
 fi
 
 INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
-echo "→ instalando en $INSTALL_DIR"
+echo "→ installing in $INSTALL_DIR"
 
-echo "→ paquetes del sistema"
+echo "→ system packages"
 apt-get update -qq
-# --no-install-recommends: picamera2 arrastra Qt y demás si se lo deja. En Lite no hace falta nada de eso.
-# gpiozero + lgpio: el botón físico (ADR 0007). Van por apt como picamera2 — el backend de gpiozero
-# en Trixie es lgpio, y el paquete de apt es el que trae la versión que casa con el kernel.
+# --no-install-recommends: picamera2 drags in Qt and more if left alone. None of that is needed on Lite.
+# gpiozero + lgpio: the physical button (ADR 0007). They go through apt like picamera2 — gpiozero's
+# backend on Trixie is lgpio, and the apt package is the one that brings the version matching the kernel.
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
   bluez python3-venv python3-pip python3-picamera2 python3-gpiozero python3-lgpio
 
-echo "→ venv (con los paquetes del sistema, por picamera2)"
+echo "→ venv (with the system packages, because of picamera2)"
 if [ ! -d "$INSTALL_DIR/.venv" ]; then
   python3 -m venv --system-site-packages "$INSTALL_DIR/.venv"
 fi
 "$INSTALL_DIR/.venv/bin/pip" install -q -r "$INSTALL_DIR/requirements.txt"
 
-echo "→ Bluetooth: encendido y sin ahorro de energía del adaptador"
+echo "→ Bluetooth: powered on and with the adapter's power saving off"
 rfkill unblock bluetooth || true
 systemctl enable --now bluetooth.service
 bluetoothctl power on >/dev/null || true
 
-echo "→ WiFi sin ahorro de energía"
-# Medido el 2026-09-05: el primer GET tras un rato quieto tardó 153 ms contra 41-59 los siguientes; es
-# el despertar del powersave del WiFi. Para el plan B (la foto por HTTP) conviene no pagarlo.
+echo "→ WiFi without power saving"
+# Measured on 2026-09-05: the first GET after a while idle took 153 ms against 41-59 for the following
+# ones; that is the WiFi power save waking up. For plan B (the photo over HTTP) it is better not to pay it.
 mkdir -p /etc/NetworkManager/conf.d
 printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/10-virovision-wifi-powersave.conf
 systemctl reload NetworkManager 2>/dev/null || true
 
-echo "→ AP sólo local: sin puerta de enlace ni DNS en el DHCP"
-# Medido el 2026-09-05: con el AP anunciándose como router, el iPhone unido a «ViroVision» quedaba
-# sin internet (Safari: "sin conexión"). Sin las opciones 3 (router) y 6 (DNS) la red es sólo local y el
-# teléfono conserva su ruta por defecto por datos móviles. Es el requisito duro del plan B (ADR 0003).
+echo "→ local-only AP: no gateway and no DNS in the DHCP"
+# Measured on 2026-09-05: with the AP advertising itself as a router, the iPhone joined to "ViroVision"
+# was left without internet (Safari: "no connection"). Without options 3 (router) and 6 (DNS) the network
+# is local only and the phone keeps its default route over cellular data. It is plan B's hard
+# requirement (ADR 0003).
 mkdir -p /etc/NetworkManager/dnsmasq-shared.d
-printf 'dhcp-option=3\ndhcp-option=6\n' > /etc/NetworkManager/dnsmasq-shared.d/10-virovision-solo-local.conf
+# The file used to be called 10-virovision-solo-local.conf; a stale copy would apply the same options
+# twice, so it is removed rather than left behind.
+rm -f /etc/NetworkManager/dnsmasq-shared.d/10-virovision-solo-local.conf
+printf 'dhcp-option=3\ndhcp-option=6\n' > /etc/NetworkManager/dnsmasq-shared.d/10-virovision-local-only.conf
 
-echo "→ servicio systemd"
+echo "→ systemd service"
 sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$INSTALL_DIR/virovision.service" > /etc/systemd/system/virovision.service
 systemctl daemon-reload
 systemctl enable --now virovision.service
 
 echo
-echo "listo. seguir los logs:   journalctl -u virovision -f"
-echo "ver que anuncia:          bluetoothctl show | grep -i -e powered -e discoverable"
+echo "done. follow the logs:      journalctl -u virovision -f"
+echo "check what it advertises:   bluetoothctl show | grep -i -e powered -e discoverable"

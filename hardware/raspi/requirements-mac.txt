@@ -1,2 +1,2 @@
-# Sólo para el emulador de la placa en macOS (python -m virovision.emulador). No va a la placa.
+# Only for the device emulator on macOS (python -m virovision.emulator). It does not go to the device.
 bless==0.3.0
