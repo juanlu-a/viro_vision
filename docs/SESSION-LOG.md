@@ -1725,6 +1725,53 @@ Ahora el daemon lo fija al arrancar (`set_output_volume` en `audio.py`, flag `--
 suave — que es exactamente lo contrario del objetivo. Con `amixer -M`, que mapea a volumen
 *percibido*; sin `-M` el porcentaje es una posición en la escala de dB y el 40 % es casi inaudible.
 
+## 2026-09-11 (cont. 3) — El alcance se abre a alimentos, y la placa deja de decir «null»
+
+Dos cosas que salieron de la misma prueba con el usuario.
+
+### El modelo es mejor de lo que suponía el alcance
+
+**Identifica cualquier alimento, no sólo los rubros de la canasta básica** — yerba suelta incluida.
+La canasta era el alcance *mientras la precisión era una incógnita*, una forma de acotar el problema
+a algo medible; con el modelo andando, restringirlo en el prompt es pedirle menos de lo que hace.
+
+**La canasta no desaparece: cambia de rol.** Sigue siendo el **dataset de evaluación** —lo que se
+mide— y deja de ser el límite de lo que se contesta. Son dos cosas distintas y vale no volver a
+confundirlas: un dataset acotado y reproducible es lo que hace comparables a los modelos; el alcance
+del modo es lo que el usuario puede pedirle. Por eso `ml/README.md` **no** se tocó: ahí la canasta es
+el dataset y sigue siendo correcta.
+
+Actualizados el prompt, la app, `SKILL.md`, `references/ml.md`, los dos README, `PROJECT-STATUS` y el
+ADR 0006 (con una actualización, no un rename). **Los documentos históricos quedaron intactos** a
+propósito —`REUNIONES-TUTOR.md`, el SESSION-LOG, las entradas viejas de `pruebas-y-decisiones.md`—
+porque registran lo que se dijo entonces, y reescribirlos sería falsear el registro.
+
+### La placa decía «null»
+
+Apuntada a algo que no es un alimento, decía «null» en voz alta. La cadena completa, que vale escribir
+porque ninguno de los dos extremos era obviamente culpable:
+
+1. el modelo contestaba el **literal `null`** (no un objeto);
+2. `parseJsonRecord` lo rechazaba, correctamente — un `null` de JSON no es un registro;
+3. `product` quedaba en `null`, así que `phraseProduct` caía a su **fallback de texto crudo**;
+4. ese fallback existe por una buena razón (si el modelo contesta en prosa en vez de JSON, decirlo es
+   mejor que callarse) pero **no distinguía prosa de basura**, y habló el `"null"`.
+
+Arreglado por los dos lados, porque cada uno solo dejaba el agujero abierto: el prompt pide devolver
+**siempre el objeto** con los tres campos en null y nunca un `null` solo; y el fallback distingue con
+una regla que además cubre casos que no habíamos visto — **la prosa no parsea como JSON**. `null`,
+`{}`, `[]` y un objeto sobrante parsean, y ninguno es una lectura. Eso tapa de paso el JSON válido con
+forma inesperada (`{"producto": "arroz"}`), que antes se leía con nombres de campo y todo.
+
+El mensaje pasa a **«Elemento no reconocible. Probá con una foto más de cerca.»** — «producto» quedó
+angosto con el alcance nuevo, y se conserva el qué hacer porque quien no ve la pantalla no tiene otra
+forma de saber que hay un remedio.
+
+### Para probar
+
+Bloque **G** nuevo en `qa-modo-supermercado.md`: alcance nuevo, lo no reconocible, el idioma en los
+dos caminos y el volumen de la placa.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

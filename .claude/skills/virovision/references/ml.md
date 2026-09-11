@@ -57,7 +57,8 @@ comparación en el informe.
 
 ## Datasets — evaluation, not training (ADR 0006)
 Custom **evaluation datasets** to be generated and labeled for (a) metropolitan bus lines and (b)
-basic-basket supermarket products: expected result vs. obtained result. The models are pretrained;
+food items on a supermarket shelf: expected result vs. obtained result. The **basic basket is the
+dataset**, not the scope of the mode (widened 2026-09-11). The models are pretrained;
 **nothing gets trained**. The metrics — **recall, precision, accuracy, F1** — are *the* way this
 project measures precision, and the instrument that closes the pending supermarket decision
 (Gemma 3 1B vs. Gemini Flash). Definitions and what each metric captures per use case:
