@@ -16,6 +16,7 @@ from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
 from .ap import AP_IP, AccessPoint
+from .audio import Player
 from .button import DEFAULT_GPIO, try_connect
 from .camera import Camera, synthetic_payload
 from .state import local_ip, read_status
@@ -34,6 +35,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--hci", default="hci0", help="Bluetooth adapter (default hci0)")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="HTTP server port (plan B)")
     parser.add_argument("--no-http", action="store_true", help="do not bring the HTTP server up")
+    parser.add_argument("--no-audio", action="store_true", help="receive the reading's audio but do not play it (only store it)")
     parser.add_argument("--no-ap", action="store_true", help="do not bring the access point up at startup (development on the home network)")
     parser.add_argument("--no-button", action="store_true", help="do not use the physical button (modes come in over BLE only)")
     parser.add_argument("--button-gpio", type=int, default=DEFAULT_GPIO, help=f"GPIO of the mode button (default {DEFAULT_GPIO} = physical pin 29)")
@@ -65,6 +67,10 @@ async def _main(args: argparse.Namespace) -> None:
     def ap_control(on: bool) -> None:
         ap.turn_on() if on else ap.turn_off()
 
+    # The device's speaker. It is built even with `--no-http`, so the log says at startup whether
+    # there is anything on this board able to play a reading.
+    player = Player()
+
     http = None
     if not args.no_http:
         http = HttpServer(
@@ -74,6 +80,10 @@ async def _main(args: argparse.Namespace) -> None:
             synthetic_payload=synthetic_payload,
             capture=camera.capture_jpeg if has_camera else None,
             port=args.port,
+            # THE closing of the supermarket loop: until this was passed, `/audio` wrote the MP3 to
+            # /tmp, answered 202 and nobody ever heard it. `--no-audio` keeps that old behaviour for
+            # debugging a reading without the sound.
+            play=None if args.no_audio else player.play,
         )
         http.start()
 
@@ -162,6 +172,9 @@ async def _main(args: argparse.Namespace) -> None:
     log.info("shutting down")
     if button:
         button.close()
+    # Silence a reading still playing: otherwise a restart of the service leaves a voice talking
+    # about a product from before, with no daemon behind it.
+    player.stop()
     if http:
         http.stop()
     bus.disconnect()
