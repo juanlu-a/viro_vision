@@ -16,8 +16,12 @@ apt-get update -qq
 # --no-install-recommends: picamera2 drags in Qt and more if left alone. None of that is needed on Lite.
 # gpiozero + lgpio: the physical button (ADR 0007). They go through apt like picamera2 — gpiozero's
 # backend on Trixie is lgpio, and the apt package is the one that brings the version matching the kernel.
+# alsa-utils + mpg123: playing the reading the phone sends back (`audio.py`). alsa-utils brings
+# `aplay` (WAV) and `amixer`; mpg123 decodes the MP3 the app actually sends. Without mpg123 the audio
+# arrives at the device and is never heard, which is exactly the failure this closed.
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-  bluez python3-venv python3-pip python3-picamera2 python3-gpiozero python3-lgpio
+  bluez python3-venv python3-pip python3-picamera2 python3-gpiozero python3-lgpio \
+  alsa-utils mpg123
 
 echo "→ venv (with the system packages, because of picamera2)"
 if [ ! -d "$INSTALL_DIR/.venv" ]; then

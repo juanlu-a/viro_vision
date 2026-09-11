@@ -211,7 +211,7 @@ puerto en la característica `status` (`ip`, `port`, `ap`). La app siempre tira;
 | `GET /health` | el mismo JSON que `status` |
 | `GET /measure/<bytes>` | `<bytes>` aleatorios (hasta 5 MB), para medir la descarga sin cámara |
 | `GET /photos/latest` | captura ahora y devuelve el JPEG (1024 px, q70); 503 sin cámara |
-| `POST /audio` | guarda el MP3/WAV en `/tmp/virovision-audio/` para reproducirlo; 202 con el tamaño. Con `X-Encoding: base64` decodifica el cuerpo (así lo manda la app: `fetch` de RN no envía bytes) |
+| `POST /audio` | guarda el MP3/WAV en `/tmp/virovision-audio/` **y lo reproduce** por el parlante; 202 con el tamaño. Con `X-Encoding: base64` decodifica el cuerpo (así lo manda la app: `fetch` de RN no envía bytes) |
 
 Dos modos de red, y el que importa es el segundo:
 
@@ -311,6 +311,70 @@ siempre. `--button-gpio N` para otro pin, `--no-button` para ignorarlo.
 El botón es **opcional**: sin gpiozero, sin permisos sobre el pin o sin botón soldado, el daemon
 arranca igual (log `sin botón físico`) y los modos entran por BLE. Una placa sin daemon sería peor.
 
+## Salida de audio (el modo supermercado, de punta a punta)
+
+El lazo que el usuario siente: **dos clicks** → la app baja la foto por WiFi → el modelo en la nube
+la lee → la app sintetiza la frase y la manda con `POST /audio` → **la placa la reproduce**.
+
+> ✅ **El último paso faltaba hasta el 2026-09-11.** `http_server.py` aceptaba el archivo, lo
+> escribía en `/tmp/virovision-audio/` y llamaba a un `play` que `__main__.py` **nunca le pasaba**:
+> cada lectura llegaba a la placa y moría ahí, en silencio y con un 202 que decía que había salido
+> bien. Es el peor tipo de falla —todas las capas reportan éxito— y por eso `tests/test_audio.py`
+> existe.
+
+`virovision/audio.py`, y tres cosas que conviene no deshacer:
+
+- **No espera a que el audio termine** (`Popen`, no `run`). Quien llama es el handler HTTP que le
+  contesta al teléfono, y la app **espera** esa respuesta: sostenerla lo que dura la frase haría
+  parecer lenta a la placa justo cuando está hablando.
+- **Una lectura nueva interrumpe la que suena.** Frente a la góndola el usuario pide el producto
+  siguiente antes de que termine la frase anterior, y dos voces a la vez no son información para
+  alguien que no ve la pantalla. La app hace lo mismo en su `speak()`.
+- **Degrada a un log, nunca a una excepción.** Sin decodificador, sin placa de sonido o sin parlante
+  soldado, el daemon tiene que seguir contestando BLE.
+
+**Qué decodifica qué**: `.mp3` → `mpg123 -q` (es lo que manda la app); `.wav` → `aplay -q` (viene con
+alsa-utils, sin decodificador). Los dos los instala `setup.sh`. Si en alguna placa apt no se puede
+(en ésta falla cuando el reloj no sincronizó — no tiene RTC), la salida es que la app mande WAV. El
+daemon **dice al arrancar** con qué formatos cuenta:
+
+```
+audio: .mp3 yes, .wav yes
+audio: no player installed; readings will arrive and not be heard   ← el aviso
+```
+
+`--no-audio` recibe el audio y **no** lo reproduce (guarda nada más), para depurar una lectura sin
+sonido.
+
+### Por dónde sale el sonido físicamente
+
+La Zero 2 W **no tiene jack**, así que el audio PWM se redirige a dos GPIO con `audremap` en
+`config.txt`. Sin `enable_jack` el overlay **apaga el jack**, así que una Pi que sí lo tiene queda
+comportándose como una Zero 2 W — la prueba es real, no una simulación.
+
+```
+dtoverlay=audremap,pins_12_13    # GPIO 12 = pin 32, GPIO 13 = pin 33
+audio_pwm_mode=1                 # legacy: conmuta menos (ver abajo)
+```
+
+| Cable | Pin físico | |
+|---|---|---|
+| señal | **32** | GPIO 12, canal izquierdo |
+| masa | **34** | GND, el de al lado |
+
+> ⚠️ **Antes de elegir los pines, mirar qué hay soldado.** El overlay convierte esos pines en
+> **salidas**: un botón a masa en uno de ellos, al apretarlo, es un cortocircuito contra el pad. Por
+> eso 12/13 se eligió recién después de confirmar que el pin 33 estaba libre. La alternativa es
+> `pins_18_19`, pero ésos son los del futuro DAC I2S (18 BCLK, 19 LRC, 21 DIN).
+>
+> ⚠️ **Y el transductor.** Un GPIO da **16 mA**. Un piezo es un capacitor: no pasa continua, sólo
+> picos en cada flanco, y va directo (con `audio_pwm_mode=1`, que conmuta menos, el pico es menor).
+> Un **auricular o parlante de 16-32 Ω es resistivo**: pediría ~100 mA continuos, seis veces el
+> límite, y **necesita una resistencia en serie de 100-330 Ω** o el DAC.
+>
+> Un piezo alcanza para verificar el camino, **no para voz**: resuena en una banda angosta y el habla
+> sale apenas inteligible. Eso no es una falla del PWM.
+
 ## Problemas conocidos
 
 - `BlueZ no está disponible en D-Bus`: `sudo systemctl start bluetooth` y revisar `rfkill list`.
@@ -333,7 +397,11 @@ CoreBluetooth, arrancando el emulador.
 
 ## Qué falta (en orden)
 
-1. Salida de audio por DAC I2S y anuncios pregrabados de modo y de líneas de ómnibus (ADR 0003).
+1. **El transductor definitivo.** El camino de audio ya está (`audio.py` + `audremap`), lo que falta
+   es por dónde sale: un piezo verifica pero no sirve para voz; un parlante de 8-32 Ω necesita
+   resistencia; el destino es el **DAC I2S** (MAX98357A, pines 18/19/21). Y los **anuncios
+   pregrabados** de modo y de líneas de ómnibus en la SD (ADR 0003), que hoy no existen: la placa
+   sólo reproduce lo que le manda el teléfono.
 2. Pipeline de ómnibus en placa (Coral): detección → recorte → OCR.
 3. Si la medición lo pide: AP WiFi con NetworkManager + servidor HTTP (`GET /fotos/{id}`, `POST /audio`).
 4. Calibrar los tiempos del botón con el usuario (ver *Botón físico*): los actuales son una primera
