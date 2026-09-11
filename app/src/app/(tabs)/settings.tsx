@@ -7,6 +7,7 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { announce } from '@/features/audio/announcer';
+import { AudioOutputSelector } from '@/features/audio/AudioOutputSelector';
 import { ModelSelector } from '@/features/reader/ModelSelector';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
 import { ThemeSelector } from '@/features/theme/ThemeSelector';
@@ -72,6 +73,15 @@ export default function SettingsScreen() {
             {strings.reader.cloudNotConfigured}
           </ThemedText>
         )}
+      </Card>
+
+      {/* Above "cómo funciona" and below the model: it is a decision about the reading, like the
+          model, and not part of the explanation of the app. */}
+      <Card>
+        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+          {t.audioOutput.toUpperCase()}
+        </ThemedText>
+        <AudioOutputSelector />
       </Card>
 
       <Card>

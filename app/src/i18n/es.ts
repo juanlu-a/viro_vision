@@ -126,6 +126,20 @@ export const es = {
     themeSystemHint: 'Sigue la configuración de tu teléfono.',
     themeLightHint: 'Fondo claro con texto azul profundo.',
     themeDarkHint: 'Fondo azul profundo con texto claro.',
+    audioOutput: 'Dónde se escucha',
+    audioOutputHint:
+      'Elegí si la lectura del supermercado suena en el teléfono o en el parlante del dispositivo.',
+    audioOutputPhone: 'En el teléfono',
+    audioOutputPhoneHint:
+      'La voz sale por el teléfono, al instante y sin internet. Es lo que funciona siempre.',
+    audioOutputDevice: 'En el dispositivo',
+    audioOutputDeviceHint:
+      'La lectura se sintetiza en la nube y se manda al parlante del dispositivo. Tarda un poco más y necesita internet; si el dispositivo no está disponible, suena en el teléfono.',
+    // El modo ómnibus queda afuera a propósito: tiene que funcionar sin internet (ADR 0001) y
+    // mandarlo al dispositivo exigiría sintetizarlo en la nube.
+    audioOutputBusNote: 'El modo ómnibus siempre suena en el teléfono, para que funcione sin internet.',
+    audioOutputNotConfigured:
+      'Este build no puede sintetizar audio para el dispositivo, así que la lectura va a sonar en el teléfono.',
   },
   auth: {
     loading: 'Cargando sesión…',

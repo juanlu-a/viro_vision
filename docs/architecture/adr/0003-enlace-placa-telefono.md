@@ -442,6 +442,59 @@ optimización de batería; hoy sólo está el `FOREGROUND_SERVICE_MEDIA_PLAYBACK
 `expo-audio` y ningún servicio que la app arranque. Con Doze, la conexión se cae mucho antes de que
 alguien apriete el botón.
 
+## Actualización 2026-09-11 — Dónde se escucha la lectura, se elige en Ajustes
+
+**El dispositivo final no existe todavía, y comparar los dos caminos exige poder recorrerlos los
+dos** — parado frente a la góndola, no recompilando. Así que la app suma un ajuste: la lectura de
+supermercado suena **en el teléfono** o **en el parlante del dispositivo**.
+
+Hasta ahora el teléfono hablaba siempre y el envío a la placa era una copia *best-effort* detrás de
+`EXPO_PUBLIC_AUDIO_FILE_ENABLED`: se disparaba **después** del anuncio, sin esperar, porque era un
+extra para hardware que no existía. Con el ajuste puede ser **la única salida**, y eso cambia dos
+cosas de fondo.
+
+### 1. El envío pasa a estar DENTRO de la sesión de audio
+
+Es el punto que decide si funciona con el celular bloqueado, y no es evidente. Con la pantalla
+bloqueada iOS le presta a la app unos segundos que compra la notificación BLE, y lo que los estira es
+el keep-alive de `services/audio/session.ts`. El envío viejo, sin `await` y después del anuncio,
+quedaba **fuera** de esa ventana: con el teléfono en el bolsillo, el POST lo haría un proceso que iOS
+ya suspendió. Ahora se espera antes de que el `finally` libere la sesión.
+
+El test que lo fija no mira el resultado sino **el orden**: `['begin', 'earcon', 'send', 'end']`. Es
+el requisito escrito como aserción.
+
+### 2. El teléfono es siempre el respaldo
+
+Una lectura que el usuario pidió y no puede oír es el único resultado que esta app no tiene derecho a
+producir: la voz es la interfaz, y el silencio es indistinguible de un dispositivo colgado. Así que
+**todos** los caminos por los que la placa no puede sonar terminan con el teléfono hablando:
+
+| Situación | Dónde suena | Se registra |
+|---|---|---|
+| eligió teléfono | teléfono | — |
+| eligió dispositivo, todo bien | dispositivo | `audio.spoken` con `target: device` |
+| el build no puede sintetizar | teléfono | `audio.fallback` `not-configured` |
+| el dispositivo no está disponible | teléfono | `audio.fallback` `device-unreachable` |
+| el envío falló | teléfono | `audio.fallback` `send-failed` |
+
+El motivo **se registra y no se anuncia**: decir «no pude usar la placa» antes de cada frase sería
+ruido para quien está leyendo tres productos seguidos, y el usuario igual recibe lo que pidió. La
+tabla de telemetría es la que después dice si el camino de la placa es usable de verdad.
+
+Las dos condiciones se chequean **antes** de sintetizar: la síntesis es una llamada paga y un par de
+segundos, y gastarlos en audio que no tiene dónde ir es peor que chequear dos veces.
+
+### El modo ómnibus queda afuera, y eso no es una omisión
+
+Mandar una lectura de ómnibus al dispositivo exigiría sintetizarla con un TTS **en la nube**, y el
+modo ómnibus tiene que funcionar sin internet ([ADR 0001](0001-offline-first-on-device-inference.md),
+[ADR 0006](0006-pipelines-por-caso-de-uso.md)). Este ADR ya tenía la respuesta correcta en §5:
+**anuncios pregrabados en la SD de la placa**, porque las líneas son un conjunto finito. No existen
+todavía; hasta que existan, ómnibus habla por el teléfono **cualquiera sea el ajuste**, y conserva su
+copia *best-effort* a la placa (no esperada, sin poder degradar nada). El ajuste lo dice en la misma
+pantalla donde se elige: es lo único que sorprende de él.
+
 ## Ver también
 
 - Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).

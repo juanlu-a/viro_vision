@@ -30,6 +30,7 @@
 import { AppState } from 'react-native';
 
 import { announce } from '@/features/audio/announcer';
+import { decideDelivery, getAudioOutput } from '@/features/audio/audioOutput';
 import { guessBusReading, phraseBusReading, phraseProduct } from '@/features/reader/reading';
 import type { BusReading } from '@/features/reader/reading';
 import { requestsReading, transition } from '@/features/reader/modes';
@@ -110,6 +111,12 @@ export interface ReaderDeps {
   downloadPhoto(options?: { timeoutMs?: number }): Promise<DevicePhoto>;
   sendAudio(uri: string): Promise<boolean>;
   writeMode(mode: Mode): Promise<void>;
+  /**
+   * Whether the device can receive audio right now (connected, on its network, answering). Asked
+   * BEFORE synthesizing: the synthesis is a paid cloud call, and spending it on audio that has
+   * nowhere to go is worse than checking first.
+   */
+  isDeviceReady(): boolean;
 }
 
 const noDeps: ReaderDeps = {
@@ -117,6 +124,7 @@ const noDeps: ReaderDeps = {
   downloadPhoto: () => Promise.reject(new Error(strings.connect.noAddress)),
   sendAudio: () => Promise.resolve(false),
   writeMode: () => Promise.resolve(),
+  isDeviceReady: () => false,
 };
 
 let deps: ReaderDeps = noDeps;
@@ -158,15 +166,20 @@ function errorMessage(err: unknown): string {
 }
 
 /**
- * Leaves the reading in an `.mp3`, for the device's speaker. **Best-effort on purpose**: it is
- * called AFTER the announcement and without `await` on the critical path, and it swallows any error.
+ * Sends the reading to the device's speaker: synthesize to a file in the cloud, POST it over WiFi
+ * (ADR 0003). Returns whether the user is actually going to hear it there.
  *
- * If it fails, the user has already heard the product through the phone's speaker. The file exists
- * for hardware that does not exist yet (see `services/audio/synthesis.ts`) and it cannot degrade what
- * works today — accessibility is the design criterion, not a layer.
+ * **It is awaited, and that is the whole point.** Until 2026-09-11 this was fire-and-forget after the
+ * announcement, because the phone had already spoken and this was a spare copy for hardware that did
+ * not exist. Now it can be the ONLY output, so it has to finish **inside the audio session** that
+ * `requestReading` holds open: with the screen locked, iOS gives the app a few seconds bought by the
+ * BLE notification, and the keep-alive tone in `services/audio/session.ts` is what stretches them.
+ * Left unawaited, the reading would be POSTed by a process iOS had already suspended — and the one
+ * scenario this has to survive is precisely the phone locked in a pocket.
+ *
+ * It never throws: the caller falls back to the phone, and silence is not an available outcome.
  */
-async function saveReadingAudio(text: string): Promise<void> {
-  if (!isSynthesisEnabled) return;
+async function sendReadingToDevice(text: string): Promise<boolean> {
   const t0 = Date.now();
   try {
     const uri = await synthesizeToFile(text);
@@ -177,14 +190,41 @@ async function saveReadingAudio(text: string): Promise<void> {
     const t1 = Date.now();
     const sent = await deps.sendAudio(uri);
     record('audio.send', { ms: Date.now() - t1, detail: { sent } });
+    return sent;
   } catch (err) {
-    // Deliberate silence for the user: nothing they do depends on this. But it is recorded, because
-    // it is the device speaker's path and it fails without anyone noticing.
     record('audio.send', {
       ms: Date.now() - t0,
       detail: { sent: false, message: err instanceof Error ? err.message : String(err) },
     });
+    return false;
   }
+}
+
+/**
+ * Says the reading where the user chose to hear it (`features/audio/audioOutput.ts`).
+ *
+ * The single delivery point for a supermarket result, so the two outputs cannot drift apart. The
+ * phone is the fallback for every way the device path can fail, including the send itself coming
+ * back `false`: by then the sentence has been synthesized and nobody has heard it, and paying twice
+ * is much better than leaving the user with nothing.
+ */
+async function deliverReading(text: string): Promise<void> {
+  const delivery = decideDelivery({
+    output: getAudioOutput(),
+    deviceReady: deps.isDeviceReady(),
+    synthesisEnabled: isSynthesisEnabled,
+  });
+  if (delivery.target === 'device') {
+    if (await sendReadingToDevice(text)) {
+      record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'device' } });
+      return;
+    }
+    record('audio.fallback', { detail: { reason: 'send-failed' } });
+  } else if (delivery.fallback) {
+    record('audio.fallback', { detail: { reason: delivery.fallback } });
+  }
+  await announce(text);
+  record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'phone' } });
 }
 
 /**
@@ -252,8 +292,13 @@ async function readBus(uri: string): Promise<void> {
   });
   update({ status: 'idle', reading: busReading, message: spoken });
   await announce(spoken);
-  record('audio.spoken', { detail: { mode: 'bus', characters: spoken.length } });
-  void saveReadingAudio(spoken);
+  record('audio.spoken', { detail: { mode: 'bus', characters: spoken.length, target: 'phone' } });
+  // A best-effort copy to the device's speaker, and deliberately NOT governed by the output setting:
+  // bus mode has to work with no internet (ADR 0001, ADR 0006) and sending it to the device needs a
+  // cloud synthesis, so it can never be the only output here. The phone has already spoken; this is
+  // unawaited and swallows its own errors. ADR 0003's real answer for the bus is **prerecorded clips
+  // on the board's SD**, which do not exist yet.
+  if (isSynthesisEnabled) void sendReadingToDevice(spoken);
 }
 
 /**
@@ -304,9 +349,9 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal): Promise<
       },
     });
     update({ status: 'idle', product: r.product, message: spoken });
-    await announce(spoken);
-    record('audio.spoken', { detail: { mode: 'supermarket', characters: spoken.length } });
-    void saveReadingAudio(spoken);
+    // Where this is heard is the user's choice (`features/audio/audioOutput.ts`), and it is AWAITED:
+    // the device path has to finish before the `finally` releases the audio session.
+    await deliverReading(spoken);
   } catch (err) {
     // The deadline first: it is our own abort, and by type it arrives dressed as a network failure.
     // Saying "the cloud did not answer" when the cloud was fine sends the user to retry the wrong

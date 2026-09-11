@@ -20,6 +20,8 @@ import { AppState } from 'react-native';
 
 import type { ModelProfile } from '@/services/vision';
 
+import { resetAudioOutputForTests, setAudioOutput } from '@/features/audio/audioOutput';
+
 import {
   applyGesture,
   configureReader,
@@ -47,6 +49,14 @@ jest.mock('@/services/audio/session', () => ({
     return Promise.resolve();
   },
   playStartEarcon: () => void mockAudio.push('earcon'),
+}));
+
+// Synthesis is forced ON for this file: the device output cannot be exercised otherwise, and it is
+// a build-time env const in the real module.
+const mockSynthesize = jest.fn((_text: string) => Promise.resolve('file:///tmp/reading.mp3'));
+jest.mock('@/services/audio/synthesis', () => ({
+  isSynthesisEnabled: true,
+  synthesizeToFile: (text: string) => mockSynthesize(text),
 }));
 
 const mockRecognize = jest.fn();
@@ -89,6 +99,7 @@ function deps(over: Partial<Parameters<typeof configureReader>[0]> = {}) {
     downloadPhoto: () => Promise.resolve(photo),
     sendAudio: () => Promise.resolve(true),
     writeMode: () => Promise.resolve(),
+    isDeviceReady: () => true,
     ...over,
   };
 }
@@ -107,9 +118,13 @@ function enterSupermarket() {
 
 beforeEach(() => {
   resetReaderForTests();
+  // The output choice is module state: without this, a file that sets 'device' once leaks it into
+  // every test that follows.
+  resetAudioOutputForTests();
   mockAudio.length = 0;
   mockEvents.length = 0;
   mockSpeak.mockClear();
+  mockSynthesize.mockClear();
   mockRecognize.mockReset();
   mockRecognize.mockResolvedValue({ ms: 900, model: MODEL.id, product: { kind: 'arroz', brand: 'Saman', detail: '1 kg' }, text: '' });
   (AppState as { currentState: unknown }).currentState = 'active';
@@ -141,6 +156,48 @@ describe('a reading with nothing on screen', () => {
     const spokenAt = mockSpeak.mock.invocationCallOrder[0];
     expect(spokenAt).toBeLessThan(Infinity);
     expect(mockAudio.indexOf('end')).toBe(mockAudio.length - 1);
+  });
+
+  it('sends the reading to the device instead of speaking it, when that is what was chosen', async () => {
+    setAudioOutput('device');
+    configureReader(deps({ sendAudio: () => { mockAudio.push('send'); return Promise.resolve(true); } }));
+    enterSupermarket();
+
+    await requestReading('device');
+
+    // **The order is the guarantee.** The send sits INSIDE the audio session, before `end`: with the
+    // screen locked iOS only lets the app run while the keep-alive is playing, so a send left after
+    // the release (which is what `void saveReadingAudio` used to be) would be POSTed by a suspended
+    // process. This assertion is the locked-screen requirement, written down.
+    expect(mockAudio).toEqual(['begin', 'earcon', 'send', 'end']);
+    // And the phone stays quiet: hearing it in both places at once is not what "en el dispositivo" means.
+    expect(mockSpeak).not.toHaveBeenCalled();
+  });
+
+  it('speaks on the phone when the send to the device fails: silence is not an option', async () => {
+    setAudioOutput('device');
+    configureReader(deps({ sendAudio: () => Promise.resolve(false) }));
+    enterSupermarket();
+
+    await requestReading('device');
+
+    // The sentence was already synthesized and nobody heard it. Paying twice beats leaving the user
+    // with nothing, which is indistinguishable from a device that died.
+    expect(mockSpeak).toHaveBeenCalled();
+    expect(mockAudio.indexOf('end')).toBe(mockAudio.length - 1);
+  });
+
+  it('does not pay for a synthesis when the device cannot receive it', async () => {
+    setAudioOutput('device');
+    configureReader(deps({ isDeviceReady: () => false }));
+    enterSupermarket();
+
+    await requestReading('device');
+
+    // Checked BEFORE synthesizing: the cloud TTS costs money and seconds, and the audio would have
+    // nowhere to go.
+    expect(mockSynthesize).not.toHaveBeenCalled();
+    expect(mockSpeak).toHaveBeenCalled();
   });
 
   it('releases the session even when the photo never arrives', async () => {
