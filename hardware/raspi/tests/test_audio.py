@@ -54,3 +54,23 @@ def test_stopping_with_nothing_playing_is_safe():
     player = Player()
     player.stop()
     player.stop()
+
+
+def test_the_volume_is_clamped_instead_of_passed_through():
+    """`amixer` would reject 140% with an error, and the level would silently stay where it was — the
+    symptom being "the volume setting does nothing"."""
+    from virovision.audio import DEFAULT_VOLUME_PERCENT, set_output_volume
+
+    # On the Mac there is no amixer, so this returns False: what is asserted is that it does not raise
+    # for an out-of-range value, which is the caller's contract at startup.
+    assert set_output_volume(140) is False
+    assert set_output_volume(-5) is False
+    assert 0 < DEFAULT_VOLUME_PERCENT <= 100
+
+
+def test_the_default_level_leaves_headroom():
+    """PWM audio clips at the top, and a distorted sentence is harder to understand than a soft one —
+    which is the opposite of the point."""
+    from virovision.audio import DEFAULT_VOLUME_PERCENT
+
+    assert DEFAULT_VOLUME_PERCENT < 100

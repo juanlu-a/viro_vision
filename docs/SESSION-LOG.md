@@ -1690,6 +1690,41 @@ así que la rama queda divergente aunque el contenido esté. El chequeo que vale
 repo: la comparación de contenido contra `staging` (sin tres puntos) vacía = está. De paso: la rama
 de audio salió de `staging` **antes** de ese merge, así que el PR #82 está uno atrás.
 
+## 2026-09-11 (cont. 2) — Funcionó, y las dos cosas que estaban mal
+
+Probado de punta a punta por el usuario: **el flujo de supermercado se escucha en la placa**. Con eso
+aparecieron dos defectos que sólo se podían ver oyéndolo.
+
+### Leía en inglés
+
+La placa decía «Macarrones Adria» con acento inglés. La causa: la petición al TTS de la nube mandaba
+`model`, `voice: alloy`, `input` y `response_format`, **y ninguna indicación de idioma**. `alloy`
+arranca en inglés, y el modelo infiere el idioma del texto — pero el nombre de un producto con marcas
+adentro no le alcanza para cambiar.
+
+**Por qué nadie lo había notado**: en el teléfono el problema no existe, porque a `expo-speech` se le
+pasa `es-UY` explícitamente (`tts.ts`). El camino de la nube no tenía equivalente, y hasta hoy nadie
+había escuchado su salida — el archivo se generaba y no lo consumía nadie. Es un defecto que estuvo
+ahí desde que existe `synthesis.ts` y que **sólo podía aparecer el día que el parlante de la placa
+funcionara**.
+
+Arreglado con el parámetro `instructions` de `gpt-4o-mini-tts` (acento, tono y ritmo; `tts-1` lo
+ignora), en español como el prompt de supermercado (ADR 0009): lo que gobierna es **lo que una
+persona escucha**. La instrucción pide español rioplatense, ritmo pausado y dicción nítida, sin
+entonación publicitaria. Queda anotado que el control de acento por `instructions` se reporta
+inconsistente: si el inglés vuelve, la palanca siguiente es la voz, no una instrucción más larga.
+
+### Sonaba muy bajo
+
+El nivel de la placa era **lo que hubiera quedado del último `amixer` a mano** — durante la sesión se
+movió entre 40 % y 85 % probando, y ahí quedó. Un nivel que depende de quién corrió qué no es un
+nivel.
+
+Ahora el daemon lo fija al arrancar (`set_output_volume` en `audio.py`, flag `--volume`). **90 % y no
+100 %**: el audio PWM recorta arriba, y una frase distorsionada es más difícil de entender que una
+suave — que es exactamente lo contrario del objetivo. Con `amixer -M`, que mapea a volumen
+*percibido*; sin `-M` el porcentaje es una posición en la escala de dB y el 40 % es casi inaudible.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

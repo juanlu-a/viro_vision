@@ -45,6 +45,30 @@ const OPENAI_SPEECH_URL = 'https://api.openai.com/v1/audio/speech';
 const VOICE_MODEL = 'gpt-4o-mini-tts';
 const VOICE = 'alloy';
 
+/**
+ * How the sentence has to be said. **In Spanish, and that is the whole point of it being here.**
+ *
+ * Verified on the device on 2026-09-11: without this the board read «Macarrones Adria» with an
+ * English accent. The request only carried `model`, `voice` and `input`, and `alloy` defaults to
+ * English — the model infers the language from the text, but a three-word product name with brands
+ * in it is not enough for it to switch. On the phone the problem never existed, because `expo-speech`
+ * is told `es-UY` explicitly (`tts.ts`); the cloud path had no equivalent and nobody had heard it
+ * until the board's speaker worked.
+ *
+ * It is `instructions` and not a voice change because that is the parameter `gpt-4o-mini-tts` exposes
+ * for accent, tone and pace — it is the model's distinguishing feature, and `tts-1` ignores it.
+ *
+ * In Spanish like the supermarket prompt (ADR 0009): what it governs is **what a person hears**.
+ *
+ * The steering is reported to be inconsistent for accents. If an English accent ever comes back, the
+ * next lever is the voice, not a longer instruction.
+ */
+const VOICE_INSTRUCTIONS = [
+  'Hablá en español rioplatense, neutro y claro, como se habla en Montevideo.',
+  'Ritmo pausado y dicción nítida: quien escucha no ve la pantalla y la frase no se repite.',
+  'Sin emoción agregada ni entonación publicitaria. Leé las marcas como se pronuncian en español.',
+].join(' ');
+
 /** The API's cap. Truncating is preferable to a 400 that leaves the user without a file and without a reason. */
 export const MAX_CHARACTERS = 4096;
 
@@ -77,6 +101,7 @@ export function buildSpeechRequest(
         model: VOICE_MODEL,
         voice: VOICE,
         input: text.slice(0, MAX_CHARACTERS),
+        instructions: VOICE_INSTRUCTIONS,
         response_format: 'mp3',
       },
     },
