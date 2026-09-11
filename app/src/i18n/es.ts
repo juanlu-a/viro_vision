@@ -55,6 +55,7 @@ export const es = {
     nothingRead: 'No pude leer el cartel. Probá con una foto más de cerca.',
     nothingReadProduct: 'No pude identificar el producto. Probá con una foto más de cerca.',
     error: 'No se pudo leer',
+    readTimedOut: 'Tardó demasiado. Probá de nuevo.',
     quotaExhausted: 'Cuota de la nube agotada. Reintentá en',
     waitingSlot: 'Esperando cupo del modelo. Sigo en',
     cloudNotConfigured:

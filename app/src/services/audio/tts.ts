@@ -17,10 +17,31 @@ export interface SpeakOptions {
   interrupt?: boolean;
 }
 
-export function speak(text: string, options: SpeakOptions = {}): void {
+/**
+ * Speaks, and resolves when the utterance is actually over.
+ *
+ * The promise is what lets a caller hold the audio session open until the last word (see
+ * `services/audio/session.ts`): releasing it on the line after `speak()` cuts the announcement in
+ * half with the screen locked. It **never rejects** — a failure to speak resolves like an end,
+ * because the only caller is the announcement path and ADR 0001 forbids anything there from
+ * throwing. Every existing caller ignores the promise and keeps working exactly as before.
+ */
+export function speak(text: string, options: SpeakOptions = {}): Promise<void> {
   const { language = 'es-UY', interrupt = true } = options;
   if (interrupt) Speech.stop();
-  Speech.speak(text, { language });
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    try {
+      Speech.speak(text, { language, onDone: done, onStopped: done, onError: done });
+    } catch {
+      done();
+    }
+  });
 }
 
 export function stopSpeaking(): void {

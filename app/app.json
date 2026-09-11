@@ -71,7 +71,15 @@
           "bluetoothAlwaysPermission": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento."
         }
       ],
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false,
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
+      ],
       "./plugins/withoutUserScriptSandboxing",
       "./plugins/withDevelopmentTeam",
       [

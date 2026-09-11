@@ -56,17 +56,10 @@ interface DeviceValue {
   ap: boolean;
   /** The last mode reported by the device, or null when it reported none. */
   deviceMode: DeviceMode | null;
-  /**
-   * Counter of readings the physical button has asked for (ADR 0007, 2026-10 update). It is a
-   * counter and not a boolean because two identical requests in a row have to be distinguishable:
-   * in front of the shelf the user double-clicks once per product, and a flag would collapse the
-   * second one into the first. Whoever reads it reacts to the number CHANGING, never to its value.
-   */
-  readRequest: number;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   writeMode: (mode: DeviceMode) => Promise<void>;
-  downloadPhoto: () => Promise<DevicePhoto>;
+  downloadPhoto: (options?: { timeoutMs?: number }) => Promise<DevicePhoto>;
   /** Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. */
   sendAudio: (uri: string) => Promise<boolean>;
 }
@@ -92,7 +85,6 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [wifiDetail, setWifiDetail] = useState<string | null>(null);
   const [lastNotice, setLastNotice] = useState<string | null>(null);
   const [deviceMode, setDeviceMode] = useState<DeviceMode | null>(null);
-  const [readRequest, setReadRequest] = useState(0);
 
   const credentials = useRef<WifiCredentials | null>(null);
   const joinedTo = useRef<string | null>(null);
@@ -321,13 +313,13 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         setDeviceMode(MODE_FROM_GATT[value] ?? null);
       }),
       client.onAp(startNetworkTransition),
-      client.onReadRequest(() => {
-        // Recorded here and not where it is served: this is the moment the user's finger asked for
-        // it, and the gap against the `reading.start` that follows is what says whether the device
-        // or the app is the slow half.
-        record('device.readRequest');
-        setReadRequest((n) => n + 1);
-      }),
+      // Recorded here and not where it is served: this is the moment the user's finger asked for
+      // it, and the gap against the `reading.start` that follows is what says whether the device or
+      // the app is the slow half. **Serving it is no longer this provider's job**: `features/reader`
+      // subscribes to the client itself (see `ReaderBridge`), because a hardware interrupt that has
+      // to travel through React state before anything happens is a hardware interrupt that does
+      // nothing with the screen locked — which is how the button was found broken on 2026-09-10.
+      client.onReadRequest(() => record('device.readRequest')),
       client.onDeviceError((message) => {
         // The device has no screen: if something failed on it (bringing the AP up, the camera), the
         // app is the only place anyone can find out — and since telemetry exists, the table.
@@ -400,10 +392,15 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
 
   const photoAvailable = connection.status === 'connected' && wifi === 'ready' && address !== null;
 
-  const downloadPhoto = useCallback(async () => {
-    if (!address) throw new Error(strings.connect.noAddress);
-    return downloadDevicePhoto(address);
-  }, [address]);
+  const downloadPhoto = useCallback(
+    async (options?: { timeoutMs?: number }) => {
+      if (!address) throw new Error(strings.connect.noAddress);
+      // The caller sets the deadline. With the screen locked the whole cycle has seconds, not the
+      // 20 s the download would take by default (`readingService.ts`).
+      return downloadDevicePhoto(address, options);
+    },
+    [address]
+  );
 
   const sendAudio = useCallback(
     async (uri: string): Promise<boolean> => {
@@ -427,8 +424,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<DeviceValue>(
-    () => ({ connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, readRequest, connect, disconnect, writeMode, downloadPhoto, sendAudio }),
-    [connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, readRequest, connect, disconnect, writeMode, downloadPhoto, sendAudio]
+    () => ({ connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, downloadPhoto, sendAudio }),
+    [connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, downloadPhoto, sendAudio]
   );
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;

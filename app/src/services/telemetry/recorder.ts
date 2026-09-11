@@ -117,6 +117,16 @@ const state: State = {
 };
 
 /**
+ * The app state as a string, always. `AppState.currentState` is typed as a union but is whatever
+ * the host puts there, and a non-string would be dropped by `JSON.stringify` and leave the field
+ * silently missing on exactly the rows that need it.
+ */
+function currentAppState(): string {
+  const value: unknown = AppState.currentState;
+  return typeof value === 'string' ? value : 'unknown';
+}
+
+/**
  * Enqueues an event. **Synchronous, never throws, waits for nothing.** It is the only function the
  * rest of the app uses.
  */
@@ -127,7 +137,12 @@ export function record(type: EventType, extra?: { ms?: number; detail?: Record<s
       type,
       at: state.now().toISOString(),
       ...(typeof extra?.ms === 'number' && Number.isFinite(extra.ms) ? { ms: extra.ms } : null),
-      ...(extra?.detail ? { detail: extra.detail } : null),
+      // `app` is stamped HERE and not at each call site, because the one call site somebody forgets
+      // is going to be the one on the path that matters. The whole point of this table is the phone
+      // locked in a pocket (see the module docblock), and without knowing which app state a row was
+      // written in, a locked-screen run and a foreground one are the same timeline. It is a
+      // synchronous property read and it costs nothing. A caller that passes its own `app` wins.
+      detail: { app: currentAppState(), ...extra?.detail },
     };
     state.queue.enqueue(event);
     if (state.queue.length >= UPLOAD_THRESHOLD) void flush();
@@ -237,13 +252,20 @@ export function startTelemetry(options: TelemetryOptions = {}): () => void {
     previous?.(error, fatal);
   });
 
-  // Going to the background is the only predictable moment worth draining at: the user put the phone
-  // away and the app may stay suspended for a good while.
+  // The two edges of the pocket. Going away is the obvious one: the user put the phone down and the
+  // app may stay suspended for a good while, so whatever is queued has to leave now. Coming back is
+  // the one that was missing until 2026-09-10, and it is the one that matters most: a whole reading
+  // can happen with the screen locked, and its rows only reach the table if something drains the
+  // queue. Until then that depended on a 15 s timer outliving the suspension, which is exactly the
+  // thing that cannot be assumed about a background run.
   const subscription = AppState.addEventListener('change', (next) => {
-    if (next !== 'active') {
-      record('app.background', { detail: { state: next } });
+    if (next === 'active') {
+      record('app.foreground');
       void flush();
+      return;
     }
+    record('app.background', { detail: { state: next } });
+    void flush();
   });
 
   scheduleNextUpload();

@@ -14,6 +14,7 @@ import { BleManager, State, type Device, type Subscription } from 'react-native-
 import { DEVICE_ADVERTISED_NAME, GATT, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
+import { record } from '@/services/telemetry';
 
 import {
   encodeBase64,
@@ -248,8 +249,16 @@ class BleClientPlx implements BleClient {
     try {
       event = JSON.parse(decodeTextBase64(base64)) as DeviceEvent;
     } catch {
+      // A frame that does not parse used to vanish without a trace, which reads exactly like a frame
+      // that never arrived — and those two have completely different causes.
+      record('ble.event', { detail: { parsed: false } });
       return;
     }
+    // The first thing that can be observed after the radio. With the screen locked this is what
+    // separates "iOS never woke us" from "we woke up and the rest of the chain failed", and there is
+    // no console to ask: telemetry is the only witness (`services/` may import it; the ADR 0001 ban
+    // covers `features/audio/` and `features/recognition/`).
+    record('ble.event', { detail: { t: event.t } });
     switch (event.t) {
       case 'error':
         for (const listener of this.errorListeners) listener(event.msg);

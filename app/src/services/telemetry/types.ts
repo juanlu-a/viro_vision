@@ -23,6 +23,7 @@ export type EventType =
   // App lifecycle
   | 'app.start'
   | 'app.background'
+  | 'app.foreground'
   | 'app.error'
   // BLE link (control plane, ADR 0003)
   | 'ble.scanning'
@@ -31,6 +32,7 @@ export type EventType =
   | 'ble.lost'
   | 'ble.retry'
   | 'ble.disconnected'
+  | 'ble.event'
   // WiFi network with the device (where the photo travels)
   | 'wifi.joining'
   | 'wifi.ready'
@@ -44,6 +46,7 @@ export type EventType =
   // Operating modes (ADR 0007)
   | 'mode.change'
   // One reading, end to end
+  | 'reading.requested'
   | 'reading.start'
   | 'reading.ok'
   | 'reading.failed'
@@ -52,7 +55,9 @@ export type EventType =
   | 'ocr.load'
   | 'cloud.wait'
   | 'audio.synthesis'
-  | 'audio.send';
+  | 'audio.send'
+  | 'audio.session'
+  | 'audio.spoken';
 
 export interface TelemetryEvent {
   type: EventType;
