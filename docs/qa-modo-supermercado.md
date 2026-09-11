@@ -266,6 +266,60 @@ npx expo run:ios --device "iPhone de Juan"
 
 ---
 
+## Bloque F — la lectura sonando en la placa (el ajuste «dónde se escucha»)
+
+Desde el 2026-09-11 la lectura de supermercado puede salir por el **parlante de la placa** en vez del
+teléfono, y se elige en **Ajustes → Dónde se escucha**. Razonamiento en la actualización del
+[ADR 0003](architecture/adr/0003-enlace-placa-telefono.md).
+
+**Requisitos**: `EXPO_PUBLIC_AUDIO_FILE_ENABLED=1` en `app/.env` (la placa necesita el archivo
+sintetizado) más clave de OpenAI o el proxy; la placa con el daemon que reproduce (PR #82), el
+`audremap` en `config.txt` y un transductor en los **pines 32 y 34**.
+
+### 16. Que el ajuste cambie de verdad el destino
+
+- [ ] En **En el teléfono**: la voz sale por el teléfono y la placa queda **muda**.
+- [ ] En **En el dispositivo**: la voz sale por la **placa** y el teléfono queda **mudo**. Oírla en
+      los dos lados es un defecto, no un extra: significa que el respaldo se disparó sin motivo.
+- [ ] El cambio **se anuncia por voz** al elegirlo («Dónde se escucha: En el dispositivo»). Es la
+      única confirmación para quien no mira la pantalla.
+- [ ] La elección **sobrevive a cerrar y abrir la app**.
+- [ ] `journalctl -u virovision -f` en la placa muestra `audio: playing …` por cada lectura.
+
+### 17. Que el teléfono sea siempre el respaldo (lo que no puede fallar)
+
+El silencio es el único resultado prohibido: para quien no ve la pantalla es indistinguible de un
+dispositivo colgado.
+
+- [ ] Con **En el dispositivo** y la placa **apagada**: el usuario **igual escucha el producto**, por
+      el teléfono. En la tabla, `audio.fallback` con `device-unreachable`.
+- [ ] Con **En el dispositivo** y `EXPO_PUBLIC_AUDIO_FILE_ENABLED` **apagado**: suena por el teléfono
+      y `audio.fallback` dice `not-configured`. Al elegir la opción, la voz ya avisó que este build no
+      puede.
+- [ ] Apagar la placa **en el medio** de una lectura: suena por el teléfono (`send-failed`).
+- [ ] En ningún caso hay **dos** voces ni **ninguna**.
+
+### 18. El modo ómnibus no cambia
+
+- [ ] Con **En el dispositivo** elegido, una lectura de **ómnibus** sigue sonando en el **teléfono**.
+      No es un olvido: mandarla a la placa exigiría TTS en la nube y ómnibus tiene que funcionar sin
+      internet (ADR 0001). La pantalla lo dice debajo del selector.
+
+### 19. Con la pantalla bloqueada (lo que este ajuste podía romper)
+
+Es el punto delicado: el envío a la placa pasó a estar **dentro** de la sesión de audio, porque con la
+pantalla bloqueada iOS sólo deja correr a la app mientras el keep-alive suena.
+
+- [ ] Con **En el dispositivo**, teléfono **bloqueado en el bolsillo**, dos clicks en el botón: la
+      lectura **se escucha en la placa** y el ciclo entero termina.
+- [ ] Repetir **tres veces seguidas** sin desbloquear. Las tres tienen que sonar.
+- [ ] En la tabla, cada lectura cierra con `audio.spoken` y `target: device`. Un `audio.fallback` con
+      `send-failed` sólo con la pantalla bloqueada (y no desbloqueada) es **exactamente** el síntoma
+      de que el envío se volvió a salir de la ventana de sesión: iOS suspendió el proceso antes del
+      POST.
+
+---
+
 ## Qué NO cubre este documento
 
 - **El hardware.** Los dos casos de ómnibus del diagrama

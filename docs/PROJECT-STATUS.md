@@ -151,6 +151,20 @@ tests via `jest-expo`.
   **El spike 1 de ADR 0003 queda cerrado** y con él la hipótesis sobre la que está construido todo el
   enlace. Sigue abierto `restoreStateIdentifier` (si iOS **termina** la app, CoreBluetooth no la
   relanza): no hace falta para el caso probado, y es el PR siguiente del tema.
+- **La placa reproduce el audio (2026-09-11, PR #82)**: `POST /audio` aceptaba el MP3 y llamaba a un
+  `play` que el entrypoint nunca le pasaba — cada lectura llegaba y moría en silencio con un 202
+  exitoso. `virovision/audio.py` lo cierra. **Probado en hardware**: la Zero 2 W no tiene jack, así
+  que el audio PWM sale por GPIO con `dtoverlay=audremap,pins_12_13` + `audio_pwm_mode=1` (sin
+  `enable_jack` el overlay **apaga** el jack, así que la Pi 3 B+ prestada queda comportándose como una
+  Zero). Tonos y **voz real audibles** en un auricular entre los pines 32 y 34. Falta el transductor
+  definitivo: el piezo no sirve para voz, el auricular va sin resistencia (100-330 Ω pendientes), y el
+  destino es el **DAC I2S** — que quiere GPIO 18/19/21, con un botón cableado en el 21.
+- **Dónde se escucha la lectura, se elige en Ajustes (2026-09-11)**: teléfono o parlante de la placa,
+  para poder comparar los dos caminos sin el hardware final. Lo no evidente: el envío a la placa pasó
+  a estar **dentro de la sesión de audio** (antes era `void` después del anuncio), que es lo que lo
+  hace funcionar con la pantalla bloqueada; y el **teléfono es siempre el respaldo**, con el motivo
+  registrado en `audio.fallback` en vez de anunciado. **Ómnibus queda afuera**: mandarlo a la placa
+  exigiría TTS en la nube y tiene que funcionar sin internet (ADR 0001). Ver ADR 0003, act. 2026-09-11.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a

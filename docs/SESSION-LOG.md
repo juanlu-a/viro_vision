@@ -1605,6 +1605,91 @@ Con esto **ADR 0003 queda demostrado de punta a punta**: BLE como plano de contr
 lo que despierta la app con el teléfono en el bolsillo, que era la hipótesis sobre la que está
 construido todo el diseño del enlace y hasta hoy nadie había verificado.
 
+## 2026-09-11 (cont.) — La placa habla: el lazo de supermercado cerrado, y dónde se escucha se elige
+
+Dos piezas, una en cada pilar, más una tarde de hardware.
+
+### La placa recibía el audio y nunca lo reproducía
+
+`POST /audio` aceptaba el MP3, lo escribía en `/tmp/virovision-audio/` y llamaba a un `play` que
+**`__main__.py` nunca le pasaba**. Cada lectura de supermercado llegaba al dispositivo y moría ahí,
+en silencio, **con un 202 que decía que había salido bien** — la app creía haber entregado el audio y
+la placa creía haberlo guardado. Es la peor forma que puede tener un bug: todas las capas reportan
+éxito. Cerrado con `virovision/audio.py` (PR #82).
+
+Tres decisiones del reproductor que conviene no deshacer: **no espera** a que termine el audio
+(`Popen`, no `run`) porque quien llama es el handler HTTP que le contesta al teléfono; **una lectura
+nueva interrumpe la que suena**, porque frente a la góndola se pide el producto siguiente antes de
+que termine la frase y dos voces a la vez no son información para quien no ve la pantalla; y
+**degrada a un log, nunca a una excepción**.
+
+### Cómo se saca audio de una Zero 2 W: resuelto, en la placa
+
+La Zero 2 W no tiene jack, y eso era una incógnita abierta. Resultó ser un `config.txt` de dos líneas:
+
+```
+dtoverlay=audremap,pins_12_13    # GPIO 12 = pin 32, GPIO 13 = pin 33
+audio_pwm_mode=1
+```
+
+**Sin `enable_jack`, el overlay APAGA el jack.** Eso es lo que hace que la prueba valga: la Pi 3 B+
+prestada *sí* tiene jack, y con el overlay queda comportándose como una Zero 2 W — mismo SoC, mismo
+header, mismos pines. No es una simulación.
+
+**Lo que se probó, en orden:** `aplay -l` lista la tarjeta → tonos de 440 Hz y 1 kHz **audibles** en
+un auricular entre los pines 32 y 34 → `mpg123` instalado (el reloj estaba sincronizado, así que el
+apt que fallaba por no tener RTC no molestó) → daemon nuevo desplegado → **voz real por `POST /audio`
+con `{"played": true}`**, y el journal encadenando todo: audio recibido, reproducción lanzada 5 ms
+después, 202 devuelto a los 6 ms. El teléfono no espera a que termine la frase.
+
+**Dos errores propios que vale registrar.** Se probó primero con **440 Hz sobre un piezo**, que es la
+peor frecuencia posible: un piezo es un capacitor y a 440 Hz presenta ~18 kΩ, así que casi no pasa
+corriente y casi no suena. La pista la dio el usuario: conectado a 3,3 V fijos hacía un clic y no un
+pitido — firma exacta de un piezo *pasivo*, que confirma que el elemento y los contactos andan. Y se
+configuró `pins_18_19` por seguridad (por si un botón había caído en el pin 33, que el overlay
+convierte en **salida**: un botón a masa ahí sería un cortocircuito contra el pad) sin avisar que eso
+requería mover el cable; la tarjeta se fue a la placa con el overlay en un par de pines y el buzzer
+en el otro. Se arregló por SSH, sin sacar la tarjeta.
+
+**Lo que quedó sabido sobre el transductor:** un piezo verifica el camino pero **no sirve para voz**
+—la inteligibilidad vive entre 300 Hz y 3,4 kHz y un piezo resuena arriba de los 2 kHz—; un auricular
+de 16-32 Ω **sí** reproduce voz, y hoy va **sin resistencia en serie**, pidiéndole ~100 mA a un pin de
+16 mA. Anda, pero hay que poner 100-330 Ω. El destino sigue siendo el **DAC I2S**.
+
+### El ajuste «dónde se escucha»
+
+El dispositivo final no existe, así que comparar los dos caminos exige recorrerlos los dos desde la
+app. Ajustes suma un selector: la lectura de supermercado suena **en el teléfono** o **en el parlante
+del dispositivo**. Razonamiento completo en la actualización del
+[ADR 0003](architecture/adr/0003-enlace-placa-telefono.md); lo que importa acá son las dos cosas que
+no eran evidentes.
+
+**El envío pasó a estar DENTRO de la sesión de audio, y eso es lo que lo hace funcionar bloqueado.**
+Antes era `void saveReadingAudio(...)` **después** del anuncio: una copia best-effort para hardware
+que no existía. Ahora puede ser la única salida, y con la pantalla bloqueada iOS sólo deja correr a la
+app mientras el keep-alive suena — un envío fuera de esa ventana lo haría un proceso ya suspendido.
+El test no mira el resultado sino **el orden**: `['begin', 'earcon', 'send', 'end']`.
+
+**El teléfono es siempre el respaldo.** Todos los caminos por los que la placa no puede sonar
+terminan con el teléfono hablando, y el motivo se **registra** (`audio.fallback`) en vez de
+anunciarse: decir «no pude usar la placa» antes de cada frase sería ruido, y el usuario igual recibe
+lo que pidió. Las condiciones se chequean **antes** de sintetizar, porque la síntesis es una llamada
+paga.
+
+**El modo ómnibus queda afuera a propósito**: mandarlo al dispositivo exigiría TTS en la nube y
+ómnibus tiene que funcionar sin internet (ADR 0001). ADR 0003 ya tenía la respuesta —anuncios
+pregrabados en la SD— y no existen todavía. El ajuste lo dice en la misma pantalla donde se elige.
+
+### Casi se duplicó trabajo, y la regla del repo lo evitó
+
+Antes de escribir el ajuste se buscaron ramas sin mergear, como manda `convenciones.md`. Apareció
+`fix/ios-background-reading`, con la sesión de audio, el keep-alive y el refactor de `useReader` a
+`readingService` — justo el código que el ajuste toca. El historial la mostraba con dos commits fuera
+de `staging` y parecía sin mergear; el PR #80 **estaba mergeado**, y `staging` mergea con *squash*,
+así que la rama queda divergente aunque el contenido esté. El chequeo que vale es el que dice el
+repo: la comparación de contenido contra `staging` (sin tres puntos) vacía = está. De paso: la rama
+de audio salió de `staging` **antes** de ese merge, así que el PR #82 está uno atrás.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1675,6 +1760,16 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   Es accesibilidad, no pulido: en una app cuya interfaz es la voz, un estado sin salida deja al
   usuario sin forma de saber que el remedio existe.
 - **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
+- **El transductor de audio** (del 2026-09-11, con el camino ya resuelto): el piezo verifica pero no
+  sirve para voz; el auricular sí, y hoy va **sin resistencia en serie** pidiéndole ~100 mA a un pin
+  de 16 mA — conseguir 100-330 Ω. Después: `audio_pwm_mode=2` (el default, menos ruido) y un filtro
+  RC. Destino: **DAC I2S MAX98357A**, que necesita GPIO 18/19/21 — y **hay un botón cableado en el
+  21**, así que hay que mudarlo antes.
+- **Anuncios pregrabados en la SD** para el modo ómnibus (ADR 0003 §5). Es lo que falta para que
+  ómnibus pueda sonar en la placa sin romper offline-first: hoy habla por el teléfono siempre.
+- **En qué GPIO está cada botón, de verdad.** El daemon escucha en **GPIO 5** (log del arranque) y el
+  cable estaría en el 21. Lo resuelve `/boot/firmware/check-pines.sh`, que mira siete pines mientras
+  se aprieta cada botón. Diez segundos, y hasta entonces los defaults del código son una conjetura.
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
 - **Cámara**: resuelto (era hot-plug; y es la AI Camera). Ajustar el enfoque manual: las primeras fotos salieron desenfocadas.

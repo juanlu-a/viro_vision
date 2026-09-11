@@ -40,6 +40,10 @@ export function ReaderBridge() {
       downloadPhoto: (options) => latest.current.device.downloadPhoto(options),
       sendAudio: (uri) => latest.current.device.sendAudio(uri),
       writeMode: (mode) => latest.current.device.writeMode(mode),
+      // `photoAvailable` and not `connection.status`: it is the same condition `sendAudio` needs
+      // (connected, on the device's network, and `/health` answering), so asking anything weaker
+      // would pay for a synthesis the device cannot receive.
+      isDeviceReady: () => latest.current.device.photoAvailable,
     });
   }, []);
 

@@ -116,6 +116,30 @@ auricular de la placa exige el DAC I2S (ADR 0003 §5) y **enrutar la salida** co
 de cada plataforma. La app ya sintetiza el `.mp3` (`services/audio/synthesis.ts`, detrás de una
 bandera) y la placa ya acepta `POST /audio`; falta el hardware.
 
+### Dónde se escucha la lectura (Ajustes, 2026-09-11)
+
+La lectura de **supermercado** sale por el teléfono o por el **parlante de la placa**, a elección del
+usuario en Ajustes (`features/audio/audioOutput.ts` + `AudioOutputSelector`). Existe porque el
+dispositivo final no existe y comparar los dos caminos exige recorrerlos los dos.
+
+Tres reglas que no se deducen del código:
+
+1. **El envío a la placa se espera DENTRO de la sesión de audio.** Antes era `void` después del
+   anuncio (una copia best-effort para hardware inexistente). Ahora puede ser la única salida, y con
+   la pantalla bloqueada iOS sólo deja correr a la app mientras el keep-alive suena: fuera de esa
+   ventana, el POST lo haría un proceso suspendido. El test fija **el orden**, no el resultado:
+   `['begin', 'earcon', 'send', 'end']`.
+2. **El teléfono es siempre el respaldo.** Todo camino que falle termina con el teléfono hablando; el
+   motivo se **registra** (`audio.fallback`) y no se anuncia. El silencio es el único resultado
+   prohibido. Y las condiciones se chequean **antes** de sintetizar, porque la síntesis se paga.
+3. **Ómnibus queda afuera**: mandarlo a la placa exigiría TTS en la nube y tiene que funcionar sin
+   internet (ADR 0001). ADR 0003 §5 ya tiene la respuesta —anuncios pregrabados en la SD— y no
+   existen todavía.
+
+La política es pura y vive sin el módulo nativo (mismo criterio que `services/audio/audioMode.ts`):
+`readingService.ts` la importa, y su suite no puede necesitar un mock de AsyncStorage para verificar
+una decisión que no toca el disco.
+
 ## Auth / backend (online account layer) — ARCHIVED, app has NO login
 Decision (2026-07-20, team + tutor): **the app ships without a login** — it opens directly to the tabs.
 The core is offline-first (on-device model + BLE), so accounts add no value; Apple doesn't require a

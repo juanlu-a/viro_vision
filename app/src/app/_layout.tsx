@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { isProxyConfigured } from '@/services/cloud';
 import { record, startTelemetry, isTelemetryConfigured } from '@/services/telemetry';
+import { AudioOutputProvider } from '@/features/audio/AudioOutputProvider';
 import { DeviceProvider } from '@/features/device/DeviceProvider';
 import { ProductModelProvider } from '@/features/reader/ProductModelProvider';
 import { ReaderBridge } from '@/features/reader/ReaderBridge';
@@ -75,13 +76,18 @@ export default function RootLayout() {
       {/* The supermarket model is chosen in Settings and used on Home: the state has to be a single
           one, above both tabs. */}
       <ProductModelProvider>
-        <DeviceProvider>
-          {/* Renders nothing. It hands the reading pipeline the app's live values and subscribes it
-              to the device's button, above every screen: the button has to work whatever is on
-              screen, and with the screen off there is nothing on it at all. */}
-          <ReaderBridge />
-          <RootNavigator />
-        </DeviceProvider>
+        {/* Where the reading is heard is chosen in Settings and applied by the reading pipeline, so
+            like the model it has to be a single state above both tabs. It also restores the stored
+            choice into the module the pipeline reads. */}
+        <AudioOutputProvider>
+          <DeviceProvider>
+            {/* Renders nothing. It hands the reading pipeline the app's live values and subscribes it
+                to the device's button, above every screen: the button has to work whatever is on
+                screen, and with the screen off there is nothing on it at all. */}
+            <ReaderBridge />
+            <RootNavigator />
+          </DeviceProvider>
+        </AudioOutputProvider>
       </ProductModelProvider>
     </ThemePreferenceProvider>
   );

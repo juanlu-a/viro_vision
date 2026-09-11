@@ -57,6 +57,11 @@ export type EventType =
   | 'audio.synthesis'
   | 'audio.send'
   | 'audio.session'
+  // `audio.spoken` carries `target`: 'phone' or 'device'. `audio.fallback` is the row that matters
+  // when comparing the two paths — it says the user asked for the device and heard the phone, and
+  // why. A table full of these means the device path is not actually usable yet, which is a finding
+  // and not a bug report.
+  | 'audio.fallback'
   | 'audio.spoken';
 
 export interface TelemetryEvent {
