@@ -2,7 +2,7 @@
 name: virovision
 description: >-
   ViroVision thesis context — an assistive device + mobile platform for people with low or
-  no vision that identifies metropolitan bus lines and basic-basket supermarket products and
+  no vision that identifies metropolitan bus lines and food items on a supermarket shelf and
   gives real-time auditory feedback, using Computer Vision, ML and OCR. Covers the three
   project pillars (React Native app, Raspberry Pi / IoT hardware, ML/OCR/CV). Use this whenever
   working on any ViroVision code, hardware, ML model, or thesis document.
@@ -26,7 +26,11 @@ camera device mounted on the temple of a pair of glasses captures the environmen
 1. **Bus-line identification** — recognize the line of an approaching metropolitan bus (OCR on
    the bus's number/name display) and announce it. When several buses are present, prioritize
    the most relevant one (by position/proximity) without auditory overload.
-2. **Supermarket products** — identify basic-basket products on the shelf and announce them.
+2. **Supermarket products** — identify **food items** on the shelf and announce them. **Scope widened
+   2026-09-11**: the basic basket was the scope while the accuracy was unknown; measured against the
+   real device the model identifies whatever food is in front of it — loose yerba included — so the
+   basket survives as the **evaluation dataset** (what is measured), never as the limit of what is
+   answered. The prompt says "alimentos y productos de almacén".
 
 ### Optional goals (nice-to-have, not core scope)
 - **Fingertip pointing selection** — for products, only announce the item the user is pointing

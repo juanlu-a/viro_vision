@@ -126,7 +126,9 @@ todos los eventos **en silencio**. Esto es lo que hay que confirmar:
 > (ADR 0006, actualización 2026-09-08). Hasta reponer una entrada de prueba detrás de una bandera, la
 > corrida va **fuera de la app**: el set de fotos guardado, contra el proxy, un modelo por vuelta.
 
-- [ ] Elegir **10 productos de canasta básica** reales y sacarles foto **una sola vez** cada uno.
+- [ ] Elegir **10 alimentos** reales y sacarles foto **una sola vez** cada uno. La canasta básica
+      sigue siendo el dataset de referencia (act. del ADR 0006, 2026-09-11), pero el modo ya no se
+      limita a ella: conviene incluir algo **suelto o a granel** (yerba, fruta) y algo **sin envase**.
 - [ ] Para cada foto, correrla contra **los cuatro modelos** con la MISMA imagen — si cada modelo
       viera una foto distinta, la comparación mediría fotos, no modelos.
 - [ ] Anotar por corrida: modelo, tiempo, y si acertó `tipo`, `marca` y `detalle` **por separado**.
@@ -328,3 +330,52 @@ pantalla bloqueada iOS sólo deja correr a la app mientras el keep-alive suena.
   el audio de hoy, incluido el del bloque E, sale por el parlante del teléfono.
 - **El fallback local de supermercado.** Sigue pendiente (Gemma 3 1B con visión). Hoy, sin internet,
   el modo avisa y no lee — excepción acotada y documentada a ADR 0001.
+
+---
+
+## Bloque G — el alcance nuevo y lo no reconocible (act. del ADR 0006, 2026-09-11)
+
+Desde el 2026-09-11 el modo **no se limita a la canasta básica**: identifica alimentos en general. La
+canasta queda como dataset de evaluación, no como límite.
+
+### 20. Que el alcance sea el nuevo
+
+- [ ] **Yerba suelta** (sin envase de marca): la identifica.
+- [ ] **Fruta o verdura a granel**: dice al menos el `kind`.
+- [ ] Un alimento **envasado fuera de la canasta** (galletitas, una lata, un snack): lo identifica.
+- [ ] En Inicio, la tarjeta dice «Identifica alimentos y productos de almacén» y no «de la canasta
+      básica».
+
+### 21. Que lo no reconocible se diga, y no se lea basura
+
+Es el defecto que apareció el primer día que la placa habló: apuntado a algo que no es un alimento, el
+modelo devolvía el literal `null` y **la placa lo leía en voz alta**.
+
+- [ ] Apuntar a algo que **no es un alimento** (una mano, una pared, un cable): se escucha **«Elemento
+      no reconocible. Probá con una foto más de cerca.»**
+- [ ] **Nunca** se escucha «null», ni llaves, ni nombres de campos. Si eso vuelve, el arreglo está en
+      dos lugares y hay que mirar los dos: el prompt (que pide devolver siempre el objeto) y
+      `phraseProduct` (que sólo habla el texto crudo si **no** parsea como JSON).
+- [ ] Con la foto muy borrosa o a contraluz: el mismo mensaje, no silencio.
+- [ ] El mensaje se escucha **donde esté elegido** en Ajustes: si está en «dispositivo», sale por la
+      placa como cualquier lectura.
+
+### 22. Que el idioma sea español en los dos caminos
+
+- [ ] Con **En el dispositivo**: la frase se escucha **en español**, no con acento inglés. Ese defecto
+      existió hasta el 2026-09-11 porque la petición al TTS de la nube no llevaba `instructions`.
+- [ ] Las **marcas** se pronuncian en español (Adria, Conaprole, Saman), no en inglés.
+- [ ] Comparar con la misma lectura en **En el teléfono**: las dos voces son distintas (el teléfono usa
+      la del sistema y la placa una de OpenAI), pero **las dos tienen que estar en español**. La
+      paridad de voz es una decisión abierta, no un defecto.
+
+### 23. Que el volumen de la placa sea suficiente
+
+- [ ] Con **En el dispositivo**, la frase se escucha **sin tener que acercar el oído**. El daemon fija
+      el nivel al arrancar (90 %, `--volume`); antes quedaba en lo que hubiera dejado el último
+      `amixer` a mano.
+- [ ] No se escucha **distorsionada**. Si se distorsiona, el nivel está alto para este transductor y
+      hay que bajar `--volume`: con PWM, recortar es peor que sonar bajo.
+
+---
+

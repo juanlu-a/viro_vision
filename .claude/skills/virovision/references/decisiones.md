@@ -135,6 +135,22 @@ placa**. Se retiran de Inicio la cámara del teléfono y la fototeca (y `expo-im
 permisos). Lo que se pierde y hay que tener presente: la fototeca era el insumo del **dataset de
 evaluación** —la misma foto contra varios modelos—, y esa corrida pasa a hacerse fuera de la app.
 
+### ADR 0006, act. 2026-09-11 — El alcance es **alimentos**, no la canasta básica
+
+**Qué cambió**: probado con la placa, el modelo identifica **cualquier alimento** (yerba suelta
+incluida) y no sólo los rubros de la canasta. La canasta era el alcance *mientras la precisión era
+una incógnita*; ahora **cambia de rol**: sigue siendo el **dataset de evaluación** —lo que se mide— y
+deja de ser el límite de lo que se contesta. No confundir las dos cosas otra vez.
+
+El prompt dice «alimentos y productos de almacén», y el mensaje de fallo pasa a **«Elemento no
+reconocible»** («producto» quedó angosto).
+
+**Defecto que salió de la misma prueba**: apuntado a algo que no es un alimento el modelo devolvía el
+literal `null`, el parser lo rechazaba y la frase caía al fallback de texto crudo — **la placa dijo
+«null» en voz alta**. Arreglado por los dos lados: el prompt pide devolver siempre el objeto con los
+campos en null, y el fallback distingue prosa de basura con una regla simple (**la prosa no parsea
+como JSON**).
+
 ### ADR 0007 — Botones físicos y modos de operación · **Proposed (2026-08-22) — a validar con tutor**
 
 **Qué cambió**: hasta ahora no había ninguna interfaz de entrada física especificada. El

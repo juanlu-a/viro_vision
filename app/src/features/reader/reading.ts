@@ -54,6 +54,31 @@ export function phraseProduct(product: ProductReading | null, raw: string | null
   const head = [product?.kind, product?.brand].filter(Boolean).join(' ');
   const parts = [head, product?.detail].filter(Boolean);
   if (parts.length > 0) return parts.join(', ');
-  if (raw) return raw;
+  if (raw && isSpokenAnswer(raw)) return raw;
   return t.nothingReadProduct;
+}
+
+/**
+ * Whether the model's raw answer is prose worth saying out loud.
+ *
+ * The raw fallback above exists for a good reason —a model that replies in free text instead of JSON
+ * says something useful, and saying it beats admitting defeat— but it used to say **anything**. Heard
+ * on the device on 2026-09-11: pointed at something that was not food, the model answered the bare
+ * literal `null`, the parser rejected it (a JSON `null` is not a record), and the phrase fell through
+ * to the raw text. **The board said «null» out loud.**
+ *
+ * The rule that separates the two cases: **prose does not parse as JSON.** "arroz Saman" throws;
+ * `null`, `{}`, `[]`, `""` and a leftover JSON object all parse, and none of them is a reading. That
+ * also covers the answer that is valid JSON in an unexpected shape (`{"producto": "arroz"}`), which
+ * before this was read out field names and all.
+ */
+function isSpokenAnswer(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return false;
+  try {
+    JSON.parse(trimmed);
+    return false;
+  } catch {
+    return true;
+  }
 }

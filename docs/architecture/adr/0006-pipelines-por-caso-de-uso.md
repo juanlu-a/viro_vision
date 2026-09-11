@@ -286,6 +286,38 @@ hacer desde la app. Cuando toque medir precisión por modelo hay que hacerlo fue
 el proxy, con el set de fotos guardado— o reponer una entrada de prueba detrás de una bandera, como
 `EXPO_PUBLIC_SIMULATE_DEVICE`. Lo que no se repone es una segunda fuente de imagen para el usuario.
 
+## Actualización 2026-09-11 — El alcance deja de ser la canasta básica: son alimentos
+
+**Probado con la placa de verdad, el modelo identifica cualquier alimento**, no sólo los rubros de la
+canasta básica — yerba suelta incluida. Funcionó mejor de lo esperado, y eso cambia una premisa: la
+canasta era el alcance **mientras la precisión era una incógnita**, una forma de acotar el problema a
+algo medible. Con el modelo andando, restringirlo en el prompt es pedirle menos de lo que hace.
+
+**La canasta básica no desaparece: cambia de rol.** Sigue siendo el **dataset de evaluación** —lo que
+se mide, con recall/precision/accuracy/F1— y deja de ser el límite de lo que se contesta. Son dos
+cosas distintas y conviene no confundirlas de nuevo: un dataset acotado y reproducible es lo que hace
+comparables a los modelos; el alcance del modo es lo que el usuario puede pedirle.
+
+Lo que cambió en concreto:
+
+- El prompt dice **«alimentos y productos de almacén»** y aclara que sirve cualquier alimento —
+  envasado, suelto, fresco o a granel (`services/vision/providers/prompts.ts`).
+- La app dice «Identifica alimentos y productos de almacén» donde decía «productos de la canasta
+  básica».
+- El mensaje de no reconocido pasa a **«Elemento no reconocible»**: con el alcance viejo «no pude
+  identificar el producto» tenía sentido, pero ahora el modo no se limita a productos envasados y
+  «producto» quedó angosto.
+
+**Y un defecto que salió de la misma prueba.** Apuntado a algo que no es un alimento, el modelo
+contestaba el literal `null`; el parser lo rechazaba —un `null` de JSON no es un registro— y la frase
+caía al *fallback de texto crudo*, que existe para cuando el modelo contesta en prosa en vez de JSON.
+Resultado: **la placa dijo «null» en voz alta**. Arreglado por los dos lados, porque cada uno solo
+dejaba el agujero abierto:
+
+1. el prompt pide devolver **siempre el objeto** con los tres campos en null, y nunca un `null` solo;
+2. el fallback ahora distingue prosa de basura con una regla simple: **la prosa no parsea como
+   JSON**. `null`, `{}`, `[]` y un objeto sobrante parsean, y ninguno es una lectura.
+
 ## Ver también
 
 [`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md) (el registro completo de lo

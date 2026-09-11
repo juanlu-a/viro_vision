@@ -53,7 +53,11 @@ export const es = {
     reading: 'Leyendo…',
     line: 'Línea',
     nothingRead: 'No pude leer el cartel. Probá con una foto más de cerca.',
-    nothingReadProduct: 'No pude identificar el producto. Probá con una foto más de cerca.',
+    // «Elemento no reconocible» y no «no pude identificar el producto»: desde el 2026-09-11 el modo
+    // no se limita a productos envasados —identifica cualquier alimento— así que «producto» era
+    // angosto, y esto también cubre el caso de apuntar a algo que no es un alimento. Conserva el qué
+    // hacer: quien no ve la pantalla no tiene otra forma de saber que hay un remedio.
+    nothingReadProduct: 'Elemento no reconocible. Probá con una foto más de cerca.',
     error: 'No se pudo leer',
     readTimedOut: 'Tardó demasiado. Probá de nuevo.',
     quotaExhausted: 'Cuota de la nube agotada. Reintentá en',
@@ -82,7 +86,7 @@ export const es = {
     useBus: 'Líneas de ómnibus',
     useBusDesc: 'Te dice qué ómnibus se aproxima.',
     useProduct: 'Productos de supermercado',
-    useProductDesc: 'Identifica productos de la canasta básica.',
+    useProductDesc: 'Identifica alimentos y productos de almacén.',
     testAudioButton: 'Probar audio',
     testAudioHint: 'Reproduce un mensaje de prueba para verificar la salida de voz.',
     testAudioPhrase: 'Hola, soy ViroVision. La salida de audio funciona correctamente.',

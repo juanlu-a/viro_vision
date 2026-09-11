@@ -1690,6 +1690,88 @@ así que la rama queda divergente aunque el contenido esté. El chequeo que vale
 repo: la comparación de contenido contra `staging` (sin tres puntos) vacía = está. De paso: la rama
 de audio salió de `staging` **antes** de ese merge, así que el PR #82 está uno atrás.
 
+## 2026-09-11 (cont. 2) — Funcionó, y las dos cosas que estaban mal
+
+Probado de punta a punta por el usuario: **el flujo de supermercado se escucha en la placa**. Con eso
+aparecieron dos defectos que sólo se podían ver oyéndolo.
+
+### Leía en inglés
+
+La placa decía «Macarrones Adria» con acento inglés. La causa: la petición al TTS de la nube mandaba
+`model`, `voice: alloy`, `input` y `response_format`, **y ninguna indicación de idioma**. `alloy`
+arranca en inglés, y el modelo infiere el idioma del texto — pero el nombre de un producto con marcas
+adentro no le alcanza para cambiar.
+
+**Por qué nadie lo había notado**: en el teléfono el problema no existe, porque a `expo-speech` se le
+pasa `es-UY` explícitamente (`tts.ts`). El camino de la nube no tenía equivalente, y hasta hoy nadie
+había escuchado su salida — el archivo se generaba y no lo consumía nadie. Es un defecto que estuvo
+ahí desde que existe `synthesis.ts` y que **sólo podía aparecer el día que el parlante de la placa
+funcionara**.
+
+Arreglado con el parámetro `instructions` de `gpt-4o-mini-tts` (acento, tono y ritmo; `tts-1` lo
+ignora), en español como el prompt de supermercado (ADR 0009): lo que gobierna es **lo que una
+persona escucha**. La instrucción pide español rioplatense, ritmo pausado y dicción nítida, sin
+entonación publicitaria. Queda anotado que el control de acento por `instructions` se reporta
+inconsistente: si el inglés vuelve, la palanca siguiente es la voz, no una instrucción más larga.
+
+### Sonaba muy bajo
+
+El nivel de la placa era **lo que hubiera quedado del último `amixer` a mano** — durante la sesión se
+movió entre 40 % y 85 % probando, y ahí quedó. Un nivel que depende de quién corrió qué no es un
+nivel.
+
+Ahora el daemon lo fija al arrancar (`set_output_volume` en `audio.py`, flag `--volume`). **90 % y no
+100 %**: el audio PWM recorta arriba, y una frase distorsionada es más difícil de entender que una
+suave — que es exactamente lo contrario del objetivo. Con `amixer -M`, que mapea a volumen
+*percibido*; sin `-M` el porcentaje es una posición en la escala de dB y el 40 % es casi inaudible.
+
+## 2026-09-11 (cont. 3) — El alcance se abre a alimentos, y la placa deja de decir «null»
+
+Dos cosas que salieron de la misma prueba con el usuario.
+
+### El modelo es mejor de lo que suponía el alcance
+
+**Identifica cualquier alimento, no sólo los rubros de la canasta básica** — yerba suelta incluida.
+La canasta era el alcance *mientras la precisión era una incógnita*, una forma de acotar el problema
+a algo medible; con el modelo andando, restringirlo en el prompt es pedirle menos de lo que hace.
+
+**La canasta no desaparece: cambia de rol.** Sigue siendo el **dataset de evaluación** —lo que se
+mide— y deja de ser el límite de lo que se contesta. Son dos cosas distintas y vale no volver a
+confundirlas: un dataset acotado y reproducible es lo que hace comparables a los modelos; el alcance
+del modo es lo que el usuario puede pedirle. Por eso `ml/README.md` **no** se tocó: ahí la canasta es
+el dataset y sigue siendo correcta.
+
+Actualizados el prompt, la app, `SKILL.md`, `references/ml.md`, los dos README, `PROJECT-STATUS` y el
+ADR 0006 (con una actualización, no un rename). **Los documentos históricos quedaron intactos** a
+propósito —`REUNIONES-TUTOR.md`, el SESSION-LOG, las entradas viejas de `pruebas-y-decisiones.md`—
+porque registran lo que se dijo entonces, y reescribirlos sería falsear el registro.
+
+### La placa decía «null»
+
+Apuntada a algo que no es un alimento, decía «null» en voz alta. La cadena completa, que vale escribir
+porque ninguno de los dos extremos era obviamente culpable:
+
+1. el modelo contestaba el **literal `null`** (no un objeto);
+2. `parseJsonRecord` lo rechazaba, correctamente — un `null` de JSON no es un registro;
+3. `product` quedaba en `null`, así que `phraseProduct` caía a su **fallback de texto crudo**;
+4. ese fallback existe por una buena razón (si el modelo contesta en prosa en vez de JSON, decirlo es
+   mejor que callarse) pero **no distinguía prosa de basura**, y habló el `"null"`.
+
+Arreglado por los dos lados, porque cada uno solo dejaba el agujero abierto: el prompt pide devolver
+**siempre el objeto** con los tres campos en null y nunca un `null` solo; y el fallback distingue con
+una regla que además cubre casos que no habíamos visto — **la prosa no parsea como JSON**. `null`,
+`{}`, `[]` y un objeto sobrante parsean, y ninguno es una lectura. Eso tapa de paso el JSON válido con
+forma inesperada (`{"producto": "arroz"}`), que antes se leía con nombres de campo y todo.
+
+El mensaje pasa a **«Elemento no reconocible. Probá con una foto más de cerca.»** — «producto» quedó
+angosto con el alcance nuevo, y se conserva el qué hacer porque quien no ve la pantalla no tiene otra
+forma de saber que hay un remedio.
+
+### Para probar
+
+Bloque **G** nuevo en `qa-modo-supermercado.md`: alcance nuevo, lo no reconocible, el idioma en los
+dos caminos y el volumen de la placa.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

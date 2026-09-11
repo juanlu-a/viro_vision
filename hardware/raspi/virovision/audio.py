@@ -33,6 +33,53 @@ from typing import Optional
 
 log = logging.getLogger(__name__)
 
+# Set at startup so the level is the same after every boot. Before this it was whatever `amixer` had
+# been left at by hand, which on 2026-09-11 meant the first real reading came out too quiet to use.
+#
+# 90 and not 100: PWM audio clips at the top, and clipping is *worse* than quieter — a distorted
+# sentence is harder to understand than a soft one, and understanding it is the entire point.
+DEFAULT_VOLUME_PERCENT = 90
+
+# Tried in order; the first control that exists wins. `Softvol` is the one an I2S DAC will need (the
+# MAX98357A has no volume control of its own), `PCM` is what the Pi's own output is called.
+MIXER_CONTROLS = ("Softvol", "PCM", "Master", "Speaker", "Digital")
+
+
+def set_output_volume(percent: int = DEFAULT_VOLUME_PERCENT) -> bool:
+    """Sets the output level, best-effort. Returns whether it was applied.
+
+    `amixer -M` and not plain `amixer`: without `-M` the percentage is a position on the control's dB
+    scale, where 40 % is nearly inaudible; `-M` maps it to *perceived* volume, which is what a person
+    means by "louder".
+
+    Failing is not an error worth stopping for: a board with no sound card yet still has to run.
+    """
+    percent = max(0, min(100, percent))
+    control = _find_control()
+    if control is None:
+        log.warning("audio: no ALSA control to set the volume on")
+        return False
+    try:
+        subprocess.run(
+            ["amixer", "-M", "-q", "set", control, f"{percent}%"],
+            check=True, capture_output=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        log.warning("audio: could not set %s to %d%%: %s", control, percent, exc)
+        return False
+    log.info("audio: %s at %d%%", control, percent)
+    return True
+
+
+def _find_control() -> Optional[str]:
+    try:
+        output = subprocess.run(["amixer", "scontrols"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    # Lines look like: Simple mixer control 'PCM',0
+    available = {line.split("'")[1] for line in output.splitlines() if "'" in line}
+    return next((c for c in MIXER_CONTROLS if c in available), None)
+
 # One decoder per format. `aplay` comes with alsa-utils and plays WAV with nothing else installed;
 # MP3 needs a decoder, and `mpg123` is the small standard one (`setup.sh` installs it). If apt is not
 # an option on a given board, the way out is the app sending WAV instead of MP3 — hence both.

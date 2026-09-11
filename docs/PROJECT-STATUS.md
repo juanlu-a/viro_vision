@@ -23,7 +23,8 @@ The stale feature branches have been deleted; branch from an up-to-date `main` f
 
 Thesis project (Ing. en Telemática, Facultad de Ingeniería, Montevideo, 2026 — Juan Lucas Abreu,
 Magalí Dellapiazza, Francisco Tauber). An assistive system for people with low/no vision that
-identifies **metropolitan bus lines** and **basic-basket supermarket products** and gives **real-time
+identifies **metropolitan bus lines** and **food items on a supermarket shelf** (scope widened
+2026-09-11; the basic basket is now the evaluation dataset) and gives **real-time
 auditory feedback**, via a glasses-mounted camera device paired with a mobile app. Dev target
 ~mid-Nov 2026; hard deadline **30 Nov 2026**. Full context: the `virovision` skill
 (`.claude/skills/virovision/`).

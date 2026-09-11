@@ -25,12 +25,25 @@ describe('buildSpeechRequest', () => {
       input: string;
       response_format: string;
       voice: string;
+      instructions: string;
     };
 
     expect(body.response_format).toBe('mp3');
     expect(body.input).toBe('arroz Saman, Blue Patna 1 kg');
     expect(body.model).toBe('gpt-4o-mini-tts');
     expect(body.voice).toBeTruthy();
+  });
+
+  it('asks for the reading in Spanish', () => {
+    // Heard on the device on 2026-09-11: with no `instructions` the board read «Macarrones Adria»
+    // with an English accent, because `alloy` defaults to English and a three-word product name with
+    // brands in it is not enough for the model to switch. The phone never had the problem —
+    // `expo-speech` is told `es-UY` — so nobody noticed until the board's speaker worked.
+    const { instructions } = buildSpeechRequest('macarrones Adria', 'sk-secret', DIRECT).body as {
+      instructions: string;
+    };
+
+    expect(instructions.toLowerCase()).toContain('español');
   });
 
   it('truncates at the API cap instead of eating a 400', () => {

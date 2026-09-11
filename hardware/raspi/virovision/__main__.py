@@ -16,7 +16,7 @@ from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
 from .ap import AP_IP, AccessPoint
-from .audio import Player
+from .audio import DEFAULT_VOLUME_PERCENT, Player, set_output_volume
 from .button import DEFAULT_GPIO, try_connect
 from .camera import Camera, synthetic_payload
 from .state import local_ip, read_status
@@ -36,6 +36,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="HTTP server port (plan B)")
     parser.add_argument("--no-http", action="store_true", help="do not bring the HTTP server up")
     parser.add_argument("--no-audio", action="store_true", help="receive the reading's audio but do not play it (only store it)")
+    parser.add_argument("--volume", type=int, default=DEFAULT_VOLUME_PERCENT, help=f"output level 0-100, applied at startup (default {DEFAULT_VOLUME_PERCENT})")
     parser.add_argument("--no-ap", action="store_true", help="do not bring the access point up at startup (development on the home network)")
     parser.add_argument("--no-button", action="store_true", help="do not use the physical button (modes come in over BLE only)")
     parser.add_argument("--button-gpio", type=int, default=DEFAULT_GPIO, help=f"GPIO of the mode button (default {DEFAULT_GPIO} = physical pin 29)")
@@ -68,8 +69,11 @@ async def _main(args: argparse.Namespace) -> None:
         ap.turn_on() if on else ap.turn_off()
 
     # The device's speaker. It is built even with `--no-http`, so the log says at startup whether
-    # there is anything on this board able to play a reading.
+    # there is anything on this board able to play a reading. The level is set here and not left to
+    # whatever `amixer` was last told by hand: on 2026-09-11 the first real reading came out too quiet
+    # to use, and a level that depends on who ran what is not a level.
     player = Player()
+    set_output_volume(args.volume)
 
     http = None
     if not args.no_http:
