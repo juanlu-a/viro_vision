@@ -1575,6 +1575,36 @@ Lo que se entrega es el arreglo más lo que lo hace verificable. Y queda el ries
 arreglos está escrita en el ADR y el último escalón es el `.mp3` que `services/audio/synthesis.ts` ya
 sabe producir.
 
+## 2026-09-11 — Anduvo: el spike 1 cerrado en el teléfono
+
+Build **`202609110048`** al grupo interno de TestFlight, publicado desde la propia rama con
+*Actions → TestFlight → Run workflow* (no hizo falta mergear para probar). Contra la placa real,
+**el bloque E pasa**: con la pantalla bloqueada el doble click dispara la lectura y se escucha sin
+tocar el teléfono; varias seguidas sin desbloquear salen todas; con VoiceOver prendido el anuncio
+suena y VoiceOver no se corta; y después de un rato largo bloqueado sigue andando.
+
+Las cuatro cosas valen por separado y conviene dejar escrito por qué:
+
+- **Varias seguidas** descarta que iOS nos regale un único despertar y después nos suspenda para
+  siempre. Era el modo de fallo más plausible después del primero.
+- **VoiceOver vivo valida `mixWithOthers`**, que era la decisión más discutible del PR: la
+  documentación de Expo recomienda `doNotMix` para audio en segundo plano, y nos apartamos a
+  propósito porque para este usuario el lector de pantalla **es** la interfaz. De haber estado mal, el
+  arreglo habría roto la app justo para quien la necesita.
+- **El rato largo bloqueado responde lo de `restoreStateIdentifier`**: si iOS hubiera terminado la
+  app en esa ventana, sin preservación de estado CoreBluetooth no la habría relanzado nunca y el
+  botón no habría hecho nada. Anduvo ⇒ la app seguía suspendida y viva, y la preservación de estado
+  **no hace falta para el caso de uso probado**. No que no haga falta: queda como el PR siguiente,
+  porque el síntoma de la terminación es el peor que existe (el botón deja de responder y nada lo
+  explica). El criterio de detección ya está escrito: el `session` de la telemetría cambia entre antes
+  y después de desbloquear.
+- Y el riesgo de `AVSpeechSynthesizer` **no se materializó**: respeta la sesión de `expo-audio`. La
+  escalera de fallbacks del ADR queda escrita por si alguna vez cambia, sin código muerto en el repo.
+
+Con esto **ADR 0003 queda demostrado de punta a punta**: BLE como plano de control es efectivamente
+lo que despierta la app con el teléfono en el bolsillo, que era la hipótesis sobre la que está
+construido todo el diseño del enlace y hasta hoy nadie había verificado.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1586,6 +1616,17 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Validar ADR 0006, 0007 y 0008 con el tutor** — 0006 y 0007 siguen en Proposed.
 
 ### Deuda técnica conocida
+- **`restoreStateIdentifier` en el cliente BLE** (2026-09-11). `bleClientPlx.ts` hace
+  `new BleManager()` sin opciones: si iOS **termina** la app (presión de memoria, muchas horas, el
+  usuario matándola de la bandeja), CoreBluetooth no la vuelve a levantar y **el botón deja de
+  responder sin que nada lo explique**. El bloque E mostró que no hace falta para el caso probado, no
+  que no haga falta. Cómo detectarlo: el `session` de la telemetría cambia entre antes y después de
+  desbloquear. Hacerlo a medias es peor que no hacerlo — iOS relanzaría la app sin monitores.
+- **La cola de telemetría vive en memoria** (2026-09-11): si iOS mata el proceso en segundo plano, lo
+  que no se subió se pierde, y eso se ve igual que "no pasó nada". Es justamente el caso que haría
+  falta diagnosticar para lo de arriba. Persistirla en `AsyncStorage`.
+- **`sse.ts` no tiene timeout propio** (2026-09-11): un stream colgado sólo lo corta el
+  `AbortController` de los 12 s de la lectura.
 - **El dataset de evaluación quedó sin forma de correrse** (2026-09-08): la fototeca era lo que
   permitía pasarle la misma foto a varios modelos, y se fue con la cámara del teléfono. Decidir si
   se corre fuera de la app contra el proxy o se repone una entrada detrás de una bandera.
@@ -1637,10 +1678,9 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
   decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
 - **Cámara**: resuelto (era hot-plug; y es la AI Camera). Ajustar el enfoque manual: las primeras fotos salieron desenfocadas.
-- **Spike 1**: segundo plano en iOS — **arreglado e instrumentado el 2026-09-10, falta correrlo en el
-  teléfono** (bloque E de `qa-modo-supermercado.md`). La frase que estaba acá («recién ahí
-  `isBackgroundEnabled: true`») era falsa: ese flag nunca gateó iOS. Lo que queda por decidir con la
-  corrida es si hace falta `restoreStateIdentifier`.
+- ~~**Spike 1**: segundo plano en iOS~~ — **cerrado el 2026-09-11** (build `202609110048`, bloque E).
+  La frase que estaba acá («recién ahí `isBackgroundEnabled: true`») era falsa: ese flag nunca gateó
+  iOS. Lo que queda es `restoreStateIdentifier`, abajo.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
 - **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
 - Placa: **calibrar los tiempos del botón** con el usuario (hecho el 2026-09-07, sin probar en

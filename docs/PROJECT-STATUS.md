@@ -1,6 +1,6 @@
 # ViroVision — Project status & session handoff
 
-_Living status/continuation doc. Last updated: 2026-09-10._
+_Living status/continuation doc. Last updated: 2026-09-11._
 
 This captures where the project stands so anyone (including a fresh Claude Code session, together with
 the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
@@ -135,7 +135,7 @@ tests via `jest-expo`.
   pide lectura: ómnibus es vigilancia y repetirlo costaría una foto y una llamada a la nube por toque.
   La app muestra además la foto que sacó la placa debajo del resultado. Placa y app desplegadas y
   verificadas juntas.
-- **Segundo plano en iOS (2026-09-10, spike 1 de ADR 0003)**: con la pantalla bloqueada el doble
+- **Segundo plano en iOS (2026-09-10/11, spike 1 de ADR 0003 — cerrado)**: con la pantalla bloqueada el doble
   click no hacía nada, que es exactamente el caso del producto. Resultó que **el modo de fondo nunca
   estuvo apagado** —`isBackgroundEnabled` no gatea el `Info.plist`, sólo el manifiesto de Android; el
   ADR y el log decían lo contrario y quedaron corregidos—. Lo que faltaba: **ninguna sesión de
@@ -145,9 +145,12 @@ tests via `jest-expo`.
   mantenimiento mientras dura la lectura, chirp al empezar), el pipeline salió de la pantalla a
   `features/reader/readingService.ts` con `ReaderBridge` suscrito directo al cliente BLE, `announce()`
   se puede esperar, hay tope de 12 s por lectura, y la telemetría estampa el `AppState` en cada fila
-  y vacía la cola al volver a primer plano. ⚠️ **El spike no está cerrado**: falta correr el
-  **bloque E** de [`qa-modo-supermercado.md`](qa-modo-supermercado.md) en el teléfono. De esa corrida
-  sale si hace falta `restoreStateIdentifier`.
+  y vacía la cola al volver a primer plano. ✅ **Verificado en el teléfono el 2026-09-11** (build
+  `202609110048`, bloque E de [`qa-modo-supermercado.md`](qa-modo-supermercado.md)): la lectura sale y
+  se escucha bloqueada, varias seguidas, con VoiceOver vivo y también tras un rato largo bloqueado.
+  **El spike 1 de ADR 0003 queda cerrado** y con él la hipótesis sobre la que está construido todo el
+  enlace. Sigue abierto `restoreStateIdentifier` (si iOS **termina** la app, CoreBluetooth no la
+  relanza): no hace falta para el caso probado, y es el PR siguiente del tema.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a

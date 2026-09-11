@@ -190,11 +190,17 @@ propósito: hoy nada consume el archivo, y prenderlo es pagar una llamada por ca
 
 ---
 
-## Bloque E — con la pantalla bloqueada (el caso real del producto)
+## Bloque E — con la pantalla bloqueada (el caso real del producto) ✅ *(pasado el 2026-09-11)*
 
 Es **el** bloque: el usuario lleva el teléfono bloqueado en el bolsillo y opera con el botón de la
 placa. El 2026-09-10 esto no funcionaba y nadie lo había probado así. Ver la actualización de
 [ADR 0003](architecture/adr/0003-enlace-placa-telefono.md).
+
+> **Pasado con el build `202609110048`** contra la placa real: la lectura sale y se escucha con la
+> pantalla bloqueada, varias seguidas sin desbloquear, con VoiceOver vivo, y también después de un
+> rato largo bloqueado. Se conserva entero como receta: hay que volver a correrlo ante cualquier
+> cambio en la sesión de audio, en `readingService.ts` o en el cliente BLE — y los pasos 15 y 16 son
+> los que diagnostican si alguna vez vuelve a fallar.
 
 Necesita **rebuild nativo** (cambió `app.json`) y el proyecto de Supabase con telemetría, porque
 **con el teléfono bloqueado no hay consola**: la única evidencia es la tabla `events`.

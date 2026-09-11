@@ -27,7 +27,7 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05: la foto va por WiFi**
+### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05 (la foto va por WiFi) y 2026-09-11 (segundo plano verificado)**
 
 Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
 dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
@@ -60,6 +60,24 @@ Referencia: el mismo archivo por HTTP sobre la misma radio, 46 ms. Lo siguiente 
 (AP en la placa, `wifi` por GATT, HTTP plano, módulo nativo para unirse) y el spike de iOS en WiFi sin
 internet. Lecciones de la placa real: BlueZ 5.82 expone `/org/bluez/test` (bluez-peripheral explota);
 dbus-next pierde chunks sin pausa entre notificaciones (4 ms); `PYTHONUNBUFFERED=1` en el servicio.
+
+**Qué cambió el 2026-09-10/11 — el spike 1 (segundo plano en iOS), cerrado**: probado como se usa de
+verdad —teléfono bloqueado, doble click en la placa— **no pasaba nada**. Lo primero que apareció fue
+un error del propio ADR: decía que el modo de fondo estaba apagado porque el plugin de ble-plx tenía
+`isBackgroundEnabled: false`, y **ese flag nunca gateó iOS** (sólo agrega un `<uses-feature>` en
+Android; lo que escribe `bluetooth-central` es `modes: ["central"]`). Estuvo prendido todo el tiempo.
+Lo que faltaba de verdad: **ninguna sesión de audio** (`expo-audio` instalado y sin importar en ningún
+archivo, así que iOS dejaba la app en una categoría que no puede sonar bloqueada), y **el disparo del
+botón viajando por estado de React y servido por la pantalla de Inicio**. Se agregó
+`services/audio/session.ts` con **`interruptionMode: 'mixWithOthers'`** —apartándose a propósito del
+ejemplo de Expo, que usa `doNotMix`, porque **VoiceOver es la interfaz de este usuario**—, un tono
+inaudible que sostiene el proceso vivo durante la lectura, un chirp al empezar (feedback y
+diagnóstico), y el pipeline salió a `features/reader/readingService.ts`, un módulo sin React que
+`ReaderBridge` suscribe directo al cliente BLE. **Verificado en el teléfono el 2026-09-11** (build
+`202609110048`, bloque E de la QA): lectura bloqueada, varias seguidas, VoiceOver vivo, y también tras
+un rato largo bloqueado — lo que además muestra que `restoreStateIdentifier` no hace falta para este
+caso de uso (queda como deuda para cuando iOS **termine** la app). **La hipótesis central del ADR
+—BLE es lo único que despierta la app con el teléfono en el bolsillo— queda demostrada.**
 
 **Qué cambió el 2026-09-05 (2)**: el plan B se probó en el caso real (iPhone unido al AP de la placa,
 con datos): foto en 0,34 s de mediana, **Safari y la lectura de supermercado funcionan** con el

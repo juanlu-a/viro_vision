@@ -90,12 +90,31 @@ ViroVision:
 3. **Audio:** sale por la placa (DAC I2S cableado, no A2DP). Para supermercado la app manda el MP3
    que ya sintetiza (`services/audio/synthesis.ts`); no hay que enrutar la salida del teléfono.
 
-### Audio routing
-The app must **explicitly route its output** to the device's audio endpoint instead of the system
-default, using each platform's session/routing APIs (`AVAudioSession` on iOS,
-`AudioManager`/`AudioDeviceInfo` on Android) or a RN library that exposes output-device selection
-(e.g. `expo-audio` / `react-native-track-player`). Full routing is a later task; the scaffold keeps
-it as a typed stub.
+### Sesión de audio y segundo plano (2026-09-11)
+**Hay una sesión de audio explícita** desde que se cerró el spike 1 de ADR 0003:
+`services/audio/session.ts` (política aparte en `audioMode.ts`, para poder afirmarla en un test sin
+dispositivo). Tres cosas que **no** se tocan sin leer el ADR:
+
+- **`interruptionMode: 'mixWithOthers'`**, aunque la documentación de Expo recomiende `doNotMix` para
+  audio en segundo plano. **VoiceOver es la interfaz de este usuario**: `doNotMix` lo interrumpe y
+  `duckOthers` lo baja a la mitad de una frase. Verificado en el teléfono.
+- **`shouldPlayInBackground` + un tono inaudible sostenido mientras dura la lectura.** iOS da unos
+  pocos segundos al despertar por BLE; audio realmente sonando es lo que mantiene vivo el proceso.
+- **`allowsRecording: false`**, que en iOS es lo que deja la sesión en `.playback` y no en
+  `.playAndRecord`. La app no graba nada, y los permisos de micrófono se sacaron a mano del default
+  del plugin de `expo-audio`.
+
+**El pipeline de lectura no vive en un hook**: `features/reader/readingService.ts` es un módulo sin
+React y `ReaderBridge` lo suscribe directo al cliente BLE, arriba del navegador. Es a propósito — con
+el disparo del botón viajando por estado de React y servido por la pantalla de Inicio, el botón no
+hacía nada con el teléfono bloqueado, que es el caso de uso entero. `useReader` es un
+`useSyncExternalStore` sobre ese módulo.
+
+### Audio routing (pendiente, otra cosa)
+Distinto de lo anterior: el audio hoy sale por el **parlante del teléfono**. Que salga por el
+auricular de la placa exige el DAC I2S (ADR 0003 §5) y **enrutar la salida** con las APIs de sesión
+de cada plataforma. La app ya sintetiza el `.mp3` (`services/audio/synthesis.ts`, detrás de una
+bandera) y la placa ya acepta `POST /audio`; falta el hardware.
 
 ## Auth / backend (online account layer) — ARCHIVED, app has NO login
 Decision (2026-07-20, team + tutor): **the app ships without a login** — it opens directly to the tabs.

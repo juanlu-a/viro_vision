@@ -310,7 +310,7 @@ firmware es un PR del pilar de hardware. El espejo de `features/device/gatt.ts` 
 una nota que dice que la app ya no los usa, para que nadie los vuelva a cablear creyendo que son el
 camino de la foto.
 
-## Actualización 2026-09-10 — El spike 1, y la premisa que era falsa
+## Actualización 2026-09-10/11 — El spike 1 (cerrado), y la premisa que era falsa
 
 Probado en el iPhone con el build de TestFlight: **con la pantalla bloqueada el doble click en el
 botón de la placa no hacía nada**. Al desbloquear no había lectura ni error en Inicio. Es la premisa
@@ -393,22 +393,46 @@ Se aprovechó para sacar dos permisos que el producto no usa y que entraban por 
 de `expo-audio`: `NSMicrophoneUsageDescription` (con un texto en inglés, además) y `RECORD_AUDIO` en
 Android. Mismo criterio que el 2026-09-08 con la cámara y la fototeca.
 
-### Lo que queda abierto del spike 1
+### Verificado en el dispositivo: **el spike 1 queda cerrado** (2026-09-11)
 
-- **La corrida en el dispositivo.** El spike **no se cierra** hasta que pase el bloque E de
-  [`qa-modo-supermercado.md`](../../qa-modo-supermercado.md). Lo que este PR entrega es el arreglo
-  **más la instrumentación que lo hace verificable**.
+Build `202609110048` en el grupo interno de TestFlight, corrido contra la placa real. Pasa el bloque
+E de [`qa-modo-supermercado.md`](../../qa-modo-supermercado.md):
+
+| Qué | Resultado |
+|---|---|
+| Doble click con la pantalla bloqueada | **la lectura sale y se escucha, sin tocar el teléfono** |
+| Varias lecturas seguidas sin desbloquear | salen todas |
+| VoiceOver prendido | sigue vivo: ni se corta ni baja de volumen |
+| Bloqueado un rato largo antes de apretar | anduvo igual |
+
+Las cuatro filas importan por separado. La primera es el criterio del arreglo. La segunda descarta
+que iOS nos dé un único despertar y después nos suspenda para siempre. **La tercera es la que valida
+`mixWithOthers`**: era la decisión más discutible del PR —la propia documentación de Expo recomienda
+`doNotMix` para audio en segundo plano— y la que, de estar mal, habría roto la app justo para quien
+la necesita. **Y la cuarta responde la pregunta de `restoreStateIdentifier`**: si iOS hubiera
+terminado la app en ese rato, sin preservación de estado CoreBluetooth no la habría relanzado nunca y
+el botón no habría hecho nada. Anduvo, así que en ese horizonte la app sigue suspendida y viva.
+
+**ADR 0003 queda entonces demostrado de punta a punta**: BLE como plano de control es lo que despierta
+la app con el teléfono en el bolsillo, y el ciclo completo entra en el presupuesto.
+
+### Lo que sigue abierto
+
 - **`restoreStateIdentifier`.** `bleClientPlx.ts` sigue haciendo `new BleManager()` sin opciones: si
-  iOS **termina** la app, CoreBluetooth no la vuelve a levantar nunca. Para una app apenas suspendida
-  no hace falta, y el caso probado era ése. El criterio que lo decide está en el bloque E: **si el
-  `session` de las filas de después de desbloquear cambió, iOS terminó la app** y hay que
-  implementarlo. A medias es peor que nada: iOS relanzaría la app sin monitores y se comería el
-  presupuesto de despertar sin reportar nada.
+  iOS **termina** la app —presión de memoria, muchas horas, el usuario matándola de la bandeja—
+  CoreBluetooth no la vuelve a levantar nunca. La corrida del 2026-09-11 muestra que **no hace falta
+  para el caso de uso probado**, no que no haga falta. El síntoma sería el peor posible: el botón deja
+  de responder y nada lo explica. Queda como el siguiente PR del tema, con su criterio de detección ya
+  escrito (el `session` de la telemetría cambia entre antes y después de desbloquear). A medias es
+  peor que nada: iOS relanzaría la app sin monitores y se comería el presupuesto de despertar sin
+  reportar nada.
 - **`sse.ts` no tiene timeout propio.** Un stream colgado sólo lo corta el `AbortController` de la
   lectura. Deuda anotada.
 - **La cola de telemetría vive en memoria.** Si iOS termina el proceso en segundo plano, lo que no se
-  subió se pierde, y eso se ve igual que "no pasó nada". Persistirla en `AsyncStorage` es el
-  siguiente paso natural si el bloque E deja dudas.
+  subió se pierde, y eso se ve igual que "no pasó nada". Persistirla en `AsyncStorage` es lo que haría
+  falta para poder diagnosticar justamente el caso de la terminación.
+- **El audio sigue saliendo por el parlante del teléfono.** Que salga por la placa es el producto
+  final y depende del DAC I2S (§5 de este ADR), no de esto.
 
 ### Android
 
