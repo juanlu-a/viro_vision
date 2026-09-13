@@ -40,8 +40,16 @@ export interface BleClient {
    * separate signal from `onMode` because a double click in supermarket changes no mode and still
    * has to take a photo — keying the capture off the transition is exactly what made the second
    * double click do nothing.
+   *
+   * **It carries the mode the board was in, and the listener has to use it** (0/1/2, or null from a
+   * board too old to send it). The two signals do not travel at the same speed on this side: `read`
+   * is served synchronously in the BLE callback, while `onMode` goes through React state and a
+   * commit. So on the double click that ALSO changes the mode, the reading always arrives first and
+   * would otherwise run against the previous mode — or, from idle, be dropped outright. That is the
+   * "it turns supermarket on but takes no photo, and only the next double click reads" reported on
+   * 2026-09-13.
    */
-  onReadRequest(listener: () => void): () => void;
+  onReadRequest(listener: (mode: number | null) => void): () => void;
   /** Sets the mode on the device (0 idle, 1 bus, 2 supermarket). It turns its AP on or off. */
   writeMode(mode: number): Promise<void>;
   /** Credentials of the device's AP, or null when it has none. */

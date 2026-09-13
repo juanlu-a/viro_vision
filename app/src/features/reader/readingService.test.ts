@@ -27,6 +27,7 @@ import {
   configureReader,
   setModeFromDevice,
   getReaderState,
+  readFromDevice,
   requestReading,
   resetReaderForTests,
   READING_DEADLINE_MS,
@@ -286,6 +287,67 @@ describe('a reading with nothing on screen', () => {
     expect(mockSpeak).toHaveBeenCalledWith(expect.stringContaining('Tardó demasiado'));
     expect(mockAudio[mockAudio.length - 1]).toBe('end');
     jest.useRealTimers();
+  });
+});
+
+/**
+ * The bug of 2026-09-13: the double click turned supermarket on and took no photo, and only the NEXT
+ * double click read anything.
+ *
+ * The cause was an ordering one, not a timing one, so it reproduces deterministically here: the
+ * board's `read` event reaches the pipeline synchronously while the mode it announces has to travel
+ * through React state first. These tests pin the contract that fixes it — a reading from the board
+ * is judged against the mode the BOARD reports, never against the mode the app has caught up to.
+ *
+ * They are worth keeping past the fix because the failure is invisible: nothing throws, nothing is
+ * logged, the mode is announced correctly, and the only symptom is a photo that is never taken.
+ */
+describe('a reading asked for by the physical button', () => {
+  it('reads in the mode the board reports, even when the app still thinks it is idle', async () => {
+    configureReader(deps());
+    // No `enterSupermarket()` on purpose: this is the state the app is in when the FIRST double
+    // click arrives — idle, because the mode notification has not been committed yet.
+    expect(getReaderState().mode).toBe('idle');
+
+    await readFromDevice('supermarket');
+
+    expect(getReaderState().mode).toBe('supermarket');
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not read in the previous mode when the double click also changed it', async () => {
+    configureReader(deps());
+    setModeFromDevice('bus');
+    mockRecognize.mockClear();
+
+    await readFromDevice('supermarket');
+
+    // Bus and supermarket are different pipelines (ADR 0006): running the reading a tick early sent
+    // the shelf photo through the OCR meant for a bus sign, which looks to the user exactly like
+    // "it did nothing".
+    expect(getReaderState().mode).toBe('supermarket');
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+  });
+
+  it('repeats the reading when the board reports the mode it is already in (ADR 0007)', async () => {
+    configureReader(deps());
+    setModeFromDevice('supermarket');
+
+    await readFromDevice('supermarket');
+    await readFromDevice('supermarket');
+
+    // In front of the shelf the user double-clicks once per product: the second gesture changes no
+    // mode and still has to take a photo.
+    expect(mockRecognize).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to the app\'s own mode for a board too old to send one', async () => {
+    configureReader(deps());
+    enterSupermarket();
+
+    await readFromDevice(null);
+
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
   });
 });
 

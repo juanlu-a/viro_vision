@@ -17,8 +17,9 @@
 import { useEffect, useRef } from 'react';
 
 import { useDevice } from '@/features/device/DeviceProvider';
+import { MODE_FROM_GATT } from '@/features/device/gatt';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
-import { configureReader, requestReading, setModeFromDevice } from '@/features/reader/readingService';
+import { configureReader, readFromDevice, setModeFromDevice } from '@/features/reader/readingService';
 import { getBleClient } from '@/services/ble/bleClient';
 
 export function ReaderBridge() {
@@ -51,7 +52,17 @@ export function ReaderBridge() {
   // reasons: it keeps a hardware interrupt from travelling through React state (which is what broke
   // it with the screen locked), and it avoids a `features/device` → `features/reader` import edge
   // that would close a module-scope cycle.
-  useEffect(() => getBleClient().onReadRequest(() => void requestReading('device')), []);
+  //
+  // All this does is turn the GATT number into a mode: applying it before the reading —and why that
+  // ordering is the fix for the double click that took no photo— lives in `readFromDevice`, where it
+  // can be tested without a screen.
+  useEffect(
+    () =>
+      getBleClient().onReadRequest((gattMode) => {
+        void readFromDevice(gattMode === null ? null : MODE_FROM_GATT[gattMode] ?? null);
+      }),
+    [],
+  );
 
   // The mode reported by the device (physical button, ADR 0007) wins: the app mirrors and announces it.
   const deviceMode = device.deviceMode;

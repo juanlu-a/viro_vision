@@ -14,6 +14,7 @@ import { BleManager, State, type Device, type Subscription } from 'react-native-
 import { DEVICE_ADVERTISED_NAME, GATT, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
+import { loadLastDeviceId, saveLastDeviceId } from '@/services/storage/lastDevice';
 import { record } from '@/services/telemetry';
 
 import {
@@ -24,6 +25,16 @@ import {
 import { BleDeviceNotFoundError, BleNotConnectedError, type BleClient } from './bleClient';
 
 const SCAN_TIMEOUT_MS = 15_000;
+/**
+ * How long any single connect attempt may take before it is abandoned.
+ *
+ * It exists because CoreBluetooth's own `connect` has NO timeout: it waits for the peripheral to
+ * show up for as long as the app lives. Without this number, connecting to a remembered identifier
+ * whose board is switched off would hang the whole path forever, and the user would get a screen
+ * that says "searching" and never changes again. Five seconds is ~10x a connect that works, so it
+ * only ever fires on one that was not going to.
+ */
+const CONNECT_TIMEOUT_MS = 5_000;
 /**
  * Android negotiates whatever MTU is asked for up to 517; iOS ignores the request and gives 185. A
  * large MTU does not move the photo —that goes over HTTP (ADR 0003)— but it does prevent the
@@ -81,22 +92,40 @@ class BleClientPlx implements BleClient {
   private readonly statusListeners = new Set<(status: DeviceStatus) => void>();
   private readonly modeListeners = new Set<(mode: number) => void>();
   private readonly apListeners = new Set<(on: boolean) => void>();
-  private readonly readRequestListeners = new Set<() => void>();
+  private readonly readRequestListeners = new Set<(mode: number | null) => void>();
   private readonly errorListeners = new Set<(message: string) => void>();
 
   constructor(private readonly manager: BleManager) {}
 
   async connect(): Promise<DeviceInfo> {
     await this.waitForRadio();
-    const found = await this.scan();
-    // iOS ignores `requestMTU`; Android negotiates it right here and saves a second round trip.
-    const connected = await this.manager.connectToDevice(found.id, { requestMTU: REQUESTED_MTU });
-    const device = await connected.discoverAllServicesAndCharacteristics();
+    const shortcut = await this.shortcut();
+    let device: Device | null = null;
+    if (shortcut) {
+      record('ble.found', { detail: { via: shortcut.via } });
+      // A shortcut that does not work out costs one timeout and then gets out of the way. Without
+      // this fallback a remembered identifier that stopped being valid —the board was replaced, the
+      // phone was restored from a backup— would make the app stop scanning FOREVER, which is a much
+      // worse failure than the slow reconnection it was meant to fix.
+      device = await this.open(shortcut.id).catch(() => null);
+      if (!device) record('ble.found', { detail: { via: shortcut.via, failed: true } });
+    }
+    if (!device) {
+      const found = await this.scan();
+      record('ble.found', { detail: { via: 'scan' } });
+      device = await this.open(found.id);
+    }
     this.device = device;
+    // Remembered so the next connection can skip the scan (see `services/storage/lastDevice`).
+    void saveLastDeviceId(device.id);
 
     this.subscriptions.push(
       this.manager.onDeviceDisconnected(device.id, () => {
         this.cleanup();
+        // Released on our side too, even though the link is already gone. iOS otherwise keeps the
+        // peripheral in a half-open state that the next `connectToDevice` queues behind, which turns
+        // one dropped link into the several failed attempts the user has to sit through.
+        void this.manager.cancelDeviceConnection(device.id).catch(() => {});
         for (const listener of this.disconnectListeners) listener();
       }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.event, (error, c) => {
@@ -166,7 +195,7 @@ class BleClientPlx implements BleClient {
     return () => this.errorListeners.delete(listener);
   }
 
-  onReadRequest(listener: () => void): () => void {
+  onReadRequest(listener: (mode: number | null) => void): () => void {
     this.readRequestListeners.add(listener);
     return () => this.readRequestListeners.delete(listener);
   }
@@ -213,16 +242,67 @@ class BleClientPlx implements BleClient {
     );
   }
 
+  /**
+   * A peripheral we can try WITHOUT scanning, or null when there is none.
+   *
+   * This is the fix for "reconnecting takes several attempts" (2026-09-13), and it is an ordering
+   * one: a scan only ever sees a peripheral that is advertising, and there are two ordinary
+   * situations where ours is not.
+   *
+   * 1. **It is already connected to the system.** iOS keeps a peripheral connected across an app
+   *    restart, and another app —or Settings— can hold it too. A connected peripheral advertises
+   *    nothing and `startDeviceScan` will never report it, so the app scanned for 15 s, failed, and
+   *    retried into the same wall. `connectedDevices` is the only API that sees these.
+   * 2. **The board thinks the previous link is still up.** When the phone goes away without closing
+   *    the connection, BlueZ keeps it open until the supervision timeout and does not advertise
+   *    meanwhile. Connecting straight to a known identifier works here; scanning does not.
+   *
+   * Neither call touches the radio: both answer from the OS's own tables, so asking costs
+   * milliseconds even when the board is switched off.
+   */
+  private async shortcut(): Promise<{ id: string; via: 'connected' | 'remembered' } | null> {
+    const alreadyConnected = await this.manager.connectedDevices([GATT.serviceUuid]).catch(() => [] as Device[]);
+    if (alreadyConnected.length > 0) return { id: alreadyConnected[0].id, via: 'connected' };
+
+    const remembered = await loadLastDeviceId();
+    if (!remembered) return null;
+    const known = await this.manager.devices([remembered]).catch(() => [] as Device[]);
+    return known.length > 0 ? { id: known[0].id, via: 'remembered' } : null;
+  }
+
+  /** Connects and discovers, leaving nothing pending on the OS if it fails. */
+  private async open(id: string): Promise<Device> {
+    try {
+      // iOS ignores `requestMTU`; Android negotiates it right here and saves a second round trip.
+      const connected = await this.manager.connectToDevice(id, {
+        requestMTU: REQUESTED_MTU,
+        timeout: CONNECT_TIMEOUT_MS,
+      });
+      return await connected.discoverAllServicesAndCharacteristics();
+    } catch (err) {
+      // A connect that failed leaves a pending request on the OS side, and on iOS a pending request
+      // for a peripheral keeps the next one from being made: that is how one bad attempt turned into
+      // "it takes several tries". Cancelling is what makes the retry a fresh attempt instead of
+      // queueing behind the broken one.
+      await this.manager.cancelDeviceConnection(id).catch(() => {});
+      throw err;
+    }
+  }
+
   private scan(): Promise<Device> {
     // Filtering by service UUID and not by name: it is the only thing iOS also honours with the app
     // in the background, and the name may not be in the advertisement packet.
     return withDeadline<Device>(
       SCAN_TIMEOUT_MS,
       () => new BleDeviceNotFoundError(),
-      (resolve, reject) => {
+      (resolve) => {
         this.manager.startDeviceScan([GATT.serviceUuid], { allowDuplicates: false }, (error, device) => {
           if (error) {
-            reject(new BleDeviceNotFoundError());
+            // One scan error is not the end of the scan. iOS reports transient ones (the radio
+            // resetting, another app starting its own scan) and giving up on the first meant the
+            // whole 15 s budget was thrown away on a hiccup — and the user got "device not found"
+            // for a board that was sitting there advertising.
+            record('ble.scanError', { detail: { message: error.message } });
             return;
           }
           if (device) resolve(device);
@@ -266,9 +346,13 @@ class BleClientPlx implements BleClient {
       case 'ap':
         for (const listener of this.apListeners) listener(event.on);
         break;
-      case 'read':
-        for (const listener of this.readRequestListeners) listener();
+      case 'read': {
+        // The board says which mode it is reading in, and that number is the whole point: see
+        // `onReadRequest` in `bleClient.ts`. `undefined` is a board from before the field existed.
+        const mode = typeof event.mode === 'number' ? event.mode : null;
+        for (const listener of this.readRequestListeners) listener(mode);
         break;
+      }
       case 'result':
         for (const listener of this.recognitionListeners) listener(event.event);
         break;
