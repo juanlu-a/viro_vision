@@ -1915,8 +1915,44 @@ de la placa (`bluetoothctl remove`); la mitad del teléfono la tiene que borrar 
 gratis del mismo rato: el script de `bleak` leyó `status` y escribió en `control` **sin emparejarse**,
 que es justo lo que el ADR sostiene.
 
-**Lo que queda sin medir es la mitad de la app** (que el doble click saque la foto, y la reconexión
-sin varios intentos): necesita el build de TestFlight, lanzado a mano desde la rama.
+**Y la mitad de la app, con el build de la rama puesto**, cerró el mismo día. La secuencia entera son
+164 ms:
+
+```
+18:44:25,720  button: 2 click(s)
+18:44:25,721  mode → SUPERMARKET
+18:44:25,722  button: reading requested in SUPERMARKET
+18:44:25,884  photo of 49019 bytes captured in 91 ms
+18:44:25,885  192.168.1.13 "GET /photos/latest" 200
+```
+
+Es **el primer doble click desde *esperando***: cambió de modo y sacó la foto en el mismo gesto. Eso
+es exactamente lo que antes se descartaba en silencio. Y **ninguna alerta de emparejamiento**: la
+central que se conectó es una dirección aleatoria de iOS, sin vínculo.
+
+### Un hallazgo que no estábamos buscando: el gesto ignorado es mudo
+
+De siete dobles clicks repetidos, **cinco bajaron foto y dos no**. No es un bug: los dos que no caen
+2 a 4 segundos después del anterior, o sea con una lectura todavía en vuelo, y ADR 0007 decidió a
+propósito **no encolar** (para cuando terminara, la foto sería de una escena que el usuario ya dejó
+atrás). El comportamiento es correcto.
+
+Lo que no está bien es **cómo se siente**. En `requestReading` el *earcon* suena **después** de la
+guarda:
+
+```ts
+if (reading) { record(...); return; }   // <- sale acá
+reading = true;
+const audio = await beginReadingAudio();
+playStartEarcon();                       // <- nunca llega
+```
+
+Así que un gesto ignorado no produce **ningún** sonido. Para alguien que no ve la pantalla eso es
+indistinguible de un botón que no anduvo — y «el botón se siente muerto» es literalmente la queja que
+originó las dos actualizaciones anteriores de ADR 0007. Hace falta un sonido corto de «ahora no»
+antes del `return`, distinto del de inicio. Queda anotado abajo; no se metió en esta rama porque es
+una decisión de producto (qué suena, y si además conviene reemplazar la lectura en curso en vez de
+ignorar la nueva), no un arreglo.
 
 ## Open threads / next
 
@@ -2006,12 +2042,18 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   iOS. Lo que queda es `restoreStateIdentifier`, abajo.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
 - **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
-- **Botón: verificado en hardware el 2026-09-13** (30 gestos, cero errores). Lo que queda de esa
-  tanda es la **mitad de la app**: con el build de la rama puesto, confirmar que el doble click saca
-  la foto y que reconecta sin varios intentos — y, en el teléfono, *Olvidar este dispositivo* una vez,
-  porque iOS conserva su mitad del vínculo que ya se borró de la placa. Mirar también si aparece
-  `NOT advertising` tras una desconexión: es la única hipótesis del lado de la placa que sigue sin
-  descartarse.
+- **El gesto ignorado tiene que sonar** (del 2026-09-13, ADR 0007). Cuando llega un doble click con
+  una lectura en vuelo, `requestReading` sale por la guarda `if (reading)` **antes** de
+  `playStartEarcon()`, así que no suena nada. Ignorar es la decisión correcta —no encolar una foto de
+  una escena que el usuario ya dejó atrás— pero el silencio la vuelve indistinguible de un botón
+  roto para quien no ve la pantalla, que es la queja que originó las dos actualizaciones anteriores
+  del ADR. Falta decidir **qué** suena (un tono corto de «ahora no», distinto del de inicio) y, de
+  paso, si conviene que el gesto nuevo *reemplace* la lectura en curso en vez de perderse.
+- **Reconexión BLE tras cerrar la app del todo**: no se llegó a probar el 2026-09-13 (el caso en que
+  iOS retiene el periférico y ningún escaneo lo ve). Es el camino `via: 'connected'` de la telemetría:
+  si aparece en la tabla, el atajo está trabajando.
+- Mirar si aparece `NOT advertising` tras una desconexión: es la única hipótesis del lado de la placa
+  que sigue sin descartarse.
 - Placa: DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
   de ómnibus es el caso B, todo en placa).
 

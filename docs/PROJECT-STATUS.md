@@ -148,7 +148,11 @@ tests via `jest-expo`.
   sistema y ningún escaneo puede verlo. **El botón quedó verificado en hardware el mismo día**: 30
   gestos (11 dobles, 10 simples, 9 largos) sin un solo error, con el primer doble click de la sesión
   entrando a supermercado en vez de a ómnibus. El arranque encontró además el vínculo viejo con el
-  iPhone que causaba la alerta de emparejamiento, y se borró. Falta medir la mitad de la app.
+  iPhone que causaba la alerta de emparejamiento, y se borró. **La mitad de la app también quedó
+  verificada** con un build de la rama: el primer doble click desde *esperando* cambió de modo y bajó
+  la foto en 164 ms, sin ninguna alerta de emparejamiento. Queda anotado un hallazgo lateral: el
+  gesto que se ignora por haber una lectura en vuelo no emite sonido, y para quien no ve la pantalla
+  eso es indistinguible de un botón roto.
 - **Segundo plano en iOS (2026-09-10/11, spike 1 de ADR 0003 — cerrado)**: con la pantalla bloqueada el doble
   click no hacía nada, que es exactamente el caso del producto. Resultó que **el modo de fondo nunca
   estuvo apagado** —`isBackgroundEnabled` no gatea el `Info.plist`, sólo el manifiesto de Android; el
