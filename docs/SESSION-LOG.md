@@ -975,7 +975,7 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   que "tardaba" por procesar el video entero. Arnaldo Castro presta un servidor con **Tesla V100**.
   Decisión de la sesión: **prescindir del Coral**. La cámara real es la AI Camera (IMX500): el detector
   corre en el sensor y la Pi Zero 2 W sólo recorta y lee. Clonado en `repositorios/bus-banner-recognizer`,
-  rama `feat/pipeline-foto-banner-ocr`, **con push y sin PR** hasta que Magalí lo revise.
+  rama `feat/bus-banner-pipeline`, **con push y sin PR** hasta que Magalí lo revise.
 
 - **Diagnóstico**: el repo no "andaba lento", no andaba. Cargaba los 1338 frames en RAM (2,4 GB) y
   corría dos YOLO por frame; `results.names` sobre una lista (`AttributeError`); filtraba la clase
@@ -1008,16 +1008,30 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
 
 - **Corrección de Juan Lucas, y es la definición del modo: el modo ómnibus vigila, no saca una foto.**
   El usuario no ve venir el ómnibus; al activar el modo la cámara queda abierta y el detector corre en
-  cada frame (en el sensor, gratis para la Pi). Se agregó la capa `seguimiento.py`: identidad de ómnibus
+  cada frame (en el sensor, gratis para la Pi). Se agregó la capa `tracking.py`: identidad de ómnibus
   por solapamiento entre frames, confirmación (0,3 s), "se acerca" por crecimiento de la caja, lectura
   sólo del ómnibus principal cuando el banner tiene ≥ 22 px, voto entre lecturas, **un anuncio de
   presencia y uno de línea por ómnibus** (una pista perdida un instante no se re-anuncia). Simulado sobre
-  los videos con `bus-banner vigilar`: la línea llega 0,1-0,3 s después del aviso de presencia de día y
-  cerca; de noche insiste 10 lecturas. `scripts/vigilar_imx500.py` es la prueba de campo en la Pi
-  (picamera2 + IMX500 + `Vigilante`, anuncios `.wav` pregrabados, guarda el frame de cada lectura para
+  los videos con `bus-banner watch`: la línea llega 0,1-0,3 s después del aviso de presencia de día y
+  cerca; de noche insiste 10 lecturas. `scripts/watch_imx500.py` es la prueba de campo en la Pi
+  (picamera2 + IMX500 + `Watcher`, anuncios `.wav` pregrabados, guarda el frame de cada lectura para
   armar el dataset real). Fork en `juanlu-a/bus-banner-recognizer` para instalar en la placa con `pip
   install git+…`. Esto no contradice el "nunca siempre prendido" de ADR 0007: el reconocimiento sigue
   atado a un modo explícito; dentro del modo ómnibus, vigilar **es** la función.
+
+## 2026-09-13 — El repo de Magalí pasa a inglés, un archivo por etapa
+
+- Magalí leyó la rama y marcó dos cosas: el repo es en inglés y el nuestro estaba en español, y "el
+  bondi y el cartel están todo mezclado" (un solo `detector.py`). Las dos tenían razón, y ADR 0009 ya
+  pide todo el código en inglés. Refactor sin cambio de lógica (mismos 43 tests, mismas métricas:
+  numero 0,875 / destino 0,732): `bus_banner/detection/bus.py` y `detection/sign.py` separados, con el
+  wrapper de ultralytics compartido y `combined.py` como único lugar que los encadena; `crop.py`,
+  `ocr.py`, `reading.py`, `catalog.py`, `pipeline.py`, `tracking.py`; `data/` y `models/`; scripts
+  `train.py`, `export_imx.py`, `pseudo_label_bus.py`, `build_catalog.py`, `watch_imx500.py`. Rama
+  renombrada a `feat/bus-banner-pipeline` (el PR #1 de su repo la sigue). README y PR reescritos en
+  inglés llano: el pipeline en cinco pasos, un archivo por paso, y el modo ómnibus como cámara en vivo.
+- Lo único que queda en español en ese código es el JSON del evento BLE (`t`, `numero`, `nombre`): es el
+  contrato vigente de la app y cambiarlo es una decisión del lado de la app.
 
 ## Open threads / next
 
@@ -1053,12 +1067,12 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   `wifi`); el AP se prende con un modo activo y se apaga en *esperando*, siempre con tope; el flujo
   completo botón → BLE despierta → `GET /fotos/ultima` → nube → `POST /audio` → parlante (DAC I2S);
   spike 1 de segundo plano en iOS. Deuda: el AP por `systemd-run` no arrancó una vez sin registro.
-- **Camino de ómnibus, siguiente**: (1) Magalí revisa la rama `feat/pipeline-foto-banner-ocr` de su repo
+- **Camino de ómnibus, siguiente**: (1) Magalí revisa la rama `feat/bus-banner-pipeline` de su repo
   y **rota la API key de Roboflow**; (2) en la V100: `pseudo_etiquetar_bus.py` → revisar en Roboflow →
   `entrenar.py` (2 clases) → `exportar_imx.py`; (3) en la Pi: `imx500-package`, medir el OCR con
-  `--detector manual` (RSS y latencia en 4×A53), y correr `scripts/vigilar_imx500.py` en una parada
+  `--detector manual` (RSS y latencia en 4×A53), y correr `scripts/watch_imx500.py` en una parada
   (con `--solo-carteles` y el `.rpk` de una clase si el de dos no está); medir consumo del modo con la
-  UPS HAT; (4) `omnibus.py` en el daemon: `Modo.OMNIBUS` abre la cámara y corre el `Vigilante` sobre los
+  UPS HAT; (4) `omnibus.py` en el daemon: `Modo.OMNIBUS` abre la cámara y corre el `Watcher` sobre los
   tensores del IMX500 → `evento resultado` + anuncio pregrabado; apagado automático tras N minutos sin
   ómnibus (`camara.py` hoy sólo da JPEG); (5) **fotos con el dispositivo** para el set de evaluación y
   una v7 del dataset.

@@ -118,10 +118,10 @@ la Pi Zero 2 W sólo recorta, lee (RapidOCR sobre onnxruntime) y anuncia; el Cor
 ocupado" de 0003 y el Spike 4 (libedgetpu) desaparecen. (2) **El detector del banner se fine-tunea**
 (yolo11n de dos clases `bus_sign` + `bus`, en la V100 de Arnaldo Castro; export `format="imx"`); "nada se
 entrena" queda para el OCR. (3) **El modo ómnibus vigila, no saca una foto**: cámara abierta, detector en
-cada frame en el sensor, capa de seguimiento (`seguimiento.py`) que confirma la pista, anuncia presencia,
+cada frame en el sensor, capa de seguimiento (`tracking.py`) que confirma la pista, anuncia presencia,
 lee el banner del ómnibus principal y anuncia la línea una vez por ómnibus; compatible con 0007 (el modo es
 explícito). El código vive en el repo de Magalí (`bus-banner-recognizer`, rama
-`feat/pipeline-foto-banner-ocr`; fork `juanlu-a/bus-banner-recognizer` para instalar en la placa): medido
+`feat/bus-banner-pipeline`; fork `juanlu-a/bus-banner-recognizer` para instalar en la placa): medido
 en la Mac, numero 0,875 / destino 0,73 sobre 117 imágenes.
 
 ### ADR 0007 — Botones físicos y modos de operación · **Proposed (2026-08-22) — a validar con tutor**

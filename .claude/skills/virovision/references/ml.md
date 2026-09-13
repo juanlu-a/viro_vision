@@ -75,6 +75,6 @@ project measures precision, and the instrument that closes the pending supermark
 Pipelines decided per use case (ADR 0006, Proposed — tutor validation pending): buses = detection
 **en el sensor IMX500** (sin Coral) → banner crop → OCR en la Pi; supermarket = vision LLM en la nube.
 **El pipeline de ómnibus existe y anda en la Mac** (2026-09-07, repo `bus-banner-recognizer` de Magalí,
-rama `feat/pipeline-foto-banner-ocr`): numero 0,875 / destino 0,73 sobre 117 imágenes con RapidOCR.
+rama `feat/bus-banner-pipeline`): numero 0,875 / destino 0,73 sobre 117 imágenes con RapidOCR.
 Still to be done: entrenar el modelo de 2 clases en la V100, exportar a IMX500 y medir en la placa, set
 de evaluación con fotos del dispositivo, integración en el daemon, y la decisión de supermercado.

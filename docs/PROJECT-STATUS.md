@@ -33,7 +33,7 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 ```
 app/        React Native (Expo) app        ← main work so far
 hardware/   RPi Zero 2 W + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07)   raspi/ = daemon BLE (ADR 0003)
-ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer, rama feat/pipeline-foto-banner-ocr)
+ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer, rama feat/bus-banner-pipeline)
 docs/       thesis deliverables, ADRs, this file
 .claude/skills/virovision/   knowledge skill
 ```
@@ -181,7 +181,7 @@ Pick a track (see the skill for pillar detail):
   banner → OCR con métricas; siguen el fine-tuning de 2 clases en la V100 y el export al IMX500. Falta el
   set de evaluación con fotos del dispositivo y todo lo de supermercado.
 - **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). Siguen: botón GPIO,
-  DAC I2S + anuncios pregrabados, `omnibus.py` en el daemon (tensores del IMX500 → `procesar_con_caja`), carcasa.
+  DAC I2S + anuncios pregrabados, `omnibus.py` en el daemon (tensores del IMX500 → `process_with_boxes`), carcasa.
 
 **Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core
 value prop, and exercises the recognition/audio domain already scaffolded.

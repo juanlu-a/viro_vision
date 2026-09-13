@@ -305,7 +305,7 @@ métricas lo exigen.
 recorte del banner RapidOCR acierta el número en el 87,5 % y el destino en el 73 %; con 25 % de margen
 vertical perdía el primer dígito, con 12 % no. El catálogo finito de líneas de STM (503 pares desde
 datos abiertos) corrige el destino por similitud y da la lista de anuncios a pregrabar (ADR 0003).
-Código, métricas y scripts: repo `bus-banner-recognizer`, rama `feat/pipeline-foto-banner-ocr`.
+Código, métricas y scripts: repo `bus-banner-recognizer`, rama `feat/bus-banner-pipeline`.
 
 **El modo ómnibus es vigilancia continua, no una foto.** El usuario no ve venir el ómnibus: al activar
 el modo (ADR 0007) la cámara queda abierta y el detector corre en cada frame dentro del sensor; una capa
