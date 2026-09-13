@@ -62,6 +62,20 @@ archivo `SIN-AP`, y si hay que cambiar el flag, `modo-red.sh`.
 > obvio — `grep -ro -- '--[a-z-]*' /Volumes/bootfs/*.sh`. Un flag repetido en dos scripts se corrige
 > en uno solo y vuelve en el próximo arranque.
 
+> 💡 **Para entrar sin la tarjeta: `tools/ap.py`.** Apaga el punto de acceso por BLE desde la Mac, y
+> la placa vuelve sola a la WiFi conocida — con eso hay SSH sin apagar nada ni abrir la caja.
+>
+> ```sh
+> cd hardware/raspi
+> ./.venv-mac/bin/python tools/ap.py --status   # sólo mira
+> ./.venv-mac/bin/python tools/ap.py            # apaga el AP -> vuelve a la red de casa -> hay SSH
+> ./.venv-mac/bin/python tools/ap.py --on       # lo vuelve a encender
+> ```
+>
+> La app del teléfono tiene que estar **cerrada**: mientras una central está conectada la placa deja
+> de anunciar. La primera corrida pide permiso de Bluetooth para la terminal; sin él el escaneo
+> devuelve vacío **sin ningún error**, que es la forma más confusa de fallar.
+
 **Con el AP arriba sí se puede entrar.** `sshd` escucha en todas las interfaces: uniéndose a la red
 `ViroVision` (clave `virovision2026`) se llega a `ssh virovision@10.42.0.1`. Lo que se pierde en esa
 computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a propósito (ADR 0003).
