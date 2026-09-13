@@ -61,12 +61,24 @@ class AccessPoint:
 
     def turn_off(self) -> None:
         result = self._run(["con", "down", CONNECTION_NAME])
-        self.on = False
         log.info("AP down (%s)", "ok" if result.returncode == 0 else (result.stderr or "").strip()[:120])
         # Do not trust autoconnect: on 2026-09-06 the device was left on no network at all after
         # bringing the AP down (the phone was still joined to a ghost AP and `status` said "no IP").
         # NM is explicitly asked to connect wlan0 to the best known network.
         self.reconnect()
+        # And do not trust `con down` either. On 2026-09-13, asked over BLE to turn the AP off, this
+        # method returned happily and `status` reported `ap: false` — while that same `status` still
+        # said `network: "virovision-ap"`. nmcli had not taken it down, and `self.on` was a belief
+        # rather than an observation, so the app was told the AP was off by a board that was still
+        # serving it. `active_connection()` already existed to answer exactly this question; nobody
+        # was asking it. The state now comes from the interface, and a failure is loud.
+        active = self.active_connection()
+        self.on = active == CONNECTION_NAME
+        if self.on:
+            log.error("the AP did NOT come down: wlan0 is still on %s", active)
+        # `turn_on` is left believing its own nmcli on purpose: `con up` blocks until the connection
+        # is active, and `__main__` already verifies it against the interface's real address
+        # (`local_ip() == AP_IP`) before declaring the AP up. It is this direction that had no check.
 
     def reconnect(self) -> None:
         """Connects wlan0 to the known network with autoconnect (home, the lab…)."""

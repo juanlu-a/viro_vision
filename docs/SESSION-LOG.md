@@ -1858,9 +1858,27 @@ condición lleva el «sin nadie conectado» a propósito: BlueZ deja de anunciar
 mientras hay una central conectada, y un log que grita lobo en cada sesión normal es un log que nadie
 lee — justo la señal que esto existe para dar.
 
+### Un tercer bug, encontrado mientras buscábamos la forma de entrar a la placa
+
+Para desplegar hay que sacar la placa de su AP, y el repo ya nombraba el camino: apagarlo por BLE
+desde la Mac. Se hizo (un script de veinte líneas con `bleak`, que de paso confirmó que **conectarse
+no pide ningún emparejamiento**: leyó `status` y escribió en `control` sin vínculo). La placa contestó
+`ap: false`… y su propio `status`, en el mismo JSON, decía `network: "virovision-ap"`.
+
+`nmcli con down` había devuelto 0 sin hacer nada, y `AccessPoint.turn_off()` ponía `self.on = False`
+**sin verificar**: era una creencia, no una observación. Así, la placa le informa a la app que el AP
+está apagado mientras lo sigue sirviendo — el estado del que la app no puede recuperarse sola, porque
+deja de buscar al dispositivo justo donde está.
+
+Lo irónico, otra vez: `active_connection()` existe desde el 2026-09-06 y se agregó para contestar
+exactamente esta pregunta. Nadie la hacía. Ahora `turn_off` la consulta, `self.on` sale de la
+interfaz, y un AP que no bajó se registra como `ERROR`. `turn_on` se deja como está a propósito:
+`con up` bloquea hasta activar, y `__main__` ya lo verifica contra la dirección real de la interfaz.
+La dirección sin chequeo era ésta.
+
 ### Verificación
 
-`lint`, `typecheck` y los 243 tests de la app en verde; 63 de la placa. **Nada de esto está probado en
+`lint`, `typecheck` y los 243 tests de la app en verde; 64 de la placa. **Lo de la app no está probado en
 hardware todavía** — la placa no estaba a mano. Lo que sí se hizo fue dejar la próxima prueba
 concluyente: con `-v`, el journal dice cuántos clicks vio el botón y quién está conectado, que son las
 dos preguntas que esta sesión tuvo que contestar leyendo código.
