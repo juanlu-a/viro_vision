@@ -10,7 +10,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from virovision.button import ClickDetector  # noqa: E402
+from virovision.button import (  # noqa: E402
+    DEBOUNCE_S,
+    DOUBLE_CLICK_WINDOW_S,
+    LONG_PRESS_S,
+    ClickDetector,
+)
 from virovision.modes import ModeMachine, Mode  # noqa: E402
 
 
@@ -137,3 +142,38 @@ def test_the_gestures_lead_to_the_adr_0007_modes():
     d.held()
     d.released()
     assert modes.current is Mode.IDLE
+
+
+# --- the timings themselves -----------------------------------------------------------------------
+# These three assertions are here for the same reason as the ones in `theme.test.ts`: they are the
+# only record of a decision that looks like an arbitrary number in the source, and somebody reading
+# `button.py` in six months has no way to tell which of them can be nudged. They come from a real
+# failure — on 2026-09-13 the first double click of every session landed on bus mode — so if one of
+# them starts failing, the question to answer is "what changed about how the button is pressed",
+# not "which number do I move so the test passes".
+
+
+def test_the_debounce_is_shorter_than_the_shortest_real_click():
+    """gpiozero's `bounce_time` ignores every edge within that window of the previous accepted one,
+    releases included, so it is an upper bound on how short a click may be. A click shorter than the
+    debounce loses its release; the next press then looks like no state change at all and the double
+    click collapses into ONE click — which is exactly the "the first double click turns on bus mode"
+    of 2026-09-13. Somebody double-clicking a button on their temple presses for well under 50 ms,
+    so this has to stay in the tens of milliseconds, not the fifties."""
+    assert DEBOUNCE_S <= 0.02
+
+
+def test_the_double_click_window_is_not_a_desktop_double_click():
+    """0.4 s is the mouse figure and this is not a mouse: the button is on a pair of glasses, pressed
+    by somebody who cannot see it and gets no feedback until the gesture resolves. The second click
+    regularly arrived after the window closed. The cost of widening it is paid by the SINGLE click
+    (bus mode, which then watches on its own) and that is the cheaper of the two."""
+    assert DOUBLE_CLICK_WINDOW_S >= 0.5
+
+
+def test_a_long_press_is_still_unmistakably_longer_than_a_double_click():
+    """The three gestures have to stay separable by duration alone, because duration is all the user
+    can feel. If the window ever grew past the hold threshold, "I am taking my time over the second
+    click" and "I am holding it down to leave" would become the same gesture — and leaving a mode by
+    accident is the failure this project decided it cares most about avoiding."""
+    assert LONG_PRESS_S > DOUBLE_CLICK_WINDOW_S

@@ -17,11 +17,12 @@ from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
 from .ap import AP_IP, AccessPoint
 from .audio import DEFAULT_VOLUME_PERCENT, Player, set_output_volume
-from .button import DEFAULT_GPIO, try_connect
+from .button import DEBOUNCE_S, DEFAULT_GPIO, DOUBLE_CLICK_WINDOW_S, LONG_PRESS_S, try_connect
 from .camera import Camera, synthetic_payload
 from .state import local_ip, read_status
 from .http_server import DEFAULT_PORT, HttpServer
 from .gatt import ADVERTISED_NAME, SERVICE_UUID, ViroVisionService
+from .link import CentralWatcher, log_existing_bonds, report_visibility, set_bonding
 
 log = logging.getLogger("virovision")
 
@@ -40,6 +41,16 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--no-ap", action="store_true", help="do not bring the access point up at startup (development on the home network)")
     parser.add_argument("--no-button", action="store_true", help="do not use the physical button (modes come in over BLE only)")
     parser.add_argument("--button-gpio", type=int, default=DEFAULT_GPIO, help=f"GPIO of the mode button (default {DEFAULT_GPIO} = physical pin 29)")
+    # The three button timings, on the command line because they are calibrated against a real
+    # finger: editing `button.py` over SSH for every try is why they went untested for days.
+    parser.add_argument("--debounce-ms", type=float, default=DEBOUNCE_S * 1000, help=f"button debounce, ms (default {int(DEBOUNCE_S * 1000)}); an upper bound on how short a click may be")
+    parser.add_argument("--long-press-ms", type=float, default=LONG_PRESS_S * 1000, help=f"hold threshold to leave the mode, ms (default {int(LONG_PRESS_S * 1000)})")
+    parser.add_argument("--double-click-ms", type=float, default=DOUBLE_CLICK_WINDOW_S * 1000, help=f"wait after a release before deciding how many clicks there were, ms (default {int(DOUBLE_CLICK_WINDOW_S * 1000)})")
+    parser.add_argument(
+        "--pairable",
+        action="store_true",
+        help="let centrals bond with this board (off by default: ADR 0003 does not encrypt, so the app never needs a bond, and a stale bond is what makes iOS ask to pair again)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args()
 
@@ -115,15 +126,27 @@ async def _main(args: argparse.Namespace) -> None:
         on_clicks=service.core.from_button,
         on_hold=service.core.button_long_press,
         gpio=args.button_gpio,
+        long_press_s=args.long_press_ms / 1000,
+        window_s=args.double_click_ms / 1000,
+        debounce_s=args.debounce_ms / 1000,
     )
 
-    # Without an agent, BlueZ rejects any pairing attempt. NoIo = "just works", no PIN: the user cannot
-    # read a PIN on the device, and ADR 0003 deliberately does not encrypt the payload.
+    # The agent stays registered even with bonding off: it is what lets BlueZ answer a pairing
+    # attempt instead of leaving the central waiting on a request nobody handles. NoIo = "just
+    # works", no PIN — the user cannot read a PIN on a device with no screen.
     agent = NoIoAgent()
     await agent.register(bus)
 
     await adapter.set_powered(True)
     await adapter.set_alias(args.name)
+    # No bonding by default (`link.py` explains why): the app needs no bond, and a bond the phone and
+    # the board stop agreeing on is what turns every reconnection into a pairing alert.
+    await set_bonding(adapter, args.pairable)
+    await log_existing_bonds(bus, f"/org/bluez/{args.hci}")
+    # Who connects and who leaves, in the journal. Until 2026-09-13 the board said nothing about the
+    # link at all, and "the app finds nothing" had two indistinguishable causes.
+    centrals = CentralWatcher()
+    await centrals.start(bus)
 
     # The AP stays on while the device is powered (ADR 0003, 2026-09-07 update): the phone joins when
     # it connects over BLE and the photo is available the instant a mode is activated. With no time
@@ -158,11 +181,17 @@ async def _main(args: argparse.Namespace) -> None:
         loop.add_signal_handler(sig, stop.set)
 
     no_network_since = None
+    heartbeats = 0
     while not stop.is_set():
         try:
             await asyncio.wait_for(stop.wait(), STATUS_EVERY_SECONDS)
         except asyncio.TimeoutError:
             service.notify_status()
+            # Once a minute: could a phone find this board at all right now (see `link.py`)? It is
+            # the one hypothesis for "the app finds nothing" that could not be tested from the app.
+            heartbeats += 1
+            if heartbeats % 4 == 0:
+                await report_visibility(adapter, centrals)
             # Network watchdog: if it is not an AP and it has gone more than a minute with no network,
             # ask NM to connect. A device on no network at all is useless and cannot be fixed remotely.
             if not ap.on and ap.active_connection() is None:

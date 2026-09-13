@@ -200,6 +200,12 @@ perdería en silencio; y si no se perdiera, haría decir «Modo supermercado act
 está leyendo tres productos seguidos. La placa **no** saca la foto por su cuenta: viaja la intención,
 y la app la busca por HTTP (ADR 0003).
 
+**El campo `mode` de `read` no es decorativo: la app lo aplica antes de leer.** El doble click que
+además cambia de modo manda dos cosas, y en el teléfono no llegan a la misma velocidad — `read` se
+sirve sincrónicamente y el modo viaja por el estado de React. Hasta el 2026-09-13 la lectura ganaba
+siempre y se juzgaba contra el modo anterior: desde *esperando* se descartaba en silencio, y por eso
+el doble click prendía supermercado sin sacar la foto.
+
 ## Plan B: la foto por WiFi (HTTP) y el punto de acceso
 
 Decidido el 2026-09-05 (ADR 0003, Actualización): por BLE la foto tarda 4,5 s; por WiFi, 46 ms. El
@@ -300,13 +306,26 @@ interno, sin resistencia externa. Con un tact switch de 4 patas hay que usar **d
 diagonal**: las dos de una misma cara vienen unidas de fábrica y darían un botón apretado para
 siempre. `--button-gpio N` para otro pin, `--no-button` para ignorarlo.
 
-**Tiempos** (en `button.py`, todavía sin calibrar con el usuario):
+**Tiempos** (en `button.py`, recalibrados el 2026-09-13 tras la primera sesión de uso seguido):
 
-| Constante | Valor | Por qué |
-|---|---|---|
-| `REBOTE_S` | 50 ms | el rebote de un tact switch 6x6 está en el orden de los 10 ms |
-| `UMBRAL_LARGO_S` | 0,8 s | salir por accidente es peor que tener que insistir |
-| `VENTANA_DOBLE_CLICK_S` | 0,4 s | es lo que tarda en aplicarse un click simple: el precio del doble click |
+| Constante | Bandera | Valor | Por qué |
+|---|---|---|---|
+| `DEBOUNCE_S` | `--debounce-ms` | **15 ms** | `bounce_time` de gpiozero ignora **todo** flanco dentro de esa ventana del anterior, el de soltar incluido: es una **cota superior de lo corto que puede ser un click**. Con 50 ms, un doble click rápido perdía un flanco y colapsaba en **un** click — por eso el primer doble click encendía ómnibus |
+| `LONG_PRESS_S` | `--long-press-ms` | 0,8 s | salir por accidente es peor que tener que insistir. Tiene que quedar **más largo que la ventana de doble click**, o los dos gestos dejan de distinguirse por duración (hay un test que lo fija) |
+| `DOUBLE_CLICK_WINDOW_S` | `--double-click-ms` | **0,6 s** | 0,4 s era la cifra del mouse; acá el botón está en la sien y no hay feedback hasta que el gesto resuelve. Lo paga el click **simple**, que cae en ómnibus y después vigila solo |
+
+Las tres son banderas porque se calibran **contra un dedo real**: editar el archivo por SSH en cada
+prueba es por qué estuvieron tres días sin calibrar.
+
+**Cada gesto queda en el journal.** La cuenta de clicks resuelta va en `info`; los flancos sueltos,
+en `debug` (`-v`). Es lo único que distingue «el gesto se leyó mal» de «el gesto se leyó bien y el
+modo está mal mapeado», que se arreglan en archivos distintos:
+
+```sh
+journalctl -u virovision -f | grep button
+# button: 2 click(s)
+# button: long press
+```
 
 El botón es **opcional**: sin gpiozero, sin permisos sobre el pin o sin botón soldado, el daemon
 arranca igual (log `sin botón físico`) y los modos entran por BLE. Una placa sin daemon sería peor.
@@ -375,11 +394,45 @@ audio_pwm_mode=1                 # legacy: conmuta menos (ver abajo)
 > Un piezo alcanza para verificar el camino, **no para voz**: resuena en una banda angosta y el habla
 > sale apenas inteligible. Eso no es una falla del PWM.
 
+## El enlace: la placa no se empareja, y lo dice
+
+Desde el 2026-09-13 ([ADR 0003](../../docs/architecture/adr/0003-enlace-placa-telefono.md),
+actualización): **la placa arranca con `Pairable = false`**. Ninguna característica de este perfil
+pide autenticación —ADR 0003 decidió no cifrar la carga—, así que la app nunca necesitó un vínculo
+(*bond*) para nada. Un vínculo no compraba nada y costaba la falla que el usuario reportó: iOS guarda
+su clave, las dos copias dejan de coincidir y desde ahí **cada reconexión termina en «ViroVision
+quiere emparejarse»**, a veces varias veces seguidas.
+
+> **En un teléfono que ya se emparejó antes, una sola vez:** *Ajustes → Bluetooth → ViroVision →
+> Olvidar este dispositivo*. iOS conserva su mitad de la clave e intenta cifrar hasta que se la
+> borra.
+
+`--pairable` devuelve el comportamiento anterior. En la placa, los vínculos guardados se listan al
+arrancar (log) y se borran con `bluetoothctl remove <MAC>`.
+
+**Y el journal cuenta el enlace**, que antes era el hueco grande: la placa anunciaba y todo lo demás
+sólo se veía desde el teléfono, así que «la app no encuentra nada» tenía dos causas opuestas
+indistinguibles.
+
+```sh
+journalctl -u virovision -f | grep -E 'central|bonding|advertising'
+# bonding disabled: no central can pair ...
+# central connected: 4A:BF:... (BlueZ stops advertising while it is)
+# central disconnected: 4A:BF:... (advertising should resume)
+# NOT advertising and no central connected: no phone can find this board   <-- ⚠️ la falla es de la placa
+```
+
 ## Problemas conocidos
 
 - `BlueZ no está disponible en D-Bus`: `sudo systemctl start bluetooth` y revisar `rfkill list`.
 - El iPhone ve `ViroVision` pero no conecta: borrar el dispositivo en *Ajustes → Bluetooth* del
   teléfono (iOS cachea el GATT viejo) y reiniciar el servicio.
+- **El iPhone pide emparejarse solo**: la placa está corriendo con `--pairable`, o con un daemon
+  anterior al 2026-09-13. Ver la sección de arriba.
+- **La app dice «no se encontró el dispositivo» y la placa parece bien**: mirar `central connected`
+  en el journal. Si hay una central conectada, la placa no está anunciando **a propósito** y el
+  teléfono que la tiene tomada no es necesariamente el que está buscando — desde el build del
+  2026-09-13 la app mira primero lo que ya está conectado al sistema, justamente por esto.
 - Sin cámara detectada: `libcamera-hello --list-cameras`; en Bookworm la Camera Module 3 va sin
   tocar `config.txt`. El daemon sigue igual sin cámara, sólo `foto` falla.
 - `pip` se queja de *externally-managed-environment*: es que no se activó el venv; `setup.sh` instala
