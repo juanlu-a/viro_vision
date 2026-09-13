@@ -1876,12 +1876,47 @@ interfaz, y un AP que no bajó se registra como `ERROR`. `turn_on` se deja como 
 `con up` bloquea hasta activar, y `__main__` ya lo verifica contra la dirección real de la interfaz.
 La dirección sin chequeo era ésta.
 
-### Verificación
+### Verificación en hardware, el mismo día
 
-`lint`, `typecheck` y los 243 tests de la app en verde; 64 de la placa. **Lo de la app no está probado en
-hardware todavía** — la placa no estaba a mano. Lo que sí se hizo fue dejar la próxima prueba
-concluyente: con `-v`, el journal dice cuántos clicks vio el botón y quién está conectado, que son las
-dos preguntas que esta sesión tuvo que contestar leyendo código.
+`lint`, `typecheck` y los 243 tests de la app en verde; 64 de la placa. Y la placa apareció, así que
+la mitad del hardware **quedó medida en vez de supuesta**.
+
+Entrar costó más que arreglar. La placa arrancó en modo producto, o sea fuera de la red de casa. El
+Mac tenía `virovision.local → 192.168.1.14` en caché —ARP y mDNS contestaban— y no había nadie: ni
+ping, ni 22, ni 8080. Es una forma muy convincente de perder media hora, y la lección es corta:
+**verificá con un servicio, no con que el nombre resuelva.** El barrido bueno es
+`curl http://192.168.1.X:8080/health`, no un `ping`.
+
+El segundo intento fue apagarle el AP por BLE, que es donde apareció el tercer bug (arriba). El que
+funcionó fue la microSD: `touch /Volumes/bootfs/SIN-AP` y arrancar.
+
+De paso, dos cosas que la tarjeta confirmó antes de tocar nada: el `.tgz` del 09-11 **sí tiene**
+`requests_reading`, y el daemon que estaba corriendo también — o sea que el evento `read` salía bien
+de la placa y el bug de «no saca la foto» era **enteramente de la app**. Dejó de ser una deducción.
+
+**El botón, con un dedo real, con el daemon nuevo:**
+
+| Gesto | Repeticiones | Resultado |
+|---|---|---|
+| doble click | 11 | `2 click(s)` — 11/11 |
+| click simple | 10 | `1 click(s)` — 10/10 |
+| click largo | 9 | `long press` → IDLE, sin click residual — 9/9 |
+
+Cero errores en 30 gestos. El **primer** doble click de la sesión —el que siempre caía en ómnibus—
+entró directo a supermercado y además pidió lectura.
+
+Los clicks simples no son ceremonia: bajar el antirrebote de 50 a 15 ms tiene el riesgo **opuesto**
+al que arregla —que el rebote mecánico cuele un click de más y parta un click simple en dos— y los
+dobles no lo detectan. Por eso se midieron los tres gestos y no sólo el que fallaba.
+
+Y el arranque encontró lo que sospechábamos del emparejamiento: **`1 device(s) still bonded`, un
+iPhone** (`Paired: yes, Bonded: yes`). Ese vínculo viejo es la causa de la alerta repetida. Se borró
+de la placa (`bluetoothctl remove`); la mitad del teléfono la tiene que borrar el usuario. Contraprueba
+gratis del mismo rato: el script de `bleak` leyó `status` y escribió en `control` **sin emparejarse**,
+que es justo lo que el ADR sostiene.
+
+**Lo que queda sin medir es la mitad de la app** (que el doble click saque la foto, y la reconexión
+sin varios intentos): necesita el build de TestFlight, lanzado a mano desde la rama.
 
 ## Open threads / next
 
@@ -1971,14 +2006,12 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   iOS. Lo que queda es `restoreStateIdentifier`, abajo.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
 - **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
-- Placa: **verificar en hardware los tiempos del botón y el enlace sin emparejamiento** (2026-09-13,
-  recalibrados y escritos, ninguno probado en la placa). El protocolo es corto y cierra las dos
-  preguntas de esta sesión: desplegar el daemon, correrlo con `-v`, hacer diez dobles clicks y
-  confirmar que el journal dice `button: 2 click(s)` las diez veces; después apagar y prender el
-  teléfono y confirmar que reconecta **sin** alerta de emparejamiento. Si algún doble click sigue
-  leyéndose como uno, bajar `--debounce-ms` a 10 y subir `--double-click-ms` a 0,8 **de a uno**, que
-  para eso son banderas. Y mirar si aparece `NOT advertising` tras una desconexión: es la única hipótesis
-  del lado de la placa que no se pudo descartar desde acá.
+- **Botón: verificado en hardware el 2026-09-13** (30 gestos, cero errores). Lo que queda de esa
+  tanda es la **mitad de la app**: con el build de la rama puesto, confirmar que el doble click saca
+  la foto y que reconecta sin varios intentos — y, en el teléfono, *Olvidar este dispositivo* una vez,
+  porque iOS conserva su mitad del vínculo que ya se borró de la placa. Mirar también si aparece
+  `NOT advertising` tras una desconexión: es la única hipótesis del lado de la placa que sigue sin
+  descartarse.
 - Placa: DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
   de ómnibus es el caso B, todo en placa).
 
