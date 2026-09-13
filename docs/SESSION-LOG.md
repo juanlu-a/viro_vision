@@ -1772,6 +1772,99 @@ forma de saber que hay un remedio.
 Bloque **G** nuevo en `qa-modo-supermercado.md`: alcance nuevo, lo no reconocible, el idioma en los
 dos caminos y el volumen de la placa.
 
+## 2026-09-13 — El botón y el enlace, medidos contra un dedo y un teléfono reales
+
+Dos quejas de uso seguido, ninguna de ellas donde parecía. Vale la pena el detalle porque las dos
+tenían una causa **determinista** y aun así se leían como «a veces anda».
+
+### «El primer doble click siempre prende ómnibus»
+
+No era la máquina de modos (`modes.py` estaba bien y tenía tests): era el **antirrebote**.
+
+`bounce_time` de gpiozero no significa «ignorá el rebote después de apretar». Significa *ignorá todo
+flanco que llegue dentro de esa ventana del flanco anterior aceptado*, **incluido el de soltar**. O
+sea que es una **cota superior de lo corto que puede ser un click**: si el click dura menos que el
+antirrebote se pierde su flanco de soltar, la pulsación siguiente ya no parece un cambio de estado, y
+el doble click **colapsa en uno solo** — que es exactamente «prendió ómnibus». Los 50 ms se habían
+elegido «con margen sobre los ~10 ms de rebote mecánico», leyendo el parámetro al revés.
+
+Quedó en **15 ms**, y la ventana de doble click pasó de 0,4 s a **0,6 s**: 0,4 s es la cifra de un
+mouse, y esto es un botón en la sien, sin pantalla, apretado por alguien que no lo ve. Lo paga el
+click **simple**, que es el barato — cae en ómnibus, que después vigila solo.
+
+**Las tres pasan a ser banderas** (`--debounce-ms`, `--double-click-ms`, `--long-press-ms`). No es
+comodidad: «calibrar los tiempos del botón» estuvo tres días en los pendientes porque probar un valor
+significaba editar `button.py` por SSH y reiniciar. Y **cada gesto se registra** — los flancos en
+`debug`, la cuenta resuelta en `info`. Sin ese log, «hice doble click y prendió ómnibus» no tiene
+forma de distinguirse de «el gesto se leyó bien y el modo está mal mapeado», y se arreglan en
+archivos distintos.
+
+Los tests que quedaron no prueban gpiozero (no está en la Mac): fijan los **invariantes** de los tres
+números, con el porqué escrito, al estilo de `theme.test.ts`. Si alguno empieza a fallar, la pregunta
+es qué cambió del botón, no qué número mover.
+
+### «Prende supermercado pero no saca la foto; recién el tercer doble click lee»
+
+Ésta era de la app, y **no era una carrera: era determinista**. Un doble click hace que la placa mande
+dos señales —el modo por la característica `mode` y el evento `read`— y desde el PR #80 las dos llegan
+por caminos de velocidad incomparable:
+
+- `read` → `ReaderBridge` → `requestReading()`, **sincrónico**, dentro del callback de BLE;
+- el modo → `onMode` → estado del provider → render → efecto → `setModeFromDevice`.
+
+React no commitea adentro de un callback nativo, así que **la lectura ganaba siempre** y se juzgaba
+contra el modo *anterior* al click. Desde *esperando* eso caía en la guarda `mode === 'idle'` de
+`requestReading` y **se descartaba sin decir nada**: se anunciaba el modo, no se sacaba la foto, y
+recién el doble click siguiente —con el modo ya commiteado— leía.
+
+Lo irónico es que el arreglo ya estaba en el protocolo: el evento **siempre fue `{"t":"read","mode":N}`**
+y la app tiraba el campo `mode` a la basura. Ahora lo usa: `readFromDevice(mode)` aplica el modo de la
+placa **antes** de servir la lectura, en el mismo tick, en vez de correrle la carrera al commit. La
+lógica salió del `.tsx` a `readingService.ts` para poder testearla — y los dos tests nuevos fallan si
+se saca la línea, que es la única forma de saber que pinchan el bug y no otra cosa.
+
+**La lección que vale para el próximo**: cuando el PR #80 sacó el pipeline de React para que el botón
+funcionara con la pantalla bloqueada, creó **dos caminos con latencias de distinto orden** para
+señales que describen un mismo gesto. Eso es una clase de bug, no un caso: si dos señales del mismo
+evento viajan por caminos distintos, la que llega primero no puede depender del estado que trae la
+otra.
+
+### El enlace: «lleva varios intentos de pedido de enlace»
+
+Acá había tres cosas, y la primera es la que más molesta y menos hacía falta.
+
+**1. El emparejamiento no servía para nada.** Ninguna característica pide autenticación —ADR 0003
+decidió **no cifrar** la carga—, así que la app nunca necesitó un vínculo. Pero la placa era
+`Pairable` por defecto, así que se creaba uno igual; y un vínculo del que el teléfono y la placa
+tienen copias que dejan de coincidir es justo la falla reportada: **cada reconexión termina en la
+alerta del sistema**, a veces varias veces. Ahora arranca con `Pairable = false` (`--pairable` lo
+devuelve). Costo, una sola vez por teléfono ya emparejado: *Olvidar este dispositivo*.
+
+**2. Escanear era la peor forma de encontrar una placa conocida.** La app escaneaba **siempre**, y un
+escaneo sólo ve a quien está anunciando. Hay dos situaciones cotidianas en las que la placa no lo
+está, y desde el teléfono se ven idénticas: (a) el periférico **ya está conectado al sistema** —iOS lo
+sostiene entre reinicios de la app, y `startDeviceScan` **nunca** reporta uno conectado, así que la
+app escaneaba 15 s contra una pared y reintentaba—, y (b) la placa cree que el enlace anterior sigue
+vivo y BlueZ no anuncia hasta el *supervision timeout*. El orden pasó a ser: lo que ya está conectado
+al sistema → el identificador recordado (conexión directa, con timeout, sin radio de por medio) →
+escanear. Y toda conexión fallida se cancela explícitamente: en iOS un pedido pendiente bloquea el
+siguiente, que es cómo **un** intento malo se volvía «varios intentos».
+
+**3. La placa no contaba nada del enlace.** Anunciaba, y todo lo demás sólo se veía desde el teléfono
+— la mitad equivocada para quedarse ciego. `virovision/link.py` registra ahora qué central se conecta
+y se va, qué vínculos hay guardados, y cuántas instancias de anuncio tiene BlueZ arriba. Si alguna vez
+aparece `NOT advertising and no central connected`, la falla es de la placa y no hay que deducirlo. La
+condición lleva el «sin nadie conectado» a propósito: BlueZ deja de anunciar **legítimamente**
+mientras hay una central conectada, y un log que grita lobo en cada sesión normal es un log que nadie
+lee — justo la señal que esto existe para dar.
+
+### Verificación
+
+`lint`, `typecheck` y los 243 tests de la app en verde; 63 de la placa. **Nada de esto está probado en
+hardware todavía** — la placa no estaba a mano. Lo que sí se hizo fue dejar la próxima prueba
+concluyente: con `-v`, el journal dice cuántos clicks vio el botón y quién está conectado, que son las
+dos preguntas que esta sesión tuvo que contestar leyendo código.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1860,8 +1953,15 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   iOS. Lo que queda es `restoreStateIdentifier`, abajo.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
 - **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
-- Placa: **calibrar los tiempos del botón** con el usuario (hecho el 2026-09-07, sin probar en
-  hardware); DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
+- Placa: **verificar en hardware los tiempos del botón y el enlace sin emparejamiento** (2026-09-13,
+  recalibrados y escritos, ninguno probado en la placa). El protocolo es corto y cierra las dos
+  preguntas de esta sesión: desplegar el daemon, correrlo con `-v`, hacer diez dobles clicks y
+  confirmar que el journal dice `button: 2 click(s)` las diez veces; después apagar y prender el
+  teléfono y confirmar que reconecta **sin** alerta de emparejamiento. Si algún doble click sigue
+  leyéndose como uno, bajar `--debounce-ms` a 10 y subir `--double-click-ms` a 0,8 **de a uno**, que
+  para eso son banderas. Y mirar si aparece `NOT advertising` tras una desconexión: es la única hipótesis
+  del lado de la placa que no se pudo descartar desde acá.
+- Placa: DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
   de ómnibus es el caso B, todo en placa).
 
 ### Suelto

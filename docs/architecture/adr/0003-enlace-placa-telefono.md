@@ -495,6 +495,56 @@ todavía; hasta que existan, ómnibus habla por el teléfono **cualquiera sea el
 copia *best-effort* a la placa (no esperada, sin poder degradar nada). El ajuste lo dice en la misma
 pantalla donde se elige: es lo único que sorprende de él.
 
+## Actualización 2026-09-13 — La placa deja de emparejarse, y la app deja de buscar a ciegas
+
+Dos síntomas de la primera semana de uso real, con la misma raíz: **nada de lo que hace falta para
+reconectarse estaba donde parecía**.
+
+### 1. El «pedido de enlace» no hacía falta para nada
+
+Ninguna característica de este perfil pide autenticación —este ADR decidió **no cifrar la carga**
+(§2)—, así que la app **nunca necesitó un vínculo (*bond*)** para leer, escribir ni suscribirse. Un
+vínculo no compraba nada y costaba justo la falla que el usuario reportó: el iPhone guarda una clave
+para la placa, las dos copias dejan de coincidir (una reinstalación, un `/var/lib/bluetooth` limpio,
+una dirección aleatoria que deja de resolverse) y desde ahí **cada reconexión termina en la alerta
+del sistema «ViroVision quiere emparejarse»**, a veces más de una vez antes de que la app vea el
+dispositivo.
+
+**Decisión: la placa arranca con `Pairable = false`.** Sin clave no hay clave en la que discrepar.
+`--pairable` devuelve el comportamiento anterior en una bandera si alguna vez el intercambio sale
+mal.
+
+> **Costo, una sola vez, en un teléfono que ya se emparejó:** iOS conserva su mitad de la clave e
+> intenta cifrar. *Ajustes → Bluetooth → ViroVision → Olvidar este dispositivo*, una vez, y se
+> termina. Va en las notas del build.
+
+### 2. Escanear era la peor forma de encontrar una placa que ya conocíamos
+
+La app escaneaba **siempre**, y un escaneo sólo ve a un periférico que está anunciando. Hay dos
+situaciones cotidianas en las que el nuestro no lo está, y desde el teléfono son idénticas:
+
+- **Ya está conectado al sistema.** iOS sostiene el periférico entre reinicios de la app, y Ajustes u
+  otra app pueden tenerlo tomado. Un periférico conectado no anuncia y `startDeviceScan` **no lo
+  reporta nunca**: la app escaneaba 15 s, fallaba y reintentaba contra la misma pared. `connectedDevices`
+  es la única API que los ve.
+- **La placa cree que el enlace anterior sigue vivo.** Si el teléfono se va sin cerrar la conexión,
+  BlueZ la sostiene hasta el *supervision timeout* y mientras tanto no anuncia.
+
+**Decisión: el escaneo pasa a ser el último recurso.** El orden es (1) lo que ya está conectado al
+sistema, (2) el identificador recordado de la última vez —conexión directa, sin radio de por medio—,
+(3) escanear. Y toda conexión fallida se cancela explícitamente: en iOS un pedido de conexión
+pendiente bloquea el siguiente, que es cómo un intento malo se volvía «varios intentos».
+
+### 3. Lo que la placa nunca contó
+
+La placa no registraba **nada** sobre el enlace: anunciaba, y todo lo demás sólo se veía desde el
+teléfono — la mitad equivocada para quedarse ciego, porque «la app no encuentra nada» tiene dos
+causas opuestas que se ven igual. Ahora el journal dice qué central se conecta y se desconecta, qué
+vínculos hay guardados, y cuántas instancias de anuncio tiene BlueZ arriba (`virovision/link.py`).
+Si alguna vez aparece `NOT advertising and no central connected`, la falla es de la placa y ya no hace
+falta deducirlo — y la condición incluye «sin nadie conectado» porque BlueZ deja de anunciar
+**legítimamente** mientras hay una central conectada.
+
 ## Ver también
 
 - Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).

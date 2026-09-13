@@ -136,6 +136,17 @@ tests via `jest-expo`.
   pide lectura: ómnibus es vigilancia y repetirlo costaría una foto y una llamada a la nube por toque.
   La app muestra además la foto que sacó la placa debajo del resultado. Placa y app desplegadas y
   verificadas juntas.
+- **El botón y el enlace, tras la primera sesión de uso seguido (2026-09-13, ADR 0003 y 0007 act.)**:
+  tres defectos con causa determinista, **escritos y sin probar todavía en hardware**. (a) El
+  antirrebote de 50 ms era una *cota de lo corto que puede ser un click* —así funciona `bounce_time`
+  de gpiozero— y colapsaba el doble click rápido en uno: quedó en 15 ms, la ventana de doble click en
+  0,6 s, y los tres tiempos pasan a ser banderas calibrables con el gesto registrado en el journal.
+  (b) El evento `read` traía el modo desde siempre y la app lo descartaba, juzgando la lectura contra
+  el modo anterior al click: desde *esperando* la descartaba en silencio, que es el «prende
+  supermercado y no saca la foto». (c) La placa se emparejaba sin necesitarlo —nada en el perfil pide
+  autenticación— y la app escaneaba siempre, incluso cuando el periférico ya estaba conectado al
+  sistema y ningún escaneo puede verlo. Verificación en hardware pendiente; protocolo en el
+  SESSION-LOG.
 - **Segundo plano en iOS (2026-09-10/11, spike 1 de ADR 0003 — cerrado)**: con la pantalla bloqueada el doble
   click no hacía nada, que es exactamente el caso del producto. Resultó que **el modo de fondo nunca
   estuvo apagado** —`isBackgroundEnabled` no gatea el `Info.plist`, sólo el manifiesto de Android; el
