@@ -100,6 +100,20 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const syncedNetwork = useRef<{ ap: boolean; ip: string | null; ok: boolean }>({ ap: false, ip: null, ok: false });
   // The last `status` recorded, so the table does not fill with identical heartbeats.
   const statusFingerprint = useRef<string | null>(null);
+  /**
+   * Whether the user has already been told the network is ready, for the network it is ready ON.
+   *
+   * Because they were told twice in the field (2026-09-13). The network check legitimately runs more
+   * than once for one connection — once from `connectInternal` and again from the first `status`
+   * that brings the device's address — and each run that reaches the end announces. The `run`
+   * counter does not catch it: it only discards a run that was SUPERSEDED, and these two do not
+   * overlap, the second starts after the first finished.
+   *
+   * Saying the same sentence twice is not cosmetic here. The voice is the whole interface, so a
+   * repeated announcement is indistinguishable from a second event having happened — and the user is
+   * being trained to count announcements to know what the device is doing.
+   */
+  const announcedReadyFor = useRef<string | null>(null);
 
   /**
    * The network follows the AP: join when the device turns it on, leave when it turns it off, and
@@ -108,6 +122,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
    * situation changed while it waited, its results are discarded.
    */
   const failNetwork = useCallback((detail: string) => {
+    // Cleared here and on every other way out of `ready` below: the guard must suppress a repeated
+    // announcement, never a real one. A network that failed and came back has to be announced again.
+    announcedReadyFor.current = null;
     setWifi('error');
     setWifiDetail(detail);
     record('wifi.failed', { detail: { reason: detail } });
@@ -121,6 +138,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       const current = () => run === networkSyncRun.current;
       setWifiDetail(null);
       if (!target) {
+        announcedReadyFor.current = null;
         setWifi('off');
         return false;
       }
@@ -175,7 +193,13 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // on 2026-09-06 the network never became ready and without this number there was no way to
         // know where it hung.
         record('wifi.ready', { ms: Date.now() - t0, detail: { ip: target.ip } });
-        announce(strings.connect.wifiReadyAnnounce);
+        // Announced once per network, not once per check (see `announcedReadyFor`). The row above is
+        // still recorded every time: a second check reaching "ready" is worth knowing about in the
+        // table, it is just not worth saying out loud again.
+        if (announcedReadyFor.current !== target.ip) {
+          announcedReadyFor.current = target.ip;
+          announce(strings.connect.wifiReadyAnnounce);
+        }
         return true;
       }
       failNetwork(strings.connect.wifiNoResponse.replace('{ip}', target.ip));
@@ -191,6 +215,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
    * (2026-09-05, first run of the flow).
    */
   const startNetworkTransition = useCallback(() => {
+    announcedReadyFor.current = null;
     networkSyncRun.current += 1;
     syncedNetwork.current = { ap: false, ip: null, ok: false };
     setAddress(null);
@@ -300,6 +325,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     const unsubscribes = [
       client.onDisconnect(() => {
         record('ble.lost');
+        announcedReadyFor.current = null;
         networkSyncRun.current += 1; // invalidates any network wait in flight
         setConnection({ status: 'error', device: null, message: strings.connection.lost });
         setAddress(null);
@@ -362,6 +388,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       joinedTo.current = null;
     }
     networkSyncRun.current += 1;
+    announcedReadyFor.current = null;
     await getBleClient().disconnect();
     setConnection(initialConnection);
     setAddress(null);

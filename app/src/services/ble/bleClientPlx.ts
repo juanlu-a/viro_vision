@@ -26,15 +26,18 @@ import { BleDeviceNotFoundError, BleNotConnectedError, type BleClient } from './
 
 const SCAN_TIMEOUT_MS = 15_000;
 /**
- * How long any single connect attempt may take before it is abandoned.
+ * How long a connect attempt may take before it is abandoned.
  *
  * It exists because CoreBluetooth's own `connect` has NO timeout: it waits for the peripheral to
- * show up for as long as the app lives. Without this number, connecting to a remembered identifier
- * whose board is switched off would hang the whole path forever, and the user would get a screen
- * that says "searching" and never changes again. Five seconds is ~10x a connect that works, so it
- * only ever fires on one that was not going to.
+ * show up for as long as the app lives. Without a number here, connecting to a remembered
+ * identifier whose board is switched off would hang the whole path forever and the user would get a
+ * screen that says "searching" and never changes again.
+ *
+ * It is as long as the scan's on purpose. That queueing is not a flaw to be cut short — it is the
+ * one mechanism that survives the case a scan cannot see (below, in `reach`), so it is given the
+ * same budget and raced instead of being tried first and abandoned.
  */
-const CONNECT_TIMEOUT_MS = 5_000;
+const CONNECT_TIMEOUT_MS = SCAN_TIMEOUT_MS;
 /**
  * Android negotiates whatever MTU is asked for up to 517; iOS ignores the request and gives 185. A
  * large MTU does not move the photo —that goes over HTTP (ADR 0003)— but it does prevent the
@@ -99,22 +102,7 @@ class BleClientPlx implements BleClient {
 
   async connect(): Promise<DeviceInfo> {
     await this.waitForRadio();
-    const shortcut = await this.shortcut();
-    let device: Device | null = null;
-    if (shortcut) {
-      record('ble.found', { detail: { via: shortcut.via } });
-      // A shortcut that does not work out costs one timeout and then gets out of the way. Without
-      // this fallback a remembered identifier that stopped being valid —the board was replaced, the
-      // phone was restored from a backup— would make the app stop scanning FOREVER, which is a much
-      // worse failure than the slow reconnection it was meant to fix.
-      device = await this.open(shortcut.id).catch(() => null);
-      if (!device) record('ble.found', { detail: { via: shortcut.via, failed: true } });
-    }
-    if (!device) {
-      const found = await this.scan();
-      record('ble.found', { detail: { via: 'scan' } });
-      device = await this.open(found.id);
-    }
+    const device = await this.reach();
     this.device = device;
     // Remembered so the next connection can skip the scan (see `services/storage/lastDevice`).
     void saveLastDeviceId(device.id);
@@ -240,6 +228,42 @@ class BleClientPlx implements BleClient {
         return () => sub.remove();
       }
     );
+  }
+
+  /**
+   * Gets a connected, discovered device: the identifier we know first, the scan only if that fails.
+   *
+   * **The budget is the fix here, not the order.** The field measured 10-15 s to reconnect after the
+   * app was force-quit (2026-09-13) with a 5 s cap on the direct connect: it gave up at 5 s and the
+   * scan then started spending its own 15 s from scratch. But 5 s was short of the very window that
+   * matters — when the phone goes away without closing the link, the board holds it open until the
+   * BLE supervision timeout (a handful of seconds) and does not advertise meanwhile, so it becomes
+   * reachable at around 6 s. The old cap expired just before the thing it was waiting for happened.
+   *
+   * Waiting is the right move because iOS **queues** a direct connect and fulfils it the instant the
+   * peripheral becomes connectable. In that same window a scan cannot help at all, by definition:
+   * there is no advertisement to see. So the identifier gets the full budget, and the scan stays as
+   * the fallback for the only case it is better at — a board whose identifier we do not have, or no
+   * longer have (it was replaced, the phone was restored from a backup). That fallback is what keeps
+   * a stale identifier from stranding the app for good.
+   *
+   * They are not raced. Two `open()` calls on one peripheral is a hazard, not a speed-up: the loser
+   * fails with "already connected" and its own cleanup would cancel the winner's connection.
+   */
+  private async reach(): Promise<Device> {
+    const shortcut = await this.shortcut();
+    if (shortcut) {
+      try {
+        const device = await this.open(shortcut.id);
+        record('ble.found', { detail: { via: shortcut.via } });
+        return device;
+      } catch {
+        record('ble.found', { detail: { via: shortcut.via, failed: true } });
+      }
+    }
+    const found = await this.scan();
+    record('ble.found', { detail: { via: 'scan' } });
+    return this.open(found.id);
   }
 
   /**
