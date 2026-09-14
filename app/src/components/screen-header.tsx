@@ -8,9 +8,9 @@
  * be decided by its tallest element —the symbol on Home, the line of text elsewhere— and the titles
  * would end up misaligned across screens.
  *
- * There are **two symbol files**, not one recoloured: the brand manual defines the pupil as deep
- * blue on light and white on dark, and a single image cannot do both — with a white pupil on a light
- * background the eye looks hollow.
+ * The symbol is the dark-mode file: the brand manual defines the pupil as deep blue on light and
+ * white on dark, and the app ships dark only (ADR 0010). `symbol-light.png` stays in the assets for
+ * thesis material, not for the app.
  *
  * The symbol is decorative for the screen reader — the title already says which screen you are on,
  * and announcing "image" before every header would be noise on every navigation.
@@ -19,7 +19,6 @@ import { Image } from 'expo-image';
 import { View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { useThemePreference } from '@/features/theme/ThemePreferenceProvider';
 
 /** `large` only on Home. Every other screen goes without the mark. */
 export type HeaderMark = 'large' | 'none';
@@ -35,8 +34,6 @@ export function ScreenHeader({
   subtitle?: string;
   mark?: HeaderMark;
 }) {
-  const { scheme } = useThemePreference();
-
   return (
     <View className="gap-two">
       {/* `min-h-[48px]`: the fixed height makes the title land at the same height whether it
@@ -44,11 +41,7 @@ export function ScreenHeader({
       <View className="min-h-[48px] flex-row items-center gap-three">
         {mark !== 'none' && (
           <Image
-            source={
-              scheme === 'dark'
-                ? require('@/../assets/images/symbol-dark.png')
-                : require('@/../assets/images/symbol-light.png')
-            }
+            source={require('@/../assets/images/symbol-dark.png')}
             style={{ width: MARK_SIZE, height: MARK_SIZE }}
             contentFit="contain"
             accessibilityElementsHidden

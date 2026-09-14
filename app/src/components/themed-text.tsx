@@ -52,6 +52,7 @@ const COLORS: Record<ThemeColor, string> = {
   primaryEdge: 'text-primary-edge',
   onPrimary: 'text-on-primary',
   danger: 'text-danger',
+  warning: 'text-warning',
   success: 'text-success',
   successMuted: 'text-success-muted',
   tabInactive: 'text-tab-inactive',

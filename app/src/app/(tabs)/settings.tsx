@@ -10,7 +10,6 @@ import { announce } from '@/features/audio/announcer';
 import { AudioOutputSelector } from '@/features/audio/AudioOutputSelector';
 import { ModelSelector } from '@/features/reader/ModelSelector';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
-import { ThemeSelector } from '@/features/theme/ThemeSelector';
 import { strings } from '@/i18n';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -47,6 +46,11 @@ function FeatureRow({
   );
 }
 
+/**
+ * Settings. No appearance section since 2026-09-14 (ADR 0010): the app ships dark only, so there is
+ * nothing to choose. What is left are decisions about the reading (model, where it is heard) and the
+ * explanation of what the app recognizes.
+ */
 export default function SettingsScreen() {
   const t = strings.settings;
   const { model, models, choose } = useProductModel();
@@ -54,13 +58,6 @@ export default function SettingsScreen() {
   return (
     <Screen scroll>
       <ScreenHeader title={t.title} />
-
-      <Card>
-        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {t.appearance.toUpperCase()}
-        </ThemedText>
-        <ThemeSelector />
-      </Card>
 
       {/* No surrounding label, by request: the trigger already announces itself as "Modelo
           seleccionado: X" and the menu as "Seleccionar modelo". With no key in the build there is

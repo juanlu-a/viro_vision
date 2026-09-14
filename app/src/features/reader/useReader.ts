@@ -5,8 +5,9 @@
  * lived here, which meant the device's physical button only worked while Home was mounted and only
  * after React had scheduled and committed a render — a chain that cannot be relied on when the phone
  * is locked in a pocket, which is the whole product (ADR 0003 §2). What is left here is what is
- * genuinely presentation: subscribing to the pipeline's state, and turning the device's connection
- * into the one word Home's status line shows.
+ * genuinely presentation: subscribing to the pipeline's state, and whether the device can take a
+ * photo right now. Until 2026-09-14 it also condensed the device's connection into the one word of
+ * Home's status line; that line lives only on the Device tab now.
  *
  * The returned shape is unchanged, so Home and its accessibility behaviour are untouched.
  */
@@ -30,20 +31,5 @@ export function useReader() {
     model,
     /** The device can take the photo now: connected, with a network and answering. Without this there is no reading. */
     deviceReady: device.photoAvailable,
-    // The device is connected and its network is coming up: reading is about to be enabled.
-    deviceConnecting: device.connection.status === 'connected' && device.wifi === 'joining',
-    /** For Home's status line: what is going on on the device side, in one word. */
-    deviceState:
-      device.connection.status === 'connected'
-        ? device.wifi === 'ready'
-          ? ('ready' as const)
-          : device.wifi === 'joining'
-            ? ('connecting' as const)
-            : device.wifi === 'error'
-              ? ('error' as const)
-              : ('no-network' as const)
-        : device.connection.status === 'scanning' || device.connection.status === 'connecting'
-          ? ('searching' as const)
-          : ('no-device' as const),
   };
 }

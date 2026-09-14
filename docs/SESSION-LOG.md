@@ -2030,6 +2030,37 @@ que lo propone el central (iOS), no la placa—, no el código de la app.
   no capturó el motivo de desconexión. Si vuelve a pasar, `sudo btmon | grep -i reason` durante el
   arranque lo cierra.
 
+## 2026-09-14 — Menos pantalla: un tema, una línea de estado, el modo a secas
+
+Rama `fix/home-and-settings-declutter`, PR a `staging`. Pedido del usuario, cuatro arreglos que en
+el fondo son uno: la app le hablaba a quien la mira, y la usa quien la escucha. Quedó en el
+**ADR 0010**.
+
+- **Inicio pierde el título «RECONOCIMIENTO», la línea del dispositivo y el rótulo «Modo actual».**
+  Muestra sólo el nombre del modo, en tamaño de cuerpo y no de titular. El lector de pantalla sigue
+  oyendo «Modo: Esperando», porque «Esperando» solo no dice qué espera. La pista del botón «Leer con
+  el dispositivo» manda a la pestaña Dispositivo en vez de «arriba». Con eso `useReader` perdió
+  `deviceState` y `deviceConnecting`, y `es.ts` siete cadenas que sólo esa línea usaba.
+- **La pestaña Dispositivo pasa a ser la única línea de estado, y «Conectado» significa «listo».**
+  Verde sólo con BLE y WiFi; si el enlace está y la red no, **«Conectado (falta el WiFi)» en ámbar**,
+  sin más texto: la razón y el remedio siguen en el aviso de abajo. El caso «falta el Bluetooth» no
+  existe como parcial —sin BLE no hay credenciales ni dirección—, así que queda el «Sin conectar» de
+  siempre. La lógica está en `features/device/connectionLabel.ts` con test, fuera del componente.
+  Token nuevo `warning` (`#FFC857` / `#6E4400`), AAA, con su aserción en `theme.test.ts`.
+- **Se retira el selector de tema: la app es sólo oscura.** Se borran `features/theme/`,
+  `services/storage/themePreference.ts` y los `use-color-scheme`. `useTheme()` devuelve
+  `Colors.dark`; el generador pone la paleta oscura en `:root` y se va `darkMode: 'class'` de
+  Tailwind, así ningún frame puede pintar claro y nadie tiene que empujar el esquema a NativeWind;
+  el splash ya no espera a leer una preferencia; `app.json` fija `userInterfaceStyle: "dark"`; el
+  header usa sólo `symbol-dark.png`. La paleta clara **se queda** en `colors.js`, verificada: es la
+  del manual y la usa la tesis.
+- **«Qué reconoce» dice «Identifica alimentos y productos de supermercado»**, sin «almacén». El
+  prompt del modelo no se tocó: sigue diciendo «almacén» porque ahí describe qué contestar, no qué
+  leer en pantalla.
+- Verificación: `typecheck`, `lint` y **250 tests** en verde (uno nuevo, `connectionLabel.test.ts`).
+  Documentación: ADR 0010, `decisiones.md`, `app.md`, la skill de marca, `PROJECT-STATUS.md` y la
+  QA de supermercado (el orden de VoiceOver en Inicio y el texto de «Qué reconoce»).
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

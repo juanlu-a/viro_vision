@@ -14,16 +14,14 @@
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
-  // `class` and not `media`: the app's theme is a persisted user preference, not the system's
-  // scheme. `ThemePreferenceProvider` is what pushes it.
-  darkMode: 'class',
+  // Single scheme (ADR 0010): `global.css` defines the dark palette on `:root` and nothing toggles
+  // it, so no `darkMode` strategy is configured — a `dark:` variant would be a bug, not a style.
   theme: {
     extend: {
       colors: {
-        // Each role points at a CSS variable, not at a hex. That way `bg-surface` is written
-        // **once** and holds in both themes: what changes is the variable's value, which
-        // `global.css` defines for `:root` and for `.dark:root`. That file is generated from
-        // `colors.js` with `npm run theme:css`, so there is still a single source of truth.
+        // Each role points at a CSS variable, not at a hex, so the class names the role and the
+        // palette lives in one place: `global.css`, generated from `colors.js` with
+        // `npm run theme:css`.
         background: 'rgb(var(--color-background) / <alpha-value>)',
         surface: 'rgb(var(--color-surface) / <alpha-value>)',
         'surface-elevated': 'rgb(var(--color-surface-elevated) / <alpha-value>)',
@@ -36,6 +34,7 @@ module.exports = {
         'primary-edge': 'rgb(var(--color-primary-edge) / <alpha-value>)',
         'on-primary': 'rgb(var(--color-on-primary) / <alpha-value>)',
         danger: 'rgb(var(--color-danger) / <alpha-value>)',
+        warning: 'rgb(var(--color-warning) / <alpha-value>)',
         success: 'rgb(var(--color-success) / <alpha-value>)',
         'success-muted': 'rgb(var(--color-success-muted) / <alpha-value>)',
         'tab-inactive': 'rgb(var(--color-tab-inactive) / <alpha-value>)',

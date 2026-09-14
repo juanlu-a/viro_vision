@@ -199,6 +199,18 @@ daemon (`--no-ap`) y el esquema de Supabase (tabla `events`, y el vocabulario `r
 **El criterio para no volver a deslizarse**: *¿lo lee una persona o lo lee una máquina?* La regla
 anterior no era enunciable así, y por eso se corrió dos veces.
 
+### ADR 0010 — Un solo tema (oscuro) y una sola línea de estado · **Accepted (2026-09-14)**
+
+Antes había selector de tema (sistema / claro / oscuro) persistido, y la pantalla de Inicio repetía
+el estado del dispositivo con su propio vocabulario. **Qué cambió**: la app se publica **sólo en
+oscuro** —`useTheme()` devuelve `Colors.dark`, `global.css` pone la paleta oscura en `:root`, sin
+provider ni preferencia—; el estado del dispositivo vive **sólo en la pestaña Dispositivo** y
+«Conectado» en verde significa *listo para usar*; si falta la red dice «Conectado (falta el WiFi)»
+en ámbar (token `warning`), y nada más. Inicio muestra sólo el nombre del modo, en tamaño de cuerpo.
+
+**Qué NO cambió**: la paleta clara sigue en `colors.js` y verificada por `theme.test.ts`, porque es
+la del manual y la usa la tesis. Nadie la renderiza.
+
 ## Decisiones sin ADR, pero vigentes
 
 **Ojo al medir cualquier cosa contra estas APIs: hay que espaciar las corridas.** Sostener pedidos

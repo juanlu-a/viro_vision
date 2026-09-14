@@ -17,8 +17,9 @@ export const es = {
     settings: 'Ajustes',
   },
   reader: {
-    section: 'Reconocimiento',
-    modeLabel: 'Modo actual',
+    // Screen reader only: on screen the mode name stands alone. The caption is what turns
+    // «Esperando» into something that says what is waiting.
+    modeLabel: 'Modo',
     modeIdle: 'Esperando',
     modeBus: 'Modo ómnibus',
     modeSupermarket: 'Modo supermercado',
@@ -38,16 +39,8 @@ export const es = {
     readWithDeviceHint:
       'La cámara del dispositivo saca la foto y la manda al teléfono por WiFi; el resultado se anuncia en voz alta.',
     readNeedsDeviceHint:
-      'Para leer hace falta el dispositivo prendido y cerca. Fijate arriba en qué anda, o buscalo desde la pestaña Dispositivo.',
+      'Para leer hace falta el dispositivo prendido y cerca. Fijate en la pestaña Dispositivo en qué anda.',
     readingFromDevice: 'Pidiendo la foto al dispositivo…',
-    deviceConnecting: 'Conectando con el dispositivo…',
-    deviceStatusLabel: 'Dispositivo',
-    deviceReady: 'listo, con su red',
-    deviceNetworkError: 'conectado por Bluetooth, sin red',
-    deviceNoNetwork: 'conectado por Bluetooth, red apagada',
-    deviceSearching: 'buscando…',
-    deviceAbsent: 'no encontrado; prendelo y acercalo',
-    deviceConnectingHint: 'La placa está levantando su red WiFi. En unos segundos vas a poder leer con su cámara.',
     deviceCaptureFailed: 'El dispositivo no pudo mandar la foto.',
     preparing: 'Preparando el lector… la primera vez descarga unos 250 MB.',
     reading: 'Leyendo…',
@@ -86,7 +79,7 @@ export const es = {
     useBus: 'Líneas de ómnibus',
     useBusDesc: 'Te dice qué ómnibus se aproxima.',
     useProduct: 'Productos de supermercado',
-    useProductDesc: 'Identifica alimentos y productos de almacén.',
+    useProductDesc: 'Identifica alimentos y productos de supermercado.',
     testAudioButton: 'Probar audio',
     testAudioHint: 'Reproduce un mensaje de prueba para verificar la salida de voz.',
     testAudioPhrase: 'Hola, soy ViroVision. La salida de audio funciona correctamente.',
@@ -122,14 +115,6 @@ export const es = {
   settings: {
     title: 'Ajustes',
     intro: 'Configuración de accesibilidad, voz y dispositivo.',
-    appearance: 'Apariencia',
-    appearanceHint: 'Elegí el tema de la aplicación.',
-    themeSystem: 'Según el sistema',
-    themeLight: 'Claro',
-    themeDark: 'Oscuro',
-    themeSystemHint: 'Sigue la configuración de tu teléfono.',
-    themeLightHint: 'Fondo claro con texto azul profundo.',
-    themeDarkHint: 'Fondo azul profundo con texto claro.',
     audioOutput: 'Dónde se escucha',
     audioOutputHint:
       'Elegí si la lectura del supermercado suena en el teléfono o en el parlante del dispositivo.',
@@ -170,6 +155,9 @@ export const es = {
     scanning: 'Buscando dispositivo…',
     connecting: 'Conectando…',
     connected: 'Conectado',
+    // Amber on the Device tab: the Bluetooth link is up but the photo path is not. Only what is
+    // missing, in brackets; the reason and the remedy go in the notice below, not here.
+    connectedWithoutWifi: 'Conectado (falta el WiFi)',
     error: 'Error de conexión',
     notFound: 'No encontré el dispositivo. Fijate que esté prendido y cerca.',
     lost: 'Se perdió la conexión con el dispositivo. Buscalo de nuevo.',
