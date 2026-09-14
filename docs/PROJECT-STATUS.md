@@ -152,7 +152,10 @@ tests via `jest-expo`.
   verificada** con un build de la rama: el primer doble click desde *esperando* cambió de modo y bajó
   la foto en 164 ms, sin ninguna alerta de emparejamiento. Queda anotado un hallazgo lateral: el
   gesto que se ignora por haber una lectura en vuelo no emite sonido, y para quien no ve la pantalla
-  eso es indistinguible de un botón roto.
+  eso es indistinguible de un botón roto. **Cerrado el 2026-09-14**: la reconexión al reabrir la app
+  bajó de los 10-15 s (el intento directo se rendía a los 5 s y la placa se libera a los ~6), el AP
+  vuelve a la red conocida en 5 s de punta a punta, y `tools/ap.py` permite entrar a la placa sin
+  sacar la microSD.
 - **Segundo plano en iOS (2026-09-10/11, spike 1 de ADR 0003 — cerrado)**: con la pantalla bloqueada el doble
   click no hacía nada, que es exactamente el caso del producto. Resultó que **el modo de fondo nunca
   estuvo apagado** —`isBackgroundEnabled` no gatea el `Info.plist`, sólo el manifiesto de Android; el

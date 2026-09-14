@@ -2004,6 +2004,17 @@ cinco segundos de punta a punta.
 2. **Reproducir instrumentado le gana a razonar**, y en esta placa eso significa escribir el log a un
    archivo: el SSH se cae justo cuando empieza lo interesante, porque lo interesante es la radio.
 
+### La reconexión, verificada
+
+Con el segundo build de la rama y la placa en modo producto: **la reconexión al reabrir la app bajó**
+de los 10-15 s reportados. El arreglo era el presupuesto, no el orden — el intento directo se rendía
+a los 5 s y la placa se libera a los ~6, así que expiraba justo antes de lo que estaba esperando.
+
+Queda una asimetría que vale escribir, porque es el tipo de cosa que se olvida: **el número de arriba
+no es la latencia de la radio**, es cuánto tarda la placa en darse cuenta de que el teléfono se fue.
+Si alguna vez hace falta bajarlo más, lo que hay que tocar es el *supervision timeout* del enlace —
+que lo propone el central (iOS), no la placa—, no el código de la app.
+
 ### Y dos cosas anotadas sin arreglar
 
 - **El journal no sobrevive bien a los reinicios.** `/var/log/journal` existe (o sea, es persistente)
