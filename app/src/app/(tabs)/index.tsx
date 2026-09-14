@@ -14,10 +14,13 @@
  *
  * The screen shows the RESULT and the photo behind it, nothing else. The timings, which model
  * answered and the OCR's raw text are recorded in Supabase since 2026-09-07: they were a
- * diagnostics screen embedded in the interface of an app for people who do not see it.
+ * diagnostics screen embedded in the interface of an app for people who do not see it. Since
+ * 2026-09-14 the device's status line is gone too: the Device tab already says whether the device is
+ * fully usable, and saying it twice made Home read like a dashboard. What Home keeps is the reason a
+ * read cannot happen, in the read button's hint, because that is actionable right here.
  */
 import { Image } from 'expo-image';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
@@ -39,15 +42,7 @@ const MODE_LABEL: Record<Mode, string> = {
 export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
-  const { state, applyGesture, read, model, deviceReady, deviceState } = useReader();
-  const deviceText = {
-    ready: r.deviceReady,
-    connecting: r.deviceConnecting,
-    error: r.deviceNetworkError,
-    'no-network': r.deviceNoNetwork,
-    searching: r.deviceSearching,
-    'no-device': r.deviceAbsent,
-  }[deviceState];
+  const { state, applyGesture, read, model, deviceReady } = useReader();
 
   const busy = state.status !== 'idle';
   const rows = state.product ? productRows(state.product) : state.reading ? busLineRows(state.reading) : null;
@@ -60,33 +55,14 @@ export default function HomeScreen() {
 
       {/* The main action: first on the screen and first for the screen reader. */}
       <Card>
-        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {r.section.toUpperCase()}
-        </ThemedText>
-
-        {/* The device, in one line and always: from the moment the app opens, the device connects
-            and joins its network on its own; this line shows that progress so that "not yet" does
-            not look like "it does not work". It is a live region: the screen reader announces the
-            changes. And since the device is the only camera, it is also what explains why reading
-            may be switched off. */}
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLiveRegion="polite"
-          accessibilityLabel={`${r.deviceStatusLabel}: ${deviceText}`}
-          className="flex-row items-center gap-two">
-          {deviceState === 'connecting' || deviceState === 'searching' ? <ActivityIndicator size="small" /> : null}
-          <ThemedText type="small" themeColor={deviceState === 'ready' ? 'success' : deviceState === 'error' ? 'danger' : 'textSecondary'}>
-            {r.deviceStatusLabel}: {deviceText}
-          </ThemedText>
-        </View>
-
-        {/* The mode as text too: state is never communicated by buttons or colour alone. */}
+        {/* The mode as text too: state is never communicated by buttons or colour alone. Only the
+            mode's name, in body size: the "Modo actual" caption and the display-size word were the
+            largest thing on the screen for the least useful information on it. The screen reader
+            still gets the caption, because "Esperando" on its own does not say what is waiting. */}
         <View accessible accessibilityRole="text" accessibilityLabel={`${r.modeLabel}: ${MODE_LABEL[state.mode]}`}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {r.modeLabel}
+          <ThemedText type="default" className="font-sans-bold">
+            {MODE_LABEL[state.mode]}
           </ThemedText>
-          <ThemedText type="subtitle">{MODE_LABEL[state.mode]}</ThemedText>
         </View>
 
         <AccessibleButton
@@ -115,9 +91,9 @@ export default function HomeScreen() {
 
         {/* A single read button, and the photo is ALWAYS taken by the device (ADR 0003). Without it
             there is no image, so it is disabled instead of hidden —an absent control communicates no
-            state— and the hint says what is missing: the line above says what the device is doing,
-            this one says what to do about it. The button mutates and is not swapped for another one,
-            so VoiceOver does not lose focus when the state changes. */}
+            state— and the hint says what is missing and where to look (the Device tab). The button
+            mutates and is not swapped for another one, so VoiceOver does not lose focus when the
+            state changes. */}
         <AccessibleButton
           label={
             state.status === 'preparing' && state.progress != null
