@@ -140,6 +140,54 @@ cambia al cambiar de modelo, y llevaba una guarda para no disparar por un motivo
 registra. Para cuando terminara, la foto extra sería de una escena que el usuario ya dejó atrás — y
 está por escuchar el resultado de la que sí está corriendo.
 
+## Actualización 2026-09-13 — el doble click, probado con un dedo real
+
+Primera sesión de uso seguido con el botón soldado. Los dos gestos fallaban, por motivos
+independientes y en capas distintas.
+
+### El primer doble click de cada sesión encendía ómnibus
+
+No era la máquina de modos: era el **antirrebote**. `bounce_time` de gpiozero no significa «ignorar
+el rebote después de una pulsación», significa *ignorar todo flanco que llegue dentro de esa ventana
+del flanco anterior aceptado* — **el de soltar incluido**. Es decir, es una **cota superior de lo
+corto que puede ser un click**: un click más corto que el antirrebote pierde su flanco de soltar, la
+pulsación siguiente ya no parece un cambio de estado, y **el doble click colapsa en uno solo**. Los
+50 ms elegidos «con margen» eran más largos que la pulsación de alguien apurado apretando un botón
+en su sien.
+
+| Constante | Antes | Ahora | Por qué |
+|---|---|---|---|
+| antirrebote | 50 ms | **15 ms** | cota de lo corto que puede ser un click; 15 ms igual cubre el rebote mecánico (~10 ms) de un tact switch 6x6 |
+| ventana de doble click | 0,4 s | **0,6 s** | 0,4 s es la cifra del mouse; acá no hay mouse ni feedback hasta que el gesto resuelve. Lo paga el click **simple**, que es el barato: cae en ómnibus, que después vigila solo |
+| umbral de click largo | 0,8 s | 0,8 s | sin cambios; sigue siendo el más largo de los tres, y eso es un invariante con test propio |
+
+Los tres pasan a ser **banderas de línea de comando** (`--debounce-ms`, `--double-click-ms`,
+`--long-press-ms`): se calibran contra un dedo real, y editar `button.py` por SSH en cada prueba es
+exactamente por qué estuvieron tres días sin calibrar. Y cada gesto **se registra**: los flancos en
+`debug`, la cuenta de clicks resuelta en `info`. Sin eso, «hice doble click y prendió ómnibus» no
+tiene forma de distinguirse de «el gesto se leyó bien y el modo está mal mapeado».
+
+### El segundo doble click prendía supermercado y no sacaba la foto
+
+Esto sí era de la app, y **no era una carrera: era determinista**. Un doble click hace que la placa
+mande dos cosas —el modo nuevo por la característica `mode` y el evento `read`— y desde el PR #80 las
+dos llegan a velocidades incomparables: `read` se sirve **sincrónicamente** en el callback de BLE,
+mientras que el modo viaja `onMode` → estado del provider → render → efecto. React no commitea
+adentro de un callback nativo, así que **la lectura ganaba siempre** y se juzgaba contra el modo
+*anterior* al click. Desde *esperando* eso caía en la guarda `mode === 'idle'` de `requestReading` y
+**se descartaba en silencio**: el modo se anunciaba, la foto no se sacaba, y recién el doble click
+siguiente leía.
+
+**Decisión: el evento `read` ya traía el modo (`{"t":"read","mode":N}`) y la app tiene que usarlo.**
+Se aplica el modo de la placa **antes** de servir la lectura, en el mismo tick
+(`readFromDevice(mode)`), en vez de correrle la carrera al commit. La app sigue reflejando el evento
+`mode` por el camino de siempre; cuando llega, ya nombra el modo en el que está y no anuncia dos
+veces.
+
+> Corrección a la actualización anterior: «los dos son contadores y lo que dispara es que el total
+> cambie» describe la implementación que el PR #80 reemplazó al sacar el pipeline de React. Hoy hay
+> un solo punto de entrada (`requestReading(source)`) y el origen viaja como parámetro.
+
 ## Ver también
 
 [ADR 0006](0006-pipelines-por-caso-de-uso.md), el diagrama de modos en

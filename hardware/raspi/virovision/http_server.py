@@ -22,9 +22,11 @@ import binascii
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import ThreadingMixIn
 from typing import Callable, Optional
 
 log = logging.getLogger(__name__)
@@ -35,6 +37,27 @@ AUDIO_MAX_BYTES = 5_000_000
 AUDIO_DIRECTORY = "/tmp/virovision-audio"
 
 SyncCapture = Callable[[], bytes]
+
+
+class _QuietServer(ThreadingHTTPServer):
+    """A client that hangs up is not an incident.
+
+    `socketserver` prints a twenty-line traceback for any exception while handling a request,
+    `ConnectionResetError` included — and that one is what a phone does every time it drops a
+    keep-alive connection, which on this device is *normal traffic*: the app polls `/health` and
+    then goes away. Seen on 2026-09-13, right after a reading that had worked perfectly.
+
+    It matters because of what the journal is for here. This board has no screen, so the log is the
+    only place a failure can be noticed, and a scary traceback for routine behaviour is exactly how
+    a log stops being read — the same reason `report_visibility` only warns when nobody is connected.
+    A real error still goes through: only the peer going away is demoted to a debug line.
+    """
+
+    def handle_error(self, request, client_address) -> None:
+        if isinstance(sys.exc_info()[1], (ConnectionResetError, BrokenPipeError, TimeoutError)):
+            log.debug("client %s hung up", client_address[0] if client_address else "?")
+            return
+        ThreadingMixIn.handle_error(self, request, client_address)
 
 
 class HttpServer:
@@ -137,7 +160,7 @@ class HttpServer:
         self._synthetic_payload = synthetic_payload
         self._capture = capture
         self._play = play
-        self._server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+        self._server = _QuietServer(("0.0.0.0", port), Handler)
         self._server.daemon_threads = True
         self._thread: Optional[threading.Thread] = None
 

@@ -7,10 +7,10 @@ Format: short Markdown, numbered `NNNN-title.md`, status one of Proposed / Accep
 |---|-------|--------|
 | [0001](0001-offline-first-on-device-inference.md) | Offline-first: self-contained, on-device inference | Accepted (enmendado 2026-08-10 — nube como acelerador opcional) |
 | [0002](0002-backend-and-auth-supabase.md) | Backend & auth: Supabase as the online account layer | Accepted |
-| [0003](0003-enlace-placa-telefono.md) | Enlace placa ↔ teléfono: BLE como plano de control, la foto se decide midiendo | Proposed — a validar con tutor (actualizado 2026-09-05 — medido: BLE 4,5 s, WiFi 0,3 s; híbrido BLE control + WiFi payload validado en el caso real) |
+| [0003](0003-enlace-placa-telefono.md) | Enlace placa ↔ teléfono: BLE como plano de control, la foto se decide midiendo | Proposed — a validar con tutor (actualizado 2026-09-05 — medido: BLE 4,5 s, WiFi 0,3 s; híbrido BLE control + WiFi payload validado en el caso real; 2026-09-13 — la placa deja de emparejarse y el escaneo pasa a ser el último recurso) |
 | [0004](0004-on-device-inference-runtime.md) | Runtime de inferencia on-device (Gemma vía LiteRT-LM) | Proposed (actualizado 2026-08-22 — el runtime se resuelve por caso de uso, ver 0006) |
 | [0006](0006-pipelines-por-caso-de-uso.md) | Pipelines por caso de uso: bondis local (TPU preprocesadora), supermercado LLM en la nube | Proposed — a validar con tutor (actualizado 2026-09-01 — cinco modelos, cae la gratuidad) |
-| [0007](0007-botones-fisicos-modos-de-operacion.md) | Botones físicos y modos de operación del dispositivo | Proposed — a validar con tutor |
+| [0007](0007-botones-fisicos-modos-de-operacion.md) | Botones físicos y modos de operación del dispositivo | Proposed — a validar con tutor (actualizado 2026-09-13 — tiempos del botón calibrados y el pedido de lectura usa el modo que manda la placa) |
 | [0008](0008-proxy-propio-para-claves-de-nube.md) | Un proxy propio para las claves de los modelos de nube | Accepted |
 | [0009](0009-idioma-del-codigo.md) | El código en inglés, la app y la tesis en español | Accepted |
 

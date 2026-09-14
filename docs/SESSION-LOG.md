@@ -1772,6 +1772,264 @@ forma de saber que hay un remedio.
 Bloque **G** nuevo en `qa-modo-supermercado.md`: alcance nuevo, lo no reconocible, el idioma en los
 dos caminos y el volumen de la placa.
 
+## 2026-09-13 — El botón y el enlace, medidos contra un dedo y un teléfono reales
+
+Dos quejas de uso seguido, ninguna de ellas donde parecía. Vale la pena el detalle porque las dos
+tenían una causa **determinista** y aun así se leían como «a veces anda».
+
+### «El primer doble click siempre prende ómnibus»
+
+No era la máquina de modos (`modes.py` estaba bien y tenía tests): era el **antirrebote**.
+
+`bounce_time` de gpiozero no significa «ignorá el rebote después de apretar». Significa *ignorá todo
+flanco que llegue dentro de esa ventana del flanco anterior aceptado*, **incluido el de soltar**. O
+sea que es una **cota superior de lo corto que puede ser un click**: si el click dura menos que el
+antirrebote se pierde su flanco de soltar, la pulsación siguiente ya no parece un cambio de estado, y
+el doble click **colapsa en uno solo** — que es exactamente «prendió ómnibus». Los 50 ms se habían
+elegido «con margen sobre los ~10 ms de rebote mecánico», leyendo el parámetro al revés.
+
+Quedó en **15 ms**, y la ventana de doble click pasó de 0,4 s a **0,6 s**: 0,4 s es la cifra de un
+mouse, y esto es un botón en la sien, sin pantalla, apretado por alguien que no lo ve. Lo paga el
+click **simple**, que es el barato — cae en ómnibus, que después vigila solo.
+
+**Las tres pasan a ser banderas** (`--debounce-ms`, `--double-click-ms`, `--long-press-ms`). No es
+comodidad: «calibrar los tiempos del botón» estuvo tres días en los pendientes porque probar un valor
+significaba editar `button.py` por SSH y reiniciar. Y **cada gesto se registra** — los flancos en
+`debug`, la cuenta resuelta en `info`. Sin ese log, «hice doble click y prendió ómnibus» no tiene
+forma de distinguirse de «el gesto se leyó bien y el modo está mal mapeado», y se arreglan en
+archivos distintos.
+
+Los tests que quedaron no prueban gpiozero (no está en la Mac): fijan los **invariantes** de los tres
+números, con el porqué escrito, al estilo de `theme.test.ts`. Si alguno empieza a fallar, la pregunta
+es qué cambió del botón, no qué número mover.
+
+### «Prende supermercado pero no saca la foto; recién el tercer doble click lee»
+
+Ésta era de la app, y **no era una carrera: era determinista**. Un doble click hace que la placa mande
+dos señales —el modo por la característica `mode` y el evento `read`— y desde el PR #80 las dos llegan
+por caminos de velocidad incomparable:
+
+- `read` → `ReaderBridge` → `requestReading()`, **sincrónico**, dentro del callback de BLE;
+- el modo → `onMode` → estado del provider → render → efecto → `setModeFromDevice`.
+
+React no commitea adentro de un callback nativo, así que **la lectura ganaba siempre** y se juzgaba
+contra el modo *anterior* al click. Desde *esperando* eso caía en la guarda `mode === 'idle'` de
+`requestReading` y **se descartaba sin decir nada**: se anunciaba el modo, no se sacaba la foto, y
+recién el doble click siguiente —con el modo ya commiteado— leía.
+
+Lo irónico es que el arreglo ya estaba en el protocolo: el evento **siempre fue `{"t":"read","mode":N}`**
+y la app tiraba el campo `mode` a la basura. Ahora lo usa: `readFromDevice(mode)` aplica el modo de la
+placa **antes** de servir la lectura, en el mismo tick, en vez de correrle la carrera al commit. La
+lógica salió del `.tsx` a `readingService.ts` para poder testearla — y los dos tests nuevos fallan si
+se saca la línea, que es la única forma de saber que pinchan el bug y no otra cosa.
+
+**La lección que vale para el próximo**: cuando el PR #80 sacó el pipeline de React para que el botón
+funcionara con la pantalla bloqueada, creó **dos caminos con latencias de distinto orden** para
+señales que describen un mismo gesto. Eso es una clase de bug, no un caso: si dos señales del mismo
+evento viajan por caminos distintos, la que llega primero no puede depender del estado que trae la
+otra.
+
+### El enlace: «lleva varios intentos de pedido de enlace»
+
+Acá había tres cosas, y la primera es la que más molesta y menos hacía falta.
+
+**1. El emparejamiento no servía para nada.** Ninguna característica pide autenticación —ADR 0003
+decidió **no cifrar** la carga—, así que la app nunca necesitó un vínculo. Pero la placa era
+`Pairable` por defecto, así que se creaba uno igual; y un vínculo del que el teléfono y la placa
+tienen copias que dejan de coincidir es justo la falla reportada: **cada reconexión termina en la
+alerta del sistema**, a veces varias veces. Ahora arranca con `Pairable = false` (`--pairable` lo
+devuelve). Costo, una sola vez por teléfono ya emparejado: *Olvidar este dispositivo*.
+
+**2. Escanear era la peor forma de encontrar una placa conocida.** La app escaneaba **siempre**, y un
+escaneo sólo ve a quien está anunciando. Hay dos situaciones cotidianas en las que la placa no lo
+está, y desde el teléfono se ven idénticas: (a) el periférico **ya está conectado al sistema** —iOS lo
+sostiene entre reinicios de la app, y `startDeviceScan` **nunca** reporta uno conectado, así que la
+app escaneaba 15 s contra una pared y reintentaba—, y (b) la placa cree que el enlace anterior sigue
+vivo y BlueZ no anuncia hasta el *supervision timeout*. El orden pasó a ser: lo que ya está conectado
+al sistema → el identificador recordado (conexión directa, con timeout, sin radio de por medio) →
+escanear. Y toda conexión fallida se cancela explícitamente: en iOS un pedido pendiente bloquea el
+siguiente, que es cómo **un** intento malo se volvía «varios intentos».
+
+**3. La placa no contaba nada del enlace.** Anunciaba, y todo lo demás sólo se veía desde el teléfono
+— la mitad equivocada para quedarse ciego. `virovision/link.py` registra ahora qué central se conecta
+y se va, qué vínculos hay guardados, y cuántas instancias de anuncio tiene BlueZ arriba. Si alguna vez
+aparece `NOT advertising and no central connected`, la falla es de la placa y no hay que deducirlo. La
+condición lleva el «sin nadie conectado» a propósito: BlueZ deja de anunciar **legítimamente**
+mientras hay una central conectada, y un log que grita lobo en cada sesión normal es un log que nadie
+lee — justo la señal que esto existe para dar.
+
+### Un tercer bug, encontrado mientras buscábamos la forma de entrar a la placa
+
+Para desplegar hay que sacar la placa de su AP, y el repo ya nombraba el camino: apagarlo por BLE
+desde la Mac. Se hizo (un script de veinte líneas con `bleak`, que de paso confirmó que **conectarse
+no pide ningún emparejamiento**: leyó `status` y escribió en `control` sin vínculo). La placa contestó
+`ap: false`… y su propio `status`, en el mismo JSON, decía `network: "virovision-ap"`.
+
+`nmcli con down` había devuelto 0 sin hacer nada, y `AccessPoint.turn_off()` ponía `self.on = False`
+**sin verificar**: era una creencia, no una observación. Así, la placa le informa a la app que el AP
+está apagado mientras lo sigue sirviendo — el estado del que la app no puede recuperarse sola, porque
+deja de buscar al dispositivo justo donde está.
+
+Lo irónico, otra vez: `active_connection()` existe desde el 2026-09-06 y se agregó para contestar
+exactamente esta pregunta. Nadie la hacía. Ahora `turn_off` la consulta, `self.on` sale de la
+interfaz, y un AP que no bajó se registra como `ERROR`. `turn_on` se deja como está a propósito:
+`con up` bloquea hasta activar, y `__main__` ya lo verifica contra la dirección real de la interfaz.
+La dirección sin chequeo era ésta.
+
+### Verificación en hardware, el mismo día
+
+`lint`, `typecheck` y los 243 tests de la app en verde; 64 de la placa. Y la placa apareció, así que
+la mitad del hardware **quedó medida en vez de supuesta**.
+
+Entrar costó más que arreglar. La placa arrancó en modo producto, o sea fuera de la red de casa. El
+Mac tenía `virovision.local → 192.168.1.14` en caché —ARP y mDNS contestaban— y no había nadie: ni
+ping, ni 22, ni 8080. Es una forma muy convincente de perder media hora, y la lección es corta:
+**verificá con un servicio, no con que el nombre resuelva.** El barrido bueno es
+`curl http://192.168.1.X:8080/health`, no un `ping`.
+
+El segundo intento fue apagarle el AP por BLE, que es donde apareció el tercer bug (arriba). El que
+funcionó fue la microSD: `touch /Volumes/bootfs/SIN-AP` y arrancar.
+
+De paso, dos cosas que la tarjeta confirmó antes de tocar nada: el `.tgz` del 09-11 **sí tiene**
+`requests_reading`, y el daemon que estaba corriendo también — o sea que el evento `read` salía bien
+de la placa y el bug de «no saca la foto» era **enteramente de la app**. Dejó de ser una deducción.
+
+**El botón, con un dedo real, con el daemon nuevo:**
+
+| Gesto | Repeticiones | Resultado |
+|---|---|---|
+| doble click | 11 | `2 click(s)` — 11/11 |
+| click simple | 10 | `1 click(s)` — 10/10 |
+| click largo | 9 | `long press` → IDLE, sin click residual — 9/9 |
+
+Cero errores en 30 gestos. El **primer** doble click de la sesión —el que siempre caía en ómnibus—
+entró directo a supermercado y además pidió lectura.
+
+Los clicks simples no son ceremonia: bajar el antirrebote de 50 a 15 ms tiene el riesgo **opuesto**
+al que arregla —que el rebote mecánico cuele un click de más y parta un click simple en dos— y los
+dobles no lo detectan. Por eso se midieron los tres gestos y no sólo el que fallaba.
+
+Y el arranque encontró lo que sospechábamos del emparejamiento: **`1 device(s) still bonded`, un
+iPhone** (`Paired: yes, Bonded: yes`). Ese vínculo viejo es la causa de la alerta repetida. Se borró
+de la placa (`bluetoothctl remove`); la mitad del teléfono la tiene que borrar el usuario. Contraprueba
+gratis del mismo rato: el script de `bleak` leyó `status` y escribió en `control` **sin emparejarse**,
+que es justo lo que el ADR sostiene.
+
+**Y la mitad de la app, con el build de la rama puesto**, cerró el mismo día. La secuencia entera son
+164 ms:
+
+```
+18:44:25,720  button: 2 click(s)
+18:44:25,721  mode → SUPERMARKET
+18:44:25,722  button: reading requested in SUPERMARKET
+18:44:25,884  photo of 49019 bytes captured in 91 ms
+18:44:25,885  192.168.1.13 "GET /photos/latest" 200
+```
+
+Es **el primer doble click desde *esperando***: cambió de modo y sacó la foto en el mismo gesto. Eso
+es exactamente lo que antes se descartaba en silencio. Y **ninguna alerta de emparejamiento**: la
+central que se conectó es una dirección aleatoria de iOS, sin vínculo.
+
+### Un hallazgo que no estábamos buscando: el gesto ignorado es mudo
+
+De siete dobles clicks repetidos, **cinco bajaron foto y dos no**. No es un bug: los dos que no caen
+2 a 4 segundos después del anterior, o sea con una lectura todavía en vuelo, y ADR 0007 decidió a
+propósito **no encolar** (para cuando terminara, la foto sería de una escena que el usuario ya dejó
+atrás). El comportamiento es correcto.
+
+Lo que no está bien es **cómo se siente**. En `requestReading` el *earcon* suena **después** de la
+guarda:
+
+```ts
+if (reading) { record(...); return; }   // <- sale acá
+reading = true;
+const audio = await beginReadingAudio();
+playStartEarcon();                       // <- nunca llega
+```
+
+Así que un gesto ignorado no produce **ningún** sonido. Para alguien que no ve la pantalla eso es
+indistinguible de un botón que no anduvo — y «el botón se siente muerto» es literalmente la queja que
+originó las dos actualizaciones anteriores de ADR 0007. Hace falta un sonido corto de «ahora no»
+antes del `return`, distinto del de inicio. Queda anotado abajo; no se metió en esta rama porque es
+una decisión de producto (qué suena, y si además conviene reemplazar la lectura en curso en vez de
+ignorar la nueva), no un arreglo.
+
+## 2026-09-14 — Entrar a la placa: tres hipótesis mías, las tres equivocadas
+
+Sesión corta y con una sola moraleja, que es metodológica. El bug era chico; lo caro fue que lo
+diagnostiqué mal tres veces seguidas, y cada vez con un argumento que sonaba bien.
+
+El síntoma: pedirle a la placa que apague su AP por BLE no hacía nada. El comando llegaba, la placa
+contestaba, y wlan0 seguía en `virovision-ap`.
+
+**Hipótesis 1: NetworkManager vuelve a elegir el AP.** La descarté mirando los perfiles —
+`Jack_2.4` tiene `autoconnect yes` y el AP `no`, así que `device connect` debería elegir la casa.
+**Era la correcta**, y el motivo por el que la descarté era falso: `autoconnect` gobierna la
+activación *automática*, no un `device connect` explícito.
+
+**Hipótesis 2: el `nmcli` está mal.** Corrí la secuencia a mano y funcionó perfecto, así que la
+descarté. Lo que no vi es que había puesto un `sleep 2` entre `con down` y `device connect` sin
+pensarlo — y en esos dos segundos el autoconnect de NM ya había levantado la casa, así que
+`device connect` no tuvo nada que elegir. **Mi propio experimento contenía el arreglo y no me di
+cuenta.**
+
+**Hipótesis 3: es polkit, el daemon no corre como root.** El servicio tiene `User=root`.
+
+Lo que cerró el caso fue dejar de razonar y **reproducirlo instrumentado**: levantar el AP a mano,
+dejar una ventana de 150 s, mandar el comando por BLE desde la Mac, y tener el journal escribiéndose
+a un archivo que sobreviviera a la caída del SSH. Cinco líneas y no quedó nada que interpretar:
+
+```
+control ← {'cmd': 'ap', 'value': False}
+AP down (ok)
+reconnection to the known network: ok
+ERROR the AP did NOT come down: wlan0 is still on virovision-ap
+```
+
+Los dos comandos devuelven éxito. `nmcli device connect wlan0` **no** significa «reconectá a la red
+que conocés»: significa *activá la mejor conexión **disponible***, y un segundo después de bajar el
+AP la red de casa no está disponible —nadie re-escaneó— mientras que un perfil en modo AP siempre lo
+está, porque no necesita ver nada.
+
+El arreglo invierte el orden: primero se le da la chance al autoconnect de NM, que es el mecanismo
+que se porta bien (2 s medidos, y elige lo que la placa está configurada para preferir); sólo si eso
+no pasa se levanta un perfil **por nombre**, nunca «el mejor disponible», y el AP propio queda
+excluido por construcción. Verificado en la placa: `AP down (ok)` → `back on Jack_2.4 (after 2 s)`,
+cinco segundos de punta a punta.
+
+**Las dos lecciones, que valen más que el bug:**
+
+1. **Un experimento a mano que «funciona» puede estar probando otra cosa.** El `sleep` que agregué
+   por comodidad cambiaba la condición que estaba midiendo.
+2. **Reproducir instrumentado le gana a razonar**, y en esta placa eso significa escribir el log a un
+   archivo: el SSH se cae justo cuando empieza lo interesante, porque lo interesante es la radio.
+
+### La reconexión, verificada
+
+Con el segundo build de la rama y la placa en modo producto: **la reconexión al reabrir la app bajó**
+de los 10-15 s reportados. El arreglo era el presupuesto, no el orden — el intento directo se rendía
+a los 5 s y la placa se libera a los ~6, así que expiraba justo antes de lo que estaba esperando.
+
+Queda una asimetría que vale escribir, porque es el tipo de cosa que se olvida: **el número de arriba
+no es la latencia de la radio**, es cuánto tarda la placa en darse cuenta de que el teléfono se fue.
+Si alguna vez hace falta bajarlo más, lo que hay que tocar es el *supervision timeout* del enlace —
+que lo propone el central (iOS), no la placa—, no el código de la app.
+
+### Y dos cosas anotadas sin arreglar
+
+- **El journal no sobrevive bien a los reinicios.** `/var/log/journal` existe (o sea, es persistente)
+  y aun así `journalctl --list-boots` muestra **un solo arranque**. La placa no tiene RTC: arranca
+  creyendo que es la hora del último apagado y NTP la corrige a mitad de camino, así que las marcas
+  de tiempo saltan y los arranques anteriores desaparecen de la vista. Se perdió así el log de la
+  única prueba en modo producto. Para un dispositivo cuyo único diagnóstico es el log, hay que
+  resolverlo antes de la primera salida a la calle.
+- **Durante el arranque, el teléfono se conectó y desconectó cinco veces en 30 s**, cada conexión de
+  menos de 1,5 s, y después se calmó solo. El daemon tarda ~45 s en inicializar la cámara y registra
+  el servicio GATT **antes** del anuncio, así que un connect directo encolado por iOS puede entrar
+  cuando la placa todavía no está lista. Es una sospecha, no un diagnóstico: el `btmon` llegó tarde y
+  no capturó el motivo de desconexión. Si vuelve a pasar, `sudo btmon | grep -i reason` durante el
+  arranque lo cierra.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -1860,8 +2118,26 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   iOS. Lo que queda es `restoreStateIdentifier`, abajo.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
 - **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
-- Placa: **calibrar los tiempos del botón** con el usuario (hecho el 2026-09-07, sin probar en
-  hardware); DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
+- **El gesto ignorado tiene que sonar** (del 2026-09-13, ADR 0007). Cuando llega un doble click con
+  una lectura en vuelo, `requestReading` sale por la guarda `if (reading)` **antes** de
+  `playStartEarcon()`, así que no suena nada. Ignorar es la decisión correcta —no encolar una foto de
+  una escena que el usuario ya dejó atrás— pero el silencio la vuelve indistinguible de un botón
+  roto para quien no ve la pantalla, que es la queja que originó las dos actualizaciones anteriores
+  del ADR. Falta decidir **qué** suena (un tono corto de «ahora no», distinto del de inicio) y, de
+  paso, si conviene que el gesto nuevo *reemplace* la lectura en curso en vez de perderse.
+- **Reconexión BLE tras cerrar la app del todo**: no se llegó a probar el 2026-09-13 (el caso en que
+  iOS retiene el periférico y ningún escaneo lo ve). Es el camino `via: 'connected'` de la telemetría:
+  si aparece en la tabla, el atajo está trabajando.
+- Mirar si aparece `NOT advertising` tras una desconexión: es la única hipótesis del lado de la placa
+  que sigue sin descartarse.
+- **El journal tiene que sobrevivir a un reinicio** (del 2026-09-14). Es persistente y aun así sólo
+  se ve el último arranque, por el salto de reloj de una placa sin RTC. Es lo que hizo que se
+  perdiera el log de la prueba en modo producto. Sin esto, cualquier falla en la calle es
+  irrecuperable en cuanto alguien apaga y prende.
+- **La rotación de conexiones BLE durante el arranque** (del 2026-09-14): cinco conexiones de menos
+  de 1,5 s en 30 s, y se calma sola. Sospecha: el GATT se registra ~45 s antes del anuncio, mientras
+  la cámara inicializa, y iOS entra con un connect encolado. Cerrarlo con `btmon` durante un arranque.
+- Placa: DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
   de ómnibus es el caso B, todo en placa).
 
 ### Suelto

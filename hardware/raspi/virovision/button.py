@@ -22,17 +22,31 @@ log = logging.getLogger(__name__)
 # makes the wiring mistake-proof. Internal pull-up and the button to ground, no external resistor.
 DEFAULT_GPIO = 5
 
-# The three timings, to be calibrated with the real hardware and with eyes closed (which is how it is
-# used). A 6x6 tact switch's mechanical bounce is on the order of 10 ms; 50 gives margin without
-# feeling slow.
-DEBOUNCE_S = 0.05
+# The three timings. All three are overridable from the command line (`--debounce-ms`,
+# `--long-press-ms`, `--double-click-ms`): they have to be calibrated on the real board, with eyes
+# closed, and re-editing this file for every try is how "still uncalibrated" stayed in the open
+# threads for three days.
+#
+# gpiozero's `bounce_time` does NOT mean "ignore bounce after a press": it ignores every edge that
+# arrives within that window of the PREVIOUS accepted edge, release edges included. So the debounce
+# is an upper bound on how short a click may be — a click shorter than this loses its release, the
+# next press then looks like no change at all, and a double click collapses into ONE click. That is
+# what made the first double click land on bus mode (reported 2026-09-13): 50 ms is longer than the
+# press of somebody double-clicking a button on their temple in a hurry. 15 ms still clears the
+# ~10 ms mechanical bounce of a 6x6 tact switch and stops eating real presses.
+DEBOUNCE_S = 0.015
 # How long it has to be held for it to count as "leave the mode". Considerably longer than a normal
 # click: leaving by accident is worse than having to insist, because it leaves the user without the
 # mode they thought they had.
 LONG_PRESS_S = 0.8
 # How long is waited after release before deciding how many clicks there were. It is the price of the
 # double click: a single click takes this long to apply.
-DOUBLE_CLICK_WINDOW_S = 0.4
+#
+# 0.4 s was a desktop double-click window and this is not a mouse: the button is on the temple of a
+# pair of glasses, pressed by somebody who cannot see it, and the second click regularly arrived
+# late. Widening it to 0.6 s costs 200 ms on every single click —which lands on bus mode, a mode
+# that then watches on its own— and buys the gesture that was being misread.
+DOUBLE_CLICK_WINDOW_S = 0.6
 
 
 class _Cancellable(Protocol):
@@ -71,12 +85,19 @@ class ClickDetector:
         self._pending: Optional[_Cancellable] = None
 
     def pressed(self) -> None:
+        # Every edge is logged, and this is not debugging left behind. The board has no screen: when
+        # the user says "the double click turned on bus mode", the ONLY way to tell a misread gesture
+        # from a mis-mapped one is a journal that says how many edges arrived and when. The journal
+        # timestamps them, which is why no clock is needed here. It stays at debug (`-v`) because a
+        # line per edge is noise the rest of the time; the resolved gesture, below, is at info.
+        log.debug("button: press")
         self._was_long = False
 
     def held(self) -> None:
         """The hold threshold was met, with the button still pressed. It acts here and not on release:
         the user needs the audio announcement at the moment the gesture completes, not when they
         decide to lift their finger."""
+        log.info("button: long press")
         self._was_long = True
         self._forget_pending()
         self._clicks = 0
@@ -84,9 +105,11 @@ class ClickDetector:
 
     def released(self) -> None:
         if self._was_long:
+            log.debug("button: release after a long press (not a click)")
             self._was_long = False
             return
         self._clicks += 1
+        log.debug("button: release (%d click(s) so far, deciding in %.0f ms)", self._clicks, self._window_s * 1000)
         self._forget_pending()
         self._pending = self._schedule(self._window_s, self._resolve)
 
@@ -94,6 +117,9 @@ class ClickDetector:
         clicks, self._clicks = self._clicks, 0
         self._pending = None
         if clicks:
+            # What the board BELIEVES the user did, before `modes.py` turns it into a mode. If this
+            # says 1 and the user pressed twice, the bug is in the timings here, not in the machine.
+            log.info("button: %d click(s)", clicks)
             self._on_clicks(clicks)
 
     def _forget_pending(self) -> None:
@@ -139,12 +165,27 @@ class Button:
         self._button.close()
 
 
-def try_connect(loop, on_clicks, on_hold, gpio: int = DEFAULT_GPIO) -> Optional[Button]:
+def try_connect(
+    loop,
+    on_clicks,
+    on_hold,
+    gpio: int = DEFAULT_GPIO,
+    long_press_s: float = LONG_PRESS_S,
+    window_s: float = DOUBLE_CLICK_WINDOW_S,
+    debounce_s: float = DEBOUNCE_S,
+) -> Optional[Button]:
     """The button is optional: without it the app keeps sending modes over BLE. A board without
     gpiozero, without permissions on the GPIO or without a soldered button has to start all the same,
-    not be left without a daemon."""
+    not be left without a daemon.
+
+    The three timings travel all the way from the command line so they can be calibrated against a
+    real finger without editing the source on the board and restarting from an editor over SSH.
+    """
     try:
-        return Button(loop, on_clicks, on_hold, gpio=gpio)
+        return Button(
+            loop, on_clicks, on_hold,
+            gpio=gpio, long_press_s=long_press_s, window_s=window_s, debounce_s=debounce_s,
+        )
     except Exception as exc:  # noqa: BLE001 — gpiozero raises all sorts depending on why the pin fails
         log.warning("no physical button (GPIO %d): %s", gpio, exc)
         return None

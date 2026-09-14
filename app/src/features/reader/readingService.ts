@@ -258,6 +258,26 @@ export function setModeFromDevice(mode: Mode): void {
   if (mode !== state.mode) changeMode(mode, 'device');
 }
 
+/**
+ * The board's button asked for a reading, in the mode the board says it is in.
+ *
+ * **The mode is applied first, and that ordering is the whole function.** One double click makes the
+ * board send two things: the new mode on the `mode` characteristic, and a `read` event. They reach
+ * this module at very different speeds — `read` is served straight from the BLE callback, while the
+ * mode travels `onMode` → provider state → render → effect, and React does not commit inside a
+ * native callback. So the reading always arrived first and was judged against the mode from BEFORE
+ * the click: from idle it hit `requestReading`'s `mode === 'idle'` guard and was dropped in silence.
+ * That is the bug reported on 2026-09-13 — the double click switched to supermarket, took no photo,
+ * and only the NEXT double click read anything.
+ *
+ * `mode` is null only for a board from before the event carried it; then the app's own mode is all
+ * there is, which is the old behaviour and no worse than it was.
+ */
+export function readFromDevice(mode: Mode | null): Promise<void> {
+  if (mode) setModeFromDevice(mode);
+  return requestReading('device');
+}
+
 /** Bus mode: ALWAYS local (ADR 0006) — OCR over the photo, without touching the network. */
 async function readBus(uri: string): Promise<void> {
   if (!isOcrLoaded()) {

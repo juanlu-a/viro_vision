@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import time
 from typing import Callable, Optional, Sequence
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ PASSWORD = "virovision2026"
 AP_IP = "10.42.0.1"
 
 Run = Callable[[Sequence[str]], subprocess.CompletedProcess]
+# Injectable so the tests do not really wait for the reconnection window (the repo's convention for
+# anything with time in it).
+Sleep = Callable[[float], None]
 
 
 def _nmcli(arguments: Sequence[str]) -> subprocess.CompletedProcess:
@@ -34,8 +38,15 @@ def _nmcli(arguments: Sequence[str]) -> subprocess.CompletedProcess:
 
 
 class AccessPoint:
-    def __init__(self, run: Run = _nmcli, ssid: str = SSID, password: str = PASSWORD) -> None:
+    def __init__(
+        self,
+        run: Run = _nmcli,
+        ssid: str = SSID,
+        password: str = PASSWORD,
+        sleep: Sleep = time.sleep,
+    ) -> None:
         self._run = run
+        self._sleep = sleep
         self._ssid = ssid
         self._password = password
         self.on = False
@@ -61,17 +72,77 @@ class AccessPoint:
 
     def turn_off(self) -> None:
         result = self._run(["con", "down", CONNECTION_NAME])
-        self.on = False
         log.info("AP down (%s)", "ok" if result.returncode == 0 else (result.stderr or "").strip()[:120])
         # Do not trust autoconnect: on 2026-09-06 the device was left on no network at all after
         # bringing the AP down (the phone was still joined to a ghost AP and `status` said "no IP").
         # NM is explicitly asked to connect wlan0 to the best known network.
         self.reconnect()
+        # And do not trust `con down` either. On 2026-09-13, asked over BLE to turn the AP off, this
+        # method returned happily and `status` reported `ap: false` — while that same `status` still
+        # said `network: "virovision-ap"`. nmcli had not taken it down, and `self.on` was a belief
+        # rather than an observation, so the app was told the AP was off by a board that was still
+        # serving it. `active_connection()` already existed to answer exactly this question; nobody
+        # was asking it. The state now comes from the interface, and a failure is loud.
+        active = self.active_connection()
+        self.on = active == CONNECTION_NAME
+        if self.on:
+            log.error("the AP did NOT come down: wlan0 is still on %s", active)
+        # `turn_on` is left believing its own nmcli on purpose: `con up` blocks until the connection
+        # is active, and `__main__` already verifies it against the interface's real address
+        # (`local_ip() == AP_IP`) before declaring the AP up. It is this direction that had no check.
 
-    def reconnect(self) -> None:
-        """Connects wlan0 to the known network with autoconnect (home, the lab…)."""
-        result = self._run(["-w", "25", "device", "connect", "wlan0"])
-        log.info("reconnection to the known network: %s", "ok" if result.returncode == 0 else (result.stderr or result.stdout or "").strip()[:160])
+    def reconnect(self, attempts: int = 6, wait_s: float = 2.0) -> None:
+        """Puts wlan0 back on a known network — and never back on our own AP.
+
+        It used to be one line, `nmcli device connect wlan0`, and that line is what kept the board
+        stuck on its own access point (measured 2026-09-14: `con down` ok, `device connect` ok, and
+        wlan0 back on `virovision-ap` a second later, where it stayed). **`device connect` means
+        "activate the best AVAILABLE connection"**, and right after tearing the AP down that choice is
+        ours to lose: the home network has not been re-scanned yet, so it is not available — while an
+        AP-mode profile always is, because it needs to see nothing. `autoconnect no` does not save us
+        either: that flag governs *automatic* activation, not an explicit `device connect`.
+
+        So the order is inverted. NetworkManager's own autoconnect is given the chance first, because
+        it is the one that behaves: measured on the board, it brings the home profile up about two
+        seconds after the AP goes down, choosing what this board is actually configured to prefer.
+        Only if that does not happen is a profile **named explicitly** — never "the best available".
+        """
+        for attempt in range(attempts):
+            active = self.active_connection()
+            if active is not None and active != CONNECTION_NAME:
+                log.info("back on %s (after %.0f s)", active, attempt * wait_s)
+                return
+            self._sleep(wait_s)
+        for name in self.known_networks():
+            result = self._run(["-w", "25", "con", "up", name])
+            if result.returncode == 0:
+                log.info("reconnected to %s by name", name)
+                return
+            log.warning("could not bring %s up: %s", name, (result.stderr or "").strip()[:120])
+        log.error("wlan0 is not on any known network (active: %s)", self.active_connection())
+
+    def known_networks(self) -> list:
+        """WiFi profiles this board may join, our own AP excluded.
+
+        `NAME` is asked for LAST because a connection name may contain a colon and `nmcli -t`
+        escapes it: splitting from the left would cut a name in half, splitting with the name at the
+        end cannot.
+        """
+        try:
+            output = self._run(["-t", "-f", "TYPE,AUTOCONNECT,NAME", "con", "show"]).stdout or ""
+        except Exception:  # noqa: BLE001
+            return []
+        names = []
+        for line in output.splitlines():
+            parts = line.split(":", 2)
+            if len(parts) < 3:
+                continue
+            kind, autoconnect, name = parts
+            # Only WiFi, only what the board is meant to join on its own, and never the AP: bringing
+            # our own access point back up is the exact bug this method exists to prevent.
+            if "wireless" in kind and autoconnect == "yes" and name != CONNECTION_NAME:
+                names.append(name)
+        return names
 
     def active_connection(self) -> Optional[str]:
         """Name of the active connection on wlan0, or None. It goes into `status` so the app (and

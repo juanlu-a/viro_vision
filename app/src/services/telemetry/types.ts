@@ -27,6 +27,13 @@ export type EventType =
   | 'app.error'
   // BLE link (control plane, ADR 0003)
   | 'ble.scanning'
+  // How the peripheral was reached: already connected to the system, remembered from last time, or
+  // found by scanning. It is the number that says whether skipping the scan is buying anything, and
+  // a run of `via: 'scan'` after a disconnection is the board failing to advertise again.
+  | 'ble.found'
+  // A scan callback that came back with an error. They are survivable and no longer end the scan, so
+  // without a row here they would be completely invisible.
+  | 'ble.scanError'
   | 'ble.connected'
   | 'ble.failed'
   | 'ble.lost'
