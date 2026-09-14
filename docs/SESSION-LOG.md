@@ -1954,6 +1954,71 @@ antes del `return`, distinto del de inicio. Queda anotado abajo; no se metió en
 una decisión de producto (qué suena, y si además conviene reemplazar la lectura en curso en vez de
 ignorar la nueva), no un arreglo.
 
+## 2026-09-14 — Entrar a la placa: tres hipótesis mías, las tres equivocadas
+
+Sesión corta y con una sola moraleja, que es metodológica. El bug era chico; lo caro fue que lo
+diagnostiqué mal tres veces seguidas, y cada vez con un argumento que sonaba bien.
+
+El síntoma: pedirle a la placa que apague su AP por BLE no hacía nada. El comando llegaba, la placa
+contestaba, y wlan0 seguía en `virovision-ap`.
+
+**Hipótesis 1: NetworkManager vuelve a elegir el AP.** La descarté mirando los perfiles —
+`Jack_2.4` tiene `autoconnect yes` y el AP `no`, así que `device connect` debería elegir la casa.
+**Era la correcta**, y el motivo por el que la descarté era falso: `autoconnect` gobierna la
+activación *automática*, no un `device connect` explícito.
+
+**Hipótesis 2: el `nmcli` está mal.** Corrí la secuencia a mano y funcionó perfecto, así que la
+descarté. Lo que no vi es que había puesto un `sleep 2` entre `con down` y `device connect` sin
+pensarlo — y en esos dos segundos el autoconnect de NM ya había levantado la casa, así que
+`device connect` no tuvo nada que elegir. **Mi propio experimento contenía el arreglo y no me di
+cuenta.**
+
+**Hipótesis 3: es polkit, el daemon no corre como root.** El servicio tiene `User=root`.
+
+Lo que cerró el caso fue dejar de razonar y **reproducirlo instrumentado**: levantar el AP a mano,
+dejar una ventana de 150 s, mandar el comando por BLE desde la Mac, y tener el journal escribiéndose
+a un archivo que sobreviviera a la caída del SSH. Cinco líneas y no quedó nada que interpretar:
+
+```
+control ← {'cmd': 'ap', 'value': False}
+AP down (ok)
+reconnection to the known network: ok
+ERROR the AP did NOT come down: wlan0 is still on virovision-ap
+```
+
+Los dos comandos devuelven éxito. `nmcli device connect wlan0` **no** significa «reconectá a la red
+que conocés»: significa *activá la mejor conexión **disponible***, y un segundo después de bajar el
+AP la red de casa no está disponible —nadie re-escaneó— mientras que un perfil en modo AP siempre lo
+está, porque no necesita ver nada.
+
+El arreglo invierte el orden: primero se le da la chance al autoconnect de NM, que es el mecanismo
+que se porta bien (2 s medidos, y elige lo que la placa está configurada para preferir); sólo si eso
+no pasa se levanta un perfil **por nombre**, nunca «el mejor disponible», y el AP propio queda
+excluido por construcción. Verificado en la placa: `AP down (ok)` → `back on Jack_2.4 (after 2 s)`,
+cinco segundos de punta a punta.
+
+**Las dos lecciones, que valen más que el bug:**
+
+1. **Un experimento a mano que «funciona» puede estar probando otra cosa.** El `sleep` que agregué
+   por comodidad cambiaba la condición que estaba midiendo.
+2. **Reproducir instrumentado le gana a razonar**, y en esta placa eso significa escribir el log a un
+   archivo: el SSH se cae justo cuando empieza lo interesante, porque lo interesante es la radio.
+
+### Y dos cosas anotadas sin arreglar
+
+- **El journal no sobrevive bien a los reinicios.** `/var/log/journal` existe (o sea, es persistente)
+  y aun así `journalctl --list-boots` muestra **un solo arranque**. La placa no tiene RTC: arranca
+  creyendo que es la hora del último apagado y NTP la corrige a mitad de camino, así que las marcas
+  de tiempo saltan y los arranques anteriores desaparecen de la vista. Se perdió así el log de la
+  única prueba en modo producto. Para un dispositivo cuyo único diagnóstico es el log, hay que
+  resolverlo antes de la primera salida a la calle.
+- **Durante el arranque, el teléfono se conectó y desconectó cinco veces en 30 s**, cada conexión de
+  menos de 1,5 s, y después se calmó solo. El daemon tarda ~45 s en inicializar la cámara y registra
+  el servicio GATT **antes** del anuncio, así que un connect directo encolado por iOS puede entrar
+  cuando la placa todavía no está lista. Es una sospecha, no un diagnóstico: el `btmon` llegó tarde y
+  no capturó el motivo de desconexión. Si vuelve a pasar, `sudo btmon | grep -i reason` durante el
+  arranque lo cierra.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2054,6 +2119,13 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   si aparece en la tabla, el atajo está trabajando.
 - Mirar si aparece `NOT advertising` tras una desconexión: es la única hipótesis del lado de la placa
   que sigue sin descartarse.
+- **El journal tiene que sobrevivir a un reinicio** (del 2026-09-14). Es persistente y aun así sólo
+  se ve el último arranque, por el salto de reloj de una placa sin RTC. Es lo que hizo que se
+  perdiera el log de la prueba en modo producto. Sin esto, cualquier falla en la calle es
+  irrecuperable en cuanto alguien apaga y prende.
+- **La rotación de conexiones BLE durante el arranque** (del 2026-09-14): cinco conexiones de menos
+  de 1,5 s en 30 s, y se calma sola. Sospecha: el GATT se registra ~45 s antes del anuncio, mientras
+  la cámara inicializa, y iOS entra con un connect encolado. Cerrarlo con `btmon` durante un arranque.
 - Placa: DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
   de ómnibus es el caso B, todo en placa).
 

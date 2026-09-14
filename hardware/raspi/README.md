@@ -62,18 +62,9 @@ archivo `SIN-AP`, y si hay que cambiar el flag, `modo-red.sh`.
 > obvio — `grep -ro -- '--[a-z-]*' /Volumes/bootfs/*.sh`. Un flag repetido en dos scripts se corrige
 > en uno solo y vuelve en el próximo arranque.
 
-> ⚠️ **`tools/ap.py` NO sirve todavía para entrar** (probado el 2026-09-13). La herramienta manda el
-> comando bien y la placa lo acepta, pero el AP **no baja**: `status` se queda en `ap: true` con
-> `network: "virovision-ap"` indefinidamente. La sospecha es `reconnect()`, que hace
-> `nmcli device connect wlan0` — «activá la mejor conexión disponible» — y NetworkManager puede
-> volver a elegir el AP. **Hasta que esté arreglado, para entrar hay que sacar la microSD** (o usar
-> un cable de red). Lo bueno es que la placa ya no miente: desde este PR reporta `ap: true` en vez
-> de decir que apagó algo que no apagó.
->
-> 💡 **La intención de `tools/ap.py`** (y lo que va a hacer cuando el `nmcli` esté bien): apagar el
-> punto de acceso por BLE desde la Mac, para que la placa vuelva sola a la WiFi conocida y haya SSH
-> sin apagar nada ni abrir la caja. `--status` **sí funciona** y es útil igual: dice en qué red está
-> la placa sin necesidad de entrar.
+> 💡 **Para entrar sin la tarjeta: `tools/ap.py`.** Apaga el punto de acceso por BLE desde la Mac y
+> la placa vuelve sola a la WiFi conocida, así que hay SSH sin apagar nada ni abrir la caja.
+> **Medido en la placa el 2026-09-14: cinco segundos de punta a punta.**
 >
 > ```sh
 > cd hardware/raspi
