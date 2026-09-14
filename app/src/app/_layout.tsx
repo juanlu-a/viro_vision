@@ -1,6 +1,6 @@
 import '@/global.css';
 
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
@@ -17,10 +17,6 @@ import { DeviceProvider } from '@/features/device/DeviceProvider';
 import { ProductModelProvider } from '@/features/reader/ProductModelProvider';
 import { ReaderBridge } from '@/features/reader/ReaderBridge';
 import { configureAudioSession } from '@/services/audio/session';
-import {
-  ThemePreferenceProvider,
-  useThemePreference,
-} from '@/features/theme/ThemePreferenceProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -28,22 +24,20 @@ SplashScreen.preventAutoHideAsync();
 // startup: doing it on first use would leave that call competing with the initialization.
 initExecutorch({ resourceFetcher: ExpoResourceFetcher });
 
-function buildNavTheme(scheme: 'light' | 'dark') {
-  const c = Colors[scheme];
-  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
-  return {
-    ...base,
-    colors: {
-      ...base.colors,
-      primary: c.primary,
-      background: c.background,
-      card: c.background,
-      text: c.text,
-      border: c.border,
-      notification: c.danger,
-    },
-  };
-}
+// The app ships dark only (ADR 0010): the navigation theme is built once, from the same tokens the
+// screens use, so the system chrome (headers, tab bar background) never disagrees with them.
+const NAV_THEME = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: Colors.dark.primary,
+    background: Colors.dark.background,
+    card: Colors.dark.background,
+    text: Colors.dark.text,
+    border: Colors.dark.border,
+    notification: Colors.dark.danger,
+  },
+};
 
 export default function RootLayout() {
   // Telemetry starts once and is switched off on unmount. It goes at the very top so the global
@@ -72,7 +66,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemePreferenceProvider>
+    <>
       {/* The supermarket model is chosen in Settings and used on Home: the state has to be a single
           one, above both tabs. */}
       <ProductModelProvider>
@@ -89,23 +83,22 @@ export default function RootLayout() {
           </DeviceProvider>
         </AudioOutputProvider>
       </ProductModelProvider>
-    </ThemePreferenceProvider>
+    </>
   );
 }
 
 function RootNavigator() {
-  const { scheme, isReady } = useThemePreference();
-
   useEffect(() => {
-    // The splash is held until we know which theme to apply: otherwise the app paints with one
-    // scheme and jumps to the other, a disorienting flash for someone with low vision.
-    if (isReady) SplashScreen.hideAsync();
-  }, [isReady]);
+    // Until 2026-09-14 the splash was held until the stored theme preference had been read, so the
+    // app would not paint with one scheme and jump to the other. With a single scheme there is
+    // nothing to wait for: the splash (itself Azul Profundo) hands over to the same colour.
+    SplashScreen.hideAsync();
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider value={buildNavTheme(scheme)}>
+        <ThemeProvider value={NAV_THEME}>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
           </Stack>

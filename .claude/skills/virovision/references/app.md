@@ -158,8 +158,10 @@ Ya no es un scaffold. Lo que existe y funciona:
   comprueban contraste WCAG en los dos temas; ya atajó tres regresiones invisibles a ojo. Identidad
   aplicada según el manual v1.0 (ver la skill `virovision-marca`), con tipografía de marca embebida
   en el binario.
-- **Selector de tema** claro/oscuro/sistema, persistido en AsyncStorage — es una preferencia de
-  accesibilidad, así que funciona sin red ni cuenta.
+- **Un solo tema, el oscuro** (ADR 0010, 2026-09-14). Hubo selector claro/oscuro/sistema hasta esa
+  fecha; se retiró porque la interfaz es la voz y sostener dos esquemas en dos sistemas de estilo
+  costaba más de lo que daba. La paleta clara sigue en `colors.js`, verificada, sin que nadie la
+  renderice.
 - **Benchmark de latencia contra modelos de visión en la nube** (`services/vision/`), con
   time-to-first-token medido sobre streaming SSE, limitador de cuota y estadística de mediana/p90.
   Es instrumentación de desarrollo, no producto.

@@ -81,8 +81,10 @@ tests via `jest-expo`.
 ## What's done per pillar
 
 **App** (structure + honest stubs):
-- Screens: **iOS bottom tabs, no login** — `index` (Home + **working TTS** "Probar audio"), `connect`
-  (Dispositivo / BLE status), `settings` (appearance + about). Green/black design system + light mode.
+- Screens: **iOS bottom tabs, no login** — `index` (Inicio: el modo y los botones, sin estado del
+  dispositivo), `connect` (Dispositivo: la única línea de estado; «Conectado» en verde = listo para
+  usar, «Conectado (falta el WiFi)» en ámbar si falta la red), `settings` (modelo, dónde se escucha,
+  qué reconoce). **Sólo modo oscuro** desde el 2026-09-14 (ADR 0010): el selector de tema se retiró.
 - Domain layers under `app/src/`: `features/{recognition,device,audio,auth}`,
   `services/{ble,audio,supabase,storage}`, `i18n` (Spanish strings), `types`.
 - **BLE** = cliente real sobre `react-native-ble-plx` detrás del selector de `services/ble/bleClient.ts`

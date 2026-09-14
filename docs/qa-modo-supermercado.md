@@ -49,8 +49,11 @@ npx expo run:ios --device "iPhone de Juan"
 
 ### 4. Con VoiceOver
 
-- [ ] Recorrer Inicio con swipes. Orden esperado: estado del dispositivo → modo actual → botón
-      ómnibus → botón supermercado → Leer con el dispositivo → resultados.
+- [ ] Recorrer Inicio con swipes. Orden esperado: modo («Modo: Esperando») → botón ómnibus → botón
+      supermercado → Leer con el dispositivo → resultados. Desde el 2026-09-14 el estado del
+      dispositivo **no** está en Inicio: vive sólo en la pestaña Dispositivo (ADR 0010).
+- [ ] En Dispositivo, con la placa enlazada pero sin su red: dice «Conectado (falta el WiFi)» en
+      ámbar y VoiceOver lo lee igual. Con la red lista pasa a «Conectado» en verde.
 - [ ] El **selector de modelo** está en Ajustes (desde el 2026-09-04): el disparador se anuncia como
       "Modelo seleccionado: <modelo>" y el menú como "Seleccionar modelo", `radiogroup` con `checked`.
 - [ ] Elegir otro modelo en Ajustes y volver a Inicio: la lectura siguiente tiene que salir por **ese**
@@ -343,8 +346,8 @@ canasta queda como dataset de evaluación, no como límite.
 - [ ] **Yerba suelta** (sin envase de marca): la identifica.
 - [ ] **Fruta o verdura a granel**: dice al menos el `kind`.
 - [ ] Un alimento **envasado fuera de la canasta** (galletitas, una lata, un snack): lo identifica.
-- [ ] En Inicio, la tarjeta dice «Identifica alimentos y productos de almacén» y no «de la canasta
-      básica».
+- [ ] En Ajustes, «Qué reconoce» dice «Identifica alimentos y productos de supermercado» y no «de la
+      canasta básica» (ni «de almacén», desde el 2026-09-14).
 
 ### 21. Que lo no reconocible se diga, y no se lea basura
 
