@@ -12,18 +12,27 @@ import { View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
+import { describeConnection, type ConnectionTone } from '@/features/device/connectionLabel';
 import { DeviceSummary } from '@/features/device/DeviceSummary';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
+import type { ThemeColor } from '@/constants/theme';
 import { useDevice } from '@/features/device/DeviceProvider';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
 
+const TONE_COLOR: Record<ConnectionTone, ThemeColor> = {
+  success: 'success',
+  warning: 'warning',
+  danger: 'danger',
+  neutral: 'textSecondary',
+};
+
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { connection, wifiDetail, lastNotice, connect, disconnect } = useDevice();
+  const { connection, wifi, wifiDetail, lastNotice, connect, disconnect } = useDevice();
   // The Wi-Fi status line (off / joining / ready) is gone since 2026-09-09: it was device console,
   // and the app stopped being its own console. What stays is the REASON something did not work,
   // because for someone who does not see the screen that is the only explanation of why the button
@@ -32,8 +41,11 @@ export default function ConnectScreen() {
 
   const isConnected = connection.status === 'connected';
   const isBusy = connection.status === 'scanning' || connection.status === 'connecting';
-  const dotColor =
-    isConnected ? theme.success : connection.status === 'error' ? theme.danger : theme.textSecondary;
+  // Green only when the device is fully usable; amber says what is still missing. Since 2026-09-14
+  // this is the only status line in the app, so "Conectado" has to mean "ready to use", not "the
+  // Bluetooth link is up". The colour reinforces the text, it never replaces it.
+  const label = describeConnection(connection, wifi);
+  const labelColor = TONE_COLOR[label.tone];
 
   return (
     <Screen
@@ -52,14 +64,14 @@ export default function ConnectScreen() {
           accessible
           accessibilityRole="text"
           accessibilityLiveRegion="polite"
-          accessibilityLabel={`${t.statusLabel}: ${connection.message}`}>
-          <View className="h-[12px] w-[12px] rounded-pill" style={{ backgroundColor: dotColor }} />
+          accessibilityLabel={`${t.statusLabel}: ${label.text}`}>
+          <View className="h-[12px] w-[12px] rounded-pill" style={{ backgroundColor: theme[labelColor] }} />
           <View className="flex-1 gap-[2px]">
             <ThemedText type="small" themeColor="textSecondary">
               {t.statusLabel.toUpperCase()}
             </ThemedText>
-            <ThemedText type="default" className="font-sans-bold">
-              {connection.message}
+            <ThemedText type="default" className="font-sans-bold" themeColor={labelColor}>
+              {label.text}
             </ThemedText>
           </View>
         </View>

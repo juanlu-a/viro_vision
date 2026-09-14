@@ -93,6 +93,13 @@ describe.each(themes)('%s theme', (_name, theme) => {
     expect(contrastRatio(theme.danger, theme.background)).toBeGreaterThanOrEqual(AAA);
   });
 
+  it('the warning colour reaches AAA on the background and the accent floor on the surface', () => {
+    // It is the "Conectado (falta el WiFi)" label inside a card on the Device tab: text, so AAA, and
+    // checked on the card too for the same reason as `success`.
+    expect(contrastRatio(theme.warning, theme.background)).toBeGreaterThanOrEqual(AAA);
+    expect(contrastRatio(theme.warning, theme.surface)).toBeGreaterThanOrEqual(ACCENT);
+  });
+
   it('the success colour reaches AAA on the background', () => {
     expect(contrastRatio(theme.success, theme.background)).toBeGreaterThanOrEqual(AAA);
   });

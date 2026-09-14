@@ -29,6 +29,10 @@ const Colors = {
     // exists so the component has the same shape in both themes, not to add contrast.
     primaryEdge: '#2BD69A',
     danger: '#F3AAAD', // 7.09:1 AAA
+    // Amber for "partly": the device's status when the link is up but the photo path is not. It is
+    // TEXT, so AAA on the background (10.97:1) and 9.24:1 on the card; the text says what is missing,
+    // the colour only reinforces it.
+    warning: '#FFC857',
     success: '#2BD69A', // the manual's Verde Lectura — 8.99:1 AAA
     successMuted: '#0B3A33',
     tabInactive: '#A9C0DE',
@@ -58,6 +62,8 @@ const Colors = {
     // background or darkening the brand: the border gives 7.19:1 and the button stays brand green.
     primaryEdge: '#105E3F',
     danger: '#A5171C', // 7.08:1 AAA
+    // The amber, darkened to AAA as text on the light background (7.79:1) and 7.15:1 on the card.
+    warning: '#6E4400',
     // The same green does not work as TEXT in light (2.44:1). It is darkened to AAA keeping the
     // hue: it is the colour of status labels ("Conectado", "confirmado"), not of fills.
     success: '#105E3F', // 7.19:1 on the background, 6.61:1 on the card

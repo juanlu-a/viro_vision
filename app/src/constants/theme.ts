@@ -20,6 +20,10 @@
  *
  * Target: **AAA (7:1)** for text, 4.5:1 for the accent, 3:1 for control borders (WCAG 1.4.11).
  * `theme.test.ts` verifies it automatically.
+ *
+ * **The app renders only `dark`** since 2026-09-14 (ADR 0010). `light` stays in the table because it
+ * is the brand manual's palette, thesis material uses it, and keeping it verified costs nothing; no
+ * screen reads it.
  */
 // The table lives in `colors.js`, in plain JavaScript, because `tailwind.config.js` needs it too and
 // is CommonJS. A single source: `bg-surface` and this token are the same hex, and `theme.test.ts`
@@ -45,6 +49,7 @@ export type ThemeColor =
   | 'primaryEdge'
   | 'onPrimary'
   | 'danger'
+  | 'warning'
   | 'success'
   | 'successMuted'
   | 'tabInactive'
