@@ -1097,6 +1097,58 @@ sin ninguna clave adentro**, verificado funcionando en el teléfono.
   `VENTANA_DOBLE_CLICK_S` 0,4 s) son una primera estimación y hay que calibrarlos con el usuario, con
   los ojos cerrados, que es como se usa.
 
+## 2026-09-07 — El camino de ómnibus sale del stand by: el repo de Magui anda, y el detector va al sensor
+
+- **Contexto.** Magalí tenía el pipeline de ómnibus en su repo
+  ([bus-banner-recognizer](https://github.com/MagaliDellapiazza02/bus-banner-recognizer): YOLO11n COCO
+  para `bus` + YOLO11n fine-tuneado con 140 fotos de Roboflow para `bus_sign` + PaddleOCR) y reportaba
+  que "tardaba" por procesar el video entero. Arnaldo Castro presta un servidor con **Tesla V100**.
+  Decisión de la sesión: **prescindir del Coral**. La cámara real es la AI Camera (IMX500): el detector
+  corre en el sensor y la Pi Zero 2 W sólo recorta y lee. Clonado en `repositorios/bus-banner-recognizer`,
+  rama `feat/bus-banner-pipeline`, **con push y sin PR** hasta que Magalí lo revise.
+
+- **Diagnóstico**: el repo no "andaba lento", no andaba. Cargaba los 1338 frames en RAM (2,4 GB) y
+  corría dos YOLO por frame; `results.names` sobre una lista (`AttributeError`); filtraba la clase
+  `destination_sign` cuando el modelo se llama `bus_sign` (nunca matcheaba); `NameError` en el dibujo;
+  **el OCR nunca se llamaba**; la API key de Roboflow quedó hardcodeada en el notebook (22 MB de outputs)
+  → **hay que rotarla**, ya está en la historia.
+
+- **Lo construido** (paquete `bus_banner`, pipeline de **foto**, no de video): detector → ómnibus más
+  grande → banner = cartel ancho más alto de su mitad superior → recorte con 12 % de margen → **OCR sólo
+  sobre el recorte** (RapidOCR, PP-OCRv4 mobile en onnxruntime, sin detección de texto; reintento con
+  detección si el parseo sale incompleto) → `{numero, destino, crudo, confianza}` con el mismo criterio
+  que `adivinarLectura` de la app, corregido contra un **catálogo de 503 pares línea/destino** de los datos
+  abiertos de STM + destinos observados. `Resultado.a_evento()` da el JSON ≤ 180 bytes de la
+  característica `evento` (`{t:'resultado', numero, nombre, ms}`). 29 tests (geometría, parseo, evento,
+  smoke con pesos). CLI `bus-banner foto|frame|video|evaluar`. Scripts para la V100: pseudo-etiquetar
+  `bus` con YOLO11x (dataset de **dos clases**, porque en el IMX500 corre una sola red), entrenar
+  (`fliplr=0`, `hsv_h=0.01`, yolo11n a 640) y exportar `format="imx"` (Linux x86, Python ≤ 3.11, Java 17).
+
+- **Medido** (Mac M4 Pro, CPU; 117 imágenes: un frame cada 30 de los tres videos + 14 de test de Roboflow,
+  `datos/eval/gt.csv`): RapidOCR **numero 0,875**, destino 0,732, OCR p50 81 ms; PaddleOCR 0,896 / 0,768,
+  p50 118 ms pero sin wheel para la Pi. CLAHE empeora; detección de texto siempre no mejora. El OCR solo
+  (lo que corre en la placa): 140 MB de RSS y ~5-150 ms en la Mac. Modo video en streaming: 90 frames en
+  8 s. **Ojo**: los videos son tres ómnibus y las fotos de Roboflow son fotos web; el set que vale son fotos
+  del dispositivo.
+
+- **Qué cambia en las decisiones** (enmienda a ADR 0006, y toca 0003 y las referencias): el detector del
+  banner **sí se fine-tunea** ("nada se entrena" queda para el OCR, que se evalúa y sólo se entrena si las
+  métricas lo exigen); el acelerador del camino de ómnibus es el **IMX500**, no el Coral; con eso el USB de
+  la Zero 2 W queda libre y el Spike 4 (libedgetpu en Bookworm) deja de existir.
+
+- **Corrección de Juan Lucas, y es la definición del modo: el modo ómnibus vigila, no saca una foto.**
+  El usuario no ve venir el ómnibus; al activar el modo la cámara queda abierta y el detector corre en
+  cada frame (en el sensor, gratis para la Pi). Se agregó la capa `tracking.py`: identidad de ómnibus
+  por solapamiento entre frames, confirmación (0,3 s), "se acerca" por crecimiento de la caja, lectura
+  sólo del ómnibus principal cuando el banner tiene ≥ 22 px, voto entre lecturas, **un anuncio de
+  presencia y uno de línea por ómnibus** (una pista perdida un instante no se re-anuncia). Simulado sobre
+  los videos con `bus-banner watch`: la línea llega 0,1-0,3 s después del aviso de presencia de día y
+  cerca; de noche insiste 10 lecturas. `scripts/watch_imx500.py` es la prueba de campo en la Pi
+  (picamera2 + IMX500 + `Watcher`, anuncios `.wav` pregrabados, guarda el frame de cada lectura para
+  armar el dataset real). Fork en `juanlu-a/bus-banner-recognizer` para instalar en la placa con `pip
+  install git+…`. Esto no contradice el "nunca siempre prendido" de ADR 0007: el reconocimiento sigue
+  atado a un modo explícito; dentro del modo ómnibus, vigilar **es** la función.
+
 ## 2026-09-08 — La app deja de ser su propia consola
 
 Cuatro pedidos, un mismo hilo: la app llevaba encima el andamio con el que se construyó, y con la
@@ -1954,6 +2006,20 @@ antes del `return`, distinto del de inicio. Queda anotado abajo; no se metió en
 una decisión de producto (qué suena, y si además conviene reemplazar la lectura en curso en vez de
 ignorar la nueva), no un arreglo.
 
+## 2026-09-13 — El repo de Magalí pasa a inglés, un archivo por etapa
+
+- Magalí leyó la rama y marcó dos cosas: el repo es en inglés y el nuestro estaba en español, y "el
+  bondi y el cartel están todo mezclado" (un solo `detector.py`). Las dos tenían razón, y ADR 0009 ya
+  pide todo el código en inglés. Refactor sin cambio de lógica (mismos 43 tests, mismas métricas:
+  numero 0,875 / destino 0,732): `bus_banner/detection/bus.py` y `detection/sign.py` separados, con el
+  wrapper de ultralytics compartido y `combined.py` como único lugar que los encadena; `crop.py`,
+  `ocr.py`, `reading.py`, `catalog.py`, `pipeline.py`, `tracking.py`; `data/` y `models/`; scripts
+  `train.py`, `export_imx.py`, `pseudo_label_bus.py`, `build_catalog.py`, `watch_imx500.py`. Rama
+  renombrada a `feat/bus-banner-pipeline` (el PR #1 de su repo la sigue). README y PR reescritos en
+  inglés llano: el pipeline en cinco pasos, un archivo por paso, y el modo ómnibus como cámara en vivo.
+- Lo único que queda en español en ese código es el JSON del evento BLE (`t`, `numero`, `nombre`): es el
+  contrato vigente de la app y cambiarlo es una decisión del lado de la app.
+
 ## 2026-09-14 — Entrar a la placa: tres hipótesis mías, las tres equivocadas
 
 Sesión corta y con una sola moraleja, que es metodológica. El bug era chico; lo caro fue que lo
@@ -2061,6 +2127,38 @@ el fondo son uno: la app le hablaba a quien la mira, y la usa quien la escucha. 
   Documentación: ADR 0010, `decisiones.md`, `app.md`, la skill de marca, `PROJECT-STATUS.md` y la
   QA de supermercado (el orden de VoiceOver en Inicio y el texto de «Qué reconoce»).
 
+## 2026-09-14 (cont. 2) — El modo ómnibus corre en la placa: el sensor ve el bondi, la placa habla, el OCR lee
+
+- **Pedido**: llevar lo que anda en la rama de Magalí a la Pi con la AI Camera y probar el flujo entero.
+  Con Magalí se decidió: **el detector es el COCO YOLO11n que trae la cámara** (en el sensor) y **el OCR
+  es el de ella (PaddleOCR)**; el modelo de dos clases y el reentrenamiento del OCR vienen después.
+
+- **Lo que anduvo**: `imx500_network_yolo11n_pp.rpk` (del model zoo de Raspberry Pi) corriendo en el
+  sensor a 15 fps, ómnibus con confianza 0,9 en el video de prueba proyectado en la pantalla de la Mac;
+  el seguidor lo confirma y la placa dice **"se acerca un ómnibus"** por el parlante (403 `.wav`
+  pregrabados con la voz de macOS desde el catálogo STM: `bus.wav`, uno por línea, uno por destino).
+  El OCR sobre el frame guardado lee **`115 / LUIS BRAILLE`** en la Pi. Enfoque manual ajustado con un
+  medidor de nitidez en vivo (`scripts/focus_helper.py`, varianza del Laplaciano).
+
+- **Lo que no anduvo, y por qué**: (1) sin caja de cartel (el modelo COCO no tiene esa clase) el
+  vigilante nunca llamaba al OCR — ahora lee la franja superior del ómnibus; (2) el OCR tarda **~10 s**
+  en la Pi 3 B+ y bloqueaba el loop de cámara: libcamera declara muerto el sensor tras ~1 s sin
+  dequeue ("Camera frontend has timed out"). No era el cable. El OCR pasó a un hilo aparte
+  (`Watcher(async_reads=True)` + `submit_reading`). Cajas duplicadas del mismo ómnibus se deduplican.
+
+- **PaddleOCR en la placa**: paddlepaddle no tiene wheel para Linux ARM64 con Python 3.13 (sólo 3.10-3.12).
+  Se corren **los mismos modelos PP-OCRv5 mobile exportados a ONNX** (`rapidocr` 3.x,
+  `Det.limit_side_len=320 max`: el default de 736 agranda el recorte y fragmenta el texto). Evaluado en la
+  Mac sobre 117 imágenes: numero 0,896 (idéntico a PaddleOCR), destino 0,786 (0,768), 7 ms vs 118 ms.
+
+- **La red se llevó dos horas** y quedó documentada en la memoria del agente: la placa por cable con la
+  Mac como router (alias 10.10.0.2, `pf` NAT, DNS 8.8.8.8 porque 1.1.1.1:53 está bloqueado en esa red;
+  apt en HTTPS porque la red manipula el HTTP plano). Instalados en la placa: `imx500-all`,
+  `imx500-tools`, `python3-opencv`; el daemon `virovision` quedó **parado** para liberar la cámara.
+
+- **Pendiente inmediato**: corrida en vivo con la línea anunciada (la placa quedó sin cable al final),
+  latencia del OCR nuevo en la Pi, y una parada real con `--save-frames`.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2130,7 +2228,9 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 
   Es accesibilidad, no pulido: en una app cuya interfaz es la voz, un estado sin salida deja al
   usuario sin forma de saber que el remedio existe.
-- **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
+- **Camino de ómnibus (repo de Magalí, rama `feat/bus-banner-pipeline`)**: corrida en vivo en la placa con la
+  línea anunciada; latencia del OCR PP-OCRv5-ONNX en la Pi; parada real con `--save-frames`; `omnibus.py` en el
+  daemon (`Mode.BUS` abre la cámara y corre el `Watcher`); modelo de dos clases en la V100 y export IMX.
 - **El transductor de audio** (del 2026-09-11, con el camino ya resuelto): el piezo verifica pero no
   sirve para voz; el auricular sí, y hoy va **sin resistencia en serie** pidiéndole ~100 mA a un pin
   de 16 mA — conseguir 100-330 Ω. Después: `audio_pwm_mode=2` (el default, menos ruido) y un filtro
@@ -2148,7 +2248,7 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   La frase que estaba acá («recién ahí `isBackgroundEnabled: true`») era falsa: ese flag nunca gateó
   iOS. Lo que queda es `restoreStateIdentifier`, abajo.
 - **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
-- **Spike 3**: coexistencia BLE/WiFi en el BCM43438. **Spike 4**: libedgetpu/pycoral en Bookworm.
+- **Spike 3**: coexistencia BLE/WiFi en el BCM43438. (El Spike 4, libedgetpu en Bookworm, cayó con el Coral el 2026-09-07.)
 - **El gesto ignorado tiene que sonar** (del 2026-09-13, ADR 0007). Cuando llega un doble click con
   una lectura en vuelo, `requestReading` sale por la guarda `if (reading)` **antes** de
   `playStartEarcon()`, así que no suena nada. Ignorar es la decisión correcta —no encolar una foto de
