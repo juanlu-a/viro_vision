@@ -6,10 +6,13 @@
  * `expo-speech` and nothing else; the device needs the sentence synthesized to a file in the cloud
  * and POSTed to its HTTP server (ADR 0003), which is slower and has more ways to fail.
  *
- * **Why only supermarket.** Routing a bus reading through the device would mean synthesizing it with
- * a cloud TTS, and bus mode has to work with no internet at all (ADR 0001, ADR 0006). ADR 0003
- * already answers this: the bus announcements are **prerecorded on the board's SD** for exactly that
- * reason. They do not exist yet, so the bus path speaks through the phone regardless of this setting.
+ * **Bus mode obeys it too, since 2026-09-15.** It used to be excluded, and the reason was never the
+ * rule: routing a bus reading through the device would have meant a cloud TTS, and bus mode has to
+ * work with no internet at all (ADR 0001, ADR 0006). ADR 0003 always answered this with **announcements
+ * prerecorded on the board's SD**; they simply did not exist. Now they do, so the choice applies, and
+ * it applies on both sides: the device is told to stop speaking (`writeAudioTarget`) and the phone
+ * starts (`ReaderBridge` subscribes to the reading). Neither half alone is enough - with only the
+ * first, a reading set to the phone would be silent; with only the second, it would be said twice.
  *
  * **No storage import here, on purpose** — same rule as `services/audio/audioMode.ts`. Reading this
  * module must not drag in AsyncStorage: `readingService.ts` imports it, and its test suite (and this

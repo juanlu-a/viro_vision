@@ -22,6 +22,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { announce } from '@/features/audio/announcer';
+import type { AudioOutput } from '@/features/audio/audioOutput';
 import { strings } from '@/i18n';
 import {
   BleDeviceNotFoundError,
@@ -59,6 +60,8 @@ interface DeviceValue {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   writeMode: (mode: DeviceMode) => Promise<void>;
+  /** Tells the device where bus readings should be heard. Best-effort: it never throws. */
+  writeAudioTarget: (target: AudioOutput) => Promise<void>;
   downloadPhoto: (options?: { timeoutMs?: number }) => Promise<DevicePhoto>;
   /** Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. */
   sendAudio: (uri: string) => Promise<boolean>;
@@ -397,6 +400,22 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     setDeviceMode(null);
   }, []);
 
+  const writeAudioTarget = useCallback(
+    async (target: AudioOutput) => {
+      if (connection.status !== 'connected') return;
+      try {
+        await getBleClient().writeAudioTarget(target);
+      } catch (err) {
+        // The device kept its previous target, so bus readings may come out of the wrong speaker.
+        // Not worth interrupting the user for, and not worth hiding either: this is exactly the bug
+        // that made a reading come out of the board with the setting on "phone" (2026-09-15).
+        const detail = err instanceof Error ? err.message : String(err);
+        record('device.audioTargetFailed', { detail: { target, message: detail } });
+      }
+    },
+    [connection.status]
+  );
+
   const writeMode = useCallback(
     async (mode: DeviceMode) => {
       if (connection.status !== 'connected') return;
@@ -451,8 +470,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<DeviceValue>(
-    () => ({ connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, downloadPhoto, sendAudio }),
-    [connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, downloadPhoto, sendAudio]
+    () => ({ connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio }),
+    [connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio]
   );
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;

@@ -16,6 +16,9 @@
  */
 import { useEffect, useRef } from 'react';
 
+import { announceRecognition } from '@/features/audio/announcer';
+import { getAudioOutput } from '@/features/audio/audioOutput';
+import { useAudioOutput } from '@/features/audio/AudioOutputProvider';
 import { useDevice } from '@/features/device/DeviceProvider';
 import { MODE_FROM_GATT } from '@/features/device/gatt';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
@@ -25,6 +28,7 @@ import { getBleClient } from '@/services/ble/bleClient';
 export function ReaderBridge() {
   const { model } = useProductModel();
   const device = useDevice();
+  const { output } = useAudioOutput();
 
   // Refreshed after every render, read at the instant of a reading. A ref and not state: nothing
   // here should cause a render, it only has to be current when the button is pressed. The write is
@@ -63,6 +67,32 @@ export function ReaderBridge() {
       }),
     [],
   );
+
+  // Bus readings arrive on their own: the device is watching, and the user cannot see the bus coming.
+  // Whoever speaks them is the user's choice, and the two halves of that choice live in two places -
+  // the device stops speaking because it was told to (the effect below), and the phone starts because
+  // of this subscription. Before 2026-09-15 neither half existed and a bus reading always came out of
+  // the board, whatever Settings said.
+  //
+  // `getAudioOutput()` and not the React value: the subscription is installed once, and reading the
+  // captured value would announce according to the setting as it was at mount.
+  useEffect(
+    () =>
+      getBleClient().onRecognition((event) => {
+        if (getAudioOutput() === 'phone') void announceRecognition(event);
+      }),
+    [],
+  );
+
+  // The device learns where to speak on every connection and on every change of the setting. Both,
+  // not one: it forgets on reboot, and the user can change their mind while connected.
+  const connected = device.connection.status === 'connected';
+  useEffect(() => {
+    if (connected) void device.writeAudioTarget(output);
+    // `device.writeAudioTarget` is stable per connection state; depending on `device` itself would
+    // re-send on every unrelated field it carries (wifi, photoAvailable, the last notice).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, output]);
 
   // The mode reported by the device (physical button, ADR 0007) wins: the app mirrors and announces it.
   const deviceMode = device.deviceMode;
