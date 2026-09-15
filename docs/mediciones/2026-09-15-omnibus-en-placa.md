@@ -21,7 +21,7 @@ el anuncio llega después de que arrancó, no sirve.
 - **Cámara**: Raspberry Pi AI Camera (Sony **IMX500**). El detector corre **dentro del sensor**.
 - **Detector**: `bus_sign.rpk`, el modelo de Magalí Dellapiazza cuantizado a int8 (ver abajo).
 - **OCR**: PP-OCRv5 mobile (PaddleOCR) por ONNX, en la CPU de la Pi, en un hilo aparte.
-- **Voz**: 403 `.wav` pregrabados en `/home/virovision/announcements`, por `aplay`.
+- **Voz**: 386 `.wav` pregrabados en `/home/virovision/announcements`, por `aplay`.
 - **Escena**: video de ómnibus de Montevideo reproducido en una pantalla, cámara apuntada a la
   pantalla. No es la calle; es repetible, que es lo que hacía falta para medir.
 - **Rama**: `feat/omnibus-en-el-daemon`, commit `9381499`.
@@ -48,13 +48,18 @@ Las tres lecturas siguientes de la misma corrida, ya en régimen:
 **El OCR es el costo.** La detección en el sensor no consume CPU de la Pi y no aparece en el
 presupuesto de tiempo: el sensor entrega cajas a 15 fps mientras la CPU hace otra cosa.
 
-Arranque en frío, del mismo journal:
+Reinicio en frío, con el cable de red desenchufado (journal del arranque de las 14:11):
 
-| Qué | Cuánto |
-|---|---|
-| Servicio arriba → cámara lista con el detector en el sensor | ~6 s (firmware cacheado) |
-| Cámara lista → modo ómnibus listo (carga de los modelos de OCR) | 19 s |
-| **Reinicio → listo para el primer click** | **33 s** el primer arranque, 24 s después |
+| Qué | Cuándo | Desde que arranca el servicio |
+|---|---|---|
+| Servicio activo | 14:11:07 | 0 |
+| Cámara lista, detector cargado en el sensor | 14:11:14 | 7 s |
+| Modo ómnibus listo (los tres modelos de OCR cargados) | 14:11:54 | **47 s** |
+
+Los 40 s del medio son **la carga de los modelos de OCR**, no el sensor: el firmware del detector
+queda cacheado y sube en menos de un segundo. En un reinicio del servicio sin apagar la placa el total
+baja a ~24 s. Que el modo tarde en estar listo no bloquea el arranque: el daemon responde `/health`
+a los 7 s y el botón ya escucha.
 
 Ocupación del chip del sensor: 2,64 MB de modelo + 4,48 MB de runtime = **7,12 MB de los 8 MB (90 %)**.
 

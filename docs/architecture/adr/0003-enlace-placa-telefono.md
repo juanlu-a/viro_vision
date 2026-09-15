@@ -553,7 +553,7 @@ teléfono/dispositivo y sonaba siempre en el teléfono (`app/src/features/audio/
 exclusión contradecía el ADR 0001: el único modo que funciona sin internet era el único que no podía
 sonar sin el teléfono.
 
-Ahora existen: **403 `.wav`** en la SD de la placa (los números de línea, los destinos del catálogo de
+Ahora existen: **386 `.wav`** en la SD de la placa (los números de línea, los destinos del catálogo de
 la STM y los avisos de sistema), generados con `scripts/make_announcements.py`. Con eso el camino
 entero corre en el dispositivo: detección en el sensor, OCR en la Pi, voz por el parlante, **1,27 s
 desde el botón hasta la línea dicha** ([medición](../../mediciones/2026-09-15-omnibus-en-placa.md)).
