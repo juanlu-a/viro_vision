@@ -8,13 +8,14 @@ System architecture, component and data-flow diagrams, and Architecture Decision
   foto del modo supermercado viaja por BLE o por un AP WiFi de la placa según una medición con umbral;
   el audio sale por un DAC I2S cableado en la placa (no A2DP: compartiría antena con BLE y WiFi).
 - **Recognition data flow** — per use case since [ADR 0006](adr/0006-pipelines-por-caso-de-uso.md):
-  buses = on-device detection (Coral TPU) → banner crop → OCR → announcement; supermarket =
+  buses = on-device detection (**dentro del sensor IMX500**, no en una TPU aparte) → banner crop →
+  OCR en la Pi → announcement, medido de punta a punta el 2026-09-15; supermarket =
   cloud vision LLM chosen by the user → announcement (decided 2026-08-30; the local fallback is
   still open). Los tres flujos, dibujados, en [Flujos por caso de uso](#flujos-por-caso-de-uso).
 - **ADRs** — see [`adr/`](adr/) for the full index (0001 offline-first, 0002 Supabase, 0003 enlace
   placa ↔ teléfono, 0004 on-device runtime, 0006 pipelines por caso de uso, 0007 botones físicos y
   modos, 0008 proxy de claves).
-  To backfill: RPi Zero 2 W + Coral TPU, React Native (Expo), on-device vs. offload-to-phone.
+  To backfill: RPi + AI Camera (IMX500), React Native (Expo), on-device vs. offload-to-phone.
 
 ## Modos de operación (diagrama canónico)
 
@@ -85,9 +86,9 @@ el **recorte**, no el frame entero. El OCR corre en el teléfono.
 
 ```mermaid
 flowchart LR
-    subgraph HW["Dispositivo (RPi + Coral TPU)"]
+    subgraph HW["Dispositivo (RPi + AI Camera IMX500)"]
         direction TB
-        CAM["Cámara"] --> YOLO["Detección<br/>(modelo en la TPU)"]
+        CAM["Cámara"] --> YOLO["Detección<br/>(modelo en el sensor)"]
         SPK["Parlante"]
     end
 
@@ -107,9 +108,9 @@ Es el caso que mejor cumple ADR 0001, y el que más exige del hardware.
 
 ```mermaid
 flowchart LR
-    subgraph HW["Dispositivo (RPi + Coral TPU)"]
+    subgraph HW["Dispositivo (RPi + AI Camera IMX500)"]
         direction LR
-        CAM["Cámara"] --> YOLO["Detección<br/>(modelo en la TPU)"]
+        CAM["Cámara"] --> YOLO["Detección<br/>(modelo en el sensor)"]
         YOLO --> OCR["OCR"]
         OCR --> JSON["{ numero: 456,<br/>destino: … }"]
         JSON --> SPK["Parlante"]

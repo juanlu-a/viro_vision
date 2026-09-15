@@ -33,7 +33,7 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 
 ```
 app/        React Native (Expo) app        ← main work so far
-hardware/   RPi Zero 2 W + Coral TPU + Cam Module 3 + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
+hardware/   RPi + AI Camera (IMX500) + UPS HAT (C)                  raspi/ = daemon BLE (ADR 0003)
 ml/         YOLO11 detection, OCR, Edge AI  (README stub only)
 docs/       thesis deliverables, ADRs, this file
 .claude/skills/virovision/   knowledge skill
@@ -55,8 +55,9 @@ docs/       thesis deliverables, ADRs, this file
   ExecuTorch funciona pero tarda 6,4 s. La pregunta del runtime se resuelve **por caso de uso** →
   ADR 0006.
 - **ADR 0006 — Pipelines por caso de uso** *(Proposed 2026-08-22, a validar con tutor; actualizado
-  2026-08-30 y 2026-09-01)*: **bondis = local** (detección preentrenada en la Coral TPU → recorte
-  del banner → OCR; la TPU pasa a **preprocesadora**); **supermercado = LLM con visión en la nube**,
+  2026-08-30 y 2026-09-01)*: **bondis = local** (detección → recorte del banner → OCR).
+  Desde el 2026-09-15 la detección corre **dentro del sensor de la AI Camera**, no en una TPU aparte,
+  y el camino entero está medido en la placa: **1,27 s** del botón a la línea dicha; **supermercado = LLM con visión en la nube**,
   con **cinco modelos elegidos por latencia** en el selector. Cae la gratuidad como restricción del
   proyecto (se paga para poder comparar) y sigue vigente para el usuario final. La precisión se mide
   con **datasets de evaluación** (recall / precision / accuracy / F1) — nada se entrena. Ver
@@ -135,7 +136,8 @@ tests via `jest-expo`.
   cualquier estado, y **dos clicks piden una lectura siempre** — estando ya en supermercado, el doble
   click saca otra foto en vez de no hacer nada. El pedido viaja como evento propio
   (`{"t":"read","mode":N}`) y no como un cambio de modo, porque el modo no cambia. Un click **no**
-  pide lectura: ómnibus es vigilancia y repetirlo costaría una foto y una llamada a la nube por toque.
+  pide lectura: ómnibus es vigilancia. Desde el 2026-09-15, **dentro del modo ómnibus un click repite
+  el último anuncio** (no cuesta ni foto ni nube: reproduce los `.wav` que ya están en la SD).
   La app muestra además la foto que sacó la placa debajo del resultado. Placa y app desplegadas y
   verificadas juntas.
 - **El botón y el enlace, tras la primera sesión de uso seguido (2026-09-13, ADR 0003 y 0007 act.)**:
@@ -186,8 +188,10 @@ tests via `jest-expo`.
   para poder comparar los dos caminos sin el hardware final. Lo no evidente: el envío a la placa pasó
   a estar **dentro de la sesión de audio** (antes era `void` después del anuncio), que es lo que lo
   hace funcionar con la pantalla bloqueada; y el **teléfono es siempre el respaldo**, con el motivo
-  registrado en `audio.fallback` en vez de anunciado. **Ómnibus queda afuera**: mandarlo a la placa
-  exigiría TTS en la nube y tiene que funcionar sin internet (ADR 0001). Ver ADR 0003, act. 2026-09-11.
+  registrado en `audio.fallback` en vez de anunciado. ~~**Ómnibus queda afuera**~~: quedó afuera
+  hasta el **2026-09-15**, porque mandarlo a la placa exigía un TTS. Con los 403 anuncios pregrabados
+  en la SD ya no hace falta, y ómnibus respeta el mismo ajuste que supermercado.
+  Ver ADR 0003, act. 2026-09-11 y 2026-09-15.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a
@@ -262,8 +266,10 @@ Pick a track (see the skill for pillar detail):
 - **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). **Alimentación
   comprada el 2026-09-07**: Waveshare UPS HAT (C) + LiPo 1000 mAh (`hardware/README.md`, *Alimentación*).
   **Botón físico hecho el 2026-09-07** (`raspi/virovision/button.py`, GPIO 5 / pin 29).
-  Siguen: DAC I2S + anuncios pregrabados, leer el INA219 del HAT → `estado.bateria`, medir
-  el consumo real, pipeline de ómnibus en el Coral, carcasa.
+  **El modo ómnibus entero corre en la placa desde el 2026-09-15** (detección en el sensor IMX500,
+  OCR en la Pi, anuncios pregrabados por el parlante), disparado por el botón.
+  Siguen: DAC I2S, leer el INA219 del HAT → `estado.bateria`, medir el consumo real, la app mostrando
+  la lectura de ómnibus, y la carcasa.
 
 **Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core
 value prop, and exercises the recognition/audio domain already scaffolded.

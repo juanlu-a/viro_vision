@@ -2061,6 +2061,94 @@ el fondo son uno: la app le hablaba a quien la mira, y la usa quien la escucha. 
   Documentación: ADR 0010, `decisiones.md`, `app.md`, la skill de marca, `PROJECT-STATUS.md` y la
   QA de supermercado (el orden de VoiceOver en Inicio y el texto de «Qué reconoce»).
 
+## 2026-09-15 — El modo ómnibus entero en la placa: 1,27 s del botón a la línea dicha
+
+Dos ramas: `feat/bus-banner-pipeline` en el repo de Magalí Dellapiazza (`bus-banner-recognizer`) y
+`feat/omnibus-en-el-daemon` acá. Es el día en que el camino de ómnibus dejó de ser un pipeline que
+corre a mano por SSH y pasó a ser **un modo del producto**: se aprieta el botón, la placa vigila, y
+cuando pasa un ómnibus lo dice. Sin teléfono y sin internet, que es lo que el ADR 0001 venía pidiendo
+desde julio.
+
+Los números están en [`mediciones/2026-09-15-omnibus-en-placa.md`](mediciones/2026-09-15-omnibus-en-placa.md).
+El resumen: **1,27 s** desde el click hasta «ómnibus 115, Luis Braille», de los cuales ~1 s es el OCR;
+33 s desde el reinicio hasta que el modo está listo.
+
+### El modelo de Magalí, adentro del sensor
+
+Lo que corre en la cámara **es su modelo, sin reentrenar**: YOLO11n fine-tuneado sobre el dataset
+Roboflow `find-bus-sign` v6 (140 fotos, una clase `bus_sign`, 40 epochs). Las diferencias son de
+formato: pesos **int8** cuantizados con la herramienta de Sony calibrando con esas mismas 140 fotos,
+**NMS incluida** en el modelo, y 2,64 MB en vez de 5,2. Ocupa el **90 % de los 8 MB** del chip, así
+que un modelo de dos clases entra pero uno más grande no.
+
+Que corra **dentro del sensor** es lo que hace que la cuenta cierre: el detector no consume CPU ni RAM
+de la Pi, y no aparece en el presupuesto de tiempo. La Pi sólo recorta y lee.
+
+El export costó tres intentos de Docker (falta de `openjdk-17-jre-headless` en `python:3.11-slim`, un
+`ImportError` de protobuf, y otro de `MulticlassNMSOBB`) y se cerró fijando el juego exacto de
+versiones que usa ultralytics. **Nada se entrenó en la Mac del usuario**, por pedido explícito.
+
+### El pipeline, partido en dos como pidió Magalí
+
+Su devolución sobre el primer PR fue precisa: el repo es **sólo en inglés** y «¿dónde queda dividido
+lo del bondi y lo del cartel? está todo mezclado». Quedó `detection/bus.py` (COCO yolo11n, sólo la
+clase `bus`) separado de `detection/sign.py` (sus pesos, clase `bus_sign`), y todo el repo en inglés.
+
+Del lado de la lectura, tres cosas que sólo aparecen con carteles reales:
+
+- **El número de línea se perdía con el recorte justo**: el OCR leía `15` donde decía `115` porque el
+  primer dígito se funde con el ícono de silla de ruedas. Tres remedios, los tres puestos: margen
+  izquierdo de recorte **tres veces** el derecho (el número va a la izquierda en los carteles de
+  Montevideo), medio voto para líneas que no están en el catálogo, y reparación contra el catálogo de
+  la STM. El journal muestra `15 LUIS BRALLE` entrando y `115, LUIS BRAILLE` saliendo.
+- **El OCR no puede correr en el hilo de la cámara**: libcamera da el sensor por muerto tras ~1 s sin
+  consumir frames y el OCR tarda ~1 s. Va en un hilo aparte; es lo que hizo desaparecer los
+  «Camera frontend has timed out».
+- **`aplay a.wav b.wav` falla en el segundo archivo** («Unable to install hw params»). Un `aplay` por
+  archivo, en cola. Sin eso el destino no se escuchaba nunca.
+
+**El OCR es el de Magalí (PaddleOCR)**, no otro, por pedido del usuario. Corre por ONNX
+(PP-OCRv5 mobile) porque paddlepaddle **no tiene wheel** para Linux ARM64 con Python 3.13.
+
+### El modo, en el daemon
+
+`virovision/bus.py`, y la cámara que hasta ayer sólo sacaba fotos fijas ahora abre **una sola
+configuración de preview** que sirve para las dos cosas: el modo supermercado sigue sacando su foto
+(`/photos/latest` devuelve el mismo JPEG de 1024×766, verificado) y el modo ómnibus consume frames.
+
+Dos decisiones que se tomaron con el usuario y que cambian reglas escritas:
+
+- **En modo ómnibus la voz respeta el ajuste de la app.** Hasta hoy ómnibus sonaba siempre en el
+  teléfono, y la razón real era que **los anuncios pregrabados no existían**. Ahora existen: 403
+  `.wav` en la SD. Quedó como actualización del [ADR 0003 §5](architecture/adr/0003-enlace-placa-telefono.md).
+- **El click corto dentro del modo ómnibus repite el último anuncio.** Antes no hacía nada.
+
+### Lo que apareció en la primera prueba real
+
+El anuncio salió **dos veces en un segundo**. Era un solo ómnibus: se movió la cámara mientras estaba
+en cuadro, se perdió el track y volvió como uno nuevo. Cualquier cosa que corte el track —una mano, un
+poste, alguien que pasa— haría lo mismo, y **quien no ve no puede distinguir «lo repitió» de «llegó
+otro»**. Una línea recién anunciada queda 10 s en silencio.
+
+### Operación: lo que ya no hay que volver a preguntar
+
+Tres reglas que costaron horas y ahora viven en la skill
+(`references/placa-acceso.md`, PR #87): **nunca unir la Mac al AP de la placa** (una sola radio: se
+queda sin internet a mitad de una copia), **la microSD es el panel de control** (el archivo `SIN-AP`
+de `bootfs` decide desarrollo o producto, y un `.nmconnection` ahí agrega una red WiFi sin SSH), y
+**la placa guarda varias redes** —hoy casa y oficina— así que mudarse ya no obliga a reescribir nada.
+
+### Verificación
+
+63 tests en `bus-banner-recognizer` y **77 + 2 skipped** en `hardware/raspi`, todos en verde. En la
+placa: reinicio, click, anuncio, repetición por click corto, vuelta a *esperando* y la foto de
+supermercado intacta.
+
+Medido a medias, y anotado: el **costo en precisión del int8**. El float32 da mAP50 **0,781** en el
+split de test; la mitad cuantizada no se pudo correr porque el ONNX del export no carga fuera del
+contenedor (los operadores propios de Sony se pisan entre sí). Queda correr esa validación dentro del
+Docker del export.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2130,14 +2218,15 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 
   Es accesibilidad, no pulido: en una app cuya interfaz es la voz, un estado sin salida deja al
   usuario sin forma de saber que el remedio existe.
-- **AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor. Otro PR.
+- ~~**AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor~~ —
+  **cerrado el 2026-09-15**: corre, y el camino entero tarda 1,27 s desde el botón.
 - **El transductor de audio** (del 2026-09-11, con el camino ya resuelto): el piezo verifica pero no
   sirve para voz; el auricular sí, y hoy va **sin resistencia en serie** pidiéndole ~100 mA a un pin
   de 16 mA — conseguir 100-330 Ω. Después: `audio_pwm_mode=2` (el default, menos ruido) y un filtro
   RC. Destino: **DAC I2S MAX98357A**, que necesita GPIO 18/19/21 — y **hay un botón cableado en el
   21**, así que hay que mudarlo antes.
-- **Anuncios pregrabados en la SD** para el modo ómnibus (ADR 0003 §5). Es lo que falta para que
-  ómnibus pueda sonar en la placa sin romper offline-first: hoy habla por el teléfono siempre.
+- ~~**Anuncios pregrabados en la SD** para el modo ómnibus (ADR 0003 §5)~~ — **cerrado el
+  2026-09-15**: 403 `.wav` en la placa, y ómnibus pasa a respetar el ajuste de dónde se escucha.
 - **En qué GPIO está cada botón, de verdad.** El daemon escucha en **GPIO 5** (log del arranque) y el
   cable estaría en el 21. Lo resuelve `/boot/firmware/check-pines.sh`, que mira siete pines mientras
   se aprieta cada botón. Diez segundos, y hasta entonces los defaults del código son una conjetura.
@@ -2168,8 +2257,20 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **La rotación de conexiones BLE durante el arranque** (del 2026-09-14): cinco conexiones de menos
   de 1,5 s en 30 s, y se calma sola. Sospecha: el GATT se registra ~45 s antes del anuncio, mientras
   la cámara inicializa, y iOS entra con un connect encolado. Cerrarlo con `btmon` durante un arranque.
-- Placa: DAC I2S + anuncios pregrabados; elegir el **detector para la TPU** y medirlo (el camino
-  de ómnibus es el caso B, todo en placa).
+- Placa: DAC I2S. El detector ya no se elige: corre **dentro del sensor IMX500** y el caso B está
+  medido (2026-09-15). Falta el **costo en precisión del int8**, que necesita correr `yolo val` sobre
+  el modelo cuantizado **dentro de la imagen Docker del export** (fuera de ahí el ONNX no carga).
+- **La app todavía no muestra la lectura de ómnibus.** La mitad receptora existe y no está cableada:
+  falta suscribir `onRecognition` en `ReaderBridge.tsx`, sacar ómnibus de la exclusión de
+  `audioOutput.ts`, actualizar `audioOutputBusNote` en `i18n/es.ts` (hoy dice que ómnibus suena
+  siempre en el teléfono) y mandar `{"cmd":"audio","target":…}` al conectar y al cambiar el ajuste.
+- **Un modelo de dos clases** (ómnibus y cartel en el mismo `.rpk`) entra en el chip, pero hay que
+  entrenarlo en el servidor V100 de Arnaldo Castro, cuyo acceso SSH sigue pendiente. Con las fotos ya
+  pseudo-etiquetadas para Roboflow, Magalí no tiene que volver a etiquetar a mano.
+- **Rotar la clave de Roboflow** (quedó en el historial de git de `bus-banner-recognizer`) y la
+  contraseña de sudo de la placa, que se compartió por chat.
+- **La calle.** Todo lo medido es contra un video en una pantalla. Falta un ómnibus real, de día, en
+  movimiento, y con eso la lista de fallos que sólo aparecen afuera.
 
 ### Suelto
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.

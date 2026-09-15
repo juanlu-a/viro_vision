@@ -15,3 +15,4 @@ con ellos parezcan arbitrarias.
 | Campaña | Qué midió |
 |---|---|
 | [2026-09-02 — modelos de supermercado](2026-09-02-modelos-supermercado.md) | Latencia, acierto, cuota, costo y efecto del tamaño de imagen de los tres proveedores con clave. |
+| [2026-09-15 — el modo ómnibus en la placa](2026-09-15-omnibus-en-placa.md) | Latencia del camino de ómnibus entero corriendo en el dispositivo, disparado por el botón. |
