@@ -176,3 +176,19 @@ def test_the_mode_still_changes_without_bus_mode(loop):
         assert [e["t"] for e in notifications.events()] == ["mode"]
 
     loop.run_until_complete(scenario())
+
+
+def test_the_same_bus_seen_twice_is_announced_once():
+    """The board said "115, Luis Braille" twice within a second on its first run from the button: the
+    camera was moved while the bus was in frame, the tracker lost it, and the same bus came back as a
+    new track. Anything that makes the tracker lose a bus would do the same, and a blind user hearing
+    the line twice cannot tell whether a second bus arrived (2026-09-15)."""
+
+    class CameraWithoutModel:
+        sensor = None
+
+    watcher = BusWatcher(CameraWithoutModel(), lambda files: None, lambda event: None)
+    assert not watcher._is_an_echo("115", "LUIS BRAILLE"), "the first time is news"
+    assert watcher._is_an_echo("115", "LUIS BRAILLE"), "a second later, still the same bus"
+    assert not watcher._is_an_echo("183", "PUNTA CARRETAS"), "another line is always news"
+    assert not watcher._is_an_echo("115", "LUIS BRAILLE"), "115 stopped being the last one announced"
