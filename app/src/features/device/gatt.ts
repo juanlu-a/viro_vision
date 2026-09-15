@@ -17,7 +17,7 @@ export const GATT = {
   characteristics: {
     /** read · notify · write — uint8: 0 idle, 1 bus, 2 supermarket (ADR 0007). */
     mode: '4380c501-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status', ... }`. */
+    /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status' | 'audio', ... }`. */
     control: '4380c502-7ca3-4e37-b27d-f60e8d8d73d1',
     /** notify — JSON ≤ 180 bytes: `{ t: 'start' | 'end' | 'mode' | 'read' | 'ap' | 'error' | 'result', ... }`. */
     event: '4380c503-7ca3-4e37-b27d-f60e8d8d73d1',
@@ -71,3 +71,15 @@ export interface WifiCredentials {
 /** Operating mode as the device encodes it in the `mode` characteristic (ADR 0007). */
 export const GATT_MODE = { idle: 0, bus: 1, supermarket: 2 } as const;
 export const MODE_FROM_GATT = ['idle', 'bus', 'supermarket'] as const;
+
+/**
+ * The command that tells the device where a bus reading should be heard.
+ *
+ * It lives here, with the rest of the protocol, and not in the BLE client: it is a contract with
+ * `hardware/raspi/virovision/core.py`, which reads exactly these two keys and answers with an error
+ * event for any other target. A typo on this side is silent - the device keeps its previous setting
+ * and the reading comes out of the wrong speaker, which is how the bug was found on 2026-09-15.
+ */
+export function audioCommand(target: 'phone' | 'device'): string {
+  return JSON.stringify({ cmd: 'audio', target });
+}
