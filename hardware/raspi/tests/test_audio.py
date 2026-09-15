@@ -74,3 +74,11 @@ def test_the_default_level_leaves_headroom():
     from virovision.audio import DEFAULT_VOLUME_PERCENT
 
     assert DEFAULT_VOLUME_PERCENT < 100
+
+
+def test_a_sequence_with_no_player_installed_does_not_raise():
+    """Three clips in a row are a bus announcement. On the Mac there is no `aplay`, and the daemon has
+    to survive that: the reading is lost, not the process."""
+    player = Player()
+    player.play_sequence(["/tmp/one.wav", "/tmp/two.wav"])
+    player.stop()

@@ -1,0 +1,31 @@
+# Bus mode: the reading half (ADR 0006). Installed with --no-deps ON PURPOSE — see setup.sh.
+#
+# pip must not resolve these dependencies, because it would pull numpy and opencv from PyPI and
+# shadow the ones picamera2 was built against (apt's), and the camera stops working in a way that
+# looks like a camera fault. Everything listed here is either pure Python or has an aarch64 wheel.
+#
+# The pipeline itself lives in its own repo (bus-banner-recognizer), shared with the Mac where it is
+# developed and evaluated. It is NOT listed here: both that repo and its fork are private, and a
+# device that goes out to the street should not carry credentials to clone them. It travels as a
+# wheel instead — `uv build --wheel` on the Mac, copied to `$INSTALL_DIR/wheels/`, which setup.sh
+# installs. When the repo becomes public this can go back to being one line:
+#   bus-banner-recognizer @ git+https://github.com/juanlu-a/bus-banner-recognizer@main
+
+# OCR: PaddleOCR's PP-OCRv5 mobile models exported to ONNX. paddlepaddle itself has no wheel for this
+# board (Linux ARM64 only up to Python 3.11, and Trixie runs 3.13); onnxruntime does.
+rapidocr>=3,<4
+onnxruntime>=1.20
+
+# What rapidocr imports at runtime and --no-deps will not bring:
+colorlog
+omegaconf
+pillow
+pyclipper
+pyyaml
+requests
+shapely
+six
+tqdm
+# Pinned: omegaconf's parser is generated with ANTLR 4.9 and refuses a newer runtime with
+# "Could not deserialize ATN with version 3 (expected 4)". Measured on the board, 2026-09-15.
+antlr4-python3-runtime==4.9.3
