@@ -2143,6 +2143,25 @@ en cuadro, se perdió el track y volvió como uno nuevo. Cualquier cosa que cort
 poste, alguien que pasa— haría lo mismo, y **quien no ve no puede distinguir «lo repitió» de «llegó
 otro»**. Una línea recién anunciada queda 10 s en silencio.
 
+Probando después con varios videos distintos aparecieron dos cosas más, las dos del mismo tipo: la
+detección anda, lo que fallaba era **qué se dice y cuándo**.
+
+- **«Se acerca un ómnibus» se repetía muchas veces seguidas.** El silencio anterior cubría la línea y
+  no la presencia, y la presencia se anunciaba **una vez por track**: con videos cortados, cada corte
+  rompía el seguimiento y fabricaba un track nuevo. La frase no distingue un ómnibus de otro, así que
+  repetirla no agrega información aunque el segundo ómnibus sea real. Ventana de 15 s, y el anuncio
+  de una línea también la arma: decir «se acerca un ómnibus» después de «ómnibus 115, Luis Braille»
+  es contar algo que el usuario ya sabe.
+- **A veces decía sólo el número, a veces sólo el destino.** El anuncio salía apenas el número juntaba
+  votos, sin esperar la otra mitad. Los dos campos salen del mismo recorte, así que la mitad que falta
+  suele llegar en la lectura siguiente: ahora espera unos intentos. La paciencia **se termina cuando
+  se termina el ómnibus**: un track que se pierde con una lectura incompleta anuncia lo que tiene al
+  salir, porque ya no va a haber otro intento y media respuesta es mejor que ninguna.
+
+De paso salió un error latente: `time.monotonic()` cuenta desde el arranque del **proceso** en macOS y
+desde el arranque de la **máquina** en Linux, así que inicializar la última marca de tiempo en cero
+silenciaba el primer aviso en una plataforma y no en la otra. Ahora el «todavía no habló» es `None`.
+
 ### Operación: lo que ya no hay que volver a preguntar
 
 Tres reglas que costaron horas y ahora viven en la skill
