@@ -2075,10 +2075,14 @@ El resumen: **1,27 s** desde el click hasta «ómnibus 115, Luis Braille», de l
 
 ### El modelo de Magalí, adentro del sensor
 
-Lo que corre en la cámara **es su modelo, sin reentrenar**: YOLO11n fine-tuneado sobre el dataset
-Roboflow `find-bus-sign` v6 (140 fotos, una clase `bus_sign`, 40 epochs). Las diferencias son de
-formato: pesos **int8** cuantizados con la herramienta de Sony calibrando con esas mismas 140 fotos,
-**NMS incluida** en el modelo, y 2,64 MB en vez de 5,2. Ocupa el **90 % de los 8 MB** del chip, así
+Lo que corre en la cámara **es su modelo, sin un solo paso de entrenamiento**: YOLO11n fine-tuneado
+sobre el dataset Roboflow `find-bus-sign` v6 (140 fotos: 98 train, 28 valid, 14 test; una clase
+`bus_sign`, 40 epochs). Verificado leyendo el export, no supuesto: usa la cuantización posterior
+**sin gradientes**, que es la que ultralytics deja por defecto. Los pesos son los de ella redondeados
+a int8, con las escalas elegidas calibrando sobre las **28 fotos de valid**; unas pocas activaciones
+quedan en 16 bits. La **NMS va horneada** con `conf=0,25` / `iou=0,7`, que es la única diferencia que
+cambia el comportamiento y no sólo el formato: en el `.rpk` la confianza ya no se puede bajar en
+caliente. Y pesa 2,64 MB en vez de 5,2. Ocupa el **90 % de los 8 MB** del chip, así
 que un modelo de dos clases entra pero uno más grande no.
 
 Que corra **dentro del sensor** es lo que hace que la cuenta cierre: el detector no consume CPU ni RAM
@@ -2107,8 +2111,17 @@ Del lado de la lectura, tres cosas que sólo aparecen con carteles reales:
 - **`aplay a.wav b.wav` falla en el segundo archivo** («Unable to install hw params»). Un `aplay` por
   archivo, en cola. Sin eso el destino no se escuchaba nunca.
 
-**El OCR es el de Magalí (PaddleOCR)**, no otro, por pedido del usuario. Corre por ONNX
-(PP-OCRv5 mobile) porque paddlepaddle **no tiene wheel** para Linux ARM64 con Python 3.13.
+**El OCR es PaddleOCR, el que ella eligió**, por pedido del usuario, pero conviene decir en qué se
+parece y en qué no:
+
+- **En su repo el OCR nunca llegó a correr.** `DestinationSignDetector` construye el `PaddleOCR` y no
+  lo llama nunca, y `BusDetector.recognize_text` usa un `self.ocr` que esa clase no define: revienta
+  al primer uso. Por eso el repo detectaba y no leía.
+- **Corre por ONNX** (`rapidocr` con PP-OCRv5 mobile), no por paddlepaddle, que **no tiene wheel** para
+  Linux ARM64 con Python 3.13. Es el mismo modelo, otro motor.
+- **El reconocedor no es exactamente el suyo.** Ella pide `lang='es'`, que en PaddleOCR baja el modelo
+  latino; el que corre en la placa es el `ch_PP-OCRv5_rec_mobile`, el default multilingüe. Misma
+  familia, pesos distintos. Es candidato número uno cuando toque reentrenar el OCR.
 
 ### El modo, en el daemon
 

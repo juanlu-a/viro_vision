@@ -65,17 +65,26 @@ Ocupación del chip del sensor: 2,64 MB de modelo + 4,48 MB de runtime = **7,12 
 
 ## Qué modelo está en la cámara
 
-Es **el modelo de Magalí, sin reentrenar**: YOLO11n fine-tuneado por ella sobre el dataset Roboflow
-`find-bus-sign` v6 (140 fotos, una clase `bus_sign`, 40 epochs). Las diferencias son todas de
-formato, ninguna de aprendizaje:
+Es **el modelo de Magalí, sin un solo paso de entrenamiento**: YOLO11n fine-tuneado por ella sobre el
+dataset Roboflow `find-bus-sign` v6 (140 fotos en total — 98 de train, 28 de valid, 14 de test —, una
+clase `bus_sign`, 40 epochs). Verificado en el código, no supuesto: el export llama a
+`mct.ptq.pytorch_post_training_quantization`, **no** a la variante por gradientes
+(`pytorch_gradient_post_training_quantization`), que ultralytics deja apagada por defecto y el script
+no enciende. No hay backpropagation, no hay datos nuevos, no hay épocas.
 
 | | El de Magalí (`.pt`) | El que corre en la cámara (`.rpk`) |
 |---|---|---|
-| Pesos | float32 | **int8**, cuantizado con la herramienta de Sony calibrando con las mismas 140 fotos |
+| Pesos | float32 | los mismos, **redondeados a int8** con escalas por canal; unas pocas activaciones quedan en 16 bits |
+| Cómo se eligieron las escalas | — | calibrando con las **28 fotos del split de valid** (es el split que usa ultralytics por defecto), sin tocar los pesos |
 | Dónde corre | CPU/GPU de una computadora | **dentro del sensor**, 15 fps, sin CPU ni RAM de la Pi |
-| NMS | aparte, en ultralytics | **incluida en el modelo**: la cámara devuelve cajas finales |
+| NMS | aparte, en ultralytics, con los umbrales que se pasen en cada llamada | **horneada en el modelo** con `conf=0,25`, `iou=0,7`, `max_det=300` |
 | Tamaño | 5,2 MB | 2,64 MB |
 | Clases | `bus_sign` | `bus_sign` (idéntico) |
+
+**La NMS horneada es la única diferencia que cambia el comportamiento, no sólo el formato.** En el
+`.pt` se puede bajar la confianza en cada llamada; en el `.rpk` no: lo que puntúe menos de 0,25 no
+sale del sensor y la Pi nunca se entera. Si algún día hay que detectar carteles más chicos o más
+lejanos, ese umbral se cambia **reexportando**, no en el código de la placa.
 
 ## Lo que la medición dejó en evidencia
 
