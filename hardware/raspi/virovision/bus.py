@@ -37,6 +37,13 @@ MIN_CONFIDENCE = 0.3
 CONFIRM_SECONDS = 0.6
 VOTES_NEEDED = 2
 MIN_BANNER_HEIGHT_PX = 22
+PRESENCE_SILENCE_S = 15.0
+"""«Se acerca un ómnibus» no se repite dentro de esta ventana, venga del track que venga. Un ómnibus
+que se pierde y vuelve es un track nuevo, y con eso el aviso salía una vez por corte: probando con
+videos el 2026-09-15 se repitió muchas veces seguidas. La frase no distingue un ómnibus de otro, así
+que repetirla no agrega información aunque el segundo ómnibus sea real; lo que sí distingue es la
+línea, y ésa tiene su propia ventana."""
+
 SAME_LINE_SILENCE_S = 10.0
 """A line just announced is not announced again this soon. One bus is one announcement, and the
 tracker alone cannot guarantee that: on the first run from the button the board said "115, Luis
@@ -96,7 +103,11 @@ class BusWatcher:
         self._results: queue.Queue = queue.Queue()
         self._last_announcement: list = []
         self._last_line: tuple = ()
-        self._last_line_at = 0.0
+        self._last_line_at: float | None = None
+        self._last_voice_at: float | None = None
+        """None means «todavía no habló». Cero no sirve: `time.monotonic()` cuenta desde el arranque
+        del proceso en macOS y desde el arranque de la máquina en Linux, así que un cero literal
+        silencia el primer aviso en una plataforma y no en la otra."""
         self.running = False
 
     @property
@@ -258,19 +269,36 @@ class BusWatcher:
         bus rather than news. See SAME_LINE_SILENCE_S. Records the line when it is news, so calling
         this is what arms the silence."""
         now = time.monotonic()
-        if (number, destination) == self._last_line and now - self._last_line_at < SAME_LINE_SILENCE_S:
+        if (
+            (number, destination) == self._last_line
+            and self._last_line_at is not None
+            and now - self._last_line_at < SAME_LINE_SILENCE_S
+        ):
             return True
         self._last_line, self._last_line_at = (number, destination), now
         return False
 
+    def _presence_is_worth_saying(self) -> bool:
+        """False while the last announcement is still recent. See PRESENCE_SILENCE_S. Records the
+        moment when it says yes, so calling this is what arms the silence."""
+        now = time.monotonic()
+        if self._last_voice_at is not None and now - self._last_voice_at < PRESENCE_SILENCE_S:
+            return False
+        self._last_voice_at = now
+        return True
+
     def _handle(self, event) -> None:
         if event.kind == "bus":
+            if not self._presence_is_worth_saying():
+                log.info("bus: there is a bus, said %.1f s ago", time.monotonic() - (self._last_voice_at or 0.0))
+                return
             self._announce_presence()
         elif event.kind == "reading":
             if self._is_an_echo(event.number, event.destination):
                 log.info("bus: %s again, still the same bus", event.phrase())
                 return
             log.info("bus: %s", event.phrase())
+            self._last_voice_at = time.monotonic()
             self._last_announcement = self._files_for(event.number, event.destination)
             self._speak(self._last_announcement)
             self._emit(self._result_event(event))

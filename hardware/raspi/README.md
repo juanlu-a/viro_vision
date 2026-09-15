@@ -370,7 +370,7 @@ Pesan demasiado para el repo. Los dos se reconstruyen desde `bus-banner-recogniz
 | En la placa | Qué es | Cómo se rehace |
 |---|---|---|
 | `/home/virovision/models/bus_sign.rpk` | el detector de carteles, int8, para el sensor | `imx500-package -i packerOut.zip -o out/` sobre `models/bus_sign_v6_yolo11n_imx_model/packerOut.zip`, que sí está en el repo (LFS) |
-| `/home/virovision/announcements/` | 403 `.wav`: números de línea, destinos de la STM y avisos de sistema | `scripts/make_announcements.py` |
+| `/home/virovision/announcements/` | 386 `.wav`: números de línea, destinos de la STM y avisos de sistema | `scripts/make_announcements.py` |
 | `/home/virovision/models/catalog_stm.csv` | el catálogo de líneas y destinos de Montevideo, que repara lecturas del OCR | `scripts/build_catalog.py` |
 
 Banderas: `--bus-model`, `--announcements`, `--bus-catalog`, y `--no-bus` para apagar el modo.

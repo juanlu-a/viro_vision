@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from virovision.bus import BusWatcher  # noqa: E402
+from virovision.bus import PRESENCE_SILENCE_S, BusWatcher  # noqa: E402
 from virovision.core import EVENT, EVENT_MAX_BYTES, Core  # noqa: E402
 from virovision.modes import Mode  # noqa: E402
 
@@ -192,3 +192,41 @@ def test_the_same_bus_seen_twice_is_announced_once():
     assert watcher._is_an_echo("115", "LUIS BRAILLE"), "a second later, still the same bus"
     assert not watcher._is_an_echo("183", "PUNTA CARRETAS"), "another line is always news"
     assert not watcher._is_an_echo("115", "LUIS BRAILLE"), "115 stopped being the last one announced"
+
+
+def test_a_bus_is_announced_once_even_if_the_tracker_sees_several():
+    """«Se acerca un ómnibus» salía una vez por track, y un ómnibus que se pierde y vuelve es un
+    track nuevo. Probando con videos el 2026-09-15 la frase se repitió muchas veces seguidas: los
+    cortes del video rompían el seguimiento. La frase no distingue un ómnibus de otro, así que
+    repetirla no agrega nada."""
+
+    class CameraWithoutModel:
+        sensor = None
+
+    watcher = BusWatcher(CameraWithoutModel(), lambda files: None, lambda event: None)
+    assert watcher._presence_is_worth_saying(), "el primero sí"
+    assert not watcher._presence_is_worth_saying(), "un instante después, no"
+    watcher._last_voice_at -= PRESENCE_SILENCE_S + 1  # pasó la ventana
+    assert watcher._presence_is_worth_saying(), "más tarde vuelve a ser noticia"
+
+
+def test_the_line_silences_the_presence_that_would_follow_it():
+    """Decir «se acerca un ómnibus» después de haber dicho «ómnibus 115, Luis Braille» es contar algo
+    que el usuario ya sabe, y así llegaba: el anuncio de la línea no armaba la ventana de silencio."""
+
+    class Event:
+        kind = "reading"
+        number = "115"
+        destination = "LUIS BRAILLE"
+
+        def phrase(self):
+            return "Bus 115, LUIS BRAILLE"
+
+    class CameraWithoutModel:
+        sensor = None
+
+    watcher = BusWatcher(CameraWithoutModel(), lambda files: None, lambda event: None)
+    watcher._files_for = lambda number, destination: []  # los .wav viven en la placa, no acá
+    watcher._result_event = lambda event: {}  # el evento BLE tiene su propio test
+    watcher._handle(Event())
+    assert not watcher._presence_is_worth_saying()
