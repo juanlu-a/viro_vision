@@ -9,6 +9,11 @@ Software mínimo a propósito: Raspberry Pi OS **Lite** 64-bit (Bookworm), BlueZ
 un servicio de systemd. No hay camino sin Linux: la cámara necesita libcamera, el Coral libedgetpu, el
 BLE BlueZ.
 
+
+> **Antes de tocar la placa** leé `.claude/skills/virovision/references/placa-acceso.md`: cómo entrar por cable o
+> por la microSD, cómo agregar redes WiFi sin SSH (`bootfs/*.nmconnection`), y por qué **nunca** hay que unir la Mac
+> al AP «ViroVision».
+
 ## Instalación (una vez, por SSH)
 
 Desde la Mac, en la raíz del repo, con la placa prendida y en la misma red:
