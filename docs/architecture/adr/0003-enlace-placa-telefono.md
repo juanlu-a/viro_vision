@@ -545,6 +545,33 @@ Si alguna vez aparece `NOT advertising and no central connected`, la falla es de
 falta deducirlo — y la condición incluye «sin nadie conectado» porque BlueZ deja de anunciar
 **legítimamente** mientras hay una central conectada.
 
+## Actualización 2026-09-15 — Los anuncios pregrabados existen, y ómnibus deja de sonar siempre en el teléfono
+
+El §5 decía que en modo ómnibus la placa habla con anuncios pregrabados. Era una intención: no había
+anuncios, así que el código hacía lo contrario —el modo ómnibus quedaba **excluido** de la elección
+teléfono/dispositivo y sonaba siempre en el teléfono (`app/src/features/audio/audioOutput.ts`)—. Esa
+exclusión contradecía el ADR 0001: el único modo que funciona sin internet era el único que no podía
+sonar sin el teléfono.
+
+Ahora existen: **386 `.wav`** en la SD de la placa (los números de línea, los destinos del catálogo de
+la STM y los avisos de sistema), generados con `scripts/make_announcements.py`. Con eso el camino
+entero corre en el dispositivo: detección en el sensor, OCR en la Pi, voz por el parlante, **1,27 s
+desde el botón hasta la línea dicha** ([medición](../../mediciones/2026-09-15-omnibus-en-placa.md)).
+
+**Decisión: en modo ómnibus la voz respeta el ajuste de Ajustes**, igual que supermercado. Por
+defecto, en la placa. El JSON del resultado sale por BLE en los dos casos, porque la app muestra la
+lectura aunque no sea ella la que habla.
+
+Dos reglas que salieron de la primera prueba real y que valen como contrato del modo, no como detalle
+de implementación:
+
+- **Un ómnibus es un anuncio.** El tracker de por sí no lo garantiza: si algo corta el track —una
+  mano en la cámara, un poste, alguien que pasa— el mismo ómnibus vuelve como uno nuevo y el anuncio
+  se repite. Quien no ve no puede distinguir «lo repitió» de «llegó otro», así que una línea recién
+  anunciada queda en silencio 10 s.
+- **El click corto dentro del modo ómnibus repite el último anuncio.** Es el remedio para el caso en
+  que el usuario no llegó a escuchar, y no necesita nada del teléfono.
+
 ## Ver también
 
 - Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).

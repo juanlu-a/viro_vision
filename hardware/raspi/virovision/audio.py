@@ -26,8 +26,10 @@ is not soldered would be much worse than a silent one.
 from __future__ import annotations
 
 import logging
+import queue
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -107,6 +109,9 @@ class Player:
 
     def __init__(self) -> None:
         self._process: Optional[subprocess.Popen] = None
+        self._queue: queue.Queue = queue.Queue()
+        self._queue_lock = threading.Lock()
+        self._worker: Optional[threading.Thread] = None
         # Reported once, at startup, because it is the difference between "the audio did not arrive"
         # and "the audio arrived and there was nothing to play it with" — and on a device with no
         # screen the log is the only place anyone can tell them apart.
@@ -136,8 +141,48 @@ class Player:
             return
         log.info("audio: playing %s (pid %d)", path, self._process.pid)
 
+    def play_sequence(self, paths: list) -> None:
+        """Play these files one after another, without cutting each other off. Returns immediately.
+
+        Two lessons from the board (2026-09-15). `aplay a.wav b.wav` fails to reconfigure the device
+        for the second file ("Unable to install hw params") and only the first is heard, so there is
+        one process per file. And a bus announcement is two or three clips in a row ("a bus is
+        coming", "115", "Luis Braille"): `play` would have each one kill the previous.
+        """
+        if not paths:
+            return
+        with self._queue_lock:
+            for path in paths:
+                self._queue.put(str(path))
+            if self._worker is None or not self._worker.is_alive():
+                self._worker = threading.Thread(target=self._play_queued, name="audio", daemon=True)
+                self._worker.start()
+
+    def _play_queued(self) -> None:
+        while True:
+            try:
+                path = self._queue.get_nowait()
+            except queue.Empty:
+                return
+            command = command_for(path)
+            if command is None:
+                log.warning("audio: nothing can play %s", path)
+                continue
+            try:
+                process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except (OSError, subprocess.SubprocessError) as exc:
+                log.warning("audio: could not play %s: %s", path, exc)
+                continue
+            self._process = process
+            process.wait()
+
     def stop(self) -> None:
-        """Silence whatever is playing. Safe to call with nothing playing."""
+        """Silence whatever is playing, and drop whatever was queued behind it."""
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
         process = self._process
         self._process = None
         if process is None or process.poll() is not None:

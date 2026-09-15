@@ -64,6 +64,7 @@ class Core:
         notify: Notify,
         ap_control: Optional[ApControl] = None,
         read_wifi: Optional[Callable[[], dict]] = None,
+        bus=None,
     ) -> None:
         self._loop = loop
         self._read_status = read_status
@@ -72,10 +73,21 @@ class Core:
         self._notify = notify
         self._ap_control = ap_control
         self._read_wifi = read_wifi
+        self._bus = bus
         self._ap_off_timer: Optional[asyncio.TimerHandle] = None
         self.modes = ModeMachine()
         self._transfer_id = 0
         self._transfer_in_flight: Optional[asyncio.Task] = None
+
+    def attach_bus(self, bus) -> None:
+        """Wires bus mode in after the fact: the watcher needs to emit events through this core, and
+        this core needs to start and stop the watcher, so one of the two has to be set afterwards."""
+        self._bus = bus
+
+    def emit_event(self, obj: dict) -> None:
+        """Send an event from ANY thread. Bus mode announces from its own frame thread, and
+        `create_task` off the loop thread is a silent no-op that would lose every reading."""
+        self._loop.call_soon_threadsafe(self._event, obj)
 
     # --- reads (synchronous: that is how BlueZ and CoreBluetooth ask for them) --------------
 
@@ -114,6 +126,10 @@ class Core:
             return
         if self.modes.from_clicks(clicks):
             self._announce_mode()
+        elif self.modes.current is Mode.BUS and self._bus is not None:
+            # Already watching: the user did not catch the last announcement. There is nothing new to
+            # read —bus mode watches on its own— so the click repeats what it said.
+            self._loop.run_in_executor(None, self._bus.repeat_last)
         else:
             log.debug("button: already in %s", self.modes.current.name)
         if self.modes.requests_reading(clicks):
@@ -153,6 +169,15 @@ class Core:
             )
         elif name == "mode":
             self._change_mode(int(cmd.get("value", 0)))
+        elif name == "audio":
+            # Where the user wants to hear a bus reading (the app's setting). The device is the
+            # default: its announcements are pre-recorded and work with no phone and no internet.
+            target = str(cmd.get("target", "device"))
+            if target not in ("device", "phone"):
+                self._event({"t": "error", "msg": f"unknown audio target: {target}"[:150]})
+            elif self._bus is not None:
+                self._bus.audio_target = target
+                log.info("bus audio → %s", target)
         elif name == "status":
             self._schedule(self._notify(STATUS, self.read_status()))
         elif name == "ap":
@@ -231,11 +256,23 @@ class Core:
         # the app is notified.
         self._schedule(self._notify(MODE, self.read_mode()))
         self._event({"t": "mode", "value": int(current)})
+        self._apply_bus_mode(current)
         # Since 2026-09-07 the AP does NOT follow the mode: it stays on while the device is powered
         # (`__main__` brings it up at startup) so the phone is already on the network when the user
         # activates a mode. Waiting 20 s for the AP to come up and the phone to join, every time, was
         # unacceptable for the user; the cost is battery, and it is measured. `ap` still exists as a
         # manual command.
+
+    def _apply_bus_mode(self, current: Mode) -> None:
+        """Bus mode is the only one that keeps the camera busy, so entering and leaving it starts and
+        stops the watcher. In an executor: starting it touches the camera and the OCR, and neither
+        belongs on the event loop."""
+        if self._bus is None:
+            return
+        if current is Mode.BUS:
+            self._loop.run_in_executor(None, self._bus.start)
+        elif self._bus.running:
+            self._loop.run_in_executor(None, self._bus.stop)
 
     @staticmethod
     def _chunk(cmd: dict, mtu: int) -> int:

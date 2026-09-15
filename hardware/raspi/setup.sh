@@ -21,13 +21,26 @@ apt-get update -qq
 # arrives at the device and is never heard, which is exactly the failure this closed.
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
   bluez python3-venv python3-pip python3-picamera2 python3-gpiozero python3-lgpio \
-  alsa-utils mpg123
+  alsa-utils mpg123 python3-opencv imx500-all imx500-tools git
 
 echo "→ venv (with the system packages, because of picamera2)"
 if [ ! -d "$INSTALL_DIR/.venv" ]; then
   python3 -m venv --system-site-packages "$INSTALL_DIR/.venv"
 fi
 "$INSTALL_DIR/.venv/bin/pip" install -q -r "$INSTALL_DIR/requirements.txt"
+
+# Bus mode's reading half, WITHOUT dependency resolution: pip must not replace the numpy and opencv
+# that picamera2 was built against (see requirements-bus.txt). A failure here is not fatal — the
+# device still takes photos and answers the app, and bus mode reports itself unavailable.
+"$INSTALL_DIR/.venv/bin/pip" install -q --no-deps -r "$INSTALL_DIR/requirements-bus.txt" ||
+  echo "WARNING: bus mode's reading half did not install; the daemon will start without it"
+
+# The pipeline arrives as a wheel (its repo is private: see requirements-bus.txt).
+for wheel in "$INSTALL_DIR"/wheels/*.whl; do
+  [ -e "$wheel" ] || continue
+  "$INSTALL_DIR/.venv/bin/pip" install -q --no-deps --force-reinstall "$wheel" ||
+    echo "WARNING: could not install $wheel"
+done
 
 echo "→ Bluetooth: powered on and with the adapter's power saving off"
 rfkill unblock bluetooth || true
