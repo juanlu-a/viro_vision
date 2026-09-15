@@ -37,6 +37,14 @@ MIN_CONFIDENCE = 0.3
 CONFIRM_SECONDS = 0.6
 VOTES_NEEDED = 2
 MIN_BANNER_HEIGHT_PX = 22
+SAME_LINE_SILENCE_S = 10.0
+"""A line just announced is not announced again this soon. One bus is one announcement, and the
+tracker alone cannot guarantee that: on the first run from the button the board said "115, Luis
+Braille" twice within a second because the camera was moved while the bus was in frame, the track was
+lost and the same bus came back as a new one (2026-09-15). Whatever makes the tracker lose a bus -
+a hand on the camera, a pole in the way, someone walking past - would repeat the announcement, and a
+blind user hearing the same line twice cannot tell whether a second bus arrived. Ten seconds is
+shorter than any real gap between two buses of the same line at a stop."""
 
 Announce = Callable[[list], None]
 """Plays a list of `.wav` files, in order, without cutting each other off."""
@@ -87,6 +95,8 @@ class BusWatcher:
         self._jobs: queue.Queue = queue.Queue()
         self._results: queue.Queue = queue.Queue()
         self._last_announcement: list = []
+        self._last_line: tuple = ()
+        self._last_line_at = 0.0
         self.running = False
 
     @property
@@ -243,17 +253,38 @@ class BusWatcher:
             log.info("bus: read in %d ms: %s", ocr_ms, reading.raw if reading else "nothing")
             self._watcher.submit_reading(track_id, reading, frame_number)
 
-    def _handle(self, event) -> None:
-        from bus_banner.announcements import BUS_FILE, files_to_play
+    def _is_an_echo(self, number: str, destination: str) -> bool:
+        """True when this line was just announced, so saying it again would be an echo of the same
+        bus rather than news. See SAME_LINE_SILENCE_S. Records the line when it is news, so calling
+        this is what arms the silence."""
+        now = time.monotonic()
+        if (number, destination) == self._last_line and now - self._last_line_at < SAME_LINE_SILENCE_S:
+            return True
+        self._last_line, self._last_line_at = (number, destination), now
+        return False
 
+    def _handle(self, event) -> None:
         if event.kind == "bus":
-            files = [self._announcements / BUS_FILE]
-            self._speak([f for f in files if f.exists()])
+            self._announce_presence()
         elif event.kind == "reading":
+            if self._is_an_echo(event.number, event.destination):
+                log.info("bus: %s again, still the same bus", event.phrase())
+                return
             log.info("bus: %s", event.phrase())
-            self._last_announcement = files_to_play(self._announcements, event.number, event.destination)
+            self._last_announcement = self._files_for(event.number, event.destination)
             self._speak(self._last_announcement)
             self._emit(self._result_event(event))
+
+    def _announce_presence(self) -> None:
+        from bus_banner.announcements import BUS_FILE
+
+        files = [self._announcements / BUS_FILE]
+        self._speak([f for f in files if f.exists()])
+
+    def _files_for(self, number: str, destination: str) -> list:
+        from bus_banner.announcements import files_to_play
+
+        return files_to_play(self._announcements, number, destination)
 
     def _speak(self, files: list) -> None:
         """The device speaks unless the user chose to hear readings on the phone. The BLE event goes
