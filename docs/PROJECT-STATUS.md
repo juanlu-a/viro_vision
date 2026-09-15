@@ -189,7 +189,7 @@ tests via `jest-expo`.
   a estar **dentro de la sesión de audio** (antes era `void` después del anuncio), que es lo que lo
   hace funcionar con la pantalla bloqueada; y el **teléfono es siempre el respaldo**, con el motivo
   registrado en `audio.fallback` en vez de anunciado. ~~**Ómnibus queda afuera**~~: quedó afuera
-  hasta el **2026-09-15**, porque mandarlo a la placa exigía un TTS. Con los 403 anuncios pregrabados
+  hasta el **2026-09-15**, porque mandarlo a la placa exigía un TTS. Con los 386 anuncios pregrabados
   en la SD ya no hace falta, y ómnibus respeta el mismo ajuste que supermercado.
   Ver ADR 0003, act. 2026-09-11 y 2026-09-15.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)

@@ -2071,7 +2071,7 @@ desde julio.
 
 Los números están en [`mediciones/2026-09-15-omnibus-en-placa.md`](mediciones/2026-09-15-omnibus-en-placa.md).
 El resumen: **1,27 s** desde el click hasta «ómnibus 115, Luis Braille», de los cuales ~1 s es el OCR;
-33 s desde el reinicio hasta que el modo está listo.
+47 s desde el reinicio en frío hasta que el modo está listo, de los cuales 40 son la carga del OCR.
 
 ### El modelo de Magalí, adentro del sensor
 
@@ -2119,7 +2119,7 @@ configuración de preview** que sirve para las dos cosas: el modo supermercado s
 Dos decisiones que se tomaron con el usuario y que cambian reglas escritas:
 
 - **En modo ómnibus la voz respeta el ajuste de la app.** Hasta hoy ómnibus sonaba siempre en el
-  teléfono, y la razón real era que **los anuncios pregrabados no existían**. Ahora existen: 403
+  teléfono, y la razón real era que **los anuncios pregrabados no existían**. Ahora existen: 386
   `.wav` en la SD. Quedó como actualización del [ADR 0003 §5](architecture/adr/0003-enlace-placa-telefono.md).
 - **El click corto dentro del modo ómnibus repite el último anuncio.** Antes no hacía nada.
 
@@ -2226,7 +2226,7 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   RC. Destino: **DAC I2S MAX98357A**, que necesita GPIO 18/19/21 — y **hay un botón cableado en el
   21**, así que hay que mudarlo antes.
 - ~~**Anuncios pregrabados en la SD** para el modo ómnibus (ADR 0003 §5)~~ — **cerrado el
-  2026-09-15**: 403 `.wav` en la placa, y ómnibus pasa a respetar el ajuste de dónde se escucha.
+  2026-09-15**: 386 `.wav` en la placa, y ómnibus pasa a respetar el ajuste de dónde se escucha.
 - **En qué GPIO está cada botón, de verdad.** El daemon escucha en **GPIO 5** (log del arranque) y el
   cable estaría en el 21. Lo resuelve `/boot/firmware/check-pines.sh`, que mira siete pines mientras
   se aprieta cada botón. Diez segundos, y hasta entonces los defaults del código son una conjetura.
