@@ -2119,9 +2119,10 @@ parece y en qué no:
   al primer uso. Por eso el repo detectaba y no leía.
 - **Corre por ONNX** (`rapidocr` con PP-OCRv5 mobile), no por paddlepaddle, que **no tiene wheel** para
   Linux ARM64 con Python 3.13. Es el mismo modelo, otro motor.
-- **El reconocedor no es exactamente el suyo.** Ella pide `lang='es'`, que en PaddleOCR baja el modelo
-  latino; el que corre en la placa es el `ch_PP-OCRv5_rec_mobile`, el default multilingüe. Misma
-  familia, pesos distintos. Es candidato número uno cuando toque reentrenar el OCR.
+- **El reconocedor no era el suyo, y eso resultó ser el defecto más caro del día.** Ella pide
+  `lang='es'`, que en PaddleOCR baja el modelo latino. `RapidOcr` nunca seteaba `Rec.lang_type`, así
+  que rapidocr usaba su default: `ch`, el reconocedor de chino más inglés, 18.000 clases y **sin Ñ**.
+  Estábamos leyendo carteles de Montevideo con un modelo entrenado para otro alfabeto. Ver abajo.
 
 ### El modo, en el daemon
 
@@ -2161,6 +2162,31 @@ detección anda, lo que fallaba era **qué se dice y cuándo**.
 De paso salió un error latente: `time.monotonic()` cuenta desde el arranque del **proceso** en macOS y
 desde el arranque de la **máquina** en Linux, así que inicializar la última marca de tiempo en cero
 silenciaba el primer aviso en una plataforma y no en la otra. Ahora el «todavía no habló» es `None`.
+
+### El OCR leía en chino
+
+Lo encontró y lo midió la sesión paralela que estaba con el detector de dos clases, y explica de
+verdad el síntoma que Juan Lucas venía reportando desde el día anterior —la línea sin el destino, o
+el destino sin la línea—: buena parte de esas mitades faltantes eran mitades mal leídas.
+
+El reconocedor `latin` de PP-OCRv5 tiene 503 clases, tiene los acentos y la Ñ, y pesa la mitad
+(7,5 MB). Sobre las 117 imágenes de `data/eval/gt.csv`, con el mismo pipeline y **la misma latencia**:
+
+| reconocedor | número | destino | lectura completa |
+|---|---|---|---|
+| `ch` (el default) | 79,2 % | 71,4 % | 79,2 % |
+| `latin` | **91,7 %** | **75,0 %** | **87,5 %** |
+
+Está corriendo en la placa desde la noche del 15, y commiteado en el repo de Magalí (`ab34088`).
+Conviene leerlo como advertencia general: la librería eligió por nosotros un default razonable para
+su autor y equivocado para este proyecto, y nadie lo notó durante dos días de pruebas porque el
+síntoma parecía un problema de recorte.
+
+### Dos sesiones sobre la misma placa
+
+Trabajando en paralelo, la otra sesión paró el servicio para usar la cámara mientras esta desplegaba.
+No se perdió nada, pero **el servicio `virovision` y la cámara son exclusivos**: antes de tocarlos hay
+que mirar `pgrep -af watch_imx500` y los `sudo` recientes del journal. Quedó anotado en la skill.
 
 ### Operación: lo que ya no hay que volver a preguntar
 
