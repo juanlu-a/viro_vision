@@ -65,6 +65,7 @@ documento:
 |---|---|
 | [references/convenciones.md](references/convenciones.md) | **Antes de escribir código o abrir un PR.** Stack, estructura, patrones de servicio, errores tipados, tests, accesibilidad, y el flujo de ramas/commits. |
 | [references/decisiones.md](references/decisiones.md) | Antes de tomar una decisión que quizá ya se tomó. Índice de ADRs con su estado y **qué cambió** en cada enmienda. |
+| [references/placa-acceso.md](references/placa-acceso.md) | **Antes de tocar la Raspberry Pi**: cómo entrar (cable, microSD, redes WiFi guardadas), qué no hacer nunca (unir la Mac al AP de la placa) y las trampas ya pisadas. |
 | skill **`virovision-marca`** | Ante cualquier cosa visual: colores, tokens de tema, íconos, tipografía, material de la tesis. |
 
 ## Cross-cutting conventions & constraints

@@ -130,6 +130,25 @@ VoiceOver frente a una góndola es peor producto que cinco. La **cámara del tel
 de la placa mientras no hay hardware, y la lectura además puede dejar un `.mp3` (apagado por
 defecto). El **camino de ómnibus queda en stand by**.
 
+**Qué cambió el 2026-09-07**: el camino de ómnibus sale del stand by y se enmienda 0006 en tres puntos.
+(1) **El acelerador es el sensor IMX500** de la AI Camera, no el Coral: el detector corre en la cámara,
+la Pi sólo recorta, lee y anuncia; el Coral, la restricción "USB ocupado" de 0003 y el Spike 4
+(libedgetpu) desaparecen. (2) **El detector del banner se fine-tunea** (yolo11n de dos clases `bus_sign`
++ `bus`, en la V100 de Arnaldo Castro; export `format="imx"`); "nada se entrena" queda para el OCR.
+(3) **El modo ómnibus vigila, no saca una foto**: cámara abierta, detector en cada frame en el sensor,
+capa de seguimiento (`tracking.py`) que confirma la pista, anuncia presencia, lee el banner del ómnibus
+principal y anuncia la línea una vez por ómnibus; compatible con 0007 (el modo es explícito). El código
+vive en el repo de Magalí (`bus-banner-recognizer`, rama `feat/bus-banner-pipeline`, PR #2; fork
+`juanlu-a/bus-banner-recognizer` para instalar en la placa).
+
+**Qué cambió el 2026-09-14**: probado en la placa (Pi 3 B+ prestada + AI Camera). Hasta tener el modelo
+de dos clases, el sensor corre el **COCO YOLO11n que trae la cámara** (`imx500_network_yolo11n_pp.rpk`,
+15 fps, confianza 0,9 sobre el ómnibus) y la Pi lee la franja superior del ómnibus. **El OCR es el de
+Magalí (PaddleOCR)**, pero paddlepaddle no tiene wheel para la placa (Linux ARM64 sólo Python 3.10-3.12;
+la placa corre 3.13): en la placa corren **los mismos modelos PP-OCRv5 mobile exportados a ONNX**
+(`rapidocr` 3.x). Sobre 117 imágenes: numero 0,896 (idéntico a PaddleOCR), destino 0,786 (PaddleOCR
+0,768), 7 ms contra 118 ms por lectura en la Mac. Un reconocedor reentrenado se exporta a ONNX y entra igual.
+
 **Qué cambió el 2026-09-08**: la placa anda, así que la entrada del flujo es **sólo la cámara de la
 placa**. Se retiran de Inicio la cámara del teléfono y la fototeca (y `expo-image-picker` con sus
 permisos). Lo que se pierde y hay que tener presente: la fototeca era el insumo del **dataset de

@@ -33,8 +33,8 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 
 ```
 app/        React Native (Expo) app        ← main work so far
-hardware/   RPi + AI Camera (IMX500) + UPS HAT (C)                  raspi/ = daemon BLE (ADR 0003)
-ml/         YOLO11 detection, OCR, Edge AI  (README stub only)
+hardware/   Pi 3 B+ prestada (la Zero 2 W rompió el CSI) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
+ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer, rama feat/bus-banner-pipeline, PR #2)
 docs/       thesis deliverables, ADRs, this file
 .claude/skills/virovision/   knowledge skill
 ```
@@ -60,8 +60,11 @@ docs/       thesis deliverables, ADRs, this file
   y el camino entero está medido en la placa: **1,27 s** del botón a la línea dicha; **supermercado = LLM con visión en la nube**,
   con **cinco modelos elegidos por latencia** en el selector. Cae la gratuidad como restricción del
   proyecto (se paga para poder comparar) y sigue vigente para el usuario final. La precisión se mide
-  con **datasets de evaluación** (recall / precision / accuracy / F1) — nada se entrena. Ver
-  `docs/pruebas-y-decisiones.md`.
+  con **datasets de evaluación** (recall / precision / accuracy / F1). **Enmienda 2026-09-07**: el
+  detector del banner **se fine-tunea** (yolo11n, 2 clases) y corre en el **sensor IMX500**, no en el
+  Coral; "nada se entrena" queda para el OCR. Estado del pipeline: anda en la Mac (numero 0,875 sobre 117
+  imágenes con RapidOCR), falta entrenar en la V100, exportar y medir en la placa. Ver
+  `docs/pruebas-y-decisiones.md` y el README de bus-banner-recognizer.
 - **ADR 0008 — Proxy propio para las claves de nube** *(Accepted 2026-09-01)*: `EXPO_PUBLIC_*` se
   compila dentro del `.ipa`, así que las claves salen a una **Supabase Edge Function** que las
   inyecta del lado del servidor. Cierra el pendiente (b) de ADR 0006. El ADR compara las cinco
@@ -261,13 +264,17 @@ Pick a track (see the skill for pillar detail):
   guard), profile, and persist settings to Supabase.
 - **C. Real BLE:** hecho el 2026-09-04 (cliente ble-plx + medición). Falta verificarlo contra la
   placa real y correr la medición del ADR 0003.
-- **D. ML pillar (Python, `ml/`):** datasets for buses + products, train/fine-tune YOLO11, export to
-  TFLite/edge.
+- **D. ML pillar:** el camino de ómnibus está en `bus-banner-recognizer` (2026-09-07/14): detector en el
+  sensor (COCO preinstalado hoy; el de 2 clases cuando haya V100) → franja/banner → OCR PP-OCRv5 vía ONNX
+  → seguimiento → anuncio. Probado en la placa el 2026-09-14: detecta y anuncia "se acerca un ómnibus"; el
+  OCR lee `115 / LUIS BRAILLE` del frame guardado. Falta la corrida en vivo con la línea anunciada, medir la
+  latencia del OCR en la Pi, y el set de evaluación con fotos del dispositivo.
 - **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). **Alimentación
   comprada el 2026-09-07**: Waveshare UPS HAT (C) + LiPo 1000 mAh (`hardware/README.md`, *Alimentación*).
   **Botón físico hecho el 2026-09-07** (`raspi/virovision/button.py`, GPIO 5 / pin 29).
   **El modo ómnibus entero corre en la placa desde el 2026-09-15** (detección en el sensor IMX500,
-  OCR en la Pi, anuncios pregrabados por el parlante), disparado por el botón.
+  OCR en la Pi, anuncios pregrabados por el parlante), disparado por el botón: eso cierra a la vez los
+  anuncios pregrabados y el código de ómnibus en el daemon, que figuraban acá como pendientes.
   Siguen: DAC I2S, leer el INA219 del HAT → `estado.bateria`, medir el consumo real, la app mostrando
   la lectura de ómnibus, y la carcasa.
 
