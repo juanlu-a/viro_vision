@@ -52,6 +52,13 @@ export interface BleClient {
   onReadRequest(listener: (mode: number | null) => void): () => void;
   /** Sets the mode on the device (0 idle, 1 bus, 2 supermarket). It turns its AP on or off. */
   writeMode(mode: number): Promise<void>;
+
+  /**
+   * Tells the device where the user wants to hear a bus reading. The device speaks with its own
+   * pre-recorded announcements and has no way to know the setting, so until it is told it uses its
+   * default (itself) and talks over the phone's choice.
+   */
+  writeAudioTarget(target: 'phone' | 'device'): Promise<void>;
   /** Credentials of the device's AP, or null when it has none. */
   readWifi(): Promise<WifiCredentials | null>;
 }
@@ -127,6 +134,9 @@ const stubClient: BleClient = {
     return () => {};
   },
   async writeMode() {
+    if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
+  },
+  async writeAudioTarget() {
     if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
   },
   async readWifi() {

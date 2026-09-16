@@ -11,7 +11,7 @@
 import { Platform } from 'react-native';
 import { BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 
-import { DEVICE_ADVERTISED_NAME, GATT, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
+import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 import { loadLastDeviceId, saveLastDeviceId } from '@/services/storage/lastDevice';
@@ -196,6 +196,26 @@ class BleClientPlx implements BleClient {
       GATT.serviceUuid,
       GATT.characteristics.mode,
       encodeBase64(new Uint8Array([mode]))
+    );
+  }
+
+  /**
+   * The first thing the app writes to the control characteristic. The device cannot know what the
+   * user chose in Settings, so it falls back to its own speaker: on 2026-09-15, with the setting on
+   * "phone", a bus reading still came out of the board.
+   *
+   * Written **with** response: the point of the message is that the device changed its behaviour, and
+   * a write nobody confirmed would leave the app believing a setting that is not in force.
+   */
+  async writeAudioTarget(target: 'phone' | 'device'): Promise<void> {
+    const device = this.device;
+    if (!device) throw new BleNotConnectedError();
+    const payload = new TextEncoder().encode(audioCommand(target));
+    await this.manager.writeCharacteristicWithResponseForDevice(
+      device.id,
+      GATT.serviceUuid,
+      GATT.characteristics.control,
+      encodeBase64(payload)
     );
   }
 

@@ -124,9 +124,10 @@ export const es = {
     audioOutputDevice: 'En el dispositivo',
     audioOutputDeviceHint:
       'La lectura se sintetiza en la nube y se manda al parlante del dispositivo. Tarda un poco más y necesita internet; si el dispositivo no está disponible, suena en el teléfono.',
-    // El modo ómnibus queda afuera a propósito: tiene que funcionar sin internet (ADR 0001) y
-    // mandarlo al dispositivo exigiría sintetizarlo en la nube.
-    audioOutputBusNote: 'El modo ómnibus siempre suena en el teléfono, para que funcione sin internet.',
+    // Desde el 2026-09-15 el modo ómnibus también respeta esta elección: los anuncios del dispositivo
+    // están pregrabados en su tarjeta, así que no necesitan ni nube ni internet (ADR 0003, act. 2026-09-15).
+    audioOutputBusNote:
+      'El modo ómnibus también respeta esta elección. En el dispositivo los anuncios están grabados, así que funciona sin internet.',
     audioOutputNotConfigured:
       'Este build no puede sintetizar audio para el dispositivo, así que la lectura va a sonar en el teléfono.',
   },

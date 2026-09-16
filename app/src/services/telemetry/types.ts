@@ -49,6 +49,7 @@ export type EventType =
   | 'device.warning'
   | 'device.mode'
   | 'device.modeFailed'
+  | 'device.audioTargetFailed'
   | 'device.readRequest'
   // Operating modes (ADR 0007)
   | 'mode.change'
