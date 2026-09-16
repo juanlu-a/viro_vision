@@ -115,12 +115,29 @@ lejanos, ese umbral se cambia **reexportando**, no en el código de la placa.
   |---|---|---|---|---|
   | float32, test | 0,838 | 0,667 | **0,781** | 0,391 |
 
-  La otra mitad **no se pudo correr**: el `model_imx.onnx` que deja el export (la simulación del
-  int8) no carga fuera del contenedor del export. Necesita los operadores propios de Sony —
-  `mct_quantizers:ActivationPOTQuantizer` y `EdgeMDT:MultiClassNMSWithIndices` — y las dos librerías
-  que los registran se pisan entre sí (`Failed to add kernel for WeightsLUTSymmetricQuantizer …
-  Conflicting with a registered kernel`) en todas las combinaciones de versiones que se probaron
-  (mct-quantizers 1.6 y 1.7 contra edge-mdt-cl < 1.1). El camino que queda es correr la validación
-  **dentro de la imagen Docker del export**, donde el juego de versiones ya está resuelto.
+  La otra mitad sigue sin correr, y ahora se sabe exactamente qué falta. El `model_imx.onnx` que deja
+  el export (la simulación del int8) **no carga fuera del contenedor**: necesita los operadores
+  propios de Sony —`mct_quantizers:ActivationPOTQuantizer` y `EdgeMDT:MultiClassNMSWithIndices`— y
+  las dos librerías que los registran se pisan entre sí (`Failed to add kernel for
+  WeightsLUTSymmetricQuantizer … Conflicting with a registered kernel`) en todas las combinaciones
+  probadas en la laptop (mct-quantizers 1.6 y 1.7 contra edge-mdt-cl < 1.1).
+
+  Eso ya está resuelto: la imagen del export existe y está versionada
+  (`bus-banner-recognizer`, `docker/Dockerfile.imx`), junto con `scripts/val_imx.py`, que corre las
+  dos validaciones y saca la diferencia. Lo que falta es **el dataset**: `yolo_finetuning/find-bus-sign-*/`
+  está en el `.gitignore`, así que no viaja con el repo y hay que bajarlo de Roboflow. Con el dataset
+  en su lugar, la medición es un comando:
+
+  ```sh
+  docker build --platform linux/amd64 -f docker/Dockerfile.imx -t bus-banner-imx .
+  docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work bus-banner-imx \
+      python scripts/val_imx.py --weights models/bus_sign_v6_yolo11n.pt \
+                                --data yolo_finetuning/find-bus-sign-6/data.yaml --split test
+  ```
+
+  Una advertencia sobre qué mide: el lado cuantizado es el ONNX, una **simulación** de la aritmética
+  int8, no el `.rpk` corriendo en el sensor. Es lo más cerca que se puede medir fuera del aparato, y
+  la NMS que trae horneada (conf 0,25) es la misma que aplica la cámara, así que una detección que se
+  pierda acá también se perdería allá.
 - **La calle.** Todo esto es contra una pantalla. Falta un ómnibus real, de día, en movimiento.
 - **El consumo.** Ni corriente ni temperatura, y la Pi 3 B+ no es la placa final.
