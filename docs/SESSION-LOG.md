@@ -2414,11 +2414,31 @@ En el Drive compartido, carpeta **Documentos**, como **`ViroVision PFC v2 (compl
 entero, con lo que ya estaba en el oficial reordenado a la numeración de Altamirano y Mira, más los
 capítulos nuevos. El oficial no se tocó.
 
-Detalle técnico que sirve para la próxima: **el conector de Drive no puede editar un Google Doc que
-ya existe** (crea, renombra y mueve, nada más). Y 183 KB de texto no entran en una llamada. El camino
-que funcionó fue: armar el markdown, `pandoc` a HTML, poner el HTML en el portapapeles de macOS con
-el flavor correcto (`osascript` con `«data HTML<hex>»`), crear el Doc vacío por el conector y pegar
-con Cmd+V desde el navegador. Sale con jerarquía de títulos y tablas de verdad.
+### La receta para meter un documento largo en un Google Doc
+
+**El conector de Drive no puede editar un Google Doc que ya existe** (crea, copia, renombra y mueve,
+nada más). Y 183 KB de texto no entran en una llamada. La receta que funciona, con las tres trampas
+que hay que esquivar:
+
+1. **Copiar el doc oficial con `copy_file`**, no crear uno vacío. La carátula (con el logo de la UM,
+   que es una imagen), el índice y los estilos vienen con la copia. Armar la portada desde markdown
+   la destruye.
+2. Armar el markdown del **cuerpo solo**, desde el primer capítulo, y pasarlo a HTML con
+   `pandoc -f gfm -t html` (sin `--standalone`: agrega un `<h1>` con el título que después hay que
+   borrar a mano).
+3. Ponerlo en el portapapeles de macOS con el flavor HTML: `osascript` con
+   `set the clipboard to «data HTML<hex>»`. Verificar con `osascript -e 'clipboard info'`.
+4. En el navegador, **borrar primero el cuerpo viejo y pegar después**, en dos pasos. Si se pega
+   encima de la selección, el texto hereda el formato del punto de inserción: las 78 páginas
+   quedaron en **rojo cursiva**. Con el cursor ya en el hueco, aplicar `cmd+alt+0` (texto normal) y
+   `cmd+\` (borrar formato) antes de `cmd+v`.
+5. El pegado entra en Arial sin justificar: seleccionar el cuerpo (`cmd+shift+down` desde el primer
+   capítulo) y ponerle **Times New Roman** y `cmd+shift+j` para que coincida con el resto.
+6. Actualizar el índice: clic en él y el botón de refrescar que aparece al costado.
+
+**Y una trampa aparte:** el diálogo de Buscar y reemplazar de Docs no toma el foco al hacer clic por
+referencia de elemento. Lo que se tipea cae **en el cuerpo del documento**. Hay que clickear el campo
+por coordenadas y verificar en pantalla antes de escribir.
 
 ### Dos cosas que la redacción dejó al descubierto
 
