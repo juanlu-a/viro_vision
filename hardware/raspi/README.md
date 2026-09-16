@@ -386,8 +386,15 @@ Dos trampas que ya costaron una tarde:
 - **`pip` sin `sudo` instala en `~/.local` y el daemon (que corre como root) no lo ve.** El venv es de
   root: `sudo /home/virovision/virovision/.venv/bin/pip install …`.
 - **La placa no tiene git ni credenciales**, a propósito: un aparato que sale a la calle no debería
-  llevarlas. El paquete de `bus-banner-recognizer` se construye en la Mac (`uv build --wheel`), se
-  copia con `scp` a `~/virovision/wheels/` y se instala desde ahí.
+  llevarlas. El paquete de `bus-banner-recognizer` se construye en la Mac (`uv build --wheel`) y se
+  copia con `scp`.
+
+Los tres pasos están en **`scripts/deploy_pi.sh`, en el repo de `bus-banner-recognizer`**, que es el
+único script de despliegue del proyecto: instala el paquete, copia los scripts y el catálogo, rehace
+el `.rpk` en la placa si se le pasa un modelo, y espera a que el daemon avise que el modo ómnibus
+está listo. Con `FIELD=1` deja el servicio parado e imprime el comando de la prueba de campo, porque
+**el servicio y la cámara son exclusivos**: si el daemon está arriba, el script de campo no abre la
+cámara.
 
 ## Salida de audio (el modo supermercado, de punta a punta)
 
