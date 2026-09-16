@@ -553,8 +553,11 @@ teléfono/dispositivo y sonaba siempre en el teléfono (`app/src/features/audio/
 exclusión contradecía el ADR 0001: el único modo que funciona sin internet era el único que no podía
 sonar sin el teléfono.
 
-Ahora existen: **386 `.wav`** en la SD de la placa (los números de línea, los destinos del catálogo de
-la STM y los avisos de sistema), generados con `scripts/make_announcements.py`. Con eso el camino
+Ahora existen: **386 `.wav`** en la SD de la placa (los números de línea y los destinos del catálogo
+de la STM, más «se acerca un ómnibus» y «ómnibus sin número»), generados con
+`scripts/make_announcements.py`. *(Corregido el 2026-09-16: este párrafo decía «y los avisos de
+sistema» y era falso — los avisos de sistema no existían todavía, y ésa resultó ser exactamente la
+pieza que faltaba. Ver la actualización de abajo.)* Con eso el camino
 entero corre en el dispositivo: detección en el sensor, OCR en la Pi, voz por el parlante, **1,27 s
 desde el botón hasta la línea dicha** ([medición](../../mediciones/2026-09-15-omnibus-en-placa.md)).
 
@@ -571,6 +574,61 @@ de implementación:
   anunciada queda en silencio 10 s.
 - **El click corto dentro del modo ómnibus repite el último anuncio.** Es el remedio para el caso en
   que el usuario no llegó a escuchar, y no necesita nada del teléfono.
+
+## Actualización 2026-09-16 — La elección de salida vale para todo lo que suena, no sólo para las lecturas
+
+El 15 se cerró la mitad visible del problema: las dos lecturas —supermercado y ómnibus— salen por
+donde el usuario eligió. Probándolo con los anteojos puestos apareció la otra mitad. **Todo lo demás
+que la app dice seguía saliendo por el teléfono**: que el dispositivo se conectó, que la red quedó
+lista, que falló, que cambió el modo, el chirp del botón y hasta la confirmación del propio ajuste.
+Con la salida en el dispositivo, el usuario escuchaba el producto en los anteojos y todo el resto en
+el bolsillo.
+
+No era una regla escrita en ningún lado: era que el ajuste se consultaba en los dos únicos caminos
+donde alguien se acordó de consultarlo (`decideDelivery`), y el resto llamaba directo a `announce()`,
+que es `expo-speech` y por lo tanto siempre el teléfono.
+
+**Decisión: el ajuste gobierna todo lo que suena.** Un usuario no tiene forma de leer «la mitad de
+los sonidos se mudan de parlante y la otra mitad no» como otra cosa que un defecto.
+
+**Cómo, y por qué no puede ser de otra manera.** Los avisos de sistema son un **conjunto cerrado de
+frases pregrabadas** en la SD (`announcements/system/`, 11 `.wav`, ~950 KB), disparadas por el canal
+`control` de BLE con `{"cmd":"say","clip":"<archivo>"}`. Hay tres razones y las tres son la misma:
+
+1. **Un aviso de red no puede necesitar la red.** Sintetizarlo en la nube —que es como viaja la
+   lectura de supermercado— lo dejaría mudo justo cuando hace falta: la frase «no se pudo usar la red
+   del dispositivo» saldría por el único camino que acaba de fallar. Es ADR 0001 aplicado al aviso,
+   no sólo al reconocimiento.
+2. **BLE está vivo siempre que hay dispositivo.** Un aviso no necesita ni WiFi, ni AP, ni clave, ni
+   `photoAvailable`: sólo el enlace. Por eso hay **dos** funciones de decisión y no una
+   (`decideDelivery` para la lectura, `decideNoticeDelivery` para el aviso). Juzgar un aviso con la
+   regla de la lectura lo mandaría al teléfono cada vez que no hay síntesis o no hay AP, que es
+   precisamente cuando más se lo necesita.
+3. **El teléfono sigue siendo el fallback de todo.** Sin enlace, o si la escritura falla, habla el
+   teléfono. Un aviso que nadie escucha es igual a no avisar, y éstos son los que explican por qué
+   otra cosa se quedó callada.
+
+**Lo que se pierde, dicho en voz alta.** Tres avisos llevan un detalle variable (qué paso de la red
+falló, de qué se queja la placa, por qué falló la escritura del modo). El teléfono lo agrega; la
+placa dice una frase fija y completa, porque nadie puede grabar un `.wav` por mensaje de error. El
+detalle queda en pantalla y en telemetría, que es donde vive una cadena técnica.
+
+**Dos cosas más que aparecieron al hacerlo:**
+
+- **«Conectado» no se anunciaba por voz en ningún lado.** Estaba sólo como texto en la pestaña
+  Dispositivo, así que la única forma de enterarse de que el enlace subió era mirar la pantalla — lo
+  único que este usuario no puede hacer. Ahora es un aviso, con su contrario («se perdió la
+  conexión»), que por definición sale por el teléfono: la placa no puede anunciar su propia ausencia.
+- **El ajuste vivía sólo en el `BusWatcher`.** Una placa sin modo ómnibus disponible —sin `.rpk` en
+  el sensor, o sin `bus_banner` instalado— tiraba la elección del usuario a la basura y nadie de este
+  lado la recordaba. Ahora la dueña es el core (`core.audio_target`) y el watcher la hereda al
+  engancharse.
+
+**Lo que queda pendiente**, anotado para no descubrirlo en la calle: con el botón físico, el cambio
+de modo lo anuncia la app, así que viaja placa → app → placa. Funciona (BLE despierta la app), pero
+significa que **sin teléfono conectado un cambio de modo no se anuncia**. La placa podría decirlo
+sola, como ya hace con las lecturas de ómnibus; es un cambio aparte porque mueve el punto de decisión
+y hay que evitar que lo diga dos veces.
 
 ## Ver también
 

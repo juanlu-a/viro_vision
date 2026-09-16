@@ -11,7 +11,7 @@
 import { Platform } from 'react-native';
 import { BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 
-import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
+import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, noticeCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 import { loadLastDeviceId, saveLastDeviceId } from '@/services/storage/lastDevice';
@@ -217,6 +217,38 @@ class BleClientPlx implements BleClient {
       GATT.characteristics.control,
       encodeBase64(payload)
     );
+  }
+
+  /**
+   * Plays a pre-recorded system notice on the device's speaker.
+   *
+   * Written **without** response, unlike `writeAudioTarget`, and the difference is the deadline. A
+   * setting can wait for an acknowledgement because nobody is listening for it; a notice is the
+   * sound itself, and the chirp that confirms the button was pressed is worthless late. The board
+   * answers a write on `control` in microseconds — what a response costs here is a round trip of
+   * connection interval, which iOS can stretch to tens of milliseconds under load.
+   *
+   * The cost is that a write which never lands is not reported, so the caller cannot fall back. That
+   * is why `isLinked()` is checked first: it removes the case that actually happens (no device),
+   * leaving only a link that dies in the same instant.
+   */
+  async playNotice(clip: string): Promise<void> {
+    const device = this.device;
+    if (!device) throw new BleNotConnectedError();
+    const payload = new TextEncoder().encode(noticeCommand(clip));
+    await this.manager.writeCharacteristicWithoutResponseForDevice(
+      device.id,
+      GATT.serviceUuid,
+      GATT.characteristics.control,
+      encodeBase64(payload)
+    );
+  }
+
+  isLinked(): boolean {
+    // `this.device` is set on a successful connect and cleared by `cleanup()`, which runs both on
+    // `disconnect()` and on the `onDeviceDisconnected` callback. It is the same thing every other
+    // method here checks before writing, so a notice cannot believe in a link the writes do not.
+    return this.device !== null;
   }
 
   async readWifi(): Promise<WifiCredentials | null> {

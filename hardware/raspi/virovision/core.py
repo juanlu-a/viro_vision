@@ -18,6 +18,7 @@ import time
 from typing import Awaitable, Callable, Optional
 
 from .modes import ModeMachine, Mode
+from .notices import is_known
 from .transfer import InvalidChunkError, split
 
 log = logging.getLogger(__name__)
@@ -39,6 +40,11 @@ Capture = Callable[[], Awaitable[bytes]]
 Notify = Callable[[str, bytes], Awaitable[None]]
 # Turn the WiFi AP on/off; None when the transport does not offer it (the Mac emulator).
 ApControl = Callable[[bool], None]
+# Plays one system notice by file name (`notices.py`); None when the transport has no speaker (the
+# Mac emulator, or `--no-audio`).
+Say = Callable[[str], None]
+DEFAULT_AUDIO_TARGET = "device"
+AUDIO_TARGETS = ("device", "phone")
 AP_MINUTES_DEFAULT = 10
 AP_MINUTES_MAX = 60
 # With a mode active the AP turns itself on (the app is going to ask for the photo over WiFi) and
@@ -65,6 +71,7 @@ class Core:
         ap_control: Optional[ApControl] = None,
         read_wifi: Optional[Callable[[], dict]] = None,
         bus=None,
+        say: Optional[Say] = None,
     ) -> None:
         self._loop = loop
         self._read_status = read_status
@@ -74,6 +81,15 @@ class Core:
         self._ap_control = ap_control
         self._read_wifi = read_wifi
         self._bus = bus
+        self._say = say
+        self.audio_target = DEFAULT_AUDIO_TARGET
+        """Where the user wants to hear ViroVision, as last written by the app (`cmd: 'audio'`).
+
+        **It lives on the core and not on the watcher, since 2026-09-16.** It used to be set straight
+        on `bus`, so a board with bus mode unavailable —no `.rpk` in the sensor, `bus_banner` not
+        installed— dropped the setting on the floor and nothing on this side ever knew it. The
+        default is the device because that is what works with no phone in range.
+        """
         self._ap_off_timer: Optional[asyncio.TimerHandle] = None
         self.modes = ModeMachine()
         self._transfer_id = 0
@@ -83,6 +99,9 @@ class Core:
         """Wires bus mode in after the fact: the watcher needs to emit events through this core, and
         this core needs to start and stop the watcher, so one of the two has to be set afterwards."""
         self._bus = bus
+        # The watcher is built after the first `audio` write may already have arrived, so it is told
+        # the current target rather than starting on its own default and speaking over the choice.
+        bus.audio_target = self.audio_target
 
     def emit_event(self, obj: dict) -> None:
         """Send an event from ANY thread. Bus mode announces from its own frame thread, and
@@ -170,20 +189,45 @@ class Core:
         elif name == "mode":
             self._change_mode(int(cmd.get("value", 0)))
         elif name == "audio":
-            # Where the user wants to hear a bus reading (the app's setting). The device is the
-            # default: its announcements are pre-recorded and work with no phone and no internet.
-            target = str(cmd.get("target", "device"))
-            if target not in ("device", "phone"):
+            # Where the user wants to hear ViroVision (the app's setting). The device is the default:
+            # its announcements are pre-recorded and work with no phone and no internet.
+            target = str(cmd.get("target", DEFAULT_AUDIO_TARGET))
+            if target not in AUDIO_TARGETS:
                 self._event({"t": "error", "msg": f"unknown audio target: {target}"[:150]})
-            elif self._bus is not None:
-                self._bus.audio_target = target
-                log.info("bus audio → %s", target)
+            else:
+                self.audio_target = target
+                if self._bus is not None:
+                    self._bus.audio_target = target
+                log.info("audio → %s", target)
+        elif name == "say":
+            self._say_notice(str(cmd.get("clip", "")))
         elif name == "status":
             self._schedule(self._notify(STATUS, self.read_status()))
         elif name == "ap":
             self._ap(bool(cmd.get("value", True)), int(cmd.get("minutes", AP_MINUTES_DEFAULT)))
         else:
             self._event({"t": "error", "msg": f"unknown command: {name}"[:150]})
+
+    def _say_notice(self, clip: str) -> None:
+        """Play one of the pre-recorded system notices (`notices.py`).
+
+        **The target is deliberately not checked here.** The app has already applied the user's
+        choice —it only sends `say` when the answer was the device— and asking twice would turn a
+        failed `audio` write into silence instead of a notice from the wrong speaker. Silence is the
+        worse of the two: it is indistinguishable from a device that died.
+
+        The name is checked against the closed set instead of being joined to a path: `clip` arrives
+        over the air, and the one thing it must not be able to do is name a file we did not record.
+        """
+        if not is_known(clip):
+            self._event({"t": "error", "msg": f"unknown notice: {clip}"[:150]})
+            return
+        if self._say is None:
+            log.debug("say %s: this device has no speaker", clip)
+            return
+        # In an executor: playing spawns a process, and that does not belong on the event loop that
+        # BLE is answering from.
+        self._loop.run_in_executor(None, self._say, clip)
 
     def _ap(self, on: bool, minutes: int) -> None:
         """ADR 0003's plan B. The AP is always turned on for a bounded time: the device has a single

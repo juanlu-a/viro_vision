@@ -19,6 +19,7 @@ import { useEffect, useRef } from 'react';
 import { announceRecognition } from '@/features/audio/announcer';
 import { getAudioOutput } from '@/features/audio/audioOutput';
 import { useAudioOutput } from '@/features/audio/AudioOutputProvider';
+import { configureNotices } from '@/features/audio/systemNotice';
 import { useDevice } from '@/features/device/DeviceProvider';
 import { MODE_FROM_GATT } from '@/features/device/gatt';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
@@ -49,6 +50,17 @@ export function ReaderBridge() {
       // (connected, on the device's network, and `/health` answering), so asking anything weaker
       // would pay for a synthesis the device cannot receive.
       isDeviceReady: () => latest.current.device.photoAvailable,
+    });
+    // The system notices reach the board from here too, and through the SAME client the readings
+    // use, so "where is ViroVision heard" has one answer and not two.
+    //
+    // `isLinked` and not `photoAvailable`, unlike the reading above, and that is the whole point of
+    // the notices: they are pre-recorded clips played over BLE, so they need the link and nothing
+    // else — no WiFi, no cloud, no key. Asking for `photoAvailable` here would send every network
+    // notice to the phone at exactly the moment the network is what broke.
+    configureNotices({
+      isLinked: () => getBleClient().isLinked(),
+      playNotice: (clip) => getBleClient().playNotice(clip),
     });
   }, []);
 

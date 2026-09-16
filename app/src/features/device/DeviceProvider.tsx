@@ -21,7 +21,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { announce } from '@/features/audio/announcer';
+import { notify } from '@/features/audio/systemNotice';
 import type { AudioOutput } from '@/features/audio/audioOutput';
 import { strings } from '@/i18n';
 import {
@@ -132,7 +132,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     setWifiDetail(detail);
     record('wifi.failed', { detail: { reason: detail } });
     // Voice is the interface: a silent failure leaves the user waiting for a button that never comes.
-    announce(`${strings.connect.wifiFailedAnnounce} ${detail}`);
+    // Out of whatever output the user chose (`features/audio/systemNotice.ts`): the BLE link is up —
+    // it is how we learned the AP exists — so the board can say it even though its WiFi is what failed.
+    void notify('networkFailed', detail);
   }, []);
 
   const syncNetwork = useCallback(
@@ -201,7 +203,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // table, it is just not worth saying out loud again.
         if (announcedReadyFor.current !== target.ip) {
           announcedReadyFor.current = target.ip;
-          announce(strings.connect.wifiReadyAnnounce);
+          void notify('networkReady');
         }
         return true;
       }
@@ -295,6 +297,11 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         },
       });
       setConnection({ status: 'connected', device, message: strings.connection.connected });
+      // Said out loud since 2026-09-16. Until then the link coming up was only a label on the Device
+      // tab, so the only way to learn about it was to look at the screen — which is the one thing
+      // this app's user cannot do. It is announced from here and not from an effect on `status` so a
+      // re-render cannot say it twice.
+      void notify('connected');
       setAddress(device.address);
       setAp(device.ap);
       credentials.current = await client.readWifi().catch(() => null);
@@ -331,6 +338,11 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         announcedReadyFor.current = null;
         networkSyncRun.current += 1; // invalidates any network wait in flight
         setConnection({ status: 'error', device: null, message: strings.connection.lost });
+        // The counterpart, and the more important of the two: from here the button does nothing and
+        // no reading is coming, and without a word the user is left waiting for audio that will
+        // never arrive. It goes to the phone by force of the rule, not by exception — the link it is
+        // reporting on is the one the board would have needed to say it.
+        void notify('connectionLost');
         setAddress(null);
         setAp(false);
         setWifi('off');
@@ -354,7 +366,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // app is the only place anyone can find out — and since telemetry exists, the table.
         record('device.warning', { detail: { message } });
         setLastNotice(message);
-        announce(`${strings.connect.deviceErrorAnnounce} ${message}`);
+        // The board says the fixed sentence and the phone the whole thing, detail included: nobody
+        // can pre-record a clip per error message, and the message is on screen and in the table above.
+        void notify('deviceWarning', message);
       }),
     ];
     // The first connection comes out of the mount effect but on the next tick: the effect only
@@ -430,7 +444,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         const detail = err instanceof Error ? err.message : String(err);
         record('device.modeFailed', { detail: { mode, message: detail } });
         setLastNotice(`${strings.connect.modeWriteFailed} ${detail}`);
-        announce(`${strings.connect.modeWriteFailed} ${detail}`);
+        void notify('modeWriteFailed', detail);
       }
     },
     [connection.status]

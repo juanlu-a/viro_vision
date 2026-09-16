@@ -117,17 +117,24 @@ export const es = {
     intro: 'Configuración de accesibilidad, voz y dispositivo.',
     audioOutput: 'Dónde se escucha',
     audioOutputHint:
-      'Elegí si la lectura del supermercado suena en el teléfono o en el parlante del dispositivo.',
+      'Elegí si ViroVision te habla por el teléfono o por el parlante del dispositivo. Vale para todo lo que suena.',
     audioOutputPhone: 'En el teléfono',
     audioOutputPhoneHint:
-      'La voz sale por el teléfono, al instante y sin internet. Es lo que funciona siempre.',
+      'Todo sale por el teléfono, al instante y sin internet. Es lo que funciona siempre.',
     audioOutputDevice: 'En el dispositivo',
     audioOutputDeviceHint:
-      'La lectura se sintetiza en la nube y se manda al parlante del dispositivo. Tarda un poco más y necesita internet; si el dispositivo no está disponible, suena en el teléfono.',
-    // Desde el 2026-09-15 el modo ómnibus también respeta esta elección: los anuncios del dispositivo
-    // están pregrabados en su tarjeta, así que no necesitan ni nube ni internet (ADR 0003, act. 2026-09-15).
+      'Todo sale por el parlante del dispositivo. Los avisos y el modo ómnibus están grabados y no necesitan internet; sólo la lectura del supermercado se sintetiza en la nube y tarda un poco más. Si el dispositivo no está disponible, suena en el teléfono.',
+    // Desde el 2026-09-16 la elección vale para TODO lo que suena, no sólo para las dos lecturas: los
+    // avisos del dispositivo están pregrabados en su tarjeta y no necesitan ni nube ni internet
+    // (ADR 0003 §5, act. 2026-09-16). La nota se mantiene porque lo que sorprende ahora es lo
+    // contrario que antes: que los avisos de sistema también se muden de parlante.
     audioOutputBusNote:
-      'El modo ómnibus también respeta esta elección. En el dispositivo los anuncios están grabados, así que funciona sin internet.',
+      'Vale para todo: las lecturas, los avisos de conexión y de modo, y el sonido del botón. En el dispositivo casi todo está grabado, así que funciona sin internet.',
+    // La confirmación del selector, entera por destino: es el texto que el teléfono dice y también
+    // el que está grabado en la placa (`hardware/raspi/virovision/notices.py`), y los dos tienen que
+    // decir lo mismo o el usuario escucha una frase distinta según dónde la escuche.
+    audioOutputSetToPhone: 'Dónde se escucha: en el teléfono.',
+    audioOutputSetToDevice: 'Dónde se escucha: en el dispositivo.',
     audioOutputNotConfigured:
       'Este build no puede sintetizar audio para el dispositivo, así que la lectura va a sonar en el teléfono.',
   },
@@ -156,6 +163,9 @@ export const es = {
     scanning: 'Buscando dispositivo…',
     connecting: 'Conectando…',
     connected: 'Conectado',
+    // Dicho en voz alta, no mostrado: «Conectado» a secas alcanza en pantalla, donde está al lado
+    // del nombre del dispositivo, pero suelto en el oído no dice conectado a qué.
+    connectedAnnounce: 'Dispositivo conectado.',
     // Amber on the Device tab: the Bluetooth link is up but the photo path is not. Only what is
     // missing, in brackets; the reason and the remedy go in the notice below, not here.
     connectedWithoutWifi: 'Conectado (falta el WiFi)',

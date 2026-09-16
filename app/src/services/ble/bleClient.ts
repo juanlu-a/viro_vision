@@ -59,6 +59,23 @@ export interface BleClient {
    * default (itself) and talks over the phone's choice.
    */
   writeAudioTarget(target: 'phone' | 'device'): Promise<void>;
+  /**
+   * Plays one of the device's pre-recorded system notices on its speaker (`cmd: 'say'`).
+   *
+   * `clip` is a file name from `features/audio/notices.ts`. It is the notices' whole transport: BLE
+   * and not the HTTP server, because a notice has to be sayable when the WiFi is exactly what
+   * failed — and it is a clip and not a synthesized sentence because that would need internet
+   * (ADR 0001).
+   */
+  playNotice(clip: string): Promise<void>;
+  /**
+   * Whether there is a live GATT link right now.
+   *
+   * Synchronous and cheap on purpose: the announcement path has to know **where to speak** before it
+   * says anything, and it cannot await to find out. It answers from what this client already holds,
+   * it does not touch the radio.
+   */
+  isLinked(): boolean;
   /** Credentials of the device's AP, or null when it has none. */
   readWifi(): Promise<WifiCredentials | null>;
 }
@@ -138,6 +155,15 @@ const stubClient: BleClient = {
   },
   async writeAudioTarget() {
     if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
+  },
+  async playNotice() {
+    if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
+  },
+  isLinked() {
+    // False in a build with no BLE, and false in the simulated one too: the simulated device has no
+    // speaker, so claiming a link would send every notice to a board that cannot play it and leave
+    // the demo silent. The fallback to the phone is exactly the right answer here.
+    return false;
   },
   async readWifi() {
     return null;

@@ -187,14 +187,20 @@ tests via `jest-expo`.
   Zero). Tonos y **voz real audibles** en un auricular entre los pines 32 y 34. Falta el transductor
   definitivo: el piezo no sirve para voz, el auricular va sin resistencia (100-330 Ω pendientes), y el
   destino es el **DAC I2S** — que quiere GPIO 18/19/21, con un botón cableado en el 21.
-- **Dónde se escucha la lectura, se elige en Ajustes (2026-09-11)**: teléfono o parlante de la placa,
+- **Dónde se escucha ViroVision, se elige en Ajustes (2026-09-11)**: teléfono o parlante de la placa,
   para poder comparar los dos caminos sin el hardware final. Lo no evidente: el envío a la placa pasó
   a estar **dentro de la sesión de audio** (antes era `void` después del anuncio), que es lo que lo
   hace funcionar con la pantalla bloqueada; y el **teléfono es siempre el respaldo**, con el motivo
   registrado en `audio.fallback` en vez de anunciado. ~~**Ómnibus queda afuera**~~: quedó afuera
   hasta el **2026-09-15**, porque mandarlo a la placa exigía un TTS. Con los 386 anuncios pregrabados
-  en la SD ya no hace falta, y ómnibus respeta el mismo ajuste que supermercado.
-  Ver ADR 0003, act. 2026-09-11 y 2026-09-15.
+  en la SD ya no hace falta, y ómnibus respeta el mismo ajuste que supermercado. Desde el
+  **2026-09-16 el ajuste vale para todo lo que suena**, no sólo para las dos lecturas: la conexión, la
+  red, el cambio de modo, el chirp del botón y la confirmación del propio ajuste son **avisos de
+  sistema** con su `.wav` en `announcements/system/` de la SD (11 clips, disparados por
+  `{"cmd":"say","clip":…}` sobre BLE). Un aviso sólo necesita el enlace —ni nube, ni WiFi, ni clave—,
+  y por eso hay dos reglas de decisión y no una. **Falta escucharlo en la placa**: el camino del
+  dispositivo está verificado en la Mac, no en el hardware.
+  Ver ADR 0003, act. 2026-09-11, 2026-09-15 y 2026-09-16.
 - **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
   + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
   (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a
