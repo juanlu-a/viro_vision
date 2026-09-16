@@ -1,6 +1,6 @@
 # ViroVision — Project status & session handoff
 
-_Living status/continuation doc. Last updated: 2026-09-11._
+_Living status/continuation doc. Last updated: 2026-09-16._
 
 This captures where the project stands so anyone (including a fresh Claude Code session, together with
 the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
@@ -36,6 +36,8 @@ app/        React Native (Expo) app        ← main work so far
 hardware/   Pi 3 B+ prestada (la Zero 2 W rompió el CSI) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
 ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer, rama feat/bus-banner-pipeline, PR #2)
 docs/       thesis deliverables, ADRs, this file
+docs/tesis/ capítulos del informe formal (3 a 8, 11 y 12); el documento armado vive en el Drive
+            del proyecto como «ViroVision PFC v2 (completo)»
 .claude/skills/virovision/   knowledge skill
 ```
 
@@ -227,6 +229,9 @@ opcional — la distribución real va por TestFlight desde Xcode.
 **Hardware**: firmware inicial en `hardware/raspi/` (daemon BLE + cámara + modos; `setup.sh` por SSH),
 con **emulador para la Mac** (`python -m virovision.emulator`, mismo núcleo por CoreBluetooth) para
 probar la app sin placa. Sin verificar en la placa todavía. **ML**: not started (README stub only).
+> Nota (2026-09-16): este párrafo es del 2026-09-02 y quedó viejo. Hoy el daemon está verificado en
+> la placa y el pilar de ML existe, fuera de `ml/`: vive en `bus-banner-recognizer`, con detector
+> entrenado, dataset de evaluación de 117 imágenes y 12 corridas guardadas. Ver `docs/tesis/07-desarrollo.md` §7.4.
 
 ## Verificado en dispositivo (2026-09-02)
 

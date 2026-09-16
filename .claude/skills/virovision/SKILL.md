@@ -56,7 +56,7 @@ final integration, bug-fixing and joint testing).
 |--------|--------|---------|
 | **Mobile app** | `app/` | React Native (Expo). BLE (GATT) data/control link to the device, routing TTS audio to the device's earphone, config, and first-class accessibility. See [references/app.md](references/app.md). |
 | **Hardware / IoT** | `hardware/` | Glasses-mounted camera device: Raspberry Pi Zero 2 W + Coral TPU + Camera Module 3. See [references/hardware.md](references/hardware.md). |
-| **ML / OCR / CV** | `ml/` | Per-use-case pipelines (ADR 0006): buses = pretrained detection on the Coral TPU → banner crop → OCR; supermarket = cloud vision LLM, five models chosen by latency (ADR 0006, updated 2026-09-01); the local fallback is still open. Evaluation datasets with recall/precision/accuracy/F1. See [references/ml.md](references/ml.md). |
+| **ML / OCR / CV** | `ml/` | Per-use-case pipelines (ADR 0006): buses = detection inside the IMX500 sensor (the Coral left the design on 2026-09-07) → banner crop → OCR; supermarket = cloud vision LLM, five models chosen by latency (ADR 0006, updated 2026-09-01); the local fallback is still open. Evaluation datasets with recall/precision/accuracy/F1. See [references/ml.md](references/ml.md). |
 
 Y tres referencias transversales, que aplican al trabajo diario más que cualquier otra cosa de este
 documento:
@@ -115,11 +115,13 @@ no haya dos copias que se desincronicen.
 - `app/` — React Native mobile app (scaffolded with Expo + dev client).
 - `hardware/` — RPi Zero 2 W: `raspi/` es el daemon Python (periférico BLE + cámara + modos, ADR
   0003); READMEs con componentes y enlace. Carcasa pendiente.
-- `ml/` — YOLO11 training, OCR, datasets, edge export (TFLite).
+- `ml/` — **stub**: sólo un README. El pipeline de ómnibus (YOLO11n, dataset, OCR, export IMX500) vive en
+  el repo aparte `bus-banner-recognizer` de Magalí, y se instala en la placa como dependencia.
 - `docs/` — thesis deliverables, architecture, ADRs, and the end-to-end QA checklist
   (`qa-modo-supermercado.md`).
 - `documents/` — source documents versioned as-is (the hand-drawn use-case diagram).
-- `supabase/` — the cloud-key proxy Edge Function (ADR 0008). Written, not deployed yet.
+- `supabase/` — el proxy de claves de nube (ADR 0008) y la función de telemetría. **Desplegadas y
+  activas** desde 2026-09-02 y 2026-09-09; los builds no llevan ninguna clave de proveedor.
 
 ## Open / pending items (flagged `PENDIENTE` in the source thesis document)
 These are explicitly incomplete in the thesis and should be treated as open research:

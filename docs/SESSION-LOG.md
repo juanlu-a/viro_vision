@@ -2382,6 +2382,72 @@ Dos verificaciones que valen más que el conteo:
 `announcements/system/` a la SD y escuchar los once avisos; hasta entonces el camino del dispositivo
 está escrito y no probado.
 
+## 2026-09-16 (cont.): el cuerpo formal de la tesis, escrito desde lo que el repo ya tenía medido
+
+El pedido fue arrancar la redacción formal a partir de dos tesis de referencia que están en el Drive
+del proyecto: la de **Altamirano y Mira** para el esqueleto del cuerpo (Metodología, Planificación,
+Desarrollo, Despliegue) y la de **Juan Cruz Carrau** para el marco teórico.
+
+Primer dato que conviene no olvidar: **la tesis de Juan Cruz no menciona OCR ni YOLO ni una sola
+vez**. Lo que aporta es la escalera IA → ML → redes → CNN y la definición formal de accuracy,
+precision, recall y F1. Todo lo de OCR, YOLO, hardware embebido, comunicación inalámbrica y app
+móvil hubo que escribirlo de cero.
+
+### Qué se escribió
+
+`docs/tesis/`, un archivo por capítulo:
+
+| Archivo | Qué es |
+|---|---|
+| `03-estado-del-arte-ampliaciones.md` | Los cuatro apartados que estaban vacíos: OCR para ómnibus, productos en góndola, detección en el borde y protocolos |
+| `04-marco-teorico-ampliaciones.md` | Métricas (IoU, mAP), YOLO y una etapa, OCR en dos etapas, Edge AI y cuantización, BLE/GATT y WiFi, TTS y sesión de audio, WCAG |
+| `05-metodologia.md` | Enfoque, organización, **documentación como método** (ADRs, mediciones, skills), Trello, ramas |
+| `06-planificacion.md` | Cinco etapas derivadas de este mismo log, más la tabla de riesgos |
+| `07-desarrollo.md` | El capítulo central: arquitectura, 8 decisiones con su número, dispositivo, pipeline de ómnibus, supermercado, app, accesibilidad, verificación |
+| `08-despliegue.md` | Ramas y canales, CI, firma de iOS, backend, instalación en la placa |
+| `11-bibliografia.md` | Las referencias de los capítulos 3 y 4 |
+| `12-anexo-ampliaciones.md` | GATT completo, hiperparámetros, barrido de márgenes, datos crudos de las tres campañas |
+
+### Dónde quedó
+
+En el Drive compartido, carpeta **Documentos**, como **`ViroVision PFC v2 (completo)`**: el documento
+entero, con lo que ya estaba en el oficial reordenado a la numeración de Altamirano y Mira, más los
+capítulos nuevos. El oficial no se tocó.
+
+Detalle técnico que sirve para la próxima: **el conector de Drive no puede editar un Google Doc que
+ya existe** (crea, renombra y mueve, nada más). Y 183 KB de texto no entran en una llamada. El camino
+que funcionó fue: armar el markdown, `pandoc` a HTML, poner el HTML en el portapapeles de macOS con
+el flavor correcto (`osascript` con `«data HTML<hex>»`), crear el Doc vacío por el conector y pegar
+con Cmd+V desde el navegador. Sale con jerarquía de títulos y tablas de verdad.
+
+### Dos cosas que la redacción dejó al descubierto
+
+1. **Nunca se entrenó en la V100.** El README y los ADRs venían diciendo «entrenado en la V100 de
+   Arnaldo Castro» como si fuera un hecho. Los dos fine-tunes que existen corrieron **en CPU, 40
+   epochs, batch 16**; los 120 epochs que documenta `scripts/train.py` no se ejecutaron nunca. El
+   acceso SSH al servidor ya está, pero sin usar. El capítulo 7.4.2 lo dice con todas las letras y
+   avisa que las métricas reportadas son un piso.
+2. **Documentación desactualizada que no hay que citar.** `app/README.md` sigue diciendo que BLE es
+   un stub y el audio un TODO; `hardware/README.md` todavía lista Coral TPU y Camera Module 3;
+   `PROJECT-STATUS.md` dice «ML: not started». El capítulo cita los docblocks de los módulos y los
+   ADRs enmendados, que sí están al día. La skill se corrigió en este mismo PR (el proxy está
+   desplegado desde el 2026-09-02, y `ml/` es un stub).
+
+### Convenciones de redacción que quedaron fijadas
+
+Tercera persona siempre («el equipo», «se optó por»), **sin raya larga** (comas, dos puntos o
+paréntesis), coma decimal, y una regla de fondo: **toda cifra remite a un ADR, a una campaña de
+`docs/mediciones/` o a un `summary.json` del repo de ómnibus**, y lo que no está hecho o no está
+medido se dice, no se omite. Están escritas en `docs/tesis/README.md`.
+
+### Lo que falta del documento
+
+- Las **figuras**: van marcadas como `[FIGURA N: ...]` con la descripción de qué tiene que mostrar.
+- Las **columnas reales del Trello** (el tablero es privado y Chrome no tiene sesión de Trello).
+- El **registro de reuniones con el tutor**: `docs/REUNIONES-TUTOR.md` sólo tiene la del 2026-08-10.
+- **Verificar la bibliografía** contra las fuentes antes de entregar.
+- Conclusiones y trabajo futuro, que quedaron fuera de alcance a propósito.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2507,8 +2573,9 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - Placa: DAC I2S. El detector ya no se elige: corre **dentro del sensor IMX500** y el caso B está
   medido (2026-09-15). Falta el **costo en precisión del int8**, que necesita correr `yolo val` sobre
   el modelo cuantizado **dentro de la imagen Docker del export** (fuera de ahí el ONNX no carga).
-- **Un modelo de dos clases** (ómnibus y cartel en el mismo `.rpk`) entra en el chip, pero hay que
-  entrenarlo en el servidor V100 de Arnaldo Castro, cuyo acceso SSH sigue pendiente. Con las fotos ya
+- **Un modelo de dos clases** (ómnibus y cartel en el mismo `.rpk`) ya entra en el chip y está
+  entrenado, pero **en CPU y con 40 epochs**. El acceso SSH a la V100 de Arnaldo Castro ya está;
+  falta correr ahí el entrenamiento completo (120 epochs). Con las fotos ya
   pseudo-etiquetadas para Roboflow, Magalí no tiene que volver a etiquetar a mano.
 - **Rotar la clave de Roboflow** (quedó en el historial de git de `bus-banner-recognizer`) y la
   contraseña de sudo de la placa, que se compartió por chat.
