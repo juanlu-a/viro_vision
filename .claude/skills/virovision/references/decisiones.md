@@ -91,7 +91,7 @@ plano.
 sólo las dos lecturas. Hasta acá la conexión, la red, el cambio de modo, el chirp del botón y la
 confirmación del propio ajuste llamaban directo a `announce()` —`expo-speech`, o sea siempre el
 teléfono—, así que con la salida en la placa el usuario escuchaba el producto en los anteojos y todo
-el resto en el bolsillo. Los avisos de sistema son ahora un **conjunto cerrado de 11 `.wav`** en
+el resto en el bolsillo. Los avisos de sistema son ahora un **conjunto cerrado de 10 `.wav`** en
 `announcements/system/` de la SD, disparados por `{"cmd":"say","clip":…}` sobre el canal `control` de
 BLE. **Dos reglas de decisión y no una**: una lectura necesita nube y WiFi (`decideDelivery`), un
 aviso sólo necesita el enlace (`decideNoticeDelivery`) — juzgarlos con la misma regla mandaría todos

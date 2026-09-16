@@ -2382,6 +2382,55 @@ Dos verificaciones que valen más que el conteo:
 `announcements/system/` a la SD y escuchar los once avisos; hasta entonces el camino del dispositivo
 está escrito y no probado.
 
+## 2026-09-16 (cont.) — El primer uso real: un lazo de realimentación y la mitad que nunca se desplegó
+
+Reportado apenas llegó el build: «no se escucha por la placa los cambios de modo ni las cosas que
+pedí, sólo dentro de los modos». O sea: las lecturas salen por la placa, los avisos no.
+
+Son **dos causas distintas**, y sólo una es un bug.
+
+### 1. El lazo de realimentación (bug propio, introducido esta misma mañana)
+
+`deviceWarning` tenía clip, así que con la salida en la placa el aviso «el dispositivo avisa: …» se
+mandaba **a la placa**. La placa todavía corría el daemon viejo, que no conoce `say`, así que
+contestaba `{"t":"error","msg":"unknown command: say"}`. La app convierte **todo** error de la placa
+en `deviceWarning`, que volvía a viajar a la placa como otro `say`, que volvía a ser desconocido…
+
+Un intercambio de escrituras BLE que no termina y donde **nunca se dice nada**. Desde afuera es
+indistinguible de «la función no anda», que es exactamente como se reportó.
+
+**La regla que lo reemplaza vale más que el arreglo: la placa no reporta sus propias fallas.** Lo que
+esté roto puede ser justamente lo que tendría que decir la frase, y cuando lo roto es el canal de
+avisos, las dos mitades se alimentan entre sí. Es la misma forma que ya tenía `connectionLost`, que
+no puede anunciar su propia ausencia. `deviceWarning` pasa a ser sólo del teléfono, y quedan **10
+clips** en vez de 11.
+
+### 2. La mitad de la placa nunca se desplegó (no es un bug: es que faltó el paso)
+
+El build de TestFlight lleva **sólo la app**. En la placa siguen el daemon viejo —sin `cmd: 'say'`— y
+un `announcements/` sin la subcarpeta `system/`. Con eso, aunque no existiera el lazo, no habría
+sonado nada. Es la parte que ayer quedó anotada como pendiente y hoy se leyó como defecto, que es
+justo lo que pasa cuando se entrega media función.
+
+### Lo que se arregló para que esto no vuelva a ser mudo
+
+`aplay` escribe su queja a un `/dev/null` que elegimos a propósito, así que **un clip que falta en la
+SD sonaba igual que un parlante sin cablear**: nada, y sin manera de distinguirlos desde el teléfono.
+Ahora el `say` de `__main__` comprueba que el archivo esté antes de reproducir y devuelve si estaba;
+el core emite `missing notice: <archivo>` cuando no. Se escucha por el teléfono —por la regla de
+arriba— y dice exactamente qué falta.
+
+### Verificación
+
+274 tests en la app (2 nuevos: el que fija que una queja de la placa nunca vuelve a la placa, y el
+que exige que todo aviso sobre una falla del dispositivo sea del teléfono) y 86 en la placa (uno
+nuevo: el clip que falta se reporta en vez de callarse). El generador se corrió de nuevo: 10 `.wav`,
+824 KB.
+
+**Sigue faltando la placa.** Nada de esto está escuchado en hardware todavía, y ésa es la lección del
+día: la mitad del dispositivo necesita `python3 tools/make_system_announcements.py`, el `scp` de
+`announcements/system/` y **el daemon actualizado**.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2393,6 +2442,10 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Validar ADR 0006, 0007 y 0008 con el tutor** — 0006 y 0007 siguen en Proposed.
 
 ### Deuda técnica conocida
+- **Desplegar la mitad de la placa** (2026-09-16). Es lo primero de la lista: hasta que el daemon
+  nuevo y `announcements/system/` estén en la SD, la opción «en el dispositivo» de Ajustes cae al
+  teléfono para todos los avisos. No hay automatismo — el workflow de TestFlight publica la app y
+  nada más.
 - **Sin teléfono conectado, un cambio de modo no se anuncia** (2026-09-16). Con el botón físico el
   aviso viaja placa → app → placa: la placa notifica el modo, la app decide dónde se escucha y le
   manda el clip de vuelta. Funciona (BLE despierta la app) y mantiene **un solo punto de decisión**,

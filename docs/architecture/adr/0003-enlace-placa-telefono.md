@@ -592,7 +592,7 @@ que es `expo-speech` y por lo tanto siempre el teléfono.
 los sonidos se mudan de parlante y la otra mitad no» como otra cosa que un defecto.
 
 **Cómo, y por qué no puede ser de otra manera.** Los avisos de sistema son un **conjunto cerrado de
-frases pregrabadas** en la SD (`announcements/system/`, 11 `.wav`, ~950 KB), disparadas por el canal
+frases pregrabadas** en la SD (`announcements/system/`, 10 `.wav`, ~820 KB), disparadas por el canal
 `control` de BLE con `{"cmd":"say","clip":"<archivo>"}`. Hay tres razones y las tres son la misma:
 
 1. **Un aviso de red no puede necesitar la red.** Sintetizarlo en la nube —que es como viaja la
@@ -623,6 +623,17 @@ detalle queda en pantalla y en telemetría, que es donde vive una cadena técnic
   el sensor, o sin `bus_banner` instalado— tiraba la elección del usuario a la basura y nadie de este
   lado la recordaba. Ahora la dueña es el core (`core.audio_target`) y el watcher la hereda al
   engancharse.
+
+**Corrección del mismo día, encontrada en el primer uso real.** El aviso «el dispositivo avisa: …»
+tenía clip y por lo tanto viajaba a la placa. La placa contesta los comandos que no conoce con un
+evento de error, la app convierte todo error de la placa en ese aviso, y el aviso volvía a la placa
+como otro comando: un lazo de escrituras BLE que no termina y en el que **nunca se dice nada**. La
+regla que lo cierra es más general que el bug: **la placa no reporta sus propias fallas** — lo que
+esté roto puede ser justo lo que tendría que decir la frase. Quedan 10 clips.
+
+De paso se tapó el otro agujero mudo: `aplay` falla hacia `/dev/null`, así que un `.wav` que no está
+en la SD sonaba igual que un parlante sin cablear. Ahora la placa avisa `missing notice: <archivo>`,
+y ese aviso lo dice el teléfono.
 
 **Lo que queda pendiente**, anotado para no descubrirlo en la calle: con el botón físico, el cambio
 de modo lo anuncia la app, así que viaja placa → app → placa. Funciona (BLE despierta la app), pero

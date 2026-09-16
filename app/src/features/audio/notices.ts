@@ -56,8 +56,22 @@ export const NOTICES = {
   networkReady: { clip: 'network_ready.wav', say: strings.connect.wifiReadyAnnounce },
   /** Carries a detail: which step of joining the device's network failed. */
   networkFailed: { clip: 'network_failed.wav', say: strings.connect.wifiFailedAnnounce },
-  /** Carries a detail: the board's own message. */
-  deviceWarning: { clip: 'device_warning.wav', say: strings.connect.deviceErrorAnnounce },
+  /**
+   * The board complained about something. Carries a detail: the board's own message.
+   *
+   * **No clip, and this one is a correction rather than a design choice** (2026-09-16, found on the
+   * board within the hour). It used to have one, and routing it to the board closed a loop: the
+   * board answers an unknown `say` with an `{"t":"error"}` event, the app turns every board error
+   * into this notice, this notice went back to the board as another `say`, and around again — a
+   * silent, unbounded exchange of BLE writes with nothing ever spoken. It fired on the first real
+   * test, because the app shipped ahead of the daemon and every `say` was an unknown command.
+   *
+   * The rule that replaces it is worth more than the bug: **the board does not get to report its
+   * own faults.** Whatever is wrong with it may be the very thing that would have to carry the
+   * sentence, and the phone is the only half known to be working when the other half is complaining.
+   * Same shape as [connectionLost].
+   */
+  deviceWarning: { clip: null, say: strings.connect.deviceErrorAnnounce },
   /** Carries a detail: why the BLE write failed. */
   modeWriteFailed: { clip: 'mode_write_failed.wav', say: strings.connect.modeWriteFailed },
   modeIdle: { clip: 'mode_idle.wav', say: strings.reader.announceIdle },

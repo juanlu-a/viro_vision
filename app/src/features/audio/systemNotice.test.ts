@@ -77,14 +77,29 @@ describe('notify', () => {
   it('appends the detail on the phone and drops it on the board', async () => {
     setAudioOutput('phone');
     boardIsThere();
-    await notify('deviceWarning', 'camera timed out');
-    expect(spoken).toEqual([`${NOTICES.deviceWarning.say} camera timed out`]);
+    await notify('networkFailed', 'no responde en 10.42.0.1');
+    expect(spoken).toEqual([`${NOTICES.networkFailed.say} no responde en 10.42.0.1`]);
 
     setAudioOutput('device');
-    await notify('deviceWarning', 'camera timed out');
+    await notify('networkFailed', 'no responde en 10.42.0.1');
     // The clip is fixed, so the detail cannot travel. It is on screen and in telemetry, and the
-    // sentence still names which thing complained — that trade is the design, not an accident.
-    expect(played).toEqual([NOTICES.deviceWarning.clip]);
+    // sentence still names which thing failed — that trade is the design, not an accident.
+    expect(played).toEqual([NOTICES.networkFailed.clip]);
+  });
+
+  it('never sends a board complaint back to the board', async () => {
+    // The regression, and it is not a corner case — it ran on the board on 2026-09-16, within the
+    // hour of shipping. The app reached a daemon that did not know `say` yet; the board answered
+    // with an error event, the app turns every board error into this notice, and routing it to the
+    // board produced another unknown `say`, another error, and around again. Nothing was ever
+    // spoken and the writes never stopped, so from the outside it looked exactly like the feature
+    // simply not working.
+    setAudioOutput('device');
+    boardIsThere();
+
+    await expect(notify('deviceWarning', 'unknown command: say')).resolves.toBe('phone');
+    expect(played).toEqual([]);
+    expect(spoken).toEqual([`${NOTICES.deviceWarning.say} unknown command: say`]);
   });
 
   it('falls back to the phone with no link', async () => {
