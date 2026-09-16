@@ -27,7 +27,7 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05 (la foto va por WiFi) y 2026-09-11 (segundo plano verificado)**
+### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste) y 2026-09-16 (el ajuste vale para TODO lo que suena)**
 
 Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
 dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
@@ -86,6 +86,20 @@ router ni DNS en el DHCP); con el default de NetworkManager iOS quedaba sin inte
 placa nunca se anuncia como salida a internet**. El híbrido BLE control + WiFi payload es el diseño
 confirmado. Falta: unirse al AP desde la app, AP atado a los modos, audio de vuelta, spike de segundo
 plano.
+
+**Qué cambió el 2026-09-16**: el ajuste «dónde se escucha» pasó a gobernar **todo lo que suena**, no
+sólo las dos lecturas. Hasta acá la conexión, la red, el cambio de modo, el chirp del botón y la
+confirmación del propio ajuste llamaban directo a `announce()` —`expo-speech`, o sea siempre el
+teléfono—, así que con la salida en la placa el usuario escuchaba el producto en los anteojos y todo
+el resto en el bolsillo. Los avisos de sistema son ahora un **conjunto cerrado de 11 `.wav`** en
+`announcements/system/` de la SD, disparados por `{"cmd":"say","clip":…}` sobre el canal `control` de
+BLE. **Dos reglas de decisión y no una**: una lectura necesita nube y WiFi (`decideDelivery`), un
+aviso sólo necesita el enlace (`decideNoticeDelivery`) — juzgarlos con la misma regla mandaría todos
+los avisos de red al teléfono justo cuando la red es lo que falló. Se descubrieron dos cosas de
+paso: **«conectado» no se anunciaba por voz en ningún lado** (sólo texto en pantalla), y el
+`audio_target` vivía sólo en el `BusWatcher`, así que una placa sin modo ómnibus tiraba la elección
+del usuario. Pendiente anotado: con el botón físico el anuncio de modo viaja placa → app → placa, así
+que **sin teléfono conectado un cambio de modo no se anuncia**.
 
 ### ADR 0004 — Runtime de inferencia on-device · **Proposed — actualizado 2026-08-22: se resuelve por caso de uso**
 

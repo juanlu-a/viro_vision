@@ -14,7 +14,7 @@ from bluez_peripheral.gatt.characteristic import CharacteristicFlags as Flags
 from bluez_peripheral.gatt.characteristic import characteristic
 from bluez_peripheral.gatt.service import Service
 
-from .core import STATUS, EVENT, MODE, TRANSFER, Capture, ApControl, Core
+from .core import STATUS, EVENT, MODE, TRANSFER, Capture, ApControl, Core, Say
 from .profile import (  # noqa: F401  (re-exported for __main__)
     CH_CONTROL,
     CH_STATUS,
@@ -43,9 +43,13 @@ class ViroVisionService(Service):
         synthetic_payload: Callable[[int], bytes],
         ap_control: Optional[ApControl] = None,
         read_wifi: Optional[Callable[[], dict]] = None,
+        say: Optional[Say] = None,
     ) -> None:
         super().__init__(SERVICE_UUID, True)
-        self.core = Core(loop, read_status, capture, synthetic_payload, self._notify, ap_control=ap_control, read_wifi=read_wifi)
+        self.core = Core(
+            loop, read_status, capture, synthetic_payload, self._notify,
+            ap_control=ap_control, read_wifi=read_wifi, say=say,
+        )
 
     async def _notify(self, name: str, value: bytes) -> None:
         char = {MODE: self.mode, EVENT: self.event, TRANSFER: self.transfer, STATUS: self.status}[name]

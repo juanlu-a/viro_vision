@@ -2305,6 +2305,83 @@ split de test; la mitad cuantizada no se pudo correr porque el ONNX del export n
 contenedor (los operadores propios de Sony se pisan entre sí). Queda correr esa validación dentro del
 Docker del export.
 
+## 2026-09-16 — Los avisos también se mudan de parlante: una sola elección para todo lo que suena
+
+Reportado con los anteojos puestos: «los anuncios del modo supermercado y bondi los puedo configurar
+para que salgan por la raspi o por el celular, pero los sonidos de conectado, red lista o modo activo
+sólo se escuchan por el celular».
+
+Lo que estaba pasando, dicho sin vueltas: el ajuste no era una regla, era **dos llamadas que se
+acordaron de consultarlo**. `decideDelivery()` gobernaba las dos lecturas y nada más; todo el resto
+—la conexión, la red, el cambio de modo, el chirp del botón y hasta la confirmación del propio
+ajuste— llamaba directo a `announce()`, que es `expo-speech` y por lo tanto siempre el teléfono. Con
+la salida en la placa el usuario escuchaba el producto en los anteojos y todo el resto en el
+bolsillo, que no es media función: es la app pareciendo rota.
+
+### El aviso de sistema como concepto
+
+La pieza nueva es un **conjunto cerrado de avisos**, con su archivo `.wav` en la SD de la placa y su
+frase en español para el teléfono (`app/src/features/audio/notices.ts` ↔
+`hardware/raspi/virovision/notices.py`). No es free text y no puede serlo: los avisos que más
+importan son los de red, y una frase que necesita la nube para decirse se queda muda justo cuando
+hace falta. «No se pudo usar la red del dispositivo» no puede viajar por la red. Es ADR 0001 aplicado
+al aviso y no sólo al reconocimiento.
+
+Once clips, ~950 KB, generados con `hardware/raspi/tools/make_system_announcements.py` —en **este**
+repo, no junto a los de ómnibus: éstos salen de las cadenas de la app y cambian cuando cambia la app,
+no cuando cambia el catálogo de la STM. Se disparan con `{"cmd":"say","clip":…}` por el canal
+`control` de BLE, que es el enlace que está vivo siempre que hay dispositivo.
+
+**Dos reglas de decisión, no una.** `decideDelivery` (lectura) exige nube y WiFi con la placa
+respondiendo; `decideNoticeDelivery` (aviso) sólo exige el enlace. Juzgar un aviso con la regla de la
+lectura lo mandaría al teléfono cada vez que no hay síntesis o no hay AP — o sea, el mismo bug una
+capa más arriba. Está escrito como test: si alguien funde las dos funciones, falla.
+
+### Lo que apareció al hacerlo
+
+- **«Conectado» no se anunciaba por voz en ningún lado.** No era que sonara en el lugar equivocado:
+  no existía. Estaba sólo como texto en la pestaña Dispositivo, así que la única forma de saber que
+  el enlace subió era mirar la pantalla — lo único que este usuario no puede hacer. Lo que el usuario
+  escuchaba era **VoiceOver leyendo la pantalla**, que sale por donde el sistema operativo decide y
+  la app no puede redirigir. Ahora es un aviso propio, con su contrario («se perdió la conexión»).
+- **El `audio_target` vivía sólo en el `BusWatcher`.** Una placa con modo ómnibus no disponible —sin
+  `.rpk` en el sensor, o sin `bus_banner` instalado— tiraba la elección del usuario a la basura y
+  nadie de este lado la recordaba. Ahora la dueña es el core y el watcher la hereda al engancharse.
+- **El chirp del botón también se muda.** Se pierde el valor de diagnóstico que tenía en el teléfono
+  (se escuchó = la app despertó y su sesión de audio anda), y va igual: un usuario que puso todo en
+  los anteojos y recibe un solo chirp del bolsillo no tiene forma de leer eso como otra cosa que un
+  defecto.
+
+### Lo que se pierde, dicho en voz alta
+
+Tres avisos llevan un detalle variable (qué paso de la red falló, de qué se queja la placa, por qué
+falló la escritura del modo). El teléfono lo agrega; la placa dice una frase fija y completa, porque
+nadie puede grabar un `.wav` por mensaje de error. El detalle queda en pantalla y en telemetría, que
+es donde vive una cadena técnica. Fue una decisión tomada con el usuario, no un descuido.
+
+La otra excepción: si el build no puede sintetizar, elegir «en el dispositivo» se confirma **por el
+teléfono**, porque la frase que hay que decir es justamente que la lectura de supermercado no va a
+poder llegar a la placa, y de eso no hay clip.
+
+### Verificación
+
+`npm run lint`, `npm run typecheck` y `npm test` en verde: **272 tests, 29 suites** (16 nuevos). Del
+lado de la placa, **31 tests** entre `test_notices.py` (nuevo), `test_core.py` y `test_bus.py`.
+
+Dos verificaciones que valen más que el conteo:
+
+- El generador se corrió de verdad: 11 `.wav`, 954 KB, con la misma voz y el mismo formato que los
+  clips de ómnibus (Mónica, 22 kHz mono 16 bit) para que dos anuncios seguidos no suenen como dos
+  dispositivos.
+- El test del espejo entre los dos catálogos se probó **al revés**: renombrando `mode_bus.wav` en el
+  lado de la placa, los dos asserts fallan. Sin esa comprobación el test no valdría nada, porque un
+  nombre que no existe no rompe nada — simplemente no suena, y eso no aparece en ningún log que el
+  usuario alcance.
+
+**Falta la placa.** Todo esto está verificado en la Mac. En la placa hay que copiar
+`announcements/system/` a la SD y escuchar los once avisos; hasta entonces el camino del dispositivo
+está escrito y no probado.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2316,6 +2393,16 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Validar ADR 0006, 0007 y 0008 con el tutor** — 0006 y 0007 siguen en Proposed.
 
 ### Deuda técnica conocida
+- **Sin teléfono conectado, un cambio de modo no se anuncia** (2026-09-16). Con el botón físico el
+  aviso viaja placa → app → placa: la placa notifica el modo, la app decide dónde se escucha y le
+  manda el clip de vuelta. Funciona (BLE despierta la app) y mantiene **un solo punto de decisión**,
+  pero ata a la placa al teléfono para algo que podría decir sola, como ya hace con las lecturas de
+  ómnibus. Moverlo es un cambio aparte porque hay que evitar que lo diga dos veces cuando el teléfono
+  sí está: la app tendría que callarse para las transiciones cuyo `source` es `'device'`.
+- **Los clips de sistema se generan en la Mac y se copian a mano** (2026-09-16). `say` y `afconvert`
+  son de macOS, igual que los de ómnibus. Mientras sea así, un aviso nuevo en `notices.py` no llega a
+  la placa hasta que alguien corre el script y hace `scp`; el test del espejo protege los nombres,
+  no la existencia del archivo en la SD.
 - **`restoreStateIdentifier` en el cliente BLE** (2026-09-11). `bleClientPlx.ts` hace
   `new BleManager()` sin opciones: si iOS **termina** la app (presión de memoria, muchas horas, el
   usuario matándola de la bandeja), CoreBluetooth no la vuelve a levantar y **el botón deja de
@@ -2420,10 +2507,6 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - Placa: DAC I2S. El detector ya no se elige: corre **dentro del sensor IMX500** y el caso B está
   medido (2026-09-15). Falta el **costo en precisión del int8**, que necesita correr `yolo val` sobre
   el modelo cuantizado **dentro de la imagen Docker del export** (fuera de ahí el ONNX no carga).
-- **La app todavía no muestra la lectura de ómnibus.** La mitad receptora existe y no está cableada:
-  falta suscribir `onRecognition` en `ReaderBridge.tsx`, sacar ómnibus de la exclusión de
-  `audioOutput.ts`, actualizar `audioOutputBusNote` en `i18n/es.ts` (hoy dice que ómnibus suena
-  siempre en el teléfono) y mandar `{"cmd":"audio","target":…}` al conectar y al cambiar el ajuste.
 - **Un modelo de dos clases** (ómnibus y cartel en el mismo `.rpk`) entra en el chip, pero hay que
   entrenarlo en el servidor V100 de Arnaldo Castro, cuyo acceso SSH sigue pendiente. Con las fotos ya
   pseudo-etiquetadas para Roboflow, Magalí no tiene que volver a etiquetar a mano.

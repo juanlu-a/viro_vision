@@ -17,7 +17,7 @@ export const GATT = {
   characteristics: {
     /** read · notify · write — uint8: 0 idle, 1 bus, 2 supermarket (ADR 0007). */
     mode: '4380c501-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status' | 'audio', ... }`. */
+    /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status' | 'audio' | 'say', ... }`. */
     control: '4380c502-7ca3-4e37-b27d-f60e8d8d73d1',
     /** notify — JSON ≤ 180 bytes: `{ t: 'start' | 'end' | 'mode' | 'read' | 'ap' | 'error' | 'result', ... }`. */
     event: '4380c503-7ca3-4e37-b27d-f60e8d8d73d1',
@@ -82,4 +82,20 @@ export const MODE_FROM_GATT = ['idle', 'bus', 'supermarket'] as const;
  */
 export function audioCommand(target: 'phone' | 'device'): string {
   return JSON.stringify({ cmd: 'audio', target });
+}
+
+/**
+ * The command that makes the device say one of its pre-recorded system notices.
+ *
+ * `clip` is a file name under the board's `announcements/system/`, never a path: the board rejects
+ * anything with a separator in it. The catalogue of names is `features/audio/notices.ts` on this
+ * side and `hardware/raspi/virovision/notices.py` on the other, and they are asserted against each
+ * other rather than trusted, because a name that does not exist fails the way this whole feature
+ * fails — in silence.
+ *
+ * Why the board and not a sentence synthesized in the cloud: these are the notices that fire when
+ * the network is broken, and the one saying so cannot need the network (ADR 0001).
+ */
+export function noticeCommand(clip: string): string {
+  return JSON.stringify({ cmd: 'say', clip });
 }

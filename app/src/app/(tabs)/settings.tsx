@@ -6,7 +6,7 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { announce } from '@/features/audio/announcer';
+import { notify } from '@/features/audio/systemNotice';
 import { AudioOutputSelector } from '@/features/audio/AudioOutputSelector';
 import { ModelSelector } from '@/features/reader/ModelSelector';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
@@ -95,7 +95,10 @@ export default function SettingsScreen() {
           label={strings.home.testAudioButton}
           hint={strings.home.testAudioHint}
           variant="secondary"
-          onPress={() => announce(strings.home.testAudioPhrase)}
+          // Through the notice router: a button whose whole job is checking the audio output has to
+          // come out of the output being checked, or it verifies the one thing the user did not ask
+          // about. Since 2026-09-16 the board has this phrase recorded too.
+          onPress={() => void notify('audioTest')}
         />
       </Card>
 

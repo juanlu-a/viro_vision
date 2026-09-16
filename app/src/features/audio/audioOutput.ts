@@ -1,5 +1,11 @@
 /**
- * Where a supermarket reading is heard, and the rule for when that choice cannot be honoured.
+ * Where what ViroVision says is heard, and the rule for when that choice cannot be honoured.
+ *
+ * **One choice, everything it can reach — since 2026-09-16.** The setting used to govern only the
+ * two readings, so the link, the network, the mode and the chirp came out of the phone whatever it
+ * said; for a user with the glasses on that reads as half the app being broken. There are two
+ * decision functions below because a reading and a notice can fail for different reasons, never
+ * because they answer to different settings.
  *
  * **Why the choice exists.** The final device does not exist yet, so both paths have to be reachable
  * at runtime to be compared — standing in front of a shelf, not by rebuilding. The phone speaks with
@@ -86,5 +92,41 @@ export function decideDelivery({ output, deviceReady, synthesisEnabled }: Delive
   if (output === 'phone') return { target: 'phone' };
   if (!synthesisEnabled) return { target: 'phone', fallback: 'not-configured' };
   if (!deviceReady) return { target: 'phone', fallback: 'device-unreachable' };
+  return { target: 'device' };
+}
+
+export interface NoticeDeliveryContext {
+  /** What the user chose in Settings. The same choice that governs a reading; that is the whole point. */
+  output: AudioOutput;
+  /** Whether there is a live BLE link right now. */
+  deviceLinked: boolean;
+  /** Whether this notice has a `.wav` on the board at all (`features/audio/notices.ts`). */
+  hasClip: boolean;
+}
+
+export type NoticeDelivery =
+  | { target: 'device' }
+  | { target: 'phone'; fallback?: 'no-clip' | 'device-unreachable' };
+
+/**
+ * Decides where a **system notice** is heard — the link, the network, the mode, the setting itself.
+ *
+ * It is a second rule and not `decideDelivery` with different arguments, because the two differ in
+ * the one condition that matters: **a notice needs no synthesis.** A reading is a sentence nobody
+ * recorded, so the device path costs a cloud call and an HTTP POST over the device's WiFi, and
+ * `decideDelivery` has to refuse when either is missing. A notice is one of a closed set already
+ * recorded on the board's SD (ADR 0003 §5), so the board can say it with no internet, no WiFi and no
+ * key — over BLE, which is the link that is up whenever there is a device at all. Folding the two
+ * into one function would have to check `synthesisEnabled` for both, and every network notice would
+ * fall back to the phone at exactly the moment the user was told everything comes out of the
+ * glasses. That is the bug reported on 2026-09-16, re-created one layer up.
+ *
+ * The fallback is the phone, for the same reason as always: a notice nobody hears is the same as no
+ * notice, and these are the ones that explain why something else went quiet.
+ */
+export function decideNoticeDelivery({ output, deviceLinked, hasClip }: NoticeDeliveryContext): NoticeDelivery {
+  if (output === 'phone') return { target: 'phone' };
+  if (!hasClip) return { target: 'phone', fallback: 'no-clip' };
+  if (!deviceLinked) return { target: 'phone', fallback: 'device-unreachable' };
   return { target: 'device' };
 }

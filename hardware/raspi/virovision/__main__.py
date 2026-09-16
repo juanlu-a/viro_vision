@@ -24,6 +24,7 @@ from .bus import DEFAULT_CATALOG as BUS_DEFAULT_CATALOG
 from .bus import DEFAULT_MODEL as BUS_DEFAULT_MODEL
 from .bus import BusWatcher
 from .camera import Camera, synthetic_payload
+from .notices import SYSTEM_DIR
 from .state import local_ip, read_status
 from .http_server import DEFAULT_PORT, HttpServer
 from .gatt import ADVERTISED_NAME, SERVICE_UUID, ViroVisionService
@@ -109,6 +110,19 @@ async def _main(args: argparse.Namespace) -> None:
     player = Player()
     set_output_volume(args.volume)
 
+    def say(clip: str) -> None:
+        """Play a system notice the app asked for over BLE (`cmd: 'say'`).
+
+        The path is built here and nowhere else: the core validates the NAME against the closed set
+        in `notices.py` and never sees a directory, so nothing that arrives over the air can point at
+        a file outside `announcements/system/`.
+
+        `player.play` and not `play_sequence`: a notice is one file, and a newer one should cut off
+        the one still talking — hearing "red lista" finish on top of "se perdió la conexión" is worse
+        than losing the first.
+        """
+        player.play(str(args.announcements / SYSTEM_DIR / clip))
+
     http = None
     if not args.no_http:
         http = HttpServer(
@@ -138,6 +152,9 @@ async def _main(args: argparse.Namespace) -> None:
         synthetic_payload=synthetic_payload,
         ap_control=ap_control,
         read_wifi=lambda: {**ap.credentials(), "port": args.port if http else None},
+        # `--no-audio` silences the notices for the same reason it silences a reading: it exists to
+        # debug the pipeline without the board talking over you.
+        say=None if args.no_audio else say,
     )
     await service.register(bus, adapter=adapter)
 

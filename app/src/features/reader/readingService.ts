@@ -31,12 +31,14 @@ import { AppState } from 'react-native';
 
 import { announce } from '@/features/audio/announcer';
 import { decideDelivery, getAudioOutput } from '@/features/audio/audioOutput';
+import { MODE_NOTICE } from '@/features/audio/notices';
+import { notify } from '@/features/audio/systemNotice';
 import { guessBusReading, phraseBusReading, phraseProduct } from '@/features/reader/reading';
 import type { BusReading } from '@/features/reader/reading';
 import { requestsReading, transition } from '@/features/reader/modes';
 import type { Gesture, Mode } from '@/features/reader/modes';
 import { strings } from '@/i18n';
-import { beginReadingAudio, endReadingAudio, playStartEarcon } from '@/services/audio/session';
+import { beginReadingAudio, endReadingAudio } from '@/services/audio/session';
 import { isSynthesisEnabled, synthesizeToFile } from '@/services/audio/synthesis';
 import { flush, record } from '@/services/telemetry';
 import { HttpDownloadError } from '@/services/wifi/deviceHttp';
@@ -51,12 +53,6 @@ import {
 import type { ModelProfile, ProductReading } from '@/services/vision';
 
 const t = strings.reader;
-
-const MODE_ANNOUNCEMENT: Record<Mode, string> = {
-  idle: t.announceIdle,
-  bus: t.announceBus,
-  supermarket: t.announceSupermarket,
-};
 
 /**
  * How long a whole reading may take before it is given up.
@@ -235,7 +231,10 @@ function changeMode(next: Mode, source: 'app' | 'device'): void {
   if (next === state.mode) return;
   record('mode.change', { detail: { from: state.mode, to: next, source } });
   update({ mode: next, reading: null, product: null, message: '', photoUri: null });
-  void announce(MODE_ANNOUNCEMENT[next]);
+  // A system notice and no longer a bare `announce()`: since 2026-09-16 it comes out of the output
+  // the user chose, like everything else. `void` because the transition is already applied — the
+  // mode must not wait on a speaker.
+  void notify(MODE_NOTICE[next]).then((target) => record('audio.spoken', { detail: { notice: MODE_NOTICE[next], target } }));
 }
 
 /** A gesture made in the app's own UI. */
@@ -422,7 +421,11 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   // is the user's only sign —and ours— that the button did something at all.
   const audio = await beginReadingAudio();
   record('audio.session', { detail: { ok: audio, source } });
-  playStartEarcon();
+  // Through the notice router since 2026-09-16, so the chirp comes out of the same place as the
+  // reading it announces. Still unawaited, and still the first sound of the cycle: `notify` runs
+  // synchronously as far as the earcon on the phone path, and the device path is one BLE write
+  // without response.
+  void notify('readingStarted');
 
   const t0 = Date.now();
   const controller = new AbortController();
