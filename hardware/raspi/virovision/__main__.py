@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from pathlib import Path
 import signal
 
 from bluez_peripheral.advert import Advertisement
@@ -18,6 +19,10 @@ from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 from .ap import AP_IP, AccessPoint
 from .audio import DEFAULT_VOLUME_PERCENT, Player, set_output_volume
 from .button import DEBOUNCE_S, DEFAULT_GPIO, DOUBLE_CLICK_WINDOW_S, LONG_PRESS_S, try_connect
+from .bus import DEFAULT_ANNOUNCEMENTS as BUS_DEFAULT_ANNOUNCEMENTS
+from .bus import DEFAULT_CATALOG as BUS_DEFAULT_CATALOG
+from .bus import DEFAULT_MODEL as BUS_DEFAULT_MODEL
+from .bus import BusWatcher
 from .camera import Camera, synthetic_payload
 from .state import local_ip, read_status
 from .http_server import DEFAULT_PORT, HttpServer
@@ -39,6 +44,24 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--no-audio", action="store_true", help="receive the reading's audio but do not play it (only store it)")
     parser.add_argument("--volume", type=int, default=DEFAULT_VOLUME_PERCENT, help=f"output level 0-100, applied at startup (default {DEFAULT_VOLUME_PERCENT})")
     parser.add_argument("--no-ap", action="store_true", help="do not bring the access point up at startup (development on the home network)")
+    parser.add_argument(
+        "--bus-model",
+        type=Path,
+        default=BUS_DEFAULT_MODEL,
+        help="detector (.rpk) loaded into the IMX500 sensor for bus mode",
+    )
+    parser.add_argument(
+        "--bus-labels",
+        default=None,
+        help=(
+            "classes the detector emits, in order, comma separated (e.g. 'bus_sign,bus'). Needed when "
+            "the .rpk does not carry them. A model that has a 'bus' class is used as is; one that only "
+            "finds signs has each sign stand in for its bus, so the tracker has something to follow"
+        ),
+    )
+    parser.add_argument("--announcements", type=Path, default=BUS_DEFAULT_ANNOUNCEMENTS, help="folder with the pre-recorded .wav")
+    parser.add_argument("--bus-catalog", type=Path, default=BUS_DEFAULT_CATALOG, help="CSV number,destination used to fix the OCR")
+    parser.add_argument("--no-bus", action="store_true", help="do not load the detector nor watch in bus mode")
     parser.add_argument("--no-button", action="store_true", help="do not use the physical button (modes come in over BLE only)")
     parser.add_argument("--button-gpio", type=int, default=DEFAULT_GPIO, help=f"GPIO of the mode button (default {DEFAULT_GPIO} = physical pin 29)")
     # The three button timings, on the command line because they are calibrated against a real
@@ -67,7 +90,7 @@ async def _get_adapter(bus, hci: str) -> Adapter:
 async def _main(args: argparse.Namespace) -> None:
     loop = asyncio.get_running_loop()
 
-    camera = Camera()
+    camera = Camera(model=None if args.no_bus else args.bus_model)
     has_camera = False if args.no_camera else camera.start()
     capture = (lambda: loop.run_in_executor(None, camera.capture_jpeg)) if has_camera else None
 
@@ -117,6 +140,34 @@ async def _main(args: argparse.Namespace) -> None:
         read_wifi=lambda: {**ap.credentials(), "port": args.port if http else None},
     )
     await service.register(bus, adapter=adapter)
+
+    # Bus mode (ADR 0006, amended 2026-09-07): the detector already lives in the sensor, so what is
+    # wired here is who speaks and where the reading goes. Built after the service because it emits
+    # its readings through this core, and the core starts and stops it on every mode change.
+    bus_watcher = None
+    if not args.no_bus and has_camera:
+        labels = [name.strip() for name in args.bus_labels.split(",") if name.strip()] if args.bus_labels else None
+        # Derived, never passed separately: a detector that emits a `bus` class gives real bus boxes,
+        # and synthesizing one from the sign on top of that would give the tracker two boxes per bus.
+        # With a sign-only detector the sign has to stand in for its bus or there is nothing to track.
+        # Two flags for one fact is how they end up contradicting each other on the board at night.
+        signs_only = "bus" not in labels if labels else True
+        bus_watcher = BusWatcher(
+            camera,
+            announce=player.play_sequence,
+            emit=service.core.emit_event,
+            announcements=args.announcements,
+            catalog=args.bus_catalog,
+            labels=labels,
+            signs_only=signs_only,
+        )
+        service.core.attach_bus(bus_watcher)
+        if bus_watcher.available:
+            # Loading the OCR takes about 17 s the first time on a Pi 3 B+ (two ONNX models). Doing it
+            # now, while the user is not waiting, is what makes the button answer in a second later.
+            loop.run_in_executor(None, bus_watcher.warm_up)
+        else:
+            log.warning("bus mode unavailable: no detector in the sensor or the reading half is not installed")
 
     # The physical button (ADR 0007) goes against the same core as BLE: it is a user gesture, not a
     # transport. If there is no button (or no gpiozero, or no permissions on the pin) the daemon starts
@@ -208,6 +259,8 @@ async def _main(args: argparse.Namespace) -> None:
     # Silence a reading still playing: otherwise a restart of the service leaves a voice talking
     # about a product from before, with no daemon behind it.
     player.stop()
+    if bus_watcher:
+        bus_watcher.stop()
     if http:
         http.stop()
     bus.disconnect()

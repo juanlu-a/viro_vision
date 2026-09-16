@@ -308,7 +308,7 @@ El único control en la placa. `virovision/button.py`; los modos que dispara viv
 
 | Gesto | Desde | Efecto |
 |---|---|---|
-| 1 click | cualquier estado | modo ómnibus. Si ya está en ómnibus, **nada**: es vigilancia y ya está mirando |
+| 1 click | cualquier estado | modo ómnibus. Si ya está en ómnibus, **repite el último anuncio** |
 | 2 clicks | cualquier estado | modo supermercado **y una lectura**. Si ya está en supermercado, **lee de nuevo** |
 | mantenerlo apretado | cualquier modo | volver a *esperando* |
 
@@ -349,6 +349,77 @@ journalctl -u virovision -f | grep button
 
 El botón es **opcional**: sin gpiozero, sin permisos sobre el pin o sin botón soldado, el daemon
 arranca igual (log `sin botón físico`) y los modos entran por BLE. Una placa sin daemon sería peor.
+
+## Modo ómnibus (todo en la placa)
+
+Desde el 2026-09-15 el camino de ómnibus corre entero en el dispositivo: la detección **dentro del
+sensor** de la AI Camera, el recorte y el OCR en la CPU de la Pi, y la voz por el parlante con
+anuncios pregrabados. Sin teléfono y sin internet. **1,27 s** desde el click hasta la línea dicha
+([medición](../../docs/mediciones/2026-09-15-omnibus-en-placa.md)).
+
+`virovision/bus.py` es el dueño del modo. Lo que hay que saber para tocarlo:
+
+- **El OCR no puede correr en el hilo de la cámara.** libcamera da el sensor por muerto tras ~1 s sin
+  consumir frames, y el OCR tarda ~1 s. Va en un hilo aparte con una cola; el hilo de la cámara sólo
+  copia el frame cuando hay algo para leer, que es lo caro en una Pi 3 B+.
+- **Un ómnibus es un anuncio.** Una línea recién anunciada queda 10 s en silencio
+  (`SAME_LINE_SILENCE_S`), porque cualquier cosa que corte el track del ómnibus lo devuelve como uno
+  nuevo y quien no ve no puede distinguir «lo repitió» de «llegó otro».
+- **Si falta el modelo o falta el OCR, el modo queda inerte y el daemon sigue vivo.** Se registra la
+  advertencia y se sigue: una placa sin daemon es peor que una placa con un modo apagado.
+
+### Qué vive fuera de git, y cómo se rehace
+
+Pesan demasiado para el repo. Los dos se reconstruyen desde `bus-banner-recognizer`:
+
+| En la placa | Qué es | Cómo se rehace |
+|---|---|---|
+| `/home/virovision/models/bus_sign.rpk` | el detector de carteles, int8, para el sensor | `imx500-package -i packerOut.zip -o out/` sobre `models/bus_sign_v6_yolo11n_imx_model/packerOut.zip`, que sí está en el repo (LFS) |
+| `/home/virovision/announcements/` | 386 `.wav`: números de línea, destinos de la STM y avisos de sistema | `scripts/make_announcements.py` |
+| `/home/virovision/models/catalog_stm.csv` | el catálogo de líneas y destinos de Montevideo, que repara lecturas del OCR | `scripts/build_catalog.py` |
+
+Banderas: `--bus-model`, `--bus-labels`, `--announcements`, `--bus-catalog`, y `--no-bus` para
+apagar el modo.
+
+### Cambiar el detector sin editar dos archivos
+
+Las banderas del daemon viven en **`/etc/default/virovision`**, en la placa, y las leen tanto la
+unidad base como el drop-in que `modo-red.sh` reescribe en cada arranque. Es lo que hace que
+sobrevivan al cambio entre desarrollo y producto; puestas en la unidad, se perdían al pasar a
+producto, que es cuando nadie puede entrar a arreglarlo.
+
+```sh
+# en la placa
+sudo nano /etc/default/virovision      # VIROVISION_ARGS=--bus-model … --bus-labels …
+sudo systemctl restart virovision
+```
+
+**`--bus-labels` no es decorativo.** De ahí sale si el detector encuentra ómnibus o sólo carteles:
+con un modelo de una clase cada cartel hace de ómnibus para que el seguimiento tenga algo que
+seguir, y con uno de dos clases eso sobra y le daría al tracker dos cajas por ómnibus. Se deriva de
+las etiquetas a propósito: dos banderas para un mismo hecho terminan contradiciéndose de noche en la
+placa.
+
+### Paquetes
+
+`setup.sh` suma por apt `imx500-all`, `imx500-tools`, `python3-opencv` y `git`, y el grupo de OCR de
+`requirements-bus.txt`. Ese grupo se instala **con `--no-deps`, y no es opcional**: sin eso pip pisa
+el numpy con el que se compiló picamera2 y la cámara deja de abrir.
+
+Dos trampas que ya costaron una tarde:
+
+- **`pip` sin `sudo` instala en `~/.local` y el daemon (que corre como root) no lo ve.** El venv es de
+  root: `sudo /home/virovision/virovision/.venv/bin/pip install …`.
+- **La placa no tiene git ni credenciales**, a propósito: un aparato que sale a la calle no debería
+  llevarlas. El paquete de `bus-banner-recognizer` se construye en la Mac (`uv build --wheel`) y se
+  copia con `scp`.
+
+Los tres pasos están en **`scripts/deploy_pi.sh`, en el repo de `bus-banner-recognizer`**, que es el
+único script de despliegue del proyecto: instala el paquete, copia los scripts y el catálogo, rehace
+el `.rpk` en la placa si se le pasa un modelo, y espera a que el daemon avise que el modo ómnibus
+está listo. Con `FIELD=1` deja el servicio parado e imprime el comando de la prueba de campo, porque
+**el servicio y la cámara son exclusivos**: si el daemon está arriba, el script de campo no abre la
+cámara.
 
 ## Salida de audio (el modo supermercado, de punta a punta)
 
