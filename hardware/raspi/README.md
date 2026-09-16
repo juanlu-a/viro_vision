@@ -373,7 +373,27 @@ Pesan demasiado para el repo. Los dos se reconstruyen desde `bus-banner-recogniz
 | `/home/virovision/announcements/` | 386 `.wav`: números de línea, destinos de la STM y avisos de sistema | `scripts/make_announcements.py` |
 | `/home/virovision/models/catalog_stm.csv` | el catálogo de líneas y destinos de Montevideo, que repara lecturas del OCR | `scripts/build_catalog.py` |
 
-Banderas: `--bus-model`, `--announcements`, `--bus-catalog`, y `--no-bus` para apagar el modo.
+Banderas: `--bus-model`, `--bus-labels`, `--announcements`, `--bus-catalog`, y `--no-bus` para
+apagar el modo.
+
+### Cambiar el detector sin editar dos archivos
+
+Las banderas del daemon viven en **`/etc/default/virovision`**, en la placa, y las leen tanto la
+unidad base como el drop-in que `modo-red.sh` reescribe en cada arranque. Es lo que hace que
+sobrevivan al cambio entre desarrollo y producto; puestas en la unidad, se perdían al pasar a
+producto, que es cuando nadie puede entrar a arreglarlo.
+
+```sh
+# en la placa
+sudo nano /etc/default/virovision      # VIROVISION_ARGS=--bus-model … --bus-labels …
+sudo systemctl restart virovision
+```
+
+**`--bus-labels` no es decorativo.** De ahí sale si el detector encuentra ómnibus o sólo carteles:
+con un modelo de una clase cada cartel hace de ómnibus para que el seguimiento tenga algo que
+seguir, y con uno de dos clases eso sobra y le daría al tracker dos cajas por ómnibus. Se deriva de
+las etiquetas a propósito: dos banderas para un mismo hecho terminan contradiciéndose de noche en la
+placa.
 
 ### Paquetes
 

@@ -50,6 +50,15 @@ def _arguments() -> argparse.Namespace:
         default=BUS_DEFAULT_MODEL,
         help="detector (.rpk) loaded into the IMX500 sensor for bus mode",
     )
+    parser.add_argument(
+        "--bus-labels",
+        default=None,
+        help=(
+            "classes the detector emits, in order, comma separated (e.g. 'bus_sign,bus'). Needed when "
+            "the .rpk does not carry them. A model that has a 'bus' class is used as is; one that only "
+            "finds signs has each sign stand in for its bus, so the tracker has something to follow"
+        ),
+    )
     parser.add_argument("--announcements", type=Path, default=BUS_DEFAULT_ANNOUNCEMENTS, help="folder with the pre-recorded .wav")
     parser.add_argument("--bus-catalog", type=Path, default=BUS_DEFAULT_CATALOG, help="CSV number,destination used to fix the OCR")
     parser.add_argument("--no-bus", action="store_true", help="do not load the detector nor watch in bus mode")
@@ -137,12 +146,20 @@ async def _main(args: argparse.Namespace) -> None:
     # its readings through this core, and the core starts and stops it on every mode change.
     bus_watcher = None
     if not args.no_bus and has_camera:
+        labels = [name.strip() for name in args.bus_labels.split(",") if name.strip()] if args.bus_labels else None
+        # Derived, never passed separately: a detector that emits a `bus` class gives real bus boxes,
+        # and synthesizing one from the sign on top of that would give the tracker two boxes per bus.
+        # With a sign-only detector the sign has to stand in for its bus or there is nothing to track.
+        # Two flags for one fact is how they end up contradicting each other on the board at night.
+        signs_only = "bus" not in labels if labels else True
         bus_watcher = BusWatcher(
             camera,
             announce=player.play_sequence,
             emit=service.core.emit_event,
             announcements=args.announcements,
             catalog=args.bus_catalog,
+            labels=labels,
+            signs_only=signs_only,
         )
         service.core.attach_bus(bus_watcher)
         if bus_watcher.available:
