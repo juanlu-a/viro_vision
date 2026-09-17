@@ -62,6 +62,16 @@ describe('the notice catalogue', () => {
     }
   });
 
+  it('keeps anything that reports a board failure off the board', () => {
+    // A notice about the board being in trouble must not be delivered BY the board: whatever is
+    // wrong may be the very thing that would carry it, and when what is wrong is the notice channel
+    // itself the two halves feed each other forever. Written as a rule and not as one assertion so
+    // that a notice added later for the same kind of event has to face it.
+    for (const id of ['deviceWarning', 'connectionLost'] as const) {
+      expect(NOTICES[id].clip).toBeNull();
+    }
+  });
+
   it('covers every mode', () => {
     // The mode announcement is the one notice chosen by a lookup rather than by name, so a mode
     // added without its notice would throw at the moment of the transition — on the user's ear.

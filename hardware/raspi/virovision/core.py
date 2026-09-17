@@ -41,8 +41,10 @@ Notify = Callable[[str, bytes], Awaitable[None]]
 # Turn the WiFi AP on/off; None when the transport does not offer it (the Mac emulator).
 ApControl = Callable[[bool], None]
 # Plays one system notice by file name (`notices.py`); None when the transport has no speaker (the
-# Mac emulator, or `--no-audio`).
-Say = Callable[[str], None]
+# Mac emulator, or `--no-audio`). It returns whether the file was actually there: a clip missing from
+# the SD is the one failure of this path that is otherwise completely silent — `aplay` exits with an
+# error into /dev/null and the board looks like it spoke.
+Say = Callable[[str], bool]
 DEFAULT_AUDIO_TARGET = "device"
 AUDIO_TARGETS = ("device", "phone")
 AP_MINUTES_DEFAULT = 10
@@ -227,7 +229,24 @@ class Core:
             return
         # In an executor: playing spawns a process, and that does not belong on the event loop that
         # BLE is answering from.
-        self._loop.run_in_executor(None, self._say, clip)
+        self._loop.run_in_executor(None, self._play_notice, clip)
+
+    def _play_notice(self, clip: str) -> None:
+        """Runs on a worker thread. Reports a clip the SD does not have.
+
+        Without this the failure is invisible from the phone: the app sends `say`, the board answers
+        nothing, `aplay` fails into /dev/null and the user hears silence — which is exactly what
+        happened on 2026-09-16, when the app shipped with the notices and the `.wav` files had not
+        been copied yet. Saying *why* it is quiet is the difference between a one-line fix and an
+        afternoon.
+
+        `emit_event` and not `_event`: this is not the loop thread, and `create_task` from here would
+        be a silent no-op.
+        """
+        if self._say(clip):
+            return
+        log.warning("notice %s is not on this board", clip)
+        self.emit_event({"t": "error", "msg": f"missing notice: {clip}"[:150]})
 
     def _ap(self, on: bool, minutes: int) -> None:
         """ADR 0003's plan B. The AP is always turned on for a bounded time: the device has a single

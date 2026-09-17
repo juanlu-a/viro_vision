@@ -196,7 +196,7 @@ tests via `jest-expo`.
   en la SD ya no hace falta, y ómnibus respeta el mismo ajuste que supermercado. Desde el
   **2026-09-16 el ajuste vale para todo lo que suena**, no sólo para las dos lecturas: la conexión, la
   red, el cambio de modo, el chirp del botón y la confirmación del propio ajuste son **avisos de
-  sistema** con su `.wav` en `announcements/system/` de la SD (11 clips, disparados por
+  sistema** con su `.wav` en `announcements/system/` de la SD (10 clips, disparados por
   `{"cmd":"say","clip":…}` sobre BLE). Un aviso sólo necesita el enlace —ni nube, ni WiFi, ni clave—,
   y por eso hay dos reglas de decisión y no una. **Falta escucharlo en la placa**: el camino del
   dispositivo está verificado en la Mac, no en el hardware.

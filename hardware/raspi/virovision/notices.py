@@ -32,7 +32,6 @@ NOTICES = {
     "network_ready.wav": "Red con el dispositivo lista.",
     # The app appends which step failed; here the sentence has to stand on its own.
     "network_failed.wav": "No se pudo usar la red del dispositivo.",
-    "device_warning.wav": "El dispositivo tiene un aviso. Miralo en el teléfono.",
     "mode_write_failed.wav": "No pude avisarle el modo al dispositivo.",
     "mode_idle.wav": "Esperando. Reconocimiento apagado.",
     "mode_bus.wav": "Modo ómnibus activado.",
@@ -40,7 +39,13 @@ NOTICES = {
     "output_device.wav": "Dónde se escucha: en el dispositivo.",
     "audio_test.wav": "Hola, soy ViroVision. La salida de audio funciona correctamente.",
 }
-"""Clip file name -> what it says. Everything here is speech."""
+"""Clip file name -> what it says. Everything here is speech.
+
+There is deliberately **no clip for "the board has a warning"**: the app says that one on the phone,
+always. The board answering an unknown `say` with an error event, which the app turns back into a
+`say`, is a loop — and it is not hypothetical, it ran on the board on 2026-09-16. More generally, a
+board that is complaining is not the half to trust with the complaint.
+"""
 
 EARCON_FILE = "earcon_start.wav"
 """The chirp played the instant a reading is requested. Not speech, so it is not in `NOTICES`: the
