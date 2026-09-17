@@ -2431,6 +2431,59 @@ nuevo: el clip que falta se reporta en vez de callarse). El generador se corrió
 día: la mitad del dispositivo necesita `python3 tools/make_system_announcements.py`, el `scp` de
 `announcements/system/` y **el daemon actualizado**.
 
+## 2026-09-17 — Los avisos, verificados en la placa: los diez suenan, y las dos ramas de error también
+
+El día anterior cerró con la app entregada y la placa sin tocar. Hoy se cerró la otra mitad, y el
+primer hallazgo fue que la causa no era ninguna de las dos que habíamos supuesto.
+
+### La placa no estaba en modo desarrollo, aunque todo indicaba que sí
+
+`SIN-AP` **no existía** en la tarjeta. Lo único que quedaba era `._SIN-AP`, el archivo de recursos
+que macOS crea al lado de cada archivo que se copia a una FAT: se borró el real y sobrevivió el
+compañero, que es justo el rastro que hace creer que el archivo está. Con eso la placa arranca en
+modo producto, levanta su AP y deja cualquier otra red — sin SSH, invisible en la WiFi. El celular
+la seguía viendo porque **BLE anda igual en los dos modos**, y de ahí la confusión.
+
+Vale como regla: `ls SIN-AP` no alcanza en una tarjeta que pasó por una Mac. Hay que mirar que no
+sea el `._`.
+
+### Lo que se hizo desde la microSD
+
+Creado `SIN-AP`, reconstruido `virovision-daemon.tgz` desde el repo —el de la tarjeta era del 13 de
+septiembre, sin `cmd: 'say'` y **ni siquiera con `bus.py`**, o sea que tampoco era lo que corría— y
+copiados los diez `.wav`. Y `modo-red.sh` pasó a instalar los avisos en cada arranque, para que una
+placa en modo producto, sin SSH, también se pueda actualizar: que es exactamente la situación en la
+que se descubrió que faltaban.
+
+De paso, una trampa que ya estaba: el bucle `for f in /boot/firmware/*.nmconnection` también agarraba
+`._wye-guest.nmconnection` y lo instalaba como perfil de NetworkManager. Ahora los filtra.
+
+### Verificado en hardware, no en la Mac
+
+- Los **diez avisos por BLE**, con `tools/say.py` (nueva, hermana de `ap.py`): en el journal, cada
+  `control ← {'cmd': 'say', …}` seguido de su `audio: playing … (pid N)`. La cadena entera —ajuste,
+  escritura BLE, catálogo, `aplay`— corre.
+- **El rechazo**: `../../etc/passwd` y `mode_train.wav` vuelven como `unknown notice`. La lista
+  blanca hace lo suyo con algo que llegó por el aire.
+- **El clip que falta**: escondiendo `mode_idle.wav` a propósito, la placa contesta
+  `missing notice: mode_idle.wav`. Es la rama escrita ayer para que el fallo mudo dejara de serlo, y
+  es la que habría ahorrado la sesión entera.
+
+### Dos cosas que aparecieron mirando
+
+- **`modo-red.sh` e `instalar-daemon.sh` vivían sólo en la microSD.** Un script de arranque del que
+  existe una única copia, en un medio que se corrompe y se presta. Van al repo en `hardware/raspi/boot/`.
+- **Las fechas de archivo en la placa mienten.** `modo-red.sh` corre antes de que NTP sincronice y la
+  Pi no tiene RTC, así que todo lo que instala queda fechado en el apagado anterior. Hoy eso hizo
+  pensar por un rato que los clips eran de un despliegue viejo cuando se acababan de copiar. Para
+  saber cuándo se instaló algo: `/var/log/virovision-firstrun.log`, no `ls -la`.
+
+### Lo que falta
+
+La prueba con el celular: Ajustes → «Dónde se escucha» → **En el dispositivo**, y escuchar que la
+confirmación misma salga por la placa. Todo lo de arriba prueba que la placa hace su parte cuando se
+le pide; falta ver a la app pidiéndoselo.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2442,10 +2495,11 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Validar ADR 0006, 0007 y 0008 con el tutor** — 0006 y 0007 siguen en Proposed.
 
 ### Deuda técnica conocida
-- **Desplegar la mitad de la placa** (2026-09-16). Es lo primero de la lista: hasta que el daemon
-  nuevo y `announcements/system/` estén en la SD, la opción «en el dispositivo» de Ajustes cae al
-  teléfono para todos los avisos. No hay automatismo — el workflow de TestFlight publica la app y
-  nada más.
+- ~~**Desplegar la mitad de la placa**~~ (hecho el 2026-09-17: daemon con `cmd: 'say'` y los diez
+  clips, verificados por BLE en hardware). Queda la parte que no tiene automatismo: **el workflow de
+  TestFlight publica la app y nada más**, así que cada cambio en el daemon o en los avisos sigue
+  necesitando tarjeta o SSH. Si el daemon y la app se desincronizan otra vez, el síntoma vuelve a ser
+  silencio.
 - **Sin teléfono conectado, un cambio de modo no se anuncia** (2026-09-16). Con el botón físico el
   aviso viaja placa → app → placa: la placa notifica el modo, la app decide dónde se escucha y le
   manda el clip de vuelta. Funciona (BLE despierta la app) y mantiene **un solo punto de decisión**,
