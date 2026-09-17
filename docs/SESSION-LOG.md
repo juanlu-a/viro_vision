@@ -2653,6 +2653,10 @@ chat y la clave que quedó en el historial de git) sin publicar ningún valor.
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
 
 ### Lo más valioso que falta
+- **Correr `docs/qa-avisos-de-sistema.md` entero, con la placa y el teléfono al día.** Es la prueba
+  que cierra los cuatro PRs del 16 y 17 (#90, #91, #93, #94) y la única parte del camino que nadie
+  vio funcionando junta. El bloque 0 —alinear las dos mitades— no es opcional: la causa raíz de los
+  tres fallos de estos días fue siempre la app y la placa en versiones distintas.
 - **Dataset de evaluación con fotos reales de góndola.** Todo lo medido el 2026-09-02 usa una imagen
   sintética de alto contraste: es el piso de dificultad, y **los aciertos de ahí no son la precisión
   del sistema**. Protocolo escrito en los pasos 8 y 9 de `qa-modo-supermercado.md`.
