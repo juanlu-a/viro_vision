@@ -2431,6 +2431,99 @@ nuevo: el clip que falta se reporta en vez de callarse). El generador se corrió
 día: la mitad del dispositivo necesita `python3 tools/make_system_announcements.py`, el `scp` de
 `announcements/system/` y **el daemon actualizado**.
 
+## 2026-09-16 (cont. 2): el cuerpo formal de la tesis, escrito desde lo que el repo ya tenía medido
+
+El pedido fue arrancar la redacción formal a partir de dos tesis de referencia que están en el Drive
+del proyecto: la de **Altamirano y Mira** para el esqueleto del cuerpo (Metodología, Planificación,
+Desarrollo, Despliegue) y la de **Juan Cruz Carrau** para el marco teórico.
+
+Primer dato que conviene no olvidar: **la tesis de Juan Cruz no menciona OCR ni YOLO ni una sola
+vez**. Lo que aporta es la escalera IA → ML → redes → CNN y la definición formal de accuracy,
+precision, recall y F1. Todo lo de OCR, YOLO, hardware embebido, comunicación inalámbrica y app
+móvil hubo que escribirlo de cero.
+
+### Qué se escribió
+
+`docs/tesis/`, un archivo por capítulo:
+
+| Archivo | Qué es |
+|---|---|
+| `03-estado-del-arte-ampliaciones.md` | Los cuatro apartados que estaban vacíos: OCR para ómnibus, productos en góndola, detección en el borde y protocolos |
+| `04-marco-teorico-ampliaciones.md` | Métricas (IoU, mAP), YOLO y una etapa, OCR en dos etapas, Edge AI y cuantización, BLE/GATT y WiFi, TTS y sesión de audio, WCAG |
+| `05-metodologia.md` | Enfoque, organización, **documentación como método** (ADRs, mediciones, skills), Trello, ramas |
+| `06-planificacion.md` | Cinco etapas derivadas de este mismo log, más la tabla de riesgos |
+| `07-desarrollo.md` | El capítulo central: arquitectura, 8 decisiones con su número, dispositivo, pipeline de ómnibus, supermercado, app, accesibilidad, verificación |
+| `08-despliegue.md` | Ramas y canales, CI, firma de iOS, backend, instalación en la placa |
+| `11-bibliografia.md` | Las referencias de los capítulos 3 y 4 |
+| `12-anexo-ampliaciones.md` | GATT completo, hiperparámetros, barrido de márgenes, datos crudos de las tres campañas |
+
+### Dónde quedó
+
+En el Drive compartido, carpeta **Documentos**, como **`ViroVision PFC v2 (completo)`**: el documento
+entero, con lo que ya estaba en el oficial reordenado a la numeración de Altamirano y Mira, más los
+capítulos nuevos. El oficial no se tocó.
+
+### La receta para meter un documento largo en un Google Doc
+
+**El conector de Drive no puede editar un Google Doc que ya existe** (crea, copia, renombra y mueve,
+nada más). Y 183 KB de texto no entran en una llamada. La receta que funciona, con las tres trampas
+que hay que esquivar:
+
+1. **Copiar el doc oficial con `copy_file`**, no crear uno vacío. La carátula (con el logo de la UM,
+   que es una imagen), el índice y los estilos vienen con la copia. Armar la portada desde markdown
+   la destruye.
+2. Armar el markdown del **cuerpo solo**, desde el primer capítulo, y pasarlo a HTML con
+   `pandoc -f gfm -t html` (sin `--standalone`: agrega un `<h1>` con el título que después hay que
+   borrar a mano).
+3. Ponerlo en el portapapeles de macOS con el flavor HTML: `osascript` con
+   `set the clipboard to «data HTML<hex>»`. Verificar con `osascript -e 'clipboard info'`.
+4. En el navegador, **borrar primero el cuerpo viejo y pegar después**, en dos pasos. Si se pega
+   encima de la selección, el texto hereda el formato del punto de inserción: las 78 páginas
+   quedaron en **rojo cursiva**. Con el cursor ya en el hueco, aplicar `cmd+alt+0` (texto normal) y
+   `cmd+\` (borrar formato) antes de `cmd+v`.
+5. El pegado entra en Arial sin justificar: seleccionar el cuerpo (`cmd+shift+down` desde el primer
+   capítulo) y ponerle **Times New Roman** y `cmd+shift+j` para que coincida con el resto.
+6. Actualizar el índice: clic en él y el botón de refrescar que aparece al costado.
+
+**Y la trampa que más caro salió:** en Google Docs, **lo que se tipea cuando un diálogo no tomó el
+foco cae en el cuerpo del documento**. Pasó dos veces, con el diálogo de Buscar y reemplazar y con
+`cmd+f`, y las dos veces el texto quedó incrustado en la carátula. La regla, entonces:
+
+- **No tipear nunca dentro de Docs.** Ni buscar. Para moverse se usa el panel de esquema, que es un
+  clic; para llegar al índice, recargar la página, que abre arriba.
+- **Y si igual pasa, no deshacer a ciegas.** Seis `cmd+z` seguidos se comieron la carátula y el
+  índice enteros, porque el borrado del cuerpo viejo y el pegado son operaciones separadas y el
+  undo atraviesa las dos. Salió más barato tirar el documento y rehacerlo desde una copia nueva del
+  oficial que intentar recomponerlo con redo.
+
+### Dos cosas que la redacción dejó al descubierto
+
+1. **Nunca se entrenó en la V100.** El README y los ADRs venían diciendo «entrenado en la V100 de
+   Arnaldo Castro» como si fuera un hecho. Los dos fine-tunes que existen corrieron **en CPU, 40
+   epochs, batch 16**; los 120 epochs que documenta `scripts/train.py` no se ejecutaron nunca. El
+   acceso SSH al servidor ya está, pero sin usar. El capítulo 7.4.2 lo dice con todas las letras y
+   avisa que las métricas reportadas son un piso.
+2. **Documentación desactualizada que no hay que citar.** `app/README.md` sigue diciendo que BLE es
+   un stub y el audio un TODO; `hardware/README.md` todavía lista Coral TPU y Camera Module 3;
+   `PROJECT-STATUS.md` dice «ML: not started». El capítulo cita los docblocks de los módulos y los
+   ADRs enmendados, que sí están al día. La skill se corrigió en este mismo PR (el proxy está
+   desplegado desde el 2026-09-02, y `ml/` es un stub).
+
+### Convenciones de redacción que quedaron fijadas
+
+Tercera persona siempre («el equipo», «se optó por»), **sin raya larga** (comas, dos puntos o
+paréntesis), coma decimal, y una regla de fondo: **toda cifra remite a un ADR, a una campaña de
+`docs/mediciones/` o a un `summary.json` del repo de ómnibus**, y lo que no está hecho o no está
+medido se dice, no se omite. Están escritas en `docs/tesis/README.md`.
+
+### Lo que falta del documento
+
+- Las **figuras**: van marcadas como `[FIGURA N: ...]` con la descripción de qué tiene que mostrar.
+- Las **columnas reales del Trello** (el tablero es privado y Chrome no tiene sesión de Trello).
+- El **registro de reuniones con el tutor**: `docs/REUNIONES-TUTOR.md` sólo tiene la del 2026-08-10.
+- **Verificar la bibliografía** contra las fuentes antes de entregar.
+- Conclusiones y trabajo futuro, que quedaron fuera de alcance a propósito.
+
 ## 2026-09-17 — Los avisos, verificados en la placa: los diez suenan, y las dos ramas de error también
 
 El día anterior cerró con la app entregada y la placa sin tocar. Hoy se cerró la otra mitad, y el
@@ -2528,6 +2621,32 @@ compitiendo en silencio con lo que el producto necesita.
 282 tests en la app (5 del serializador, 2 que fijan el reparto nuevo) y 86 en la placa. Los clips
 regenerados: 6, 503 KB. **Falta llevarlos a la SD y volver a probar con el celular** — el catálogo
 cambió, así que la placa tiene 4 `.wav` que ya nadie pide y le faltan cero.
+
+## 2026-09-17 (cont. 2): la placa entra a la tesis por donde se la usa, no por donde se la programa
+
+Pregunta del equipo sobre el borrador: ¿estaba escrito todo lo que hubo que tener en cuenta para la
+Raspberry, el modo producto, el acceso remoto? **No.** Estaban el interruptor de red en una línea y
+poco más. Faltaba justamente lo que costó tiempo.
+
+### Lo que se agregó
+
+**§7.3.4, los dos modos de operación**, como decisión de diseño y no como detalle: un producto
+terminado son unos lentes con un botón, y durante el desarrollo el mismo hardware tiene que ser
+alcanzable. Sobre una sola radio las dos cosas no conviven. El interruptor vive en la partición FAT
+porque **un dispositivo sin pantalla tiene que ser gobernable sin entrar en él**, la configuración se
+regenera en cada arranque, y el enlace BLE anda igual en los dos modos, que es deliberado y tiene un
+costo de diagnóstico: desde el teléfono los dos modos se ven iguales.
+
+**§8.7, reescrito entero**, con siete subsecciones: la tarjeta como panel de control, las tres vías
+de acceso y la regla de no desplegar desde una máquina con una sola interfaz de red, el
+procedimiento de cinco pasos con sus tres restricciones (el instalador no se reejecuta, el paquete
+tiene que llevar el árbol completo, una bandera puede estar repetida en dos archivos), el
+diagnóstico y su límite (el journal no sobrevive a los reinicios por la falta de RTC, y así se
+perdió el log de la única prueba en modo producto), el punto de acceso sin gateway ni DNS, el
+pipeline de visión como dependencia, y una tabla de deuda operativa declarada.
+
+Las credenciales no se transcriben al documento: se nombra la deuda (rotar lo que se compartió por
+chat y la clave que quedó en el historial de git) sin publicar ningún valor.
 
 ## Open threads / next
 
@@ -2659,8 +2778,9 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - Placa: DAC I2S. El detector ya no se elige: corre **dentro del sensor IMX500** y el caso B está
   medido (2026-09-15). Falta el **costo en precisión del int8**, que necesita correr `yolo val` sobre
   el modelo cuantizado **dentro de la imagen Docker del export** (fuera de ahí el ONNX no carga).
-- **Un modelo de dos clases** (ómnibus y cartel en el mismo `.rpk`) entra en el chip, pero hay que
-  entrenarlo en el servidor V100 de Arnaldo Castro, cuyo acceso SSH sigue pendiente. Con las fotos ya
+- **Un modelo de dos clases** (ómnibus y cartel en el mismo `.rpk`) ya entra en el chip y está
+  entrenado, pero **en CPU y con 40 epochs**. El acceso SSH a la V100 de Arnaldo Castro ya está;
+  falta correr ahí el entrenamiento completo (120 epochs). Con las fotos ya
   pseudo-etiquetadas para Roboflow, Magalí no tiene que volver a etiquetar a mano.
 - **Rotar la clave de Roboflow** (quedó en el historial de git de `bus-banner-recognizer`) y la
   contraseña de sudo de la placa, que se compartió por chat.
