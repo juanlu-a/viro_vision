@@ -56,9 +56,9 @@ describe('notify', () => {
     setAudioOutput('device');
     boardIsThere();
 
-    await expect(notify('networkReady')).resolves.toBe('device');
+    await expect(notify('modeBus')).resolves.toBe('device');
 
-    expect(played).toEqual([NOTICES.networkReady.clip]);
+    expect(played).toEqual([NOTICES.modeBus.clip]);
     // The half that is easy to forget: a notice said in both places at once is worse than one said
     // in the wrong place, because the user cannot tell it is the same event.
     expect(spoken).toEqual([]);
@@ -68,23 +68,37 @@ describe('notify', () => {
     setAudioOutput('phone');
     boardIsThere();
 
-    await expect(notify('networkReady')).resolves.toBe('phone');
+    await expect(notify('modeBus')).resolves.toBe('phone');
 
-    expect(spoken).toEqual([NOTICES.networkReady.say]);
+    expect(spoken).toEqual([NOTICES.modeBus.say]);
     expect(played).toEqual([]);
   });
 
-  it('appends the detail on the phone and drops it on the board', async () => {
-    setAudioOutput('phone');
-    boardIsThere();
-    await notify('networkFailed', 'no responde en 10.42.0.1');
-    expect(spoken).toEqual([`${NOTICES.networkFailed.say} no responde en 10.42.0.1`]);
-
+  it('appends the detail, and keeps it on the phone whatever the setting says', async () => {
+    // Every notice that carries a detail is about the link or the network, and since 2026-09-17
+    // those are the phone's (see `notices.ts`). So the detail always arrives: there is no longer a
+    // combination where it is dropped.
     setAudioOutput('device');
-    await notify('networkFailed', 'no responde en 10.42.0.1');
-    // The clip is fixed, so the detail cannot travel. It is on screen and in telemetry, and the
-    // sentence still names which thing failed — that trade is the design, not an accident.
-    expect(played).toEqual([NOTICES.networkFailed.clip]);
+    boardIsThere();
+
+    await expect(notify('networkFailed', 'no responde en 10.42.0.1')).resolves.toBe('phone');
+    expect(spoken).toEqual([`${NOTICES.networkFailed.say} no responde en 10.42.0.1`]);
+    expect(played).toEqual([]);
+  });
+
+  it('writes nothing over BLE while the link is still being set up', async () => {
+    // The regression of 2026-09-17, stated where it can be caught. `DeviceProvider` announces this
+    // the instant the link comes up, one line before it reads the `wifi` characteristic to join the
+    // board's AP. When the announcement was a BLE write, the two raced and the phone was left with
+    // no credentials — the app reported it could not use the device's network, three layers away
+    // from the cause. The connection notices reach the board through no path at all now.
+    setAudioOutput('device');
+    boardIsThere();
+
+    for (const id of ['connected', 'connectionLost', 'networkReady', 'networkFailed'] as const) {
+      await expect(notify(id)).resolves.toBe('phone');
+    }
+    expect(played).toEqual([]);
   });
 
   it('never sends a board complaint back to the board', async () => {

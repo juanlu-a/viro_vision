@@ -2484,6 +2484,51 @@ La prueba con el celular: Ajustes → «Dónde se escucha» → **En el disposit
 confirmación misma salga por la placa. Todo lo de arriba prueba que la placa hace su parte cuando se
 le pide; falta ver a la app pidiéndoselo.
 
+## 2026-09-17 (cont.) — El reparto, corregido en uso: qué dice la placa y qué dice el teléfono
+
+Probando en modo producto: con la salida en «dispositivo» la app **no se podía unir al WiFi de la
+placa**; poniéndola en «teléfono», el mismo build andaba. Ese A/B identificó la causa sin ambigüedad.
+
+### El bug
+
+«Dispositivo conectado» se anuncia en el instante en que sube el enlace. Con la salida en la placa,
+eso es una escritura GATT en `control`, disparada **sin `await` una línea antes** de que la app lea la
+característica `wifi` para saber a qué red unirse. Dos operaciones de característica a la vez sobre un
+periférico recién conectado: la lectura volvía vacía, `readWifi()` contesta `null` ante cualquier
+falla, y sin credenciales no hay nada a lo que unirse.
+
+Lo que lo hacía difícil de ver: el síntoma —«no se pudo conectar al WiFi»— apunta a la red, tres capas
+más allá de la escritura BLE que lo causaba. La placa estaba impecable: `ap True`, `ip 10.42.0.1:8080`,
+credenciales correctas viajando por BLE. Leerla con `ap.py --status` descartó esa mitad en un minuto.
+
+### La decisión, que es más importante que el arreglo
+
+Anunciar «conectado» **por el dispositivo** es circular: cuando se anuncia, el dispositivo acaba de
+existir para la app, y el usuario está con el teléfono en la mano emparejando, no con los anteojos
+puestos. El reparto no es «todo lo que suena» sino **por quién está escuchando y dónde**:
+
+- **el teléfono**: el enlace y la red — conectado, perdido, red lista, red falló, los avisos de la
+  placa, el modo que no se pudo escribir;
+- **la placa** (según el ajuste): los modos, el chirp de la lectura, y las lecturas de cada modo como
+  ya venían. Más la confirmación del ajuste y «probar audio», que verifican la salida misma y por eso
+  tienen que salir por ella.
+
+Quedan 6 clips en la SD, no 10.
+
+### El arreglo de fondo
+
+Achicar el catálogo saca la carrera del camino de conexión, pero no la clase de bug: `applyGesture`
+anuncia el modo y lo escribe al dispositivo en la sentencia siguiente, también sin `await`. Así que
+las operaciones de característica pasan por una cola (`services/ble/serialize.ts`): **el orden en que
+se piden es el orden en que ocurren**. Un aviso es lo menos importante que lleva el enlace y estaba
+compitiendo en silencio con lo que el producto necesita.
+
+### Verificación
+
+282 tests en la app (5 del serializador, 2 que fijan el reparto nuevo) y 86 en la placa. Los clips
+regenerados: 6, 503 KB. **Falta llevarlos a la SD y volver a probar con el celular** — el catálogo
+cambió, así que la placa tiene 4 `.wav` que ya nadie pide y le faltan cero.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

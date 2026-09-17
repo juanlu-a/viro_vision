@@ -635,6 +635,47 @@ De paso se tapó el otro agujero mudo: `aplay` falla hacia `/dev/null`, así que
 en la SD sonaba igual que un parlante sin cablear. Ahora la placa avisa `missing notice: <archivo>`,
 y ese aviso lo dice el teléfono.
 
+## Actualización 2026-09-17 — Qué dice la placa y qué dice el teléfono: el reparto, corregido en uso
+
+La actualización anterior mandó a la placa **todo** lo que la app decía de sí misma. Probándolo en la
+placa apareció que eso estaba mal por dos motivos distintos, uno técnico y otro de producto, y el
+segundo es el que manda.
+
+**El técnico.** Con la salida en «dispositivo» la app dejó de poder unirse al AP. El aviso «dispositivo
+conectado» se anuncia en el instante en que sube el enlace, y con la salida en la placa eso es una
+**escritura GATT en `control`**, disparada sin `await` una línea antes de que la app **lea** la
+característica `wifi` para saber a qué red unirse. Dos operaciones de característica a la vez sobre un
+periférico recién conectado: la lectura volvía vacía, `readWifi()` contesta `null` ante cualquier
+falla, y sin credenciales no hay nada a lo que unirse. Con la salida en «teléfono» el mismo build
+andaba — el A/B que lo identificó.
+
+**El de producto, que es el que decide.** Un aviso sobre el enlace que viaja por ese mismo enlace es
+circular: cuando se anuncia que el dispositivo se conectó, el dispositivo **acaba de existir** para la
+app, y el usuario está con el teléfono en la mano emparejando, no con los anteojos puestos. Y el que
+dice que la red falló no puede ir por la red.
+
+**Decisión: el reparto no es «todo lo que suena», es por quién está escuchando y dónde.**
+
+| lo dice el teléfono | lo dice la placa (según el ajuste) |
+|---|---|
+| conectado, se perdió la conexión | los modos: espera, ómnibus, supermercado |
+| red lista, la red falló | el chirp al pedir una lectura |
+| los avisos de la propia placa | las lecturas de cada modo (como ya venía) |
+| no pude avisarle el modo | la confirmación del ajuste y «probar audio» |
+
+Las dos últimas de la derecha son la excepción razonada: verifican **la salida misma**, y una
+confirmación de «se escucha en el dispositivo» dicha por el teléfono no confirma nada. Ninguna corre
+durante una secuencia BLE — las dispara el usuario desde Ajustes.
+
+Quedan **6 clips** en la SD, no 10.
+
+**Y el arreglo de fondo, que sobrevive a la decisión.** Achicar el catálogo saca la carrera del camino
+de conexión, pero no la clase de bug: `applyGesture` anuncia el modo y lo escribe al dispositivo en la
+sentencia siguiente, también sin `await`. Así que las operaciones de característica pasan ahora por
+una cola (`services/ble/serialize.ts`): **el orden en que se piden es el orden en que ocurren**. Un
+aviso es lo menos importante que lleva el enlace y estaba compitiendo en silencio con lo que el
+producto necesita.
+
 **Lo que queda pendiente**, anotado para no descubrirlo en la calle: con el botón físico, el cambio
 de modo lo anuncia la app, así que viaja placa → app → placa. Funciona (BLE despierta la app), pero
 significa que **sin teléfono conectado un cambio de modo no se anuncia**. La placa podría decirlo
