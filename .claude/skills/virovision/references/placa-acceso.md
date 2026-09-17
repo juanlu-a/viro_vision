@@ -74,6 +74,25 @@ con el reloj atrasado) y `getent hosts deb.debian.org` antes de instalar nada.
 
 ## Trampas que ya mordieron
 
+- **`SIN-AP` puede estar «presente» y no existir.** macOS deja un `._SIN-AP` al lado de cada archivo
+  que copia a una FAT, y si se borra el real el compañero sobrevive: en un `ls` a los ojos parece que
+  está. El 2026-09-17 la placa estuvo en modo producto creyéndola en desarrollo, y como BLE anda
+  igual en los dos modos el celular la veía y no había señal de que algo estuviera mal. Comprobar con
+  `[ -f SIN-AP ] && echo sí`, no mirando el listado.
+- **Los perfiles WiFi y los avisos se instalan solos desde `bootfs`** en cada arranque
+  (`modo-red.sh`, versionado en `hardware/raspi/boot/`): un `*.nmconnection` suelto y una carpeta
+  `announcements-system/` con los `.wav`. Es la vía para actualizar una placa en modo producto, que
+  no tiene SSH.
+- **El daemon NO se reinstala solo.** `instalar-daemon.sh` está protegido por la centinela
+  `/var/lib/virovision-instalado`, así que dejar un `virovision-daemon.tgz` nuevo en la tarjeta no
+  alcanza: hay que extraerlo por SSH. El payload igual conviene que viaje en la tarjeta, porque así
+  no hace falta internet en la placa.
+- **Las fechas de archivo mienten.** `modo-red.sh` corre antes de que NTP sincronice y la Pi no tiene
+  RTC: lo que instala queda fechado en el apagado anterior. Para saber cuándo se instaló algo,
+  `/var/log/virovision-firstrun.log`.
+- **Para probar los avisos sin el teléfono**: `./.venv-mac/bin/python tools/say.py --all` desde
+  `hardware/raspi` (con la app cerrada). Dice uno por uno los diez y reporta los errores que conteste
+  la placa.
 - `nmcli con up` sobre `eth0` corta la sesión SSH que va por ese cable: usar `nmcli dev reapply eth0` o
   escribir `/etc/resolv.conf`.
 - `pkill -f "patrón"` mata la propia sesión SSH si el patrón está en su línea de comando: matar por PID
