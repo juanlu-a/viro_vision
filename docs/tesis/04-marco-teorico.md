@@ -13,7 +13,7 @@ El aprendizaje automático (Machine Learning o ML) es una subdisciplina de la IA
 
 El aprendizaje profundo (Deep Learning o DL) es una subcategoría del ML basada en redes neuronales artificiales con múltiples capas de procesamiento. Estas redes, inspiradas en el funcionamiento del cerebro humano, son capaces de aprender representaciones jerárquicas de los datos, desde características simples en las capas iniciales hasta representaciones más abstractas en las capas profundas. El DL ha demostrado resultados sobresalientes en tareas de reconocimiento de imágenes, procesamiento de lenguaje natural y síntesis de audio, constituyendo la base tecnológica de las soluciones modernas de visión por computadora.
 
-> `[PENDIENTE: apartado asignado a Magalí Dellapiazza.]`
+*[PENDIENTE: apartado asignado a Magalí Dellapiazza.]*
 ## 4.2 Evaluación de modelos de reconocimiento
 
 Toda comparación entre alternativas de reconocimiento necesita un criterio numérico común. Las
@@ -63,7 +63,7 @@ Una ventaja importante de YOLO es que ofrece variantes de distinto tamaño, desd
 
 El Reconocimiento Óptico de Caracteres (Optical Character Recognition u OCR) es una tecnología que convierte imágenes de texto impreso o escrito a mano en texto digital editable y procesable. Los sistemas modernos de OCR basados en deep learning han superado significativamente a los métodos tradicionales, logrando altas tasas de reconocimiento incluso en condiciones de iluminación variable, ángulos de captura no ideales y tipografías diversas. En el contexto de ViroVision, el OCR es una tecnología central para la identificación de los números y nombres de líneas de ómnibus a partir de las imágenes capturadas por la cámara del dispositivo, así como para la lectura de etiquetas y textos en productos de supermercado.
 
-> `[PENDIENTE: apartado asignado a Magalí Dellapiazza.]`
+*[PENDIENTE: apartado asignado a Magalí Dellapiazza.]*
 > *Esta sección amplía el apartado existente «Reconocimiento Óptico de Caracteres (OCR)».*
 
 Los sistemas modernos de OCR basados en aprendizaje profundo no resuelven el problema en un solo
@@ -97,7 +97,7 @@ La computación en el borde (Edge Computing) se refiere al procesamiento de dato
 
 *⚠️ PENDIENTE: Completar con análisis de Google Gemma (modelo de IA de Google). Investigar: arquitectura del modelo, variantes disponibles para edge computing (Gemma 2B, etc.), rendimiento en tareas de visión, viabilidad de ejecución en el hardware seleccionado, y comparación con otras alternativas (MobileNet, EfficientDet, YOLO nano, etc.).*
 
-> `[PENDIENTE: apartado asignado a Magalí Dellapiazza.]`
+*[PENDIENTE: apartado asignado a Magalí Dellapiazza.]*
 > *Esta sección amplía el apartado existente «Modelos de Inteligencia Artificial en el borde (Edge
 > AI)», cuyo contenido introductorio se conserva.*
 
