@@ -362,11 +362,9 @@ consulta de salud, generación de datos de prueba, captura y entrega de la últi
 (1024 píxeles de lado mayor, calidad 70; aproximadamente 35 KB en 200 a 235 ms incluyendo la
 captura) y recepción de audio para su reproducción.
 
-**Configuración y despliegue.** Las banderas de ejecución viven en un archivo de configuración del
-sistema, de modo que sobreviven al cambio entre el modo de desarrollo (con acceso por SSH) y el modo
-de producto (con el punto de acceso activo). El interruptor entre ambos es la presencia de un
-archivo en la partición de arranque de la tarjeta de memoria, lo que permite cambiar el
-comportamiento del dispositivo sin acceder a él por red.
+**Configuración.** Las banderas de ejecución viven en un archivo de configuración del sistema, fuera
+del paquete del servicio, de modo que sobreviven tanto a las actualizaciones como al cambio entre los
+dos modos de operación descritos en §7.3.4.
 
 **Seguridad del enlace.** Desde septiembre el dispositivo arranca con el emparejamiento Bluetooth
 deshabilitado. Ninguna característica del perfil requiere autenticación, por lo que la aplicación
@@ -393,6 +391,52 @@ medidor en serie y leer el monitor de corriente que incorpora el módulo de alim
 consecuencia, el campo de batería de la telemetría del dispositivo se reporta como nulo. Poder
 anunciar el nivel de batería por voz es, en este proyecto, un requisito de accesibilidad y no una
 comodidad: el usuario no puede consultar un indicador luminoso.
+
+### 7.3.4 Los dos modos de operación del dispositivo
+
+Un dispositivo terminado son unos lentes con un botón: no tiene teclado, ni pantalla, ni alguien que
+le administre la red. Durante el desarrollo, en cambio, ese mismo hardware tiene que ser alcanzable
+para desplegar, depurar y medir. Las dos exigencias son incompatibles sobre una sola radio: en modo
+producto la placa **levanta su propio punto de acceso**, que es al que se une el teléfono, y mientras
+ese punto de acceso está activo la placa abandonó cualquier otra red, de modo que **no hay acceso
+remoto por la red doméstica**.
+
+El proyecto resolvió esa tensión con un **interruptor explícito** en lugar de dejar el dispositivo
+permanentemente en modo desarrollo, que habría sido cómodo y habría producido mediciones que no
+corresponden al producto:
+
+| Estado del interruptor | Modo | Consecuencia |
+|---|---|---|
+| Presente | **Desarrollo** | La placa se une a la red conocida. Hay acceso remoto e internet. La aplicación informa «red apagada» |
+| Ausente | **Producto** | La placa levanta su punto de acceso al arrancar (ADR 0003). No hay acceso remoto por la red doméstica |
+
+Tres propiedades de este diseño merecen señalarse, porque son decisiones y no detalles de
+implementación:
+
+**a) El interruptor vive en la partición de arranque, que es FAT.** Se lee y se escribe desde
+cualquier computadora con la tarjeta puesta, sin herramientas especiales y sin entrar al dispositivo.
+Es la consecuencia de una regla que el proyecto adoptó después de quedarse sin acceso más de una vez:
+**un dispositivo sin pantalla tiene que ser gobernable sin entrar en él**.
+
+**b) La configuración efectiva se regenera en cada arranque.** Un servicio lee el interruptor y
+escribe la bandera con la que arranca el daemon. Esa configuración generada no se edita a mano,
+porque el siguiente arranque la sobrescribe. Lo que se cambia es el interruptor.
+
+**c) El enlace de control funciona igual en los dos modos.** Es deliberado: el plano de control no
+puede depender del modo de red, o el dispositivo quedaría mudo justamente cuando hay un problema de
+red. Tiene, sin embargo, un **costo de diagnóstico** que conviene dejar escrito: desde el teléfono
+los dos modos se ven idénticos, de modo que una placa en modo producto que se creía en desarrollo no
+da ninguna señal de estarlo. Ocurrió, y el síntoma fue la ausencia de síntoma.
+
+La consecuencia de fondo de esta decisión es que **un dispositivo en modo producto sólo se puede
+actualizar desde la tarjeta o a través del enlace de control**. Esa restricción no es un inconveniente
+del entorno de desarrollo: es el comportamiento correcto del producto, y es la que dio forma al
+procedimiento de despliegue descrito en §8.7.
+
+Como vía intermedia, el proyecto incorporó una herramienta que **apaga el punto de acceso a través
+del enlace de control**, tras lo cual la placa vuelve sola a la red conocida y el acceso remoto queda
+disponible sin abrir el dispositivo ni manipular la tarjeta. Medido sobre la placa: **cinco segundos
+de punta a punta**.
 
 ## 7.4 El pipeline de reconocimiento de líneas de ómnibus
 

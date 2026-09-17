@@ -2436,9 +2436,16 @@ que hay que esquivar:
    capítulo) y ponerle **Times New Roman** y `cmd+shift+j` para que coincida con el resto.
 6. Actualizar el índice: clic en él y el botón de refrescar que aparece al costado.
 
-**Y una trampa aparte:** el diálogo de Buscar y reemplazar de Docs no toma el foco al hacer clic por
-referencia de elemento. Lo que se tipea cae **en el cuerpo del documento**. Hay que clickear el campo
-por coordenadas y verificar en pantalla antes de escribir.
+**Y la trampa que más caro salió:** en Google Docs, **lo que se tipea cuando un diálogo no tomó el
+foco cae en el cuerpo del documento**. Pasó dos veces, con el diálogo de Buscar y reemplazar y con
+`cmd+f`, y las dos veces el texto quedó incrustado en la carátula. La regla, entonces:
+
+- **No tipear nunca dentro de Docs.** Ni buscar. Para moverse se usa el panel de esquema, que es un
+  clic; para llegar al índice, recargar la página, que abre arriba.
+- **Y si igual pasa, no deshacer a ciegas.** Seis `cmd+z` seguidos se comieron la carátula y el
+  índice enteros, porque el borrado del cuerpo viejo y el pegado son operaciones separadas y el
+  undo atraviesa las dos. Salió más barato tirar el documento y rehacerlo desde una copia nueva del
+  oficial que intentar recomponerlo con redo.
 
 ### Dos cosas que la redacción dejó al descubierto
 
@@ -2467,6 +2474,32 @@ medido se dice, no se omite. Están escritas en `docs/tesis/README.md`.
 - El **registro de reuniones con el tutor**: `docs/REUNIONES-TUTOR.md` sólo tiene la del 2026-08-10.
 - **Verificar la bibliografía** contra las fuentes antes de entregar.
 - Conclusiones y trabajo futuro, que quedaron fuera de alcance a propósito.
+
+## 2026-09-17: la placa entra a la tesis por donde se la usa, no por donde se la programa
+
+Pregunta del equipo sobre el borrador: ¿estaba escrito todo lo que hubo que tener en cuenta para la
+Raspberry, el modo producto, el acceso remoto? **No.** Estaban el interruptor de red en una línea y
+poco más. Faltaba justamente lo que costó tiempo.
+
+### Lo que se agregó
+
+**§7.3.4, los dos modos de operación**, como decisión de diseño y no como detalle: un producto
+terminado son unos lentes con un botón, y durante el desarrollo el mismo hardware tiene que ser
+alcanzable. Sobre una sola radio las dos cosas no conviven. El interruptor vive en la partición FAT
+porque **un dispositivo sin pantalla tiene que ser gobernable sin entrar en él**, la configuración se
+regenera en cada arranque, y el enlace BLE anda igual en los dos modos, que es deliberado y tiene un
+costo de diagnóstico: desde el teléfono los dos modos se ven iguales.
+
+**§8.7, reescrito entero**, con siete subsecciones: la tarjeta como panel de control, las tres vías
+de acceso y la regla de no desplegar desde una máquina con una sola interfaz de red, el
+procedimiento de cinco pasos con sus tres restricciones (el instalador no se reejecuta, el paquete
+tiene que llevar el árbol completo, una bandera puede estar repetida en dos archivos), el
+diagnóstico y su límite (el journal no sobrevive a los reinicios por la falta de RTC, y así se
+perdió el log de la única prueba en modo producto), el punto de acceso sin gateway ni DNS, el
+pipeline de visión como dependencia, y una tabla de deuda operativa declarada.
+
+Las credenciales no se transcriben al documento: se nombra la deuda (rotar lo que se compartió por
+chat y la clave que quedó en el historial de git) sin publicar ningún valor.
 
 ## Open threads / next
 

@@ -133,30 +133,143 @@ ocurrió una vez. Con el proxy en producción y sin credenciales embebidas en la
 deja sin modo supermercado a **todas las versiones distribuidas simultáneamente**. Es una dependencia
 de disponibilidad que el proyecto asume conscientemente y que debe monitorearse.
 
-## 8.7 Despliegue en el dispositivo
+## 8.7 Instalación y operación del dispositivo
 
-El software del dispositivo se instala mediante un **único script de despliegue** que copia el
-paquete, instala las dependencias y reinicia el servicio. El servicio se gestiona con systemd y
-arranca automáticamente al encender la placa.
+Desplegar sobre un dispositivo embebido sin pantalla y sin teclado es un problema distinto de
+publicar una aplicación móvil, y consumió una proporción del esfuerzo del proyecto que no se anticipó
+al planificar. Esta sección documenta el procedimiento que quedó establecido y, sobre todo, las
+restricciones que lo determinaron, porque ninguna de ellas se deduce del código.
 
-**Configuración persistente.** Las banderas de ejecución residen en un archivo de configuración del
-sistema, fuera del paquete, para sobrevivir a las actualizaciones.
+### 8.7.1 La tarjeta de memoria como panel de control
 
-**Interruptor de modo de red.** El dispositivo tiene dos comportamientos posibles: modo de desarrollo
-(se une a una red conocida y es accesible por SSH) y modo de producto (levanta su propio punto de
-acceso). El interruptor entre ambos es **la presencia de un archivo en la partición de arranque de la
-tarjeta de memoria**, lo que permite cambiarlo insertando la tarjeta en cualquier computadora, sin
-acceso por red. Un defecto encontrado durante el desarrollo dejó una lección registrada: la bandera
-antigua estaba fijada en dos archivos distintos de esa partición, y buscarla sólo en el archivo
-evidente no alcanzó.
+La tarjeta que corre en el dispositivo tiene una partición de arranque en formato FAT, legible y
+escribible desde cualquier computadora. El proyecto la usa deliberadamente como **superficie de
+administración**: el modo de red, los perfiles de red inalámbrica y los archivos de audio de los
+avisos de sistema se instalan dejando archivos en esa partición, que un servicio lee en cada
+arranque.
 
-**El pipeline de visión** se instala en la placa como dependencia desde su repositorio propio, lo que
-mantiene el ciclo de trabajo del pilar de ML independiente del ciclo del dispositivo.
+La razón es la restricción de §7.3.4: **un dispositivo en modo producto no tiene acceso remoto**, de
+modo que si la única vía de administración fuera la red, cualquier error de configuración dejaría al
+dispositivo irrecuperable sin desarmarlo.
 
-**Punto de acceso.** El dispositivo publica una red propia con configuración de alcance local. Una
-corrección necesaria fue eliminar de la configuración las opciones que anuncian puerta de enlace y
-servidor de nombres: sin ese ajuste, el teléfono que se unía a la red del dispositivo **quedaba sin
-acceso a internet**, lo que impedía alcanzar la nube en el modo supermercado.
+| Se deja en la partición de arranque | Efecto en el siguiente arranque |
+|---|---|
+| El archivo interruptor de modo de red | Selecciona modo desarrollo o modo producto |
+| Un perfil de red inalámbrica | Se instala y queda disponible; el gestor de red conserva todos los perfiles y se une al que esté presente |
+| Una carpeta con los audios de avisos de sistema | Se copian al repertorio del dispositivo |
+
+El dispositivo conserva **varios perfiles de red** simultáneos, uno por cada entorno donde se
+trabajó. Es la diferencia entre poder llevarlo a probar a otro lugar y tener que reconfigurarlo.
+
+### 8.7.2 Vías de acceso y la regla que las ordena
+
+Existen tres formas de alcanzar el dispositivo, y no son equivalentes:
+
+| Vía | Cuándo sirve | Limitación |
+|---|---|---|
+| **Red inalámbrica conocida** (modo desarrollo) | Trabajo habitual | Exige que el dispositivo esté en modo desarrollo |
+| **Cable de red** | Siempre, incluso en modo producto | La placa definitiva del proyecto no tiene conector de red; sólo la placa de reemplazo actual |
+| **Unirse al punto de acceso del dispositivo** | Cualquier modo | **Desaconsejado**, ver abajo |
+
+La regla operativa que el proyecto adoptó, después de perder sesiones a mitad de una copia de
+archivos, es: **no desplegar desde una máquina con una sola interfaz de red**. Un equipo que sólo
+tiene radio inalámbrica, al unirse al punto de acceso del dispositivo, se queda sin salida a internet;
+y el sistema operativo, al detectar una red sin salida, **vuelve solo a la red conocida**, de modo
+que la conexión no se sostiene. Una transferencia cortada por la mitad deja el servicio del
+dispositivo en un estado inconsistente.
+
+El punto de acceso **sí acepta conexiones remotas**: lo que se pierde al unirse a él no es el acceso
+al dispositivo sino el acceso a internet de la máquina, porque la red se publica deliberadamente sin
+anunciar puerta de enlace ni servidor de nombres (§8.7.5).
+
+**Configuración de la vía por cable.** La interfaz de red del dispositivo tiene dirección fija, y la
+computadora actúa como encaminador mediante una regla de traducción de direcciones. Se optó por
+dirección fija y no por asignación dinámica porque, si el dispositivo solicita configuración y nadie
+responde, el gestor de red da la conexión por fallida y el dispositivo **desaparece del enlace** hasta
+que se vuelve a conectar el cable físicamente.
+
+### 8.7.3 El procedimiento de despliegue
+
+El procedimiento verificado consta de cinco pasos y su orden importa:
+
+1. **Pasar el dispositivo a modo desarrollo** desde la tarjeta, y arrancar.
+2. **Alcanzarlo por la red conocida** y detener el servicio.
+3. **Instalar la versión nueva del paquete**, conservando un respaldo de la anterior y verificando
+   que el paquete importe correctamente **antes** de arrancar el servicio.
+4. **Actualizar la configuración de arranque** y dejar el paquete también en la partición de la
+   tarjeta, de modo que una instalación desde cero no necesite conectividad.
+5. **Verificar** contra el punto de consulta de salud del dispositivo y **volver a modo producto**.
+
+Tres restricciones de este procedimiento se descubrieron a fuerza de tropezar con ellas:
+
+- **El instalador automático no se vuelve a ejecutar.** Está protegido por un archivo centinela que
+  ya existe, y ese centinela vive en la partición del sistema, no en la de arranque, por lo que **no
+  se puede borrar desde otra computadora con la tarjeta puesta**. Dejar una versión nueva del paquete
+  en la tarjeta no alcanza: hay que instalarla por acceso remoto.
+- **El paquete debe llevar el árbol completo**, y no sólo el módulo de la aplicación. Un paquete
+  incompleto instala un servicio a medias, y el síntoma aparece mucho después, sin nada que lo
+  vincule con el día en que se armó mal.
+- **Una bandera de configuración puede estar repetida en dos archivos distintos.** Al renombrar las
+  banderas por el cambio de idioma (ADR 0009), se corrigió la ocurrencia evidente y la otra volvió a
+  imponerse en el arranque siguiente. La lección quedó escrita: buscar en **toda** la partición, no en
+  el archivo obvio.
+
+Adicionalmente, el dispositivo **no tiene reloj de tiempo real**: arranca creyendo que es la hora del
+último apagado. Hasta que el reloj se sincroniza por red, el gestor de paquetes rechaza operaciones
+por considerar los metadatos no vigentes. Por eso el procedimiento evita instalar dependencias
+mientras no cambien, y se apoya en el entorno virtual ya construido en el dispositivo.
+
+### 8.7.4 Diagnóstico y sus límites
+
+El registro del servicio es el **único diagnóstico disponible** del dispositivo en uso real: no hay
+pantalla, y el usuario no puede describir lo que vio.
+
+Aquí el proyecto tiene un problema **identificado y no resuelto**, y conviene declararlo: aunque el
+registro está configurado como persistente, sólo se conserva visible el último arranque. La causa es
+la misma ausencia de reloj de tiempo real: las marcas de tiempo saltan cuando la sincronización
+corrige la hora a mitad del arranque, y los arranques anteriores desaparecen de la vista. **Se perdió
+así el registro de la única prueba realizada en modo producto.** Para un dispositivo cuyo único
+diagnóstico es el registro, resolverlo es condición previa a las pruebas en la calle.
+
+El proyecto compensa parcialmente esta limitación por dos vías: la **telemetría** que envía la
+aplicación móvil (§7.8.3), que sí persiste y está fechada del lado del servidor, y una herramienta
+que **reproduce todos los avisos de sistema en secuencia** para verificar el repertorio de audio sin
+necesidad del teléfono.
+
+Una precaución adicional, registrada porque costó tiempo: el servicio **toma la cámara al arrancar**,
+de modo que cualquier prueba manual de la cámara exige detenerlo primero y volver a iniciarlo al
+terminar.
+
+### 8.7.5 El punto de acceso y la conectividad del teléfono
+
+El dispositivo publica una red propia protegida con clave compartida. Una corrección necesaria fue
+**eliminar de su configuración las opciones que anuncian puerta de enlace y servidor de nombres**: sin
+ese ajuste, el teléfono que se unía a la red del dispositivo enrutaba todo su tráfico por ella y
+quedaba sin acceso a internet, lo que impedía alcanzar la nube en el modo supermercado. La red queda
+así declarada como de alcance estrictamente local, y el teléfono conserva su conexión de datos.
+
+Por la misma razón, el punto de acceso tampoco sirve como vía de administración desde una máquina de
+una sola interfaz (§8.7.2): el comportamiento que protege al teléfono es el que deja sin internet a la
+computadora.
+
+### 8.7.6 El pipeline de visión como dependencia
+
+El pipeline de reconocimiento de líneas se instala en el dispositivo **como dependencia desde su
+propio repositorio**, y no se copia dentro del paquete del servicio. Esto mantiene el ciclo de trabajo
+del pilar de aprendizaje automático (entrenar, evaluar, exportar) independiente del ciclo del
+dispositivo, y permite actualizar el modelo sin reinstalar el servicio.
+
+### 8.7.7 Deuda operativa declarada
+
+El procedimiento descrito es reproducible pero no está terminado, y las brechas se declaran porque
+condicionan la etapa final:
+
+| Pendiente | Consecuencia |
+|---|---|
+| La tarjeta en uso **no se instaló con el script de instalación del repositorio**, sino a mano. No existe todavía una imagen reproducible | Reconstruir el dispositivo desde cero no es un procedimiento verificado |
+| El registro no sobrevive a los reinicios (§8.7.4) | Una falla en la calle es irrecuperable en cuanto alguien apaga el dispositivo |
+| Las credenciales de administración del dispositivo se compartieron por un canal no seguro durante el desarrollo, y una clave de servicio quedó en el historial de un repositorio | Ambas deben rotarse antes de cualquier distribución |
+| El sistema de aprovisionamiento automático estándar de la imagen no aplica la configuración de red en esta versión | Todo el andamiaje de configuración descrito existe por eso, y debería revisarse si se actualiza la imagen base |
 
 ## 8.8 Estado del despliegue
 
