@@ -45,54 +45,59 @@ export interface Notice {
  * hears them.
  */
 export const NOTICES = {
-  connected: { clip: 'connected.wav', say: strings.connection.connectedAnnounce },
   /**
-   * No clip, and not an oversight: the board cannot announce its own absence. By the time this
-   * fires the client has already dropped the link (`cleanup()` runs before the listeners), so
-   * `isLinked()` is false and the rule routes it to the phone anyway. Recording a `.wav` for it
-   * would put a file on the SD that nothing can ever reach.
+   * El enlace y la red son del teléfono, siempre (decisión del 2026-09-17).
+   *
+   * No es una limitación técnica sino el orden de los hechos: cuando se anuncia que el dispositivo
+   * se conectó, el dispositivo **acaba de existir** para la app, y el usuario está con el teléfono
+   * en la mano emparejando, no con los anteojos puestos. Un aviso sobre el enlace que viaja por ese
+   * mismo enlace es circular, y el que dice que la red falló no puede ir por la red.
+   *
+   * La versión anterior sí los mandaba a la placa y costó caro: la escritura BLE del aviso salía en
+   * el mismo instante en que la app leía la característica `wifi` para unirse al AP, y el teléfono
+   * se quedaba sin credenciales. Con la salida en «teléfono» el mismo build andaba. Ver
+   * `services/ble/serialize.ts`.
    */
+  connected: { clip: null, say: strings.connection.connectedAnnounce },
+  /** La placa no puede anunciar su propia ausencia. */
   connectionLost: { clip: null, say: strings.connection.lost },
-  networkReady: { clip: 'network_ready.wav', say: strings.connect.wifiReadyAnnounce },
-  /** Carries a detail: which step of joining the device's network failed. */
-  networkFailed: { clip: 'network_failed.wav', say: strings.connect.wifiFailedAnnounce },
+  networkReady: { clip: null, say: strings.connect.wifiReadyAnnounce },
+  /** Lleva un detalle: qué paso de la unión a la red falló. */
+  networkFailed: { clip: null, say: strings.connect.wifiFailedAnnounce },
   /**
-   * The board complained about something. Carries a detail: the board's own message.
+   * Lleva un detalle: el mensaje de la propia placa.
    *
-   * **No clip, and this one is a correction rather than a design choice** (2026-09-16, found on the
-   * board within the hour). It used to have one, and routing it to the board closed a loop: the
-   * board answers an unknown `say` with an `{"t":"error"}` event, the app turns every board error
-   * into this notice, this notice went back to the board as another `say`, and around again — a
-   * silent, unbounded exchange of BLE writes with nothing ever spoken. It fired on the first real
-   * test, because the app shipped ahead of the daemon and every `say` was an unknown command.
-   *
-   * The rule that replaces it is worth more than the bug: **the board does not get to report its
-   * own faults.** Whatever is wrong with it may be the very thing that would have to carry the
-   * sentence, and the phone is the only half known to be working when the other half is complaining.
-   * Same shape as [connectionLost].
+   * Sin clip desde el 2026-09-16, y por un motivo más fuerte que el resto: **la placa no reporta sus
+   * propias fallas.** Mandárselo cerraba un lazo —la placa contesta con un error lo que no entiende,
+   * la app convierte todo error de la placa en este aviso, y volvía— en el que nunca se decía nada.
    */
   deviceWarning: { clip: null, say: strings.connect.deviceErrorAnnounce },
-  /** Carries a detail: why the BLE write failed. */
-  modeWriteFailed: { clip: 'mode_write_failed.wav', say: strings.connect.modeWriteFailed },
+  /** Lleva un detalle: por qué falló la escritura. Es una falla del enlace, así que del teléfono. */
+  modeWriteFailed: { clip: null, say: strings.connect.modeWriteFailed },
+
+  /**
+   * Los modos sí: son lo que el usuario escucha **con los anteojos puestos y el teléfono guardado**,
+   * que es la situación del producto. Junto con las lecturas de cada modo, es todo lo que la placa
+   * dice.
+   */
   modeIdle: { clip: 'mode_idle.wav', say: strings.reader.announceIdle },
   modeBus: { clip: 'mode_bus.wav', say: strings.reader.announceBus },
   modeSupermarket: { clip: 'mode_supermarket.wav', say: strings.reader.announceSupermarket },
-  /** No clip: choosing the phone routes this very confirmation to the phone. */
-  outputSetToPhone: { clip: null, say: strings.settings.audioOutputSetToPhone },
-  outputSetToDevice: { clip: 'output_device.wav', say: strings.settings.audioOutputSetToDevice },
   /**
-   * The "Probar audio" button. It is a notice and not free speech for the obvious reason: a test of
-   * the output that always came out of the phone would test nothing the user cares about.
-   */
-  audioTest: { clip: 'audio_test.wav', say: strings.home.testAudioPhrase },
-  /**
-   * The chirp the instant a reading is requested. Routing it costs the diagnostic value it had on
-   * the phone (a chirp heard = the app woke up and its audio session works, see
-   * `services/audio/session.ts`) and adds a BLE write to the one sound that has to be immediate.
-   * It goes anyway: a user who put every other sound on the glasses and still gets one chirp from
-   * their pocket has no way to read that as anything but a bug.
+   * El chirp del instante en que se pide una lectura. Va con los modos y no con el enlace porque es
+   * propio de la lectura: confirma que el botón hizo algo durante los segundos que tarda la nube.
    */
   readingStarted: { clip: 'earcon_start.wav', say: null },
+
+  /**
+   * Las dos que verifican la salida misma, y por eso siguen el ajuste aunque no sean de un modo:
+   * una confirmación de «se escucha en el dispositivo» dicha por el teléfono no confirma nada, y un
+   * botón de «probar audio» que suena siempre en el teléfono prueba justo lo que no se preguntó.
+   * Ninguna de las dos corre durante una secuencia BLE: las dispara el usuario desde Ajustes.
+   */
+  outputSetToPhone: { clip: null, say: strings.settings.audioOutputSetToPhone },
+  outputSetToDevice: { clip: 'output_device.wav', say: strings.settings.audioOutputSetToDevice },
+  audioTest: { clip: 'audio_test.wav', say: strings.home.testAudioPhrase },
 } as const satisfies Record<string, Notice>;
 
 export type SystemNotice = keyof typeof NOTICES;

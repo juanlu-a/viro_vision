@@ -22,6 +22,7 @@ import {
   decodeBase64,
   decodeTextBase64,
 } from './base64';
+import { createSerializer } from './serialize';
 import { BleDeviceNotFoundError, BleNotConnectedError, type BleClient } from './bleClient';
 
 const SCAN_TIMEOUT_MS = 15_000;
@@ -89,6 +90,14 @@ export function createBleClientPlx(): BleClient | null {
 
 class BleClientPlx implements BleClient {
   private device: Device | null = null;
+  /**
+   * Toda operación de característica pasa por acá, en el orden en que se pidió.
+   *
+   * El motivo completo está en `serialize.ts`: un aviso escrito sin `await` mientras la app leía la
+   * característica `wifi` dejaba al teléfono sin credenciales para unirse al AP. No cubre las
+   * notificaciones, que no son operaciones.
+   */
+  private readonly gatt = createSerializer();
   private subscriptions: Subscription[] = [];
   private readonly recognitionListeners = new Set<(event: RecognitionEvent) => void>();
   private readonly disconnectListeners = new Set<() => void>();
@@ -191,11 +200,13 @@ class BleClientPlx implements BleClient {
   async writeMode(mode: number): Promise<void> {
     const device = this.device;
     if (!device) throw new BleNotConnectedError();
-    await this.manager.writeCharacteristicWithResponseForDevice(
-      device.id,
-      GATT.serviceUuid,
-      GATT.characteristics.mode,
-      encodeBase64(new Uint8Array([mode]))
+    await this.gatt(() =>
+      this.manager.writeCharacteristicWithResponseForDevice(
+        device.id,
+        GATT.serviceUuid,
+        GATT.characteristics.mode,
+        encodeBase64(new Uint8Array([mode]))
+      )
     );
   }
 
@@ -211,11 +222,13 @@ class BleClientPlx implements BleClient {
     const device = this.device;
     if (!device) throw new BleNotConnectedError();
     const payload = new TextEncoder().encode(audioCommand(target));
-    await this.manager.writeCharacteristicWithResponseForDevice(
-      device.id,
-      GATT.serviceUuid,
-      GATT.characteristics.control,
-      encodeBase64(payload)
+    await this.gatt(() =>
+      this.manager.writeCharacteristicWithResponseForDevice(
+        device.id,
+        GATT.serviceUuid,
+        GATT.characteristics.control,
+        encodeBase64(payload)
+      )
     );
   }
 
@@ -236,11 +249,13 @@ class BleClientPlx implements BleClient {
     const device = this.device;
     if (!device) throw new BleNotConnectedError();
     const payload = new TextEncoder().encode(noticeCommand(clip));
-    await this.manager.writeCharacteristicWithoutResponseForDevice(
-      device.id,
-      GATT.serviceUuid,
-      GATT.characteristics.control,
-      encodeBase64(payload)
+    await this.gatt(() =>
+      this.manager.writeCharacteristicWithoutResponseForDevice(
+        device.id,
+        GATT.serviceUuid,
+        GATT.characteristics.control,
+        encodeBase64(payload)
+      )
     );
   }
 
@@ -255,7 +270,9 @@ class BleClientPlx implements BleClient {
     const device = this.device;
     if (!device) throw new BleNotConnectedError();
     try {
-      const c = await this.manager.readCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.wifi);
+      const c = await this.gatt(() =>
+        this.manager.readCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.wifi)
+      );
       if (!c.value) return null;
       const data = JSON.parse(decodeTextBase64(c.value)) as Partial<WifiCredentials>;
       return data.ssid && data.password && data.ip ? { ssid: data.ssid, password: data.password, ip: data.ip, port: data.port ?? null } : null;
@@ -392,7 +409,9 @@ class BleClientPlx implements BleClient {
 
   private async readStatus(device: Device): Promise<DeviceStatus | null> {
     try {
-      const c = await this.manager.readCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.status);
+      const c = await this.gatt(() =>
+        this.manager.readCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.status)
+      );
       return c.value ? (JSON.parse(decodeTextBase64(c.value)) as DeviceStatus) : null;
     } catch {
       // Without a status there is still a connection: the screen shows "not reported", not an error.

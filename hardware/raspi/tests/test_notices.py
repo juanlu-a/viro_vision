@@ -137,7 +137,7 @@ def test_a_board_with_no_speaker_stays_alive(loop):
     core, notifications = build(loop, say=None)
 
     async def scenario():
-        core.write_control(json.dumps({"cmd": "say", "clip": "connected.wav"}).encode())
+        core.write_control(json.dumps({"cmd": "say", "clip": "mode_idle.wav"}).encode())
         await _drain(loop)
         assert [e for e in notifications.events() if e["t"] == "error"] == []
 
