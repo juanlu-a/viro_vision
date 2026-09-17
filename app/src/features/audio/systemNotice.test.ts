@@ -56,9 +56,9 @@ describe('notify', () => {
     setAudioOutput('device');
     boardIsThere();
 
-    await expect(notify('networkReady')).resolves.toBe('device');
+    await expect(notify('modeBus')).resolves.toBe('device');
 
-    expect(played).toEqual([NOTICES.networkReady.clip]);
+    expect(played).toEqual([NOTICES.modeBus.clip]);
     // The half that is easy to forget: a notice said in both places at once is worse than one said
     // in the wrong place, because the user cannot tell it is the same event.
     expect(spoken).toEqual([]);
@@ -68,23 +68,52 @@ describe('notify', () => {
     setAudioOutput('phone');
     boardIsThere();
 
-    await expect(notify('networkReady')).resolves.toBe('phone');
+    await expect(notify('modeBus')).resolves.toBe('phone');
 
-    expect(spoken).toEqual([NOTICES.networkReady.say]);
+    expect(spoken).toEqual([NOTICES.modeBus.say]);
     expect(played).toEqual([]);
   });
 
-  it('appends the detail on the phone and drops it on the board', async () => {
-    setAudioOutput('phone');
-    boardIsThere();
-    await notify('deviceWarning', 'camera timed out');
-    expect(spoken).toEqual([`${NOTICES.deviceWarning.say} camera timed out`]);
-
+  it('appends the detail, and keeps it on the phone whatever the setting says', async () => {
+    // Every notice that carries a detail is about the link or the network, and since 2026-09-17
+    // those are the phone's (see `notices.ts`). So the detail always arrives: there is no longer a
+    // combination where it is dropped.
     setAudioOutput('device');
-    await notify('deviceWarning', 'camera timed out');
-    // The clip is fixed, so the detail cannot travel. It is on screen and in telemetry, and the
-    // sentence still names which thing complained — that trade is the design, not an accident.
-    expect(played).toEqual([NOTICES.deviceWarning.clip]);
+    boardIsThere();
+
+    await expect(notify('networkFailed', 'no responde en 10.42.0.1')).resolves.toBe('phone');
+    expect(spoken).toEqual([`${NOTICES.networkFailed.say} no responde en 10.42.0.1`]);
+    expect(played).toEqual([]);
+  });
+
+  it('writes nothing over BLE while the link is still being set up', async () => {
+    // The regression of 2026-09-17, stated where it can be caught. `DeviceProvider` announces this
+    // the instant the link comes up, one line before it reads the `wifi` characteristic to join the
+    // board's AP. When the announcement was a BLE write, the two raced and the phone was left with
+    // no credentials — the app reported it could not use the device's network, three layers away
+    // from the cause. The connection notices reach the board through no path at all now.
+    setAudioOutput('device');
+    boardIsThere();
+
+    for (const id of ['connected', 'connectionLost', 'networkReady', 'networkFailed'] as const) {
+      await expect(notify(id)).resolves.toBe('phone');
+    }
+    expect(played).toEqual([]);
+  });
+
+  it('never sends a board complaint back to the board', async () => {
+    // The regression, and it is not a corner case — it ran on the board on 2026-09-16, within the
+    // hour of shipping. The app reached a daemon that did not know `say` yet; the board answered
+    // with an error event, the app turns every board error into this notice, and routing it to the
+    // board produced another unknown `say`, another error, and around again. Nothing was ever
+    // spoken and the writes never stopped, so from the outside it looked exactly like the feature
+    // simply not working.
+    setAudioOutput('device');
+    boardIsThere();
+
+    await expect(notify('deviceWarning', 'unknown command: say')).resolves.toBe('phone');
+    expect(played).toEqual([]);
+    expect(spoken).toEqual([`${NOTICES.deviceWarning.say} unknown command: say`]);
   });
 
   it('falls back to the phone with no link', async () => {

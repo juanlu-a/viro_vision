@@ -348,8 +348,8 @@ situado a 10-20 metros.
 
 ### 7.3.2 El daemon
 
-El software del dispositivo es un servicio en Python de **4312 líneas** repartidas en 16 módulos,
-con **91 pruebas automatizadas**. Su diseño separa un **núcleo independiente del transporte** (que
+El software del dispositivo es un servicio en Python de **4421 líneas** repartidas en 16 módulos,
+con **86 pruebas automatizadas**. Su diseño separa un **núcleo independiente del transporte** (que
 conoce los comandos, los modos y las transferencias) de los adaptadores que lo conectan al mundo: el
 adaptador BLE sobre BlueZ, el servidor HTTP, la cámara y el audio.
 
@@ -991,8 +991,8 @@ sino de verificación para usuarios con resto visual o para un acompañante: es 
 
 | Componente | Pruebas | Alcance |
 |---|---|---|
-| Aplicación móvil | **272** en 29 suites | Políticas puras, contratos de frontera, contraste, orden de ejecución |
-| Daemon del dispositivo | **91** | Núcleo independiente del transporte, gestos del botón, modos |
+| Aplicación móvil | **282** en 30 suites | Políticas puras, contratos de frontera, contraste, orden de ejecución |
+| Daemon del dispositivo | **86** | Núcleo independiente del transporte, gestos del botón, modos |
 | Pipeline de ómnibus | **65** | Geometría del recorte, interpretación, catálogo, evaluación |
 
 Las pruebas que mejor representan la orientación del proyecto son cuatro:

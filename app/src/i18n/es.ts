@@ -117,19 +117,19 @@ export const es = {
     intro: 'Configuración de accesibilidad, voz y dispositivo.',
     audioOutput: 'Dónde se escucha',
     audioOutputHint:
-      'Elegí si ViroVision te habla por el teléfono o por el parlante del dispositivo. Vale para todo lo que suena.',
+      'Elegí si los modos y las lecturas se escuchan por el teléfono o por el parlante del dispositivo.',
     audioOutputPhone: 'En el teléfono',
     audioOutputPhoneHint:
-      'Todo sale por el teléfono, al instante y sin internet. Es lo que funciona siempre.',
+      'Los modos y las lecturas salen por el teléfono, al instante y sin internet. Es lo que funciona siempre.',
     audioOutputDevice: 'En el dispositivo',
     audioOutputDeviceHint:
-      'Todo sale por el parlante del dispositivo. Los avisos y el modo ómnibus están grabados y no necesitan internet; sólo la lectura del supermercado se sintetiza en la nube y tarda un poco más. Si el dispositivo no está disponible, suena en el teléfono.',
-    // Desde el 2026-09-16 la elección vale para TODO lo que suena, no sólo para las dos lecturas: los
-    // avisos del dispositivo están pregrabados en su tarjeta y no necesitan ni nube ni internet
-    // (ADR 0003 §5, act. 2026-09-16). La nota se mantiene porque lo que sorprende ahora es lo
-    // contrario que antes: que los avisos de sistema también se muden de parlante.
+      'Los modos y las lecturas salen por el parlante del dispositivo. Los anuncios de modo y el modo ómnibus están grabados y no necesitan internet; sólo la lectura del supermercado se sintetiza en la nube y tarda un poco más. Si el dispositivo no está disponible, suena en el teléfono.',
+    // El reparto quedó fijado el 2026-09-17 (ADR 0003): la conexión y la red las dice SIEMPRE el
+    // teléfono, porque cuando se anuncian el dispositivo recién existe para la app y el usuario está
+    // emparejando con el teléfono en la mano. La nota dice lo que este ajuste NO alcanza, que es lo
+    // único que puede sorprender.
     audioOutputBusNote:
-      'Vale para todo: las lecturas, los avisos de conexión y de modo, y el sonido del botón. En el dispositivo casi todo está grabado, así que funciona sin internet.',
+      'Los avisos de conexión y de red se escuchan siempre en el teléfono. En el dispositivo los anuncios de modo están grabados, así que funcionan sin internet.',
     // La confirmación del selector, entera por destino: es el texto que el teléfono dice y también
     // el que está grabado en la placa (`hardware/raspi/virovision/notices.py`), y los dos tienen que
     // decir lo mismo o el usuario escucha una frase distinta según dónde la escuche.

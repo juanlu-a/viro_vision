@@ -62,6 +62,34 @@ describe('the notice catalogue', () => {
     }
   });
 
+  it('keeps the link and the network on the phone', () => {
+    // The design, since 2026-09-17: what the board says is what is heard with the glasses on and the
+    // phone in a pocket — the modes, the chirp and each mode's readings. Everything about connecting
+    // is the phone's, because when the app announces that the device connected the device has only
+    // just come to exist for it, and the user is holding the phone to pair. It is also what stops a
+    // notice's BLE write from racing the connection sequence, which is how it was found.
+    for (const id of ['connected', 'connectionLost', 'networkReady', 'networkFailed', 'modeWriteFailed'] as const) {
+      expect(NOTICES[id].clip).toBeNull();
+    }
+  });
+
+  it('gives the modes and the chirp a voice on the board', () => {
+    // The other half of the same rule, so narrowing the catalogue further has to be deliberate.
+    for (const id of ['modeIdle', 'modeBus', 'modeSupermarket', 'readingStarted'] as const) {
+      expect(NOTICES[id].clip).not.toBeNull();
+    }
+  });
+
+  it('keeps anything that reports a board failure off the board', () => {
+    // A notice about the board being in trouble must not be delivered BY the board: whatever is
+    // wrong may be the very thing that would carry it, and when what is wrong is the notice channel
+    // itself the two halves feed each other forever. Written as a rule and not as one assertion so
+    // that a notice added later for the same kind of event has to face it.
+    for (const id of ['deviceWarning', 'connectionLost'] as const) {
+      expect(NOTICES[id].clip).toBeNull();
+    }
+  });
+
   it('covers every mode', () => {
     // The mode announcement is the one notice chosen by a lookup rather than by name, so a mode
     // added without its notice would throw at the moment of the transition — on the user's ear.

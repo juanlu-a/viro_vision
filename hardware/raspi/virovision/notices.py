@@ -28,19 +28,26 @@ SYSTEM_DIR = "system"
 catalogue of lines cannot wipe the system notices, and so `ls` says which is which."""
 
 NOTICES = {
-    "connected.wav": "Dispositivo conectado.",
-    "network_ready.wav": "Red con el dispositivo lista.",
-    # The app appends which step failed; here the sentence has to stand on its own.
-    "network_failed.wav": "No se pudo usar la red del dispositivo.",
-    "device_warning.wav": "El dispositivo tiene un aviso. Miralo en el teléfono.",
-    "mode_write_failed.wav": "No pude avisarle el modo al dispositivo.",
     "mode_idle.wav": "Esperando. Reconocimiento apagado.",
     "mode_bus.wav": "Modo ómnibus activado.",
     "mode_supermarket.wav": "Modo supermercado activado.",
     "output_device.wav": "Dónde se escucha: en el dispositivo.",
     "audio_test.wav": "Hola, soy ViroVision. La salida de audio funciona correctamente.",
 }
-"""Clip file name -> what it says. Everything here is speech."""
+"""Clip file name -> what it says. Everything here is speech.
+
+**The link and the network are not here, and that is the design** (2026-09-17). Everything about
+connecting — connected, lost, network ready, network failed, the board's own warnings — is said by
+the phone. When the app announces that the device connected, the device has only just come to exist
+for it, and the user is holding the phone to pair rather than wearing the glasses: a notice about the
+link travelling over that link is circular, and the one saying the network failed cannot go over the
+network. The first version did send them here and it cost a real bug — the notice's BLE write raced
+the read of the `wifi` characteristic and the phone was left with no credentials to join the AP.
+
+What the board says is what is heard **with the glasses on and the phone in a pocket**: the modes,
+the reading chirp, and each mode's own readings. Plus the two that verify the output itself, because
+a confirmation of "you will hear it on the device" said by the phone confirms nothing.
+"""
 
 EARCON_FILE = "earcon_start.wav"
 """The chirp played the instant a reading is requested. Not speech, so it is not in `NOTICES`: the

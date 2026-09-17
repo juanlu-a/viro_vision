@@ -69,9 +69,19 @@ async def _drain(loop_):
         await asyncio.gather(*pending)
 
 
+def _plays(played: list, missing=()):
+    """A speaker that has every clip except `missing`."""
+
+    def say(clip: str) -> bool:
+        played.append(clip)
+        return clip not in missing
+
+    return say
+
+
 def test_a_known_notice_is_played(loop):
     played: list[str] = []
-    core, _ = build(loop, say=played.append)
+    core, _ = build(loop, say=_plays(played))
 
     async def scenario():
         core.write_control(json.dumps({"cmd": "say", "clip": "mode_bus.wav"}).encode())
@@ -83,12 +93,31 @@ def test_a_known_notice_is_played(loop):
     loop.run_until_complete(scenario())
 
 
+def test_a_clip_missing_from_the_sd_is_reported_instead_of_silent(loop):
+    """The failure that cost the first real test (2026-09-16): the app shipped with the notices and
+    `announcements/system/` had not been copied to the board yet. `aplay` fails into /dev/null, so
+    the board looked like it had spoken and the phone had no way to tell that apart from a speaker
+    that is not wired. Now it says which file is missing."""
+    played: list[str] = []
+    core, notifications = build(loop, say=_plays(played, missing={"mode_bus.wav"}))
+
+    async def scenario():
+        core.write_control(json.dumps({"cmd": "say", "clip": "mode_bus.wav"}).encode())
+        await asyncio.sleep(0.05)
+        await _drain(loop)
+        errors = [e for e in notifications.events() if e["t"] == "error"]
+        assert len(errors) == 1
+        assert "missing notice: mode_bus.wav" in errors[0]["msg"]
+
+    loop.run_until_complete(scenario())
+
+
 def test_an_unknown_name_is_refused_and_reported(loop):
     """The name arrives over the air. It is checked against the closed set rather than sanitized as
     a path, so `../` cannot be clever about it — and the app finds out instead of wondering why the
     board went quiet."""
     played: list[str] = []
-    core, notifications = build(loop, say=played.append)
+    core, notifications = build(loop, say=_plays(played))
 
     async def scenario():
         for clip in ("../../etc/passwd", "system/mode_bus.wav", "", "mode_train.wav"):
@@ -108,7 +137,7 @@ def test_a_board_with_no_speaker_stays_alive(loop):
     core, notifications = build(loop, say=None)
 
     async def scenario():
-        core.write_control(json.dumps({"cmd": "say", "clip": "connected.wav"}).encode())
+        core.write_control(json.dumps({"cmd": "say", "clip": "mode_idle.wav"}).encode())
         await _drain(loop)
         assert [e for e in notifications.events() if e["t"] == "error"] == []
 

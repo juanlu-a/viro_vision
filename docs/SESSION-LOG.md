@@ -2382,7 +2382,56 @@ Dos verificaciones que valen más que el conteo:
 `announcements/system/` a la SD y escuchar los once avisos; hasta entonces el camino del dispositivo
 está escrito y no probado.
 
-## 2026-09-16 (cont.): el cuerpo formal de la tesis, escrito desde lo que el repo ya tenía medido
+## 2026-09-16 (cont.) — El primer uso real: un lazo de realimentación y la mitad que nunca se desplegó
+
+Reportado apenas llegó el build: «no se escucha por la placa los cambios de modo ni las cosas que
+pedí, sólo dentro de los modos». O sea: las lecturas salen por la placa, los avisos no.
+
+Son **dos causas distintas**, y sólo una es un bug.
+
+### 1. El lazo de realimentación (bug propio, introducido esta misma mañana)
+
+`deviceWarning` tenía clip, así que con la salida en la placa el aviso «el dispositivo avisa: …» se
+mandaba **a la placa**. La placa todavía corría el daemon viejo, que no conoce `say`, así que
+contestaba `{"t":"error","msg":"unknown command: say"}`. La app convierte **todo** error de la placa
+en `deviceWarning`, que volvía a viajar a la placa como otro `say`, que volvía a ser desconocido…
+
+Un intercambio de escrituras BLE que no termina y donde **nunca se dice nada**. Desde afuera es
+indistinguible de «la función no anda», que es exactamente como se reportó.
+
+**La regla que lo reemplaza vale más que el arreglo: la placa no reporta sus propias fallas.** Lo que
+esté roto puede ser justamente lo que tendría que decir la frase, y cuando lo roto es el canal de
+avisos, las dos mitades se alimentan entre sí. Es la misma forma que ya tenía `connectionLost`, que
+no puede anunciar su propia ausencia. `deviceWarning` pasa a ser sólo del teléfono, y quedan **10
+clips** en vez de 11.
+
+### 2. La mitad de la placa nunca se desplegó (no es un bug: es que faltó el paso)
+
+El build de TestFlight lleva **sólo la app**. En la placa siguen el daemon viejo —sin `cmd: 'say'`— y
+un `announcements/` sin la subcarpeta `system/`. Con eso, aunque no existiera el lazo, no habría
+sonado nada. Es la parte que ayer quedó anotada como pendiente y hoy se leyó como defecto, que es
+justo lo que pasa cuando se entrega media función.
+
+### Lo que se arregló para que esto no vuelva a ser mudo
+
+`aplay` escribe su queja a un `/dev/null` que elegimos a propósito, así que **un clip que falta en la
+SD sonaba igual que un parlante sin cablear**: nada, y sin manera de distinguirlos desde el teléfono.
+Ahora el `say` de `__main__` comprueba que el archivo esté antes de reproducir y devuelve si estaba;
+el core emite `missing notice: <archivo>` cuando no. Se escucha por el teléfono —por la regla de
+arriba— y dice exactamente qué falta.
+
+### Verificación
+
+274 tests en la app (2 nuevos: el que fija que una queja de la placa nunca vuelve a la placa, y el
+que exige que todo aviso sobre una falla del dispositivo sea del teléfono) y 86 en la placa (uno
+nuevo: el clip que falta se reporta en vez de callarse). El generador se corrió de nuevo: 10 `.wav`,
+824 KB.
+
+**Sigue faltando la placa.** Nada de esto está escuchado en hardware todavía, y ésa es la lección del
+día: la mitad del dispositivo necesita `python3 tools/make_system_announcements.py`, el `scp` de
+`announcements/system/` y **el daemon actualizado**.
+
+## 2026-09-16 (cont. 2): el cuerpo formal de la tesis, escrito desde lo que el repo ya tenía medido
 
 El pedido fue arrancar la redacción formal a partir de dos tesis de referencia que están en el Drive
 del proyecto: la de **Altamirano y Mira** para el esqueleto del cuerpo (Metodología, Planificación,
@@ -2475,7 +2524,105 @@ medido se dice, no se omite. Están escritas en `docs/tesis/README.md`.
 - **Verificar la bibliografía** contra las fuentes antes de entregar.
 - Conclusiones y trabajo futuro, que quedaron fuera de alcance a propósito.
 
-## 2026-09-17: la placa entra a la tesis por donde se la usa, no por donde se la programa
+## 2026-09-17 — Los avisos, verificados en la placa: los diez suenan, y las dos ramas de error también
+
+El día anterior cerró con la app entregada y la placa sin tocar. Hoy se cerró la otra mitad, y el
+primer hallazgo fue que la causa no era ninguna de las dos que habíamos supuesto.
+
+### La placa no estaba en modo desarrollo, aunque todo indicaba que sí
+
+`SIN-AP` **no existía** en la tarjeta. Lo único que quedaba era `._SIN-AP`, el archivo de recursos
+que macOS crea al lado de cada archivo que se copia a una FAT: se borró el real y sobrevivió el
+compañero, que es justo el rastro que hace creer que el archivo está. Con eso la placa arranca en
+modo producto, levanta su AP y deja cualquier otra red — sin SSH, invisible en la WiFi. El celular
+la seguía viendo porque **BLE anda igual en los dos modos**, y de ahí la confusión.
+
+Vale como regla: `ls SIN-AP` no alcanza en una tarjeta que pasó por una Mac. Hay que mirar que no
+sea el `._`.
+
+### Lo que se hizo desde la microSD
+
+Creado `SIN-AP`, reconstruido `virovision-daemon.tgz` desde el repo —el de la tarjeta era del 13 de
+septiembre, sin `cmd: 'say'` y **ni siquiera con `bus.py`**, o sea que tampoco era lo que corría— y
+copiados los diez `.wav`. Y `modo-red.sh` pasó a instalar los avisos en cada arranque, para que una
+placa en modo producto, sin SSH, también se pueda actualizar: que es exactamente la situación en la
+que se descubrió que faltaban.
+
+De paso, una trampa que ya estaba: el bucle `for f in /boot/firmware/*.nmconnection` también agarraba
+`._wye-guest.nmconnection` y lo instalaba como perfil de NetworkManager. Ahora los filtra.
+
+### Verificado en hardware, no en la Mac
+
+- Los **diez avisos por BLE**, con `tools/say.py` (nueva, hermana de `ap.py`): en el journal, cada
+  `control ← {'cmd': 'say', …}` seguido de su `audio: playing … (pid N)`. La cadena entera —ajuste,
+  escritura BLE, catálogo, `aplay`— corre.
+- **El rechazo**: `../../etc/passwd` y `mode_train.wav` vuelven como `unknown notice`. La lista
+  blanca hace lo suyo con algo que llegó por el aire.
+- **El clip que falta**: escondiendo `mode_idle.wav` a propósito, la placa contesta
+  `missing notice: mode_idle.wav`. Es la rama escrita ayer para que el fallo mudo dejara de serlo, y
+  es la que habría ahorrado la sesión entera.
+
+### Dos cosas que aparecieron mirando
+
+- **`modo-red.sh` e `instalar-daemon.sh` vivían sólo en la microSD.** Un script de arranque del que
+  existe una única copia, en un medio que se corrompe y se presta. Van al repo en `hardware/raspi/boot/`.
+- **Las fechas de archivo en la placa mienten.** `modo-red.sh` corre antes de que NTP sincronice y la
+  Pi no tiene RTC, así que todo lo que instala queda fechado en el apagado anterior. Hoy eso hizo
+  pensar por un rato que los clips eran de un despliegue viejo cuando se acababan de copiar. Para
+  saber cuándo se instaló algo: `/var/log/virovision-firstrun.log`, no `ls -la`.
+
+### Lo que falta
+
+La prueba con el celular: Ajustes → «Dónde se escucha» → **En el dispositivo**, y escuchar que la
+confirmación misma salga por la placa. Todo lo de arriba prueba que la placa hace su parte cuando se
+le pide; falta ver a la app pidiéndoselo.
+
+## 2026-09-17 (cont.) — El reparto, corregido en uso: qué dice la placa y qué dice el teléfono
+
+Probando en modo producto: con la salida en «dispositivo» la app **no se podía unir al WiFi de la
+placa**; poniéndola en «teléfono», el mismo build andaba. Ese A/B identificó la causa sin ambigüedad.
+
+### El bug
+
+«Dispositivo conectado» se anuncia en el instante en que sube el enlace. Con la salida en la placa,
+eso es una escritura GATT en `control`, disparada **sin `await` una línea antes** de que la app lea la
+característica `wifi` para saber a qué red unirse. Dos operaciones de característica a la vez sobre un
+periférico recién conectado: la lectura volvía vacía, `readWifi()` contesta `null` ante cualquier
+falla, y sin credenciales no hay nada a lo que unirse.
+
+Lo que lo hacía difícil de ver: el síntoma —«no se pudo conectar al WiFi»— apunta a la red, tres capas
+más allá de la escritura BLE que lo causaba. La placa estaba impecable: `ap True`, `ip 10.42.0.1:8080`,
+credenciales correctas viajando por BLE. Leerla con `ap.py --status` descartó esa mitad en un minuto.
+
+### La decisión, que es más importante que el arreglo
+
+Anunciar «conectado» **por el dispositivo** es circular: cuando se anuncia, el dispositivo acaba de
+existir para la app, y el usuario está con el teléfono en la mano emparejando, no con los anteojos
+puestos. El reparto no es «todo lo que suena» sino **por quién está escuchando y dónde**:
+
+- **el teléfono**: el enlace y la red — conectado, perdido, red lista, red falló, los avisos de la
+  placa, el modo que no se pudo escribir;
+- **la placa** (según el ajuste): los modos, el chirp de la lectura, y las lecturas de cada modo como
+  ya venían. Más la confirmación del ajuste y «probar audio», que verifican la salida misma y por eso
+  tienen que salir por ella.
+
+Quedan 6 clips en la SD, no 10.
+
+### El arreglo de fondo
+
+Achicar el catálogo saca la carrera del camino de conexión, pero no la clase de bug: `applyGesture`
+anuncia el modo y lo escribe al dispositivo en la sentencia siguiente, también sin `await`. Así que
+las operaciones de característica pasan por una cola (`services/ble/serialize.ts`): **el orden en que
+se piden es el orden en que ocurren**. Un aviso es lo menos importante que lleva el enlace y estaba
+compitiendo en silencio con lo que el producto necesita.
+
+### Verificación
+
+282 tests en la app (5 del serializador, 2 que fijan el reparto nuevo) y 86 en la placa. Los clips
+regenerados: 6, 503 KB. **Falta llevarlos a la SD y volver a probar con el celular** — el catálogo
+cambió, así que la placa tiene 4 `.wav` que ya nadie pide y le faltan cero.
+
+## 2026-09-17 (cont. 2): la placa entra a la tesis por donde se la usa, no por donde se la programa
 
 Pregunta del equipo sobre el borrador: ¿estaba escrito todo lo que hubo que tener en cuenta para la
 Raspberry, el modo producto, el acceso remoto? **No.** Estaban el interruptor de red en una línea y
@@ -2512,6 +2659,11 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Validar ADR 0006, 0007 y 0008 con el tutor** — 0006 y 0007 siguen en Proposed.
 
 ### Deuda técnica conocida
+- ~~**Desplegar la mitad de la placa**~~ (hecho el 2026-09-17: daemon con `cmd: 'say'` y los diez
+  clips, verificados por BLE en hardware). Queda la parte que no tiene automatismo: **el workflow de
+  TestFlight publica la app y nada más**, así que cada cambio en el daemon o en los avisos sigue
+  necesitando tarjeta o SSH. Si el daemon y la app se desincronizan otra vez, el síntoma vuelve a ser
+  silencio.
 - **Sin teléfono conectado, un cambio de modo no se anuncia** (2026-09-16). Con el botón físico el
   aviso viaja placa → app → placa: la placa notifica el modo, la app decide dónde se escucha y le
   manda el clip de vuelta. Funciona (BLE despierta la app) y mantiene **un solo punto de decisión**,

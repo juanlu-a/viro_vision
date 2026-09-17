@@ -110,18 +110,27 @@ async def _main(args: argparse.Namespace) -> None:
     player = Player()
     set_output_volume(args.volume)
 
-    def say(clip: str) -> None:
-        """Play a system notice the app asked for over BLE (`cmd: 'say'`).
+    def say(clip: str) -> bool:
+        """Play a system notice the app asked for over BLE (`cmd: 'say'`). True if the file was there.
 
         The path is built here and nowhere else: the core validates the NAME against the closed set
         in `notices.py` and never sees a directory, so nothing that arrives over the air can point at
         a file outside `announcements/system/`.
 
+        **The existence check is the whole return value.** `player.play` cannot report it: it spawns
+        `aplay` and does not wait, and `aplay` writes its complaint to a /dev/null we chose on
+        purpose. So a board whose `announcements/system/` was never copied plays nothing and says
+        nothing about it — which is how this looked from the phone on 2026-09-16.
+
         `player.play` and not `play_sequence`: a notice is one file, and a newer one should cut off
         the one still talking — hearing "red lista" finish on top of "se perdió la conexión" is worse
         than losing the first.
         """
-        player.play(str(args.announcements / SYSTEM_DIR / clip))
+        path = args.announcements / SYSTEM_DIR / clip
+        if not path.exists():
+            return False
+        player.play(str(path))
+        return True
 
     http = None
     if not args.no_http:
