@@ -83,6 +83,19 @@ con el reloj atrasado) y `getent hosts deb.debian.org` antes de instalar nada.
   (`modo-red.sh`, versionado en `hardware/raspi/boot/`): un `*.nmconnection` suelto y una carpeta
   `announcements-system/` con los `.wav`. Es la vía para actualizar una placa en modo producto, que
   no tiene SSH.
+- **La tarjeta le gana a la placa en cada arranque.** `modo-red.sh` reinstala los avisos desde
+  `/boot/firmware/announcements-system/` cada vez que arranca, así que **alinear la placa por SSH no
+  sirve**: el próximo reinicio lo deshace. El 2026-09-18 se desplegaron 6 clips por SSH, la placa
+  reinició sola y volvieron los 10 viejos de la tarjeta. Lo que hay que actualizar es
+  `/boot/firmware/`, y **eso se hace por SSH sin sacar la tarjeta**:
+  `scp` a `/tmp` y `sudo install` / `sudo cp` a `/boot/firmware/…`. El lector de tarjetas nunca hace
+  falta.
+- **No copies código a la placa con el `tar` de macOS.** El `tar` de macOS mete los `._` de los
+  atributos extendidos, y al extraer con GNU tar en la Pi el 2026-09-18 **todos los `.py` quedaron en
+  0 bytes**: nombres y fechas correctos, contenido vacío. El daemon arrancaba, importaba módulos
+  vacíos, salía con código 0 y systemd lo reiniciaba en bucle — sin una sola excepción en el log. Lo
+  que sí funciona es `scp virovision/*.py placa:…/virovision/`, y **verificar los bytes de los dos
+  lados** (`cat *.py | wc -c`), no que los archivos existan.
 - **El daemon NO se reinstala solo.** `instalar-daemon.sh` está protegido por la centinela
   `/var/lib/virovision-instalado`, así que dejar un `virovision-daemon.tgz` nuevo en la tarjeta no
   alcanza: hay que extraerlo por SSH. El payload igual conviene que viaje en la tarjeta, porque así
