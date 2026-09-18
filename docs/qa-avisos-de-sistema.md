@@ -43,17 +43,25 @@ cd hardware/raspi
 ping -c2 virovision.local            # vuelve a la WiFi conocida
 
 # 2. El daemon, al día con el repo
-tar czf /tmp/vv.tgz --exclude=__pycache__ virovision tools
-scp /tmp/vv.tgz virovision@virovision.local:/tmp/
-ssh virovision@virovision.local 'sudo systemctl stop virovision &&
-  tar xzf /tmp/vv.tgz -C /home/virovision/virovision/ &&
+# Con scp de los .py sueltos, NO con tar: el tar de macOS deja los .py en 0 bytes en la Pi
+# (18/09), y el daemon arranca, importa módulos vacíos y reinicia en bucle sin loguear nada.
+ssh virovision@virovision.local 'sudo systemctl stop virovision'
+scp virovision/*.py virovision@virovision.local:/home/virovision/virovision/virovision/
+scp tools/*.py    virovision@virovision.local:/home/virovision/virovision/tools/
+# Verificar los BYTES, no que los archivos existan:
+cat virovision/*.py | wc -c
+ssh virovision@virovision.local 'cat /home/virovision/virovision/virovision/*.py | wc -c &&
   sudo systemctl start virovision'
 
-# 3. Los clips: exactamente los que el catálogo pide, ni uno más
+# 3. Los clips van a LA TARJETA, no al home. `modo-red.sh` la reinstala en cada arranque, así que
+#    alinear /home/virovision/announcements/ por SSH lo deshace el próximo reinicio (pasó el 18/09).
+#    No hace falta el lector: /boot/firmware se escribe por SSH.
 python3 tools/make_system_announcements.py
-scp -r announcements/system virovision@virovision.local:/tmp/sysclips
-ssh virovision@virovision.local 'sudo rm -f /home/virovision/announcements/system/*.wav &&
-  sudo install -m 644 -o virovision -g virovision /tmp/sysclips/*.wav /home/virovision/announcements/system/'
+scp announcements/system/*.wav virovision@virovision.local:/tmp/
+scp boot/modo-red.sh virovision@virovision.local:/tmp/
+ssh virovision@virovision.local 'sudo install -m 755 /tmp/modo-red.sh /boot/firmware/modo-red.sh &&
+  sudo rm -f /boot/firmware/announcements-system/*.wav &&
+  sudo cp /tmp/*.wav /boot/firmware/announcements-system/ && rm -f /tmp/*.wav'
 
 # 4. Volver a modo producto (no existe SIN-AP, así que alcanza con reiniciar)
 ssh virovision@virovision.local 'sudo reboot'
@@ -61,6 +69,10 @@ ssh virovision@virovision.local 'sudo reboot'
 
 - [ ] `./.venv-mac/bin/python tools/say.py --list` y la carpeta de la placa tienen **los mismos
       nombres**. Si sobra alguno de un lado, eso solo ya es el bug.
+- [ ] **Reiniciar y volver a comprobarlo.** La tarjeta le gana a la placa en cada arranque, así que
+      una alineación que no sobrevive un reinicio no es una alineación.
+- [ ] Los nombres retirados se **rechazan** (`unknown notice`), que es lo que prueba que el daemon
+      también quedó al día y no sólo los archivos.
 - [ ] En el teléfono, el build de TestFlight es el último (la fecha, no «el que tenía»).
 
 ---

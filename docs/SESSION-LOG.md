@@ -2648,12 +2648,59 @@ pipeline de visión como dependencia, y una tabla de deuda operativa declarada.
 Las credenciales no se transcriben al documento: se nombra la deuda (rotar lo que se compartió por
 chat y la clave que quedó en el historial de git) sin publicar ningún valor.
 
+## 2026-09-18 — Alinear la placa: dos trampas de despliegue, las dos mudas
+
+El objetivo era chico —dejar la placa con los 6 clips del catálogo nuevo y correr el bloque 4 del
+QA— y salieron dos formas de romper una placa sin que nada lo diga. Las dos valen más que la tarea.
+
+### 1. El `tar` de macOS deja los `.py` en 0 bytes
+
+Empaquetar el daemon con el `tar` de macOS y extraerlo con GNU tar en la Pi dejó **todos los archivos
+del paquete en cero bytes**: nombres correctos, fechas correctas, contenido vacío. El daemon
+arrancaba, importaba módulos vacíos, **salía con código 0** y systemd lo reiniciaba en bucle. En el
+journal no había ni una excepción: sólo «Started» y «Deactivated successfully», cuatro veces.
+
+Lo que lo hizo visible fue `python -m virovision --help` contestando **nada** con exit 0. Un help
+vacío no es un síntoma que uno busque.
+
+Lo que funciona: `scp virovision/*.py placa:…/virovision/`, sin empaquetar. Y la comprobación no es
+que los archivos estén, es **que los bytes coincidan de los dos lados** — 128.804 en este caso.
+
+### 2. La tarjeta le gana a la placa en cada arranque
+
+Tras restaurar, la alineación se deshizo sola: volvieron los 10 clips viejos. La causa es el diseño
+que se agregó el 17: `modo-red.sh` reinstala los avisos desde `/boot/firmware/announcements-system/`
+en **cada** arranque. La placa había reiniciado durante el bucle de fallos, y la tarjeta —que seguía
+vieja, porque el lector de la Mac nunca funcionó— ganó.
+
+O sea que **alinear la placa por SSH no sirve**: hay que actualizar `/boot/firmware/`. Y la buena
+noticia es que **eso se hace por SSH, sin sacar la tarjeta ni necesitar el lector**: `scp` a `/tmp` y
+`sudo install` a `/boot/firmware/…`. Dos días peleando con un lector de tarjetas para algo que no lo
+necesitaba.
+
+### Verificado
+
+Tras reiniciar —que es la única prueba que vale, porque el arranque es donde la tarjeta manda—:
+
+- los **6** clips del catálogo suenan sin error;
+- los **4** retirados se rechazan con `unknown notice`, que es lo que prueba que el daemon también
+  quedó al día y no sólo los archivos;
+- la placa volvió sola a modo producto: `ap=True`, `10.42.0.1:8080`, cámara lista.
+
+Del bloque 4 quedó sin repetir **el clip que falta** (`missing notice`): se verificó el 17 contra el
+mismo código —`_play_notice` no cambió en este despliegue, sólo se achicó el diccionario— y
+repetirlo costaba otro ciclo de bajar y subir el AP sobre una placa que ya estaba en el estado que el
+usuario quería.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
 
 ### Lo más valioso que falta
-- **Terminar `docs/qa-avisos-de-sistema.md`: falta el bloque 4**, el de que las fallas hagan ruido.
+- **Terminar `docs/qa-avisos-de-sistema.md`: del bloque 4 falta sólo el clip que falta** con el
+  despliegue actual, y las dos comprobaciones que necesitan el teléfono (que apagar la placa diga
+  «se perdió la conexión», y que ningún aviso pise a VoiceOver). El resto del bloque 4 se corrió el
+  2026-09-18.
   El camino crítico se verificó en la placa el 2026-09-17 —con la salida en «dispositivo» el teléfono
   se une al WiFi, los modos y el chirp salen por el parlante, la conexión la dice el teléfono— y con
   eso cierran los cuatro PRs del 16 y 17 (#90, #91, #93, #94). Lo que no se probó es el comportamiento
