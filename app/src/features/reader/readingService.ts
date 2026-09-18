@@ -39,6 +39,7 @@ import { requestsReading, transition } from '@/features/reader/modes';
 import type { Gesture, Mode } from '@/features/reader/modes';
 import { strings } from '@/i18n';
 import { beginReadingAudio, endReadingAudio } from '@/services/audio/session';
+import { stopSpeaking } from '@/services/audio/tts';
 import { isSynthesisEnabled, synthesizeToFile } from '@/services/audio/synthesis';
 import { flush, record } from '@/services/telemetry';
 import { HttpDownloadError } from '@/services/wifi/deviceHttp';
@@ -113,6 +114,11 @@ export interface ReaderDeps {
    * nowhere to go is worse than checking first.
    */
   isDeviceReady(): boolean;
+  /**
+   * Cuts whatever the device's speaker is playing. Used before the phone speaks, so the two outputs
+   * cannot end up talking over each other (ADR 0003, act. 2026-09-18).
+   */
+  hushDevice(): Promise<void>;
 }
 
 const noDeps: ReaderDeps = {
@@ -121,6 +127,7 @@ const noDeps: ReaderDeps = {
   sendAudio: () => Promise.resolve(false),
   writeMode: () => Promise.resolve(),
   isDeviceReady: () => false,
+  hushDevice: () => Promise.resolve(),
 };
 
 let deps: ReaderDeps = noDeps;
@@ -211,6 +218,10 @@ async function deliverReading(text: string): Promise<void> {
     synthesisEnabled: isSynthesisEnabled,
   });
   if (delivery.target === 'device') {
+    // Una voz por vez: el teléfono se calla antes de que hable la placa. Cada salida ya se
+    // interrumpía a sí misma y ninguna a la otra, y dos voces encimadas no son información para
+    // quien no ve la pantalla.
+    stopSpeaking();
     if (await sendReadingToDevice(text)) {
       record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'device' } });
       return;
@@ -219,6 +230,9 @@ async function deliverReading(text: string): Promise<void> {
   } else if (delivery.fallback) {
     record('audio.fallback', { detail: { reason: delivery.fallback } });
   }
+  // Y al revés: si habla el teléfono, la placa se calla. Sin `await`, para no demorar la lectura
+  // detrás de una escritura BLE.
+  void deps.hushDevice().catch(() => {});
   await announce(text);
   record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'phone' } });
 }

@@ -144,6 +144,10 @@ Lo más importante y lo que siempre se saltea: que **fallar haga ruido**.
       # …probar, y después devolverlo
       ```
 - [ ] Con VoiceOver encendido, ningún aviso pisa al lector de pantalla (`mixWithOthers`).
+- [ ] **Una voz por vez, cambiando de salida a mitad de anuncio.** Con la salida en «dispositivo»,
+      tocar «Probar audio» y, **mientras suena**, cambiar a «teléfono» y volver a tocarlo: el celular
+      tiene que arrancar **y la placa callarse**. Y al revés. *Reportado el 2026-09-18: las dos
+      quedaban hablando encimadas, porque cada salida sólo sabía interrumpirse a sí misma.*
 
 ---
 

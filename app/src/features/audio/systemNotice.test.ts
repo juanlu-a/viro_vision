@@ -25,12 +25,18 @@ jest.mock('@/features/audio/announcer', () => ({
   },
 }));
 
+const stops: string[] = [];
+jest.mock('@/services/audio/tts', () => ({
+  stopSpeaking: () => void stops.push('phone-stopped'),
+}));
+
 const chirps: string[] = [];
 jest.mock('@/services/audio/session', () => ({
   playStartEarcon: () => void chirps.push('earcon'),
 }));
 
 const played: string[] = [];
+const hushes: string[] = [];
 
 /** A board that is there and plays whatever it is handed. */
 function boardIsThere() {
@@ -40,6 +46,10 @@ function boardIsThere() {
       played.push(clip);
       return Promise.resolve();
     },
+    hushDevice: () => {
+      hushes.push('board-hushed');
+      return Promise.resolve();
+    },
   });
 }
 
@@ -47,6 +57,8 @@ beforeEach(() => {
   spoken.length = 0;
   chirps.length = 0;
   played.length = 0;
+  hushes.length = 0;
+  stops.length = 0;
   resetAudioOutputForTests();
   resetNoticesForTests();
 });
@@ -118,7 +130,7 @@ describe('notify', () => {
 
   it('falls back to the phone with no link', async () => {
     setAudioOutput('device');
-    configureNotices({ isLinked: () => false, playNotice: () => Promise.reject(new Error('no link')) });
+    configureNotices({ isLinked: () => false, playNotice: () => Promise.reject(new Error('no link')), hushDevice: () => Promise.resolve() });
 
     await expect(notify('modeBus')).resolves.toBe('phone');
     expect(spoken).toEqual([NOTICES.modeBus.say]);
@@ -128,7 +140,7 @@ describe('notify', () => {
     // The link died in the microseconds between the decision and the write. Rare, and the only
     // alternative is silence.
     setAudioOutput('device');
-    configureNotices({ isLinked: () => true, playNotice: () => Promise.reject(new Error('gone')) });
+    configureNotices({ isLinked: () => true, playNotice: () => Promise.reject(new Error('gone')), hushDevice: () => Promise.resolve() });
 
     await expect(notify('modeBus')).resolves.toBe('phone');
     expect(spoken).toEqual([NOTICES.modeBus.say]);
@@ -167,6 +179,42 @@ describe('notify', () => {
     expect(chirps).toEqual(['earcon']);
   });
 
+  it('silences the other output before speaking, in both directions', async () => {
+    // Reportado el 2026-09-18 probando en la placa: con la salida en dispositivo, «Probar audio»
+    // empezaba a sonar por el parlante; cambiando el ajuste a teléfono y volviendo a tocar el botón,
+    // el celular arrancaba la misma frase SIN cortar la de la placa, y quedaban dos voces encimadas.
+    //
+    // La causa era que cada salida sólo sabía interrumpirse a sí misma: el teléfono con
+    // `Speech.stop()`, la placa cortando su `aplay` anterior. Para quien no ve la pantalla, dos
+    // voces simultáneas no son información: son ruido. La regla es una voz por vez, venga de donde
+    // venga.
+    boardIsThere();
+
+    setAudioOutput('device');
+    await notify('audioTest');
+    expect(stops).toEqual(['phone-stopped']);
+
+    setAudioOutput('phone');
+    await notify('audioTest');
+    expect(hushes).toEqual(['board-hushed']);
+  });
+
+  it('does not reach for the board to hush it when there is no link', async () => {
+    // Sin enlace no hay nada que callar, y pedirlo sería una escritura que sólo puede fallar.
+    setAudioOutput('phone');
+    configureNotices({
+      isLinked: () => false,
+      playNotice: () => Promise.reject(new Error('no link')),
+      hushDevice: () => {
+        hushes.push('board-hushed');
+        return Promise.resolve();
+      },
+    });
+
+    await notify('connected');
+    expect(hushes).toEqual([]);
+  });
+
   it('never rejects, whatever the transport does', async () => {
     // It is called from BLE callbacks with nobody to catch it (ADR 0001).
     setAudioOutput('device');
@@ -175,6 +223,7 @@ describe('notify', () => {
         throw new Error('the client blew up');
       },
       playNotice: () => Promise.reject(new Error('gone')),
+      hushDevice: () => Promise.resolve(),
     });
     await expect(notify('connected')).resolves.toBe('phone');
     expect(spoken).toEqual([NOTICES.connected.say]);

@@ -45,6 +45,8 @@ ApControl = Callable[[bool], None]
 # the SD is the one failure of this path that is otherwise completely silent — `aplay` exits with an
 # error into /dev/null and the board looks like it spoke.
 Say = Callable[[str], bool]
+# Corta lo que esté sonando en el parlante. None cuando la placa no tiene con qué reproducir.
+Hush = Callable[[], None]
 DEFAULT_AUDIO_TARGET = "device"
 AUDIO_TARGETS = ("device", "phone")
 AP_MINUTES_DEFAULT = 10
@@ -74,6 +76,7 @@ class Core:
         read_wifi: Optional[Callable[[], dict]] = None,
         bus=None,
         say: Optional[Say] = None,
+        hush: Optional[Hush] = None,
     ) -> None:
         self._loop = loop
         self._read_status = read_status
@@ -84,6 +87,7 @@ class Core:
         self._read_wifi = read_wifi
         self._bus = bus
         self._say = say
+        self._hush = hush
         self.audio_target = DEFAULT_AUDIO_TARGET
         """Where the user wants to hear ViroVision, as last written by the app (`cmd: 'audio'`).
 
@@ -203,6 +207,13 @@ class Core:
                 log.info("audio → %s", target)
         elif name == "say":
             self._say_notice(str(cmd.get("clip", "")))
+        elif name == "hush":
+            # El teléfono va a hablar: la placa se calla. Una voz por vez, sin importar de qué lado
+            # salga (ADR 0003, act. 2026-09-18). Sin respuesta y sin evento: es lo más urgente que
+            # puede pedir la app y no hay nada que contestar.
+            if self._hush is not None:
+                self._hush()
+                log.info("hush: parlante cortado")
         elif name == "status":
             self._schedule(self._notify(STATUS, self.read_status()))
         elif name == "ap":

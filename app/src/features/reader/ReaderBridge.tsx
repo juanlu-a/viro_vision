@@ -50,6 +50,7 @@ export function ReaderBridge() {
       // (connected, on the device's network, and `/health` answering), so asking anything weaker
       // would pay for a synthesis the device cannot receive.
       isDeviceReady: () => latest.current.device.photoAvailable,
+      hushDevice: () => getBleClient().hushDevice(),
     });
     // The system notices reach the board from here too, and through the SAME client the readings
     // use, so "where is ViroVision heard" has one answer and not two.
@@ -61,6 +62,7 @@ export function ReaderBridge() {
     configureNotices({
       isLinked: () => getBleClient().isLinked(),
       playNotice: (clip) => getBleClient().playNotice(clip),
+      hushDevice: () => getBleClient().hushDevice(),
     });
   }, []);
 

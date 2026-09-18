@@ -69,6 +69,14 @@ export interface BleClient {
    */
   playNotice(clip: string): Promise<void>;
   /**
+   * Corta lo que esté sonando en el parlante de la placa.
+   *
+   * Se manda **antes de que hable el teléfono**. Cada salida sabía interrumpirse a sí misma y
+   * ninguna a la otra, así que dos voces podían quedar encimadas — y para quien no ve la pantalla,
+   * dos voces simultáneas no son información.
+   */
+  hushDevice(): Promise<void>;
+  /**
    * Whether there is a live GATT link right now.
    *
    * Synchronous and cheap on purpose: the announcement path has to know **where to speak** before it
@@ -158,6 +166,9 @@ const stubClient: BleClient = {
   },
   async playNotice() {
     if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
+  },
+  async hushDevice() {
+    /* no hay placa que callar */
   },
   isLinked() {
     // False in a build with no BLE, and false in the simulated one too: the simulated device has no
