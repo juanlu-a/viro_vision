@@ -2653,6 +2653,11 @@ chat y la clave que quedó en el historial de git) sin publicar ningún valor.
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
 
 ### Lo más valioso que falta
+- **Terminar `docs/qa-avisos-de-sistema.md`: falta el bloque 4**, el de que las fallas hagan ruido.
+  El camino crítico se verificó en la placa el 2026-09-17 —con la salida en «dispositivo» el teléfono
+  se une al WiFi, los modos y el chirp salen por el parlante, la conexión la dice el teléfono— y con
+  eso cierran los cuatro PRs del 16 y 17 (#90, #91, #93, #94). Lo que no se probó es el comportamiento
+  ante fallas, que es justamente donde este subsistema falló tres veces en silencio.
 - **Dataset de evaluación con fotos reales de góndola.** Todo lo medido el 2026-09-02 usa una imagen
   sintética de alto contraste: es el piso de dificultad, y **los aciertos de ahí no son la precisión
   del sistema**. Protocolo escrito en los pasos 8 y 9 de `qa-modo-supermercado.md`.

@@ -56,6 +56,14 @@ if [ -d "$SRC" ]; then
     case "$(basename "$w")" in ._*) continue ;; esac
     install -m 644 -o virovision -g virovision "$w" "$DST/$(basename "$w")" && n=$((n + 1))
   done
+  # Y se borra lo que la tarjeta ya no trae: el catálogo se achicó una vez (de 10 a 6 avisos el
+  # 2026-09-17) y los que sobran son clips que nadie puede pedir, indistinguibles de un aviso que
+  # alguien grabó y se olvidó de rutear. La tarjeta es la fuente; esto la hace fuente de verdad.
+  # Acotado a propósito: sólo `*.wav` sueltos en este directorio, que es nuestro.
+  for w in "$DST"/*.wav; do
+    [ -f "$w" ] || continue
+    [ -f "$SRC/$(basename "$w")" ] || { rm -f "$w" && echo "aviso retirado: $(basename "$w")"; }
+  done
   echo "avisos de sistema instalados: $n en $DST"
 fi
 
