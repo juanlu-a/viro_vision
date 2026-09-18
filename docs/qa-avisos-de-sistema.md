@@ -8,6 +8,11 @@ BLE que impedía unirse al WiFi y se reportaba como «no se pudo conectar a la r
 bloque dice **qué prueba** y **a dónde mirar si falla** — el síntoma de este subsistema casi nunca
 está donde está la causa.
 
+> **Corrido por primera vez el 2026-09-17 y el camino crítico pasó**: con la salida en «En el
+> dispositivo», el teléfono **se une al WiFi de la placa** —que era el bug— y los modos, el chirp y
+> las lecturas salen por el parlante mientras la conexión y la red las dice el teléfono. Lo que queda
+> sin correr entero es el bloque 4, el de que las fallas hagan ruido.
+
 > **La voz es la interfaz.** Si un paso no suena, no está «casi bien»: está roto. Silencio y
 > dispositivo muerto son indistinguibles para quien no ve la pantalla (ADR 0001).
 
