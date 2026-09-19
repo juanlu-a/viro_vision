@@ -2730,11 +2730,113 @@ error). En el hardware: el comando se acepta, no genera errores y la placa sigue
 después del corte. **Que el sonido efectivamente se corte lo tiene que confirmar un oído**, como todo
 lo de audio en este proyecto.
 
+## 2026-09-19 — «No se pudo conectar» era mentira, y la placa volvió a ser la Zero
+
+Sesión arrancada a las corridas —había una demo— y terminada con dos defectos entendidos, uno
+arreglado y una placa distinta sobre la mesa.
+
+### La placa estaba en modo producto y parecía rota
+
+Primer síntoma: «me conecto por Bluetooth pero no por WiFi». Leerla con `tools/ap.py --status` lo
+cerró en un minuto: `ap True`, `ip 10.42.0.1:8080`, credenciales correctas viajando por BLE. Estaba
+en modo producto, que es exactamente *no* tener SSH por WiFi. **BLE anda igual en los dos modos**, y
+por eso el modo de red es lo último que uno sospecha. Es la misma confusión del 2026-09-17 entrando
+por otra puerta: aquella vez la creíamos en desarrollo, ésta la creíamos rota.
+
+### El prompt de WiFi que nunca aparecía, y el que aparecía y mentía
+
+Con el build viejo la app **nunca pedía unirse a la red de la placa**: el arreglo del #94 (la
+escritura GATT del aviso pisando la lectura de la característica `wifi`) ya estaba en TestFlight
+desde el día anterior, pero el teléfono tenía un build anterior. Actualizando, el cartel apareció.
+
+Y ahí salió el defecto nuevo, que es más interesante: **el cartel aparece, se acepta, el teléfono se
+une… y diez segundos después la app dice «no se pudo conectar»**. Quince segundos más tarde vuelve a
+preguntar y «a la segunda anduvo» — había estado unido todo el tiempo.
+
+La causa está en la librería: `react-native-wifi-reborn` confirma el join **leyendo el SSID de
+vuelta**, sondeándolo 20 veces cada 0,5 s (`RNWifi.m`, `connectToProtectedSSIDOnce`). Leer el SSID en
+iOS necesita permiso de ubicación — el mismo que hace que `getCurrentWifiSSID` se cuelgue desde el
+2026-09-07 — así que en un teléfono sin ese permiso el sondeo **no puede** tener éxito: espera sus
+diez segundos y llama fallida a una conexión que funcionó. El segundo prompt no era un reintento
+inteligente: era el latido de `status` de la placa, 15 s después, corriendo `syncNetwork` de nuevo.
+
+Arreglo en **PR #98**: `joinWifi()` devuelve `'joined'` o `'unconfirmed'`, y un join sin confirmar no
+se anuncia como fallo — decide `waitForDevice()`, o sea la placa contestando en su IP. Es mejor
+evidencia que la cadena del SSID, que iOS ni siquiera entrega. Cuando contesta, la red queda marcada
+como unida para que el latido siguiente no vuelva a preguntar. El sondeo previo de SSID baja de 3 s a
+1,2 s: sólo evita un prompt redundante y la propia librería repite esa comprobación adentro.
+**Quedan ~10 s** (la promesa recién se resuelve cuando la librería termina su sondeo) y eso no se
+tocó: pasa de ~25-30 s con dos prompts a ~10 s con uno.
+
+### No había un solo log que mirar
+
+Diagnosticar esto llevó más de lo que debía porque **la telemetría está muda desde el 2026-09-10**:
+la tabla `events` tiene 230 filas y la última es de ese día, build `1.0.0+202609091836`. Del 11 en
+adelante no llegó ni un `app.start`. Los secrets del repo están puestos (`EXPO_PUBLIC_TELEMETRY_URL`
+y el proxy existen, y `EXPO_PUBLIC_SIMULATE_DEVICE` es `0`), así que **por qué dejó de mandar sigue
+sin explicación**. Desde el 2026-09-08 la información técnica no está en las pantallas: esa tabla es
+el único diagnóstico que queda, y estuvo ocho días apagada sin que nadie se enterara — que es
+exactamente el escenario contra el que avisa `app/.env.example`.
+
+### El destino del ómnibus: mecanismo encontrado, causa no
+
+Reportado: la placa dice «Ómnibus 115» y no dice «Luis Braille»; lo mismo con 110 Manga y 526 Malvín.
+No es el diccionario de audio: los tres `.wav` están en la placa (147 números + 239 destinos) y se
+reprodujeron por SSH para comprobarlo. El mecanismo es `files_to_play()`
+(`bus_banner/announcements.py`), que arma `dest/<slug>.wav` con el texto leído y **filtra en silencio
+los archivos que no existen**: un destino con una errata no suena y no deja rastro en ningún log.
+Reproducido en la Mac sobre `video1.MP4`: una lectura salió `number "102"`, `destination "GIN T
+LOUERLES"`, y no existe `dest/gin_t_louerles.wav`.
+
+Lo que convierte esa basura en un nombre válido es el catálogo (`fix_destination`, cutoff 0.65), que
+**está** en la placa. Y sobre el frame de humo la Mac lee crudo `'109 P. INDEPENDENCIA'` y anuncia
+«109 / Plaza Independencia», o sea que la cadena entera funciona con el paquete al día. La placa
+tiene `bus_banner 0.2.0` con `rel_y=0.12`, el margen vertical de antes del 2026-09-16 (hoy 0.06, más
+dos commits de crop posteriores). Eso castiga al renglón chico —el destino— pero el barrido medido
+dice 0.819 contra 0.812: **un punto, no un apagón**, así que explica una parte y no todo. Quedó sin
+cerrar por decisión del usuario, que tenía una demo.
+
+### La placa volvió a ser la Zero 2 W
+
+Al final de la sesión volvió la **Raspberry Pi Zero 2 W** y se fue la 3 B+ prestada, que cubrió los
+diez días del CSI roto (2026-09-09 → 2026-09-18). Es otra unidad —otra dirección BLE— y **su cámara
+responde**, así que este CSI está sano. Verificado por BLE y por SSH: tiene el daemon del repo
+**byte a byte** (129 508 bytes en los 17 `.py`, con el `hush` del #97 incluido), los avisos completos
+y el catálogo.
+
+Lo que cambia para siempre, y por eso se tocó la documentación: **la Zero no tiene puerto Ethernet**.
+El camino que `placa-acceso.md` recomendaba primero —cable directo Mac ↔ Pi, que funciona con el AP
+arriba— deja de existir mientras la placa sea ésta. El orden nuevo es: `tools/ap.py` por BLE (5 s, no
+persiste), `SIN-AP` en la microSD (persistente), o entrar al AP desde una máquina con dos interfaces.
+Queda anotado como candidato **sin probar** el gadget Ethernet por USB (`dtoverlay=dwc2` +
+`modules-load=dwc2,g_ether`), que sería el reemplazo natural del RJ45 y se configura desde la tarjeta.
+
+Y una consecuencia que va para arriba: **vuelven a valer las mediciones BLE del ADR 0003**, que son de
+esta radio (BCM43438, BT 4.2, sin Data Length Extension) y que la 3 B+ no podía reproducir. El aviso
+del ADR que decía «no se pueden repetir en la placa que está en uso hoy» quedó enmendado en vez de
+borrado: la 3 B+ puede volver.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
 
 ### Lo más valioso que falta
+- **Por qué la telemetría dejó de mandar el 2026-09-10** (ver la entrada del 2026-09-19). Los secrets
+  están, el código deriva la URL del proxy, y aun así no llega ni un `app.start` desde entonces. Sin
+  esto, cualquier defecto en el teléfono se diagnostica a mano y de a una sesión por vez; con esto, el
+  del WiFi se habría visto en `wifi.failed` con su `reason` en diez segundos.
+- **Los ~10 s que quedan al unirse al WiFi de la placa** (PR #98 saca los otros 15 y el segundo
+  prompt). Dos caminos, los dos a probar en el teléfono: **sondear la placa en paralelo** al join y
+  declarar la red lista apenas conteste (~1-2 s), o **darle permiso de ubicación a la app**, con lo
+  que el sondeo de la librería confirma en menos de un segundo. El segundo es decisión de producto:
+  es un permiso más que pedirle a una persona ciega.
+- **Actualizar `bus_banner` en la placa**: tiene 0.2.0 con `rel_y=0.12` y el repo va por los márgenes
+  del 2026-09-16 más dos commits de crop. Y, más importante que la versión: **un destino que no
+  matchea se descarta sin un solo log** (`files_to_play` filtra por `p.exists()`), así que el fallo es
+  invisible en el journal. Que deje un `log.info` con el crudo y el slug buscado.
+- **Probar el gadget Ethernet por USB en la Zero 2 W** (`dtoverlay=dwc2` + `modules-load=dwc2,g_ether`
+  desde `bootfs`). Sería el reemplazo del RJ45 que se perdió al volver a esta placa: cable directo,
+  con el AP arriba y sin tocarle el WiFi a nadie.
 - **Terminar `docs/qa-avisos-de-sistema.md`: del bloque 4 falta sólo el clip que falta** con el
   despliegue actual, y las dos comprobaciones que necesitan el teléfono (que apagar la placa diga
   «se perdió la conexión», y que ningún aviso pise a VoiceOver). El resto del bloque 4 se corrió el
