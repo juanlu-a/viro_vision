@@ -168,10 +168,15 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         }
         if (!current()) return false;
       }
+      // True when the system joined but could not confirm it (see `joinWifi`). The join is NOT given
+      // up on: `waitForDevice` below decides, because the device answering is better evidence than
+      // the SSID string iOS refuses to read.
+      let unconfirmed = false;
       if (apOn && credentials.current && joinedTo.current !== credentials.current.ssid) {
         try {
-          await joinWifi(credentials.current);
-          joinedTo.current = credentials.current.ssid;
+          const outcome = await joinWifi(credentials.current);
+          if (outcome === 'joined') joinedTo.current = credentials.current.ssid;
+          else unconfirmed = true;
         } catch (err) {
           if (!current()) return false;
           failNetwork(
@@ -188,11 +193,16 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       }
       if (!current()) return false;
       setWifi('joining');
-      record('wifi.joining', { detail: { ap: apOn, ip: target.ip, ssid: credentials.current?.ssid ?? null } });
+      record('wifi.joining', {
+        detail: { ap: apOn, ip: target.ip, ssid: credentials.current?.ssid ?? null, unconfirmed },
+      });
       const t0 = Date.now();
       const answers = await waitForDevice(target);
       if (!current()) return false;
       if (answers) {
+        // The device answers, so the phone IS on its network: that settles a join the system could
+        // not confirm, and stops the next heartbeat from prompting the user all over again.
+        if (unconfirmed && credentials.current) joinedTo.current = credentials.current.ssid;
         setWifi('ready');
         // The time until the device answers is what separates "it is slow" from "it does not work":
         // on 2026-09-06 the network never became ready and without this number there was no way to

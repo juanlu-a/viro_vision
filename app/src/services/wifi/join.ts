@@ -67,7 +67,37 @@ function nativeModule(): NativeWifiManager {
   return native;
 }
 
-export async function joinWifi({ ssid, password }: Pick<WifiCredentials, 'ssid' | 'password'>): Promise<void> {
+export type JoinOutcome = 'joined' | 'unconfirmed';
+
+/**
+ * Errors that mean "the join was not CONFIRMED", never "the join failed".
+ *
+ * After `applyConfiguration` succeeds, the library polls the current SSID 20 times every 0.5 s and
+ * rejects with `unableToConnect` when it never reads back the SSID it asked for (`RNWifi.m`,
+ * `connectToProtectedSSIDOnce`). Reading the SSID on iOS needs location permission — the same one
+ * that makes `getCurrentWifiSSID` hang here since 2026-09-07 — so on a phone without it the poll
+ * CANNOT succeed: it waits its ten seconds and calls a join that worked a failure.
+ *
+ * Measured on the device 2026-09-18: the prompt appears, the user accepts, the phone joins, and ten
+ * seconds later the app announces "could not join". The next status heartbeat (15 s) asked again and
+ * "the second time it worked" — it had been joined the whole time.
+ */
+const UNCONFIRMED_CODES = new Set([
+  'unableToConnect',
+  'couldNotDetectSSID',
+  'locationPermissionDenied',
+  'locationPermissionRestricted',
+]);
+
+/**
+ * Asks the system to join the device's AP.
+ *
+ * Returns `'joined'` when the system confirmed it and `'unconfirmed'` when it could not tell us —
+ * which is NOT a failure and must not be announced as one. Whether there is a network is decided by
+ * `waitForDevice`: the device answering at its IP is the only proof that matters, and it is proof
+ * the SSID string never was.
+ */
+export async function joinWifi({ ssid, password }: Pick<WifiCredentials, 'ssid' | 'password'>): Promise<JoinOutcome> {
   const wifi = nativeModule();
   try {
     await withTimeout(
@@ -77,11 +107,13 @@ export async function joinWifi({ ssid, password }: Pick<WifiCredentials, 'ssid' 
         throw new WifiJoinError('iOS did not answer the join request in 25 s', 'timeout');
       }
     );
+    return 'joined';
   } catch (err) {
     if (err instanceof WifiJoinError) throw err;
     const e = err as { code?: string; message?: string };
     // iOS returns "already associated" when the phone is already on that network: not an error.
-    if ((e.message ?? '').toLowerCase().includes('already')) return;
+    if ((e.message ?? '').toLowerCase().includes('already')) return 'joined';
+    if (e.code && UNCONFIRMED_CODES.has(e.code)) return 'unconfirmed';
     throw new WifiJoinError(e.message ?? String(err), e.code ?? null);
   }
 }
@@ -95,9 +127,17 @@ export async function leaveWifi(ssid: string): Promise<void> {
   }
 }
 
+/**
+ * 1.2 s and not 3 s (2026-09-18). This is only asked to avoid a redundant prompt, and iOS's own
+ * `connectToProtectedSSIDOnce` starts by making the very same check before applying anything, so a
+ * timeout here costs the wait and nothing else. Without location permission the system never
+ * answers, which turned those three seconds into a tax paid on every single connection.
+ */
+const SSID_READ_MS = 1_200;
+
 export async function currentSsid(): Promise<string | null> {
   try {
-    return await withTimeout(nativeModule().getCurrentWifiSSID(), 3_000, () => null);
+    return await withTimeout(nativeModule().getCurrentWifiSSID(), SSID_READ_MS, () => null);
   } catch {
     return null;
   }
