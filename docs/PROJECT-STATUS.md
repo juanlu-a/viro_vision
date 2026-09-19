@@ -33,7 +33,7 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 
 ```
 app/        React Native (Expo) app        ← main work so far
-hardware/   Pi 3 B+ prestada (la Zero 2 W rompió el CSI) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
+hardware/   Raspberry Pi Zero 2 W (de nuevo la placa en uso desde 2026-09-19; sin Ethernet) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
 ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer, rama feat/bus-banner-pipeline, PR #2)
 docs/       thesis deliverables, ADRs, this file
 docs/tesis/ capítulos del informe formal (3 a 8, 11 y 12); el documento armado vive en el Drive
@@ -232,6 +232,20 @@ probar la app sin placa. Sin verificar en la placa todavía. **ML**: not started
 > Nota (2026-09-16): este párrafo es del 2026-09-02 y quedó viejo. Hoy el daemon está verificado en
 > la placa y el pilar de ML existe, fuera de `ml/`: vive en `bus-banner-recognizer`, con detector
 > entrenado, dataset de evaluación de 117 imágenes y 12 corridas guardadas. Ver `docs/tesis/07-desarrollo.md` §7.4.
+
+**La placa en uso volvió a ser la Zero 2 W (2026-09-19).** Los diez días de Pi 3 B+ prestada
+(2026-09-09 → 2026-09-18, por el CSI roto de la Zero) terminaron. La unidad que está en uso es otra
+—otra dirección BLE— y **su cámara responde**, así que el CSI de ésta está sano. Tres consecuencias
+que valen más que el dato:
+
+- **Se cae el acceso por cable.** La Zero 2 W no tiene RJ45. Entrar es ahora: `tools/ap.py` por BLE
+  (baja el AP, la placa vuelve a la WiFi conocida, ~5 s, no persiste al reiniciar) o `SIN-AP` en la
+  microSD (persistente). Detalle y trampas en la skill, `references/placa-acceso.md`.
+- **Vuelven a valer las mediciones BLE del ADR 0003**, que son de esta misma radio (BCM43438, BT 4.2)
+  y que la 3 B+ no podía reproducir. El throughput BLE hacia un iPhone, que figuraba «sin medir»,
+  vuelve a ser medible en el hardware que decide.
+- **La Zero es sólo 2,4 GHz** (la 3 B+ era dual band): una red de 5 GHz no la ve, y el AP de la placa
+  sigue siendo 2,4 GHz de todas formas.
 
 ## Verificado en dispositivo (2026-09-02)
 

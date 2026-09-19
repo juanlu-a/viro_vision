@@ -17,6 +17,13 @@ diseño (USB libre; el Spike 4 de libedgetpu deja de existir). Riesgo abierto: i
 carteles chicos, sin medir. Wi-Fi enables the alternative "offload to phone" architecture, so both
 architectures can be compared on one board.
 
+**La unidad que está sobre la mesa (2026-09-19)**: una Zero 2 W, otra vez, después de diez días con
+una **Pi 3 B+ prestada** (2026-09-09 → 2026-09-18, por el CSI roto de la Zero anterior). Es otra
+unidad —otra dirección BLE— y su cámara responde. Lo que hay que tener presente al trabajar:
+**no tiene puerto Ethernet** (el acceso por cable no existe; ver `placa-acceso.md`), es **sólo
+2,4 GHz**, y su radio Bluetooth es el **BCM43438 (BT 4.2, sin Data Length Extension)** — el mismo
+sobre el que se midió el ADR 0003, así que esas mediciones vuelven a valer.
+
 ### Camera: Raspberry Pi AI Camera (Sony IMX500) — **la que se compró** (dos unidades; en la placa desde 2026-09-05)
 12 MP, acelerador de inferencia en el sensor, CSI. Los docs viejos decían Camera Module 3 (IMX708,
 autofocus); la que llegó es la AI Camera, y eso cambió el pilar de ML: la detección corre en el sensor
