@@ -29,18 +29,22 @@ import { announce } from '@/features/audio/announcer';
 import { decideNoticeDelivery, getAudioOutput, type AudioOutput } from '@/features/audio/audioOutput';
 import { NOTICES, type SystemNotice } from '@/features/audio/notices';
 import { playStartEarcon } from '@/services/audio/session';
+import { stopSpeaking } from '@/services/audio/tts';
 
 export interface NoticeDeps {
   /** Whether there is a live BLE link right now. Synchronous: the decision cannot await. */
   isLinked(): boolean;
   /** Plays one pre-recorded clip on the device's speaker. Rejects if the link went away. */
   playNotice(clip: string): Promise<void>;
+  /** Cuts whatever the device's speaker is playing. Called before the phone speaks. */
+  hushDevice(): Promise<void>;
 }
 
 /** No device until something says otherwise, which routes every notice to the phone. */
 const noDevice: NoticeDeps = {
   isLinked: () => false,
   playNotice: () => Promise.reject(new Error('NOTICE_TRANSPORT_NOT_CONFIGURED')),
+  hushDevice: () => Promise.resolve(),
 };
 
 let deps: NoticeDeps = noDevice;
@@ -72,15 +76,25 @@ export async function notify(id: SystemNotice, detail?: string): Promise<AudioOu
   // The whole device path is inside the try, the decision included: `isLinked` is the BLE client
   // reaching into a native module, and a notice that throws instead of falling back to the phone
   // would take down whatever BLE callback called it.
+  // Consultado una sola vez y guardado: lo necesitan la decisión y, más abajo, el silenciado de la
+  // placa. Si `isLinked` explota queda en `false`, que es la respuesta segura — no se le habla a un
+  // enlace que no sabemos si existe.
+  let linked = false;
   try {
+    linked = deps.isLinked();
     const delivery = decideNoticeDelivery({
       output: getAudioOutput(),
       // Asked here and not inside the transport: the decision has to be visible and testable without
       // a radio, which is the whole reason `decideNoticeDelivery` is a pure function.
-      deviceLinked: deps.isLinked(),
+      deviceLinked: linked,
       hasClip: notice.clip !== null,
     });
     if (delivery.target === 'device' && notice.clip) {
+      // Una voz por vez, venga de donde venga. Cada salida ya se interrumpía a sí misma —el teléfono
+      // con `Speech.stop()`, la placa cortando el `aplay` anterior— y ninguna interrumpía a la otra,
+      // así que cambiar el ajuste a mitad de un anuncio dejaba las dos hablando encimadas. Para quien
+      // no ve la pantalla, dos voces simultáneas no son información: son ruido.
+      stopSpeaking();
       await deps.playNotice(notice.clip);
       return 'device';
     }
@@ -89,6 +103,10 @@ export async function notify(id: SystemNotice, detail?: string): Promise<AudioOu
     // say it twice if the write landed after all — the same trade `deliverReading` already makes,
     // and for the same reason: paying twice is much better than leaving the user with nothing.
   }
+
+  // La otra mitad de la misma regla: si habla el teléfono, la placa se calla. Sin `await` y tragando
+  // su error — es mejor arriesgar un solapamiento que demorar el aviso detrás de una escritura BLE.
+  if (linked) void deps.hushDevice().catch(() => {});
 
   // Not wrapped: both halves of this are non-throwing by contract (`announce` resolves on failure,
   // `playStartEarcon` swallows its own errors). Wrapping it too would hide a broken one of those.

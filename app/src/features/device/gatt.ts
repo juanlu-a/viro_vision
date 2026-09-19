@@ -17,7 +17,7 @@ export const GATT = {
   characteristics: {
     /** read · notify · write — uint8: 0 idle, 1 bus, 2 supermarket (ADR 0007). */
     mode: '4380c501-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status' | 'audio' | 'say', ... }`. */
+    /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status' | 'audio' | 'say' | 'hush', ... }`. */
     control: '4380c502-7ca3-4e37-b27d-f60e8d8d73d1',
     /** notify — JSON ≤ 180 bytes: `{ t: 'start' | 'end' | 'mode' | 'read' | 'ap' | 'error' | 'result', ... }`. */
     event: '4380c503-7ca3-4e37-b27d-f60e8d8d73d1',
@@ -98,4 +98,19 @@ export function audioCommand(target: 'phone' | 'device'): string {
  */
 export function noticeCommand(clip: string): string {
   return JSON.stringify({ cmd: 'say', clip });
+}
+
+/**
+ * El comando que calla el parlante de la placa.
+ *
+ * Existe porque cada salida sabía interrumpirse a sí misma y ninguna sabía interrumpir a la otra: el
+ * teléfono llama a `Speech.stop()` antes de hablar, la placa corta el `aplay` anterior antes de
+ * reproducir, y con las dos sonando a la vez —cambiando el ajuste a mitad de un anuncio, por
+ * ejemplo— quedaban dos voces encimadas. Para quien no ve la pantalla, dos voces simultáneas no son
+ * información: son ruido (el mismo motivo que ya está escrito en `hardware/raspi/virovision/audio.py`).
+ *
+ * Sin datos: no hay nada que configurar, es «callate ahora».
+ */
+export function hushCommand(): string {
+  return JSON.stringify({ cmd: 'hush' });
 }

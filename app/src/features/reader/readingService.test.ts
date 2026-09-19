@@ -101,6 +101,7 @@ function deps(over: Partial<Parameters<typeof configureReader>[0]> = {}) {
     sendAudio: () => Promise.resolve(true),
     writeMode: () => Promise.resolve(),
     isDeviceReady: () => true,
+    hushDevice: () => Promise.resolve(),
     ...over,
   };
 }

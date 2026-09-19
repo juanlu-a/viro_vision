@@ -47,7 +47,7 @@ def loop():
     loop_.close()
 
 
-def build(loop, say=None, bus=None):
+def build(loop, say=None, bus=None, hush=None):
     notifications = Notifications()
     core = Core(
         loop,
@@ -57,6 +57,7 @@ def build(loop, say=None, bus=None):
         notifications,
         bus=bus,
         say=say,
+        hush=hush,
     )
     return core, notifications
 
@@ -182,3 +183,37 @@ def test_every_notice_the_app_can_ask_for_is_in_the_set():
     assert all(clip.endswith(".wav") for clip in CLIPS)
     # No separators anywhere: the whole point is that a name never becomes a path.
     assert all("/" not in clip and "\\" not in clip for clip in CLIPS)
+
+
+def test_the_phone_can_silence_the_speaker(loop):
+    """Reportado el 2026-09-18 probando en la placa: con la salida en dispositivo, «Probar audio»
+    sonaba por el parlante; cambiando el ajuste a teléfono y tocando el botón otra vez, el celular
+    arrancaba la misma frase **sin cortar la de la placa**, y quedaban dos voces encimadas.
+
+    Cada salida sabía interrumpirse a sí misma —`Speech.stop()` de un lado, el `aplay` anterior del
+    otro— y ninguna a la otra. Para quien no ve la pantalla, dos voces simultáneas no son
+    información: son ruido, que es el mismo motivo por el que una lectura nueva ya cortaba a la
+    anterior (`audio.py`)."""
+    silencios = []
+    core, notifications = build(loop, hush=lambda: silencios.append("stop"))
+
+    async def scenario():
+        core.write_control(json.dumps({"cmd": "hush"}).encode())
+        await _drain(loop)
+        assert silencios == ["stop"]
+        # Sin evento de error: `hush` es un comando válido, no algo que la placa no entiende.
+        assert [e for e in notifications.events() if e["t"] == "error"] == []
+
+    loop.run_until_complete(scenario())
+
+
+def test_a_board_with_no_speaker_ignores_the_silence_request(loop):
+    """`--no-audio`, o el emulador de la Mac. Callar algo que no suena no es un error."""
+    core, notifications = build(loop, hush=None)
+
+    async def scenario():
+        core.write_control(json.dumps({"cmd": "hush"}).encode())
+        await _drain(loop)
+        assert [e for e in notifications.events() if e["t"] == "error"] == []
+
+    loop.run_until_complete(scenario())

@@ -2692,6 +2692,44 @@ mismo código —`_play_notice` no cambió en este despliegue, sólo se achicó 
 repetirlo costaba otro ciclo de bajar y subir el AP sobre una placa que ya estaba en el estado que el
 usuario quería.
 
+## 2026-09-18 (cont.) — Una voz por vez: las dos salidas hablando encimadas
+
+Reportado probando en la placa, y es de los hallazgos que sólo aparecen usando: con la salida en
+«dispositivo», «Probar audio» arranca por el parlante; cambiando el ajuste a «teléfono» a mitad de la
+frase y tocando el botón de nuevo, el celular empieza la misma frase **sin cortar la de la placa**.
+
+**Cada salida sabía interrumpirse a sí misma y ninguna a la otra.** El teléfono llama a
+`Speech.stop()` antes de hablar, la placa corta su `aplay` anterior antes de reproducir. Las dos
+reglas correctas, y juntas insuficientes. El principio ya estaba escrito en `audio.py` desde el
+primer día —«dos voces a la vez es peor que cualquiera de las dos»— implementado dentro de cada
+salida y no entre las dos.
+
+La placa gana un comando `hush`, y la regla se aplica en los dos puntos de entrega que ya existían
+—`notify` y `deliverReading`— y no en cada llamador: un punto de decisión, no varios que se olvidan
+de a uno. Es la misma lección del 16, cuando el ajuste era «dos call sites que se acordaban de
+consultarlo».
+
+### Lo que salió mal en el camino, que también enseña
+
+Al desplegar, el daemon no arrancaba: `TypeError: ViroVisionService.__init__() got an unexpected
+keyword argument 'hush'`. Había agregado el parámetro al `Core` y a la llamada de `__main__`, y me
+olvidé de pasarlo por `gatt.py`, que está en el medio. **Falló ruidosamente, con traceback** — que es
+exactamente lo contrario del despliegue de la mañana, donde el `tar` de macOS dejó los `.py` en cero
+y el daemon moría en silencio con exit 0. La diferencia entre las dos mañanas es la diferencia entre
+un minuto y una hora.
+
+Y el test de «nunca rechaza» atrapó un bug de la propia implementación antes de que llegara a la
+placa: el chequeo del enlace para el `hush` había quedado **fuera** del `try`, así que un `isLinked`
+que explota tiraba el aviso entero. Se consulta una sola vez y se guarda.
+
+### Verificación
+
+284 tests en la app (3 nuevos: el silenciado en las dos direcciones, y que no se le hable a un enlace
+que no existe) y 88 en la placa (2 nuevos: el comando corta, y una placa sin parlante lo ignora sin
+error). En el hardware: el comando se acepta, no genera errores y la placa sigue reproduciendo
+después del corte. **Que el sonido efectivamente se corte lo tiene que confirmar un oído**, como todo
+lo de audio en este proyecto.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

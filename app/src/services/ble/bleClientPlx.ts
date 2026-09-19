@@ -11,7 +11,7 @@
 import { Platform } from 'react-native';
 import { BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 
-import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, noticeCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
+import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, hushCommand, noticeCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 import { loadLastDeviceId, saveLastDeviceId } from '@/services/storage/lastDevice';
@@ -249,6 +249,25 @@ class BleClientPlx implements BleClient {
     const device = this.device;
     if (!device) throw new BleNotConnectedError();
     const payload = new TextEncoder().encode(noticeCommand(clip));
+    await this.gatt(() =>
+      this.manager.writeCharacteristicWithoutResponseForDevice(
+        device.id,
+        GATT.serviceUuid,
+        GATT.characteristics.control,
+        encodeBase64(payload)
+      )
+    );
+  }
+
+  /**
+   * Calla el parlante de la placa. Sin respuesta y sin esperar: se manda justo antes de que el
+   * teléfono empiece a hablar, y un ack tardío no cambiaría nada — lo que importa es que el `aplay`
+   * de la placa reciba su `terminate` cuanto antes.
+   */
+  async hushDevice(): Promise<void> {
+    const device = this.device;
+    if (!device) throw new BleNotConnectedError();
+    const payload = new TextEncoder().encode(hushCommand());
     await this.gatt(() =>
       this.manager.writeCharacteristicWithoutResponseForDevice(
         device.id,

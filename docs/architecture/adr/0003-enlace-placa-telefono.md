@@ -676,6 +676,29 @@ una cola (`services/ble/serialize.ts`): **el orden en que se piden es el orden e
 aviso es lo menos importante que lleva el enlace y estaba compitiendo en silencio con lo que el
 producto necesita.
 
+## Actualización 2026-09-18 — Una voz por vez, venga del lado que venga
+
+Encontrado probando en la placa. Con la salida en «dispositivo», «Probar audio» empieza a sonar por
+el parlante; cambiando el ajuste a «teléfono» y tocando el botón otra vez, el celular arranca la
+misma frase **sin cortar la de la placa**, y quedan dos voces encimadas.
+
+La causa: **cada salida sabía interrumpirse a sí misma y ninguna sabía interrumpir a la otra.** El
+teléfono llama a `Speech.stop()` antes de hablar; la placa corta su `aplay` anterior antes de
+reproducir. Las dos reglas son correctas y juntas no alcanzan.
+
+No es un detalle estético. Está escrito desde el principio en `audio.py` —*«dos voces a la vez es
+peor que cualquiera de las dos: para alguien que no ve la pantalla, el audio solapado no es
+información»*— sólo que implementado dentro de cada salida y no entre las dos.
+
+**Decisión: quien empieza a hablar, calla al otro.** La placa gana un comando `{"cmd":"hush"}` que
+corta lo que esté sonando; el teléfono lo manda antes de hablar, y llama a `stopSpeaking()` antes de
+mandarle un aviso a la placa. Se aplica en los dos puntos de entrega que ya existían —los avisos de
+sistema y las lecturas— y no en cada llamador, por el mismo motivo de siempre: un punto de decisión,
+no varios que se olvidan de a uno.
+
+El silenciado de la placa va **sin `await`**: es mejor arriesgar un solapamiento de milisegundos que
+demorar un anuncio detrás de una escritura BLE. El del teléfono es local y gratis.
+
 **Lo que queda pendiente**, anotado para no descubrirlo en la calle: con el botón físico, el cambio
 de modo lo anuncia la app, así que viaja placa → app → placa. Funciona (BLE despierta la app), pero
 significa que **sin teléfono conectado un cambio de modo no se anuncia**. La placa podría decirlo

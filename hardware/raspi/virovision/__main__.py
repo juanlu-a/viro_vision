@@ -164,6 +164,7 @@ async def _main(args: argparse.Namespace) -> None:
         # `--no-audio` silences the notices for the same reason it silences a reading: it exists to
         # debug the pipeline without the board talking over you.
         say=None if args.no_audio else say,
+        hush=None if args.no_audio else player.stop,
     )
     await service.register(bus, adapter=adapter)
 
