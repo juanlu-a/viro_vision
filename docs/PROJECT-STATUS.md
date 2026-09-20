@@ -311,3 +311,25 @@ value prop, and exercises the recognition/audio domain already scaffolded.
 1. The `virovision` skill loads automatically for ViroVision work.
 2. Read this file for current state.
 3. First action should likely be consolidating `main` (see the top section).
+
+### Punto de partida al 2026-09-20 (traspaso entre sesiones)
+
+Lo que estaba en vuelo cuando se cerró la sesión del 2026-09-18/19, para que la siguiente no lo
+redescubra:
+
+- **PR #98** (`fix/wifi-join-retry` → `staging`): el join al WiFi de la placa que iOS no confirma ya
+  no se anuncia como fallo. **Compilado y en TestFlight como build `202609191458`** (grupo interno),
+  **sin probar en el teléfono**: la prueba es aceptar el cartel de WiFi una vez y ver que no vuelva
+  a preguntar ni diga «no se pudo conectar». Si pasa, se mergea; si no, el texto exacto del cartel
+  rojo dice dónde mirar (entrada del 2026-09-19 en el log). Quedan ~10 s de espera conocidos y
+  aceptados por ahora.
+- **PR #99** (`docs/placa-zero-2w-sin-ethernet`): sólo documentación, la de este cambio de placa.
+- **La placa** es la Zero 2 W, en modo producto (AP arriba), con el daemon al día con `staging`
+  (byte a byte, con el `hush` del #97). No necesita nada. Para entrar: `tools/ap.py` por BLE.
+- **Telemetría muda desde el 2026-09-10**, sin explicación. Es lo primero que conviene entender
+  antes de diagnosticar nada más en el teléfono.
+- **Ramas viejas con trabajo real sin PR**: `feat/carcasa-modelo-3d` (modelo OpenSCAD v1 y boceto
+  v2, 38 archivos) y `feat/volume-button` (segundo botón de volumen + un «ADR 0010» que hoy choca
+  con el 0010 de modo oscuro que ya está en `staging`; habría que renumerarlo). Ninguna de las dos
+  está en `staging`. Las demás ramas locales o tienen PR mergeado (squash: `git branch --merged`
+  no las ve) o están cerradas como viejas.
