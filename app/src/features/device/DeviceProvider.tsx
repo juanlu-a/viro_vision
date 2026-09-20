@@ -9,9 +9,10 @@
  * What it does on its own:
  * - **Connects over BLE at startup and reconnects** when the link drops (with growing backoff). The
  *   only permission the user sees is the system's Bluetooth one, the first time.
- * - **Joins the device's WiFi** when it turns its access point on (which it does when a mode is
- *   activated), with the credentials that arrive over BLE, and leaves when it turns it off. Zero
- *   configuration.
+ * - **Joins the device's WiFi** with the credentials that arrive over BLE, and only when the phone
+ *   is not already on it: the system's "join this network?" prompt is shown at most once per phone,
+ *   the first time (`services/wifi/join.ts` says why the check is an HTTP probe). Zero configuration,
+ *   and the network is never forgotten on purpose — forgetting it is what brings the prompt back.
  * - **Keeps the mode in sync**: the app writes it to the device and mirrors whatever the device
  *   reports.
  *
@@ -33,7 +34,7 @@ import { encodeBase64 } from '@/services/ble/base64';
 import { downloadDevicePhoto, type DevicePhoto } from '@/services/camera';
 import { record } from '@/services/telemetry';
 import { deviceUrl, type DeviceAddress } from '@/services/wifi/deviceHttp';
-import { WifiUnavailableError, waitForDevice, leaveWifi, currentSsid, joinWifi } from '@/services/wifi/join';
+import { reachDeviceNetwork } from '@/services/wifi/join';
 
 import { MODE_FROM_GATT, GATT_MODE, type DeviceStatus, type WifiCredentials } from './gatt';
 import type { ConnectionState, DeviceInfo } from './types';
@@ -90,7 +91,6 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [deviceMode, setDeviceMode] = useState<DeviceMode | null>(null);
 
   const credentials = useRef<WifiCredentials | null>(null);
-  const joinedTo = useRef<string | null>(null);
   const autoConnect = useRef(true);
   const retry = useRef(0);
   const connecting = useRef(false);
@@ -99,8 +99,10 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   // it goes in a ref instead of being captured directly.
   const connectRef = useRef<() => Promise<void>>(async () => {});
   const networkSyncRun = useRef(0);
-  // The last thing synced, so the check does not restart with every `status` heartbeat.
-  const syncedNetwork = useRef<{ ap: boolean; ip: string | null; ok: boolean }>({ ap: false, ip: null, ok: false });
+  // The last thing synced, so the check does not restart with every `status` heartbeat — nor while
+  // one is still running: a restart would cancel a join that is about to succeed and, worse, ask the
+  // system again, which is a second prompt on top of the first (2026-09-19).
+  const syncedNetwork = useRef<{ ap: boolean; ip: string | null; ok: boolean; running: boolean }>({ ap: false, ip: null, ok: false, running: false });
   // The last `status` recorded, so the table does not fill with identical heartbeats.
   const statusFingerprint = useRef<string | null>(null);
   /**
@@ -119,10 +121,10 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const announcedReadyFor = useRef<string | null>(null);
 
   /**
-   * The network follows the AP: join when the device turns it on, leave when it turns it off, and
-   * check that the device answers before declaring the photo available. It is called from the event
-   * handlers (connection, new status), never from an effect. Every run carries a number: if the
-   * situation changed while it waited, its results are discarded.
+   * The network follows the AP: join when the device has one up, and check that the device answers
+   * before declaring the photo available. It is called from the event handlers (connection, new
+   * status), never from an effect. Every run carries a number: if the situation changed while it
+   * waited, its results are discarded.
    */
   const failNetwork = useCallback((detail: string) => {
     // Cleared here and on every other way out of `ready` below: the guard must suppress a repeated
@@ -158,46 +160,20 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
       }
-      if (apOn && credentials.current && joinedTo.current !== credentials.current.ssid) {
-        setWifi('joining');
-        // If the phone is already on the device's network (iOS stores it as known and joins on its
-        // own after the first time), the system is asked for nothing: asking can show the "allow
-        // connection" prompt, and the user wants zero prompts after the first pairing.
-        if ((await currentSsid()) === credentials.current.ssid) {
-          joinedTo.current = credentials.current.ssid;
-        }
-        if (!current()) return false;
-      }
-      if (apOn && credentials.current && joinedTo.current !== credentials.current.ssid) {
-        try {
-          await joinWifi(credentials.current);
-          joinedTo.current = credentials.current.ssid;
-        } catch (err) {
-          if (!current()) return false;
-          failNetwork(
-            err instanceof WifiUnavailableError
-              ? strings.connect.wifiModuleMissing
-              : `${strings.connect.wifiJoinFailed} ${err instanceof Error ? err.message : String(err)}`
-          );
-          return false;
-        }
-      }
-      if (!apOn && joinedTo.current) {
-        await leaveWifi(joinedTo.current);
-        joinedTo.current = null;
-      }
-      if (!current()) return false;
       setWifi('joining');
-      record('wifi.joining', { detail: { ap: apOn, ip: target.ip, ssid: credentials.current?.ssid ?? null } });
+      record('wifi.joining', { detail: { ap: apOn, ip: target.ip, ssid: apOn ? (credentials.current?.ssid ?? null) : null } });
       const t0 = Date.now();
-      const answers = await waitForDevice(target);
+      // With the AP on, the credentials are the phone's ticket in; without it the device is on the
+      // same network as the phone (development) and there is nothing to join, only to reach.
+      const outcome = await reachDeviceNetwork(target, apOn ? credentials.current : null);
       if (!current()) return false;
-      if (answers) {
+      if (outcome.ok) {
         setWifi('ready');
         // The time until the device answers is what separates "it is slow" from "it does not work":
         // on 2026-09-06 the network never became ready and without this number there was no way to
-        // know where it hung.
-        record('wifi.ready', { ms: Date.now() - t0, detail: { ip: target.ip } });
+        // know where it hung. `via` says whether the user saw a prompt: 'already' is the one the
+        // second connection is supposed to be, every time.
+        record('wifi.ready', { ms: Date.now() - t0, detail: { ip: target.ip, via: outcome.via } });
         // Announced once per network, not once per check (see `announcedReadyFor`). The row above is
         // still recorded every time: a second check reaching "ready" is worth knowing about in the
         // table, it is just not worth saying out loud again.
@@ -207,10 +183,42 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         }
         return true;
       }
-      failNetwork(strings.connect.wifiNoResponse.replace('{ip}', target.ip));
+      failNetwork(
+        outcome.reason === 'unavailable'
+          ? strings.connect.wifiModuleMissing
+          : outcome.reason === 'refused'
+            ? `${strings.connect.wifiJoinFailed} ${outcome.message}`
+            : strings.connect.wifiNoResponse.replace('{ip}', target.ip)
+      );
       return false;
     },
     [failNetwork]
+  );
+
+  /**
+   * Starts a network check only when there is something new to check.
+   *
+   * Both callers go through here — the fresh connection and every `status` heartbeat — so the
+   * rule is written once: sync when the AP or the address changed, or when the last check failed
+   * and none is running. A check already in flight is left alone even by the caller that would
+   * otherwise "own" it (the first heartbeat can land while `connectInternal` is still reading the
+   * credentials): restarting it would cancel a join about to succeed and ask the system for a
+   * second prompt on top of the first.
+   */
+  const ensureNetwork = useCallback(
+    (apOn: boolean, target: DeviceAddress | null) => {
+      const previous = syncedNetwork.current;
+      const changed = previous.ap !== apOn || previous.ip !== (target?.ip ?? null);
+      if (!changed && (previous.ok || previous.running)) return;
+      const synced = { ap: apOn, ip: target?.ip ?? null, ok: false, running: true };
+      syncedNetwork.current = synced;
+      void syncNetwork(apOn, target).then((ok) => {
+        if (syncedNetwork.current !== synced) return; // superseded: its verdict is not ours to keep
+        synced.running = false;
+        synced.ok = ok;
+      });
+    },
+    [syncNetwork]
   );
 
   /**
@@ -222,7 +230,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const startNetworkTransition = useCallback(() => {
     announcedReadyFor.current = null;
     networkSyncRun.current += 1;
-    syncedNetwork.current = { ap: false, ip: null, ok: false };
+    syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     setAddress(null);
     setWifi('joining');
     setWifiDetail(null);
@@ -248,19 +256,11 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         c.device ? { ...c, device: { ...c.device, batteryLevel: status.battery, firmwareVersion: status.version } } : c
       );
       // `status` arrives every 15 s. Restarting the network check on every heartbeat cancelled the
-      // previous one before it finished (joining the WiFi + waiting for the device can take more than
-      // 15 s) and the network never became "ready" (2026-09-06). It only syncs when something changed,
-      // or when it was left in a failed state.
-      const previous = syncedNetwork.current;
-      const changed = previous.ap !== status.ap || previous.ip !== (target?.ip ?? null);
-      if (changed || !previous.ok) {
-        syncedNetwork.current = { ap: status.ap, ip: target?.ip ?? null, ok: false };
-        void syncNetwork(status.ap, target).then((ok) => {
-          if (ok && syncedNetwork.current.ip === (target?.ip ?? null)) syncedNetwork.current.ok = true;
-        });
-      }
+      // previous one before it finished and the network never became "ready" (2026-09-06):
+      // `ensureNetwork` only syncs when something changed, or when it was left in a failed state.
+      ensureNetwork(status.ap, target);
     },
-    [syncNetwork]
+    [ensureNetwork]
   );
 
   const scheduleRetry = useCallback(() => {
@@ -305,8 +305,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       setAddress(device.address);
       setAp(device.ap);
       credentials.current = await client.readWifi().catch(() => null);
-      syncedNetwork.current = { ap: device.ap, ip: device.address?.ip ?? null, ok: false };
-      void syncNetwork(device.ap, device.address);
+      ensureNetwork(device.ap, device.address);
     } catch (err) {
       // The error's TYPE, not just its message: it tells "this build has no Bluetooth" apart from
       // "the device did not show up", which lead to different places.
@@ -323,7 +322,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       connecting.current = false;
     }
-  }, [scheduleRetry, syncNetwork]);
+  }, [scheduleRetry, ensureNetwork]);
 
   useEffect(() => {
     connectRef.current = connectInternal;
@@ -337,6 +336,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         record('ble.lost');
         announcedReadyFor.current = null;
         networkSyncRun.current += 1; // invalidates any network wait in flight
+        // And forgets what was synced: the next connection has to check the network again even if
+        // the device comes back with the very same address, or `wifi` stays 'off' for good.
+        syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
         setConnection({ status: 'error', device: null, message: strings.connection.lost });
         // The counterpart, and the more important of the two: from here the button does nothing and
         // no reading is coming, and without a word the user is left waiting for audio that will
@@ -400,11 +402,10 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timer.current);
       timer.current = null;
     }
-    if (joinedTo.current) {
-      await leaveWifi(joinedTo.current);
-      joinedTo.current = null;
-    }
+    // The device's network is NOT forgotten here: iOS drops a network that goes away on its own,
+    // and forgetting it is what made the next connection ask "join ViroVision?" all over again.
     networkSyncRun.current += 1;
+    syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     announcedReadyFor.current = null;
     await getBleClient().disconnect();
     setConnection(initialConnection);
