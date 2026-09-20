@@ -2816,6 +2816,81 @@ esta radio (BCM43438, BT 4.2, sin Data Length Extension) y que la 3 B+ no podía
 del ADR que decía «no se pueden repetir en la placa que está en uso hoy» quedó enmendado en vez de
 borrado: la 3 B+ puede volver.
 
+## 2026-09-20 — Conectarse era lento y pedía permiso: tres causas, ninguna en el radio
+
+Sesión abierta con un reporte de uso, no con un bug: «la conexión con la placa viene siendo tediosa».
+BLE tarda en conectar; una vez conectado, el WiFi tarda mucho más, suele fallar al primer intento y
+vuelve a pedir permiso para unirse a la red de la placa. Lo que se quiere: una primera conexión
+fluida y, después de ésa, que cerrar y abrir la app conecte solo, sin ningún cartel. Con la Zero 2 W
+de vuelta desde ayer. La rama `fix/wifi-join-retry` (PR #98, cerrado «para rehacerlo de cero») ya
+tenía la mitad del diagnóstico; esta sesión es ese rehacer.
+
+### 1. La placa anunciaba cada 1,28 s
+
+Lo primero fue leer la placa en vez de suponer. `tools/ap.py --status` la mostró en modo producto,
+sana; se le bajó el AP por BLE para entrar por SSH y leer `debugfs`:
+`adv_min_interval` = `adv_max_interval` = **2048**, o sea 1,28 s — el valor por defecto del kernel,
+que nadie había tocado (la unidad fijaba el intervalo de *conexión* y no el de *anuncio*). Un
+teléfono sólo encuentra la placa cuando atrapa un anuncio, y la conexión directa al identificador
+recordado del 2026-09-13 también espera uno: ese intervalo era un piso debajo de todas las conexiones.
+
+Medido desde la Mac (mismo CoreBluetooth que el iPhone), seis búsquedas por intervalo, con el AP
+arriba porque así se usa: con 1,28 s, **11,5 s · 3,1 s · 10,8 s · no apareció en 20 s · 1,6 s · no
+apareció en 20 s**; con 100–152,5 ms, doce búsquedas entre **1,9 y 10,3 s, ninguna fallida**. Los
+valores de la Mac son altos en sí y no bajaron tanto como esperaba; se descartó que fuera la
+coexistencia WiFi/BT de la Zero midiendo con el AP apagado (mismo rango: 1,3–10,6 s), así que es el
+escáner de macOS, que entrega periféricos con pereza. Lo que la Mac mide bien es la cola, y dos de
+seis búsquedas que fallan es exactamente «falla al primer intento». El número del iPhone lo dará
+`ble.connected.ms`. La unidad fija ahora 160–244 (100–152,5 ms; 152,5 está
+en la lista de intervalos para los que Apple afina su escáner) en el mismo `ExecStartPre` de
+`debugfs`. **Desplegado en la placa** por SSH y verificado con `btmon`: el controlador recibe
+`Min advertising interval: 100.000 msec / Max: 152.500 msec`.
+
+De paso, un desvío del repo: la unidad instalada en la placa tenía `EnvironmentFile=-/etc/default/virovision`
+y `$VIROVISION_ARGS` (donde viven `--bus-model` y `--bus-labels`) y la del repo no. Un despliegue
+de la unidad del repo habría borrado el detector en silencio. Ya están iguales.
+
+### 2. Preguntar el SSID era pagar 3 s por una respuesta que nunca llegaba
+
+La app, antes de pedirle al sistema unirse, leía el SSID actual «para no volver a pedir el cartel».
+En iOS leer el SSID exige permiso de ubicación, que la app no pide a propósito: sin él la librería
+no contesta y la app pagaba **3 s de timeout en cada conexión**, para después llamar al join igual.
+Y el join, del lado de la librería, se confirma leyendo el SSID veinte veces cada 0,5 s: mismo
+permiso, así que **no podía confirmar nunca** y a los diez segundos llamaba fallido a un join que
+anduvo (el hallazgo del 2026-09-18). Ésas eran las dos mitades de «tarda mucho y falla al primer
+intento».
+
+La decisión (ADR 0003, act. 2026-09-20): **la única prueba de red que la app acepta es que la placa
+conteste `/health` en su IP**. No necesita permiso, tarda ~50 ms y prueba lo que importa.
+`reachDeviceNetwork` (`services/wifi/join.ts`, puro, con reloj y sondeo inyectables) sondea primero:
+si la placa contesta, la red está lista y al sistema no se le pide nada — el «sin cartel la segunda
+vez». Si no, pide el join **y sigue sondeando en paralelo**: la red se declara lista en cuanto la
+placa contesta, no cuando la librería termina sus diez segundos; de la promesa del join sólo se
+escucha un rechazo real (cancelar, contraseña inválida), que corta la espera al instante. Ocho tests
+fijan la política. `currentSsid` y `waitForDevice` se fueron.
+
+### 3. La app olvidaba la red
+
+`disconnectFromSSID` en la librería es `removeConfigurationForSSID`: al desconectar a mano o al bajar
+el AP, la app **borraba** la red guardada, y la siguiente conexión partía de cero con su cartel. iOS
+muestra ese cartel cada vez que se llama `applyConfiguration` fuera de la red (que la configuración
+exista no lo evita, visto el 2026-09-19), así que la única forma de no verlo es no llamar — y para
+eso la red tiene que seguir guardada. **La red no se olvida nunca**; `leaveWifi` se fue.
+
+### Lo que no se cambió, y por qué
+
+- **No se pide permiso de ubicación.** Habría hecho que la librería confirme en menos de un segundo,
+  pero es un permiso más que explicarle a una persona ciega por un string que ya no necesitamos.
+- **El intervalo de conexión** ya estaba en 7,5–15 ms (la unidad lo fijaba), y la Mac coalesce
+  anuncios, así que el número «real» de descubrimiento desde un iPhone sigue sin medirse: lo dirá
+  `ble.connected.ms` en la tabla cuando la telemetría vuelva.
+- En `DeviceProvider`, los dos disparadores de la comprobación de red (la conexión y cada `status`)
+  pasan por un solo `ensureNetwork`: una comprobación en vuelo no se reinicia ni por el latido ni
+  por la conexión, porque reiniciarla era pedirle al sistema un segundo cartel encima del primero.
+
+**Sin probar en el teléfono.** La prueba está escrita en `docs/PROJECT-STATUS.md` (traspaso): un
+solo cartel la primera vez, ninguno al reabrir, y `wifi.ready` con `via: 'already'` en la tabla.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2825,11 +2900,11 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   están, el código deriva la URL del proxy, y aun así no llega ni un `app.start` desde entonces. Sin
   esto, cualquier defecto en el teléfono se diagnostica a mano y de a una sesión por vez; con esto, el
   del WiFi se habría visto en `wifi.failed` con su `reason` en diez segundos.
-- **Los ~10 s que quedan al unirse al WiFi de la placa** (PR #98 saca los otros 15 y el segundo
-  prompt). Dos caminos, los dos a probar en el teléfono: **sondear la placa en paralelo** al join y
-  declarar la red lista apenas conteste (~1-2 s), o **darle permiso de ubicación a la app**, con lo
-  que el sondeo de la librería confirma en menos de un segundo. El segundo es decisión de producto:
-  es un permiso más que pedirle a una persona ciega.
+- **Probar en el teléfono la conexión rehecha el 2026-09-20** (`fix/device-connect-fast-quiet`):
+  un solo cartel de WiFi la primera vez, ninguno al cerrar y reabrir la app, y en la tabla `events`
+  `wifi.ready` con `via: 'already'` en la segunda. Si dice `joined`, iOS no está volviendo solo a la
+  red guardada (prefiere la de casa, que tiene internet) y ése es el tema siguiente; el permiso de
+  ubicación sigue descartado como atajo.
 - **Actualizar `bus_banner` en la placa**: tiene 0.2.0 con `rel_y=0.12` y el repo va por los márgenes
   del 2026-09-16 más dos commits de crop. Y, más importante que la versión: **un destino que no
   matchea se descarta sin un solo log** (`files_to_play` filtra por `p.exists()`), así que el fallo es

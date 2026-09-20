@@ -314,18 +314,22 @@ value prop, and exercises the recognition/audio domain already scaffolded.
 
 ### Punto de partida al 2026-09-20 (traspaso entre sesiones)
 
-Lo que estaba en vuelo cuando se cerró la sesión del 2026-09-18/19, para que la siguiente no lo
+Lo que estaba en vuelo cuando se cerró la sesión del 2026-09-20, para que la siguiente no lo
 redescubra:
 
-- **PR #98** (`fix/wifi-join-retry` → `staging`): el join al WiFi de la placa que iOS no confirma ya
-  no se anuncia como fallo. **Compilado y en TestFlight como build `202609191458`** (grupo interno),
-  **sin probar en el teléfono**: la prueba es aceptar el cartel de WiFi una vez y ver que no vuelva
-  a preguntar ni diga «no se pudo conectar». Si pasa, se mergea; si no, el texto exacto del cartel
-  rojo dice dónde mirar (entrada del 2026-09-19 en el log). Quedan ~10 s de espera conocidos y
-  aceptados por ahora.
+- **La conexión con la placa se rehízo entera** (rama `fix/device-connect-fast-quiet`, ADR 0003
+  act. 2026-09-20; reemplaza al PR #98, que se cerró sin mergear). Tres cosas: la placa anuncia cada
+  100–152,5 ms en vez de 1,28 s (**ya desplegado en la placa** por SSH, unidad reinstalada y
+  verificada con `btmon`); la app sondea `/health` antes de pedirle al sistema unirse al WiFi, y sólo
+  pide si la placa no contesta; y la red no se olvida nunca. **Sin probar en el teléfono todavía**:
+  la prueba es (1) primera conexión: un solo cartel de WiFi y «red lista» en ~2 s después de
+  aceptarlo, sin «no se pudo conectar»; (2) cerrar la app, abrirla: conectado y red lista **sin
+  ningún cartel**; (3) en la tabla `events`, `wifi.ready` con `via: 'already'` en (2). Si en (2)
+  aparece `joined`, iOS no está volviendo solo a la red guardada y es el tema siguiente.
 - **PR #99** (`docs/placa-zero-2w-sin-ethernet`): sólo documentación, la de este cambio de placa.
 - **La placa** es la Zero 2 W, en modo producto (AP arriba), con el daemon al día con `staging`
-  (byte a byte, con el `hush` del #97). No necesita nada. Para entrar: `tools/ap.py` por BLE.
+  (byte a byte, con el `hush` del #97) y la unidad systemd de esta rama (intervalo de anuncio).
+  Para entrar: `tools/ap.py` por BLE.
 - **Telemetría muda desde el 2026-09-10**, sin explicación. Es lo primero que conviene entender
   antes de diagnosticar nada más en el teléfono.
 - **Ramas viejas con trabajo real sin PR**: `feat/carcasa-modelo-3d` (modelo OpenSCAD v1 y boceto

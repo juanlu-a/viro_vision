@@ -527,6 +527,27 @@ journalctl -u virovision -f | grep -E 'central|bonding|advertising'
 # NOT advertising and no central connected: no phone can find this board   <-- ⚠️ la falla es de la placa
 ```
 
+### Anuncia cada 100–152,5 ms, no cada 1,28 s
+
+Desde el 2026-09-20 (ADR 0003, actualización). El kernel anuncia por defecto cada **1,28 s**
+(`adv_min_interval` = 2048 × 0,625 ms, leído en esta placa) y nadie lo había tocado. El teléfono sólo
+encuentra la placa —y sólo completa la conexión directa al identificador recordado— cuando atrapa un
+anuncio, así que ese intervalo era un piso debajo de todas las conexiones. Medido desde la Mac con el
+AP arriba: con 1,28 s, dos de seis búsquedas no la veían en 20 s; con 100–152,5 ms, cero de doce (los
+tiempos absolutos de la Mac son ruido —macOS escanea con pereza—; el número del iPhone lo da
+`ble.connected.ms` en la telemetría).
+`virovision.service` lo fija por `debugfs` en el mismo `ExecStartPre` que ya fijaba el intervalo de
+conexión. Para verificar que el controlador lo recibió:
+
+```sh
+sudo cat /sys/kernel/debug/bluetooth/hci0/adv_min_interval /sys/kernel/debug/bluetooth/hci0/adv_max_interval   # 160 y 244
+sudo btmon | grep -A2 'LE Set Advertising Parameters'   # y reiniciar el servicio en otra terminal
+```
+
+Si cambiás la unidad, en la placa se reinstala a mano: `sed "s|__INSTALL_DIR__|/home/virovision/virovision|g"
+virovision.service`, `sudo install` a `/etc/systemd/system/`, `daemon-reload`, `restart`. `setup.sh`
+sólo lo hace en la instalación inicial.
+
 ## Problemas conocidos
 
 - `BlueZ no está disponible en D-Bus`: `sudo systemctl start bluetooth` y revisar `rfkill list`.
