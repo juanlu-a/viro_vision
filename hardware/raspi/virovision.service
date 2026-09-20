@@ -13,10 +13,22 @@ WorkingDirectory=__INSTALL_DIR__
 # carries a few notifications, so the interval IS the throughput. iOS negotiates it towards 15 ms.
 # The "-" makes a missing debugfs not prevent startup.
 ExecStartPre=-/bin/sh -c 'echo 6 > /sys/kernel/debug/bluetooth/hci0/conn_min_interval; echo 12 > /sys/kernel/debug/bluetooth/hci0/conn_max_interval'
+# Advertise every 100-152.5 ms instead of the kernel's default 1.28 s (0x0800, read off this very
+# board on 2026-09-20). The phone only finds the board — and only completes a direct connect to a
+# remembered one — when it catches an advertisement, so the interval is a floor under EVERY
+# connection: at 1.28 s the app spent several seconds "searching" a board that was sitting next to
+# it. 152.5 ms is on Apple's list of intervals its scanner is tuned for (Accessory Design
+# Guidelines); 100 ms is the floor so the pair still brackets it if the controller rounds. Units of
+# 0.625 ms: 160 = 100 ms, 244 = 152.5 ms. The radio cost is noise next to the Pi itself.
+ExecStartPre=-/bin/sh -c 'echo 160 > /sys/kernel/debug/bluetooth/hci0/adv_min_interval; echo 244 > /sys/kernel/debug/bluetooth/hci0/adv_max_interval'
 # Unbuffered: the errors bluez-peripheral prints with print() reach the journal instantly and not
 # when the process dies (they were lost this way on 2026-09-05).
 Environment=PYTHONUNBUFFERED=1
-ExecStart=__INSTALL_DIR__/.venv/bin/python -m virovision
+# The daemon's flags (detector, labels) live on the board in /etc/default/virovision, read by this
+# unit AND by the drop-in `modo-red.sh` rewrites on every boot (see the README): the board in use
+# already ran this way, and a unit without the line silently dropped the flags on the next deploy.
+EnvironmentFile=-/etc/default/virovision
+ExecStart=__INSTALL_DIR__/.venv/bin/python -m virovision $VIROVISION_ARGS
 Restart=always
 RestartSec=2
 # root: BlueZ only accepts registering GATT applications and advertisements from the system bus, and
