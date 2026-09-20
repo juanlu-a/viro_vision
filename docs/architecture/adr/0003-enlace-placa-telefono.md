@@ -237,8 +237,15 @@ El caveat de D-Bus resultó real pero de otra forma: sin pausa, dbus-next **pier
 pausa de 4 ms no pierde ninguno y no es el cuello. Como referencia, el mismo archivo por HTTP sobre la
 misma radio WiFi baja en 46 ms. Detalle en `docs/mediciones/2026-09-04-ble-throughput.md`.
 
-> ⚠️ **Estas mediciones son de la Zero 2 W, y no se pueden repetir en la placa que está en uso hoy.**
-> Desde el 2026-09-09 se está trabajando con una **Raspberry Pi 3 Model B+ prestada** (se rompió el
+> ✅ **Actualización 2026-09-19: la placa en uso volvió a ser la Zero 2 W**, así que estas mediciones
+> vuelven a ser del hardware que está sobre la mesa y el aviso de abajo deja de aplicar. La unidad es
+> otra (otra dirección BLE) pero el SoC y la radio son los mismos: **BCM43438, BT 4.2, sin Data Length
+> Extension**, que es lo que decide este ADR. Lo que queda abierto —el throughput BLE hacia un iPhone,
+> «sin medir» en la tabla de §3— vuelve a ser medible donde corresponde.
+>
+> ⚠️ **Estas mediciones son de la Zero 2 W, y no se pueden repetir en la placa que estuvo en uso entre
+> el 2026-09-09 y el 2026-09-18.**
+> En esos diez días se trabajó con una **Raspberry Pi 3 Model B+ prestada** (se rompió el
 > conector CSI de 22 pines de la Zero 2 W), y su radio es otra: **Cypress CYW43455, HCI 5.0** contra
 > el **BCM43438 (BT 4.2)** de la Zero. La ausencia de Data Length Extension en el BCM43438 es *toda*
 > la razón del techo de 11,8 KB/s que mandó al plan B, y la 3 B+ no la tiene. **Un número mejor

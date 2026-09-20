@@ -33,7 +33,7 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 
 ```
 app/        React Native (Expo) app        ← main work so far
-hardware/   Pi 3 B+ prestada (la Zero 2 W rompió el CSI) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
+hardware/   Raspberry Pi Zero 2 W (de nuevo la placa en uso desde 2026-09-19; sin Ethernet) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
 ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer, rama feat/bus-banner-pipeline, PR #2)
 docs/       thesis deliverables, ADRs, this file
 docs/tesis/ capítulos del informe formal (3 a 8, 11 y 12); el documento armado vive en el Drive
@@ -233,6 +233,20 @@ probar la app sin placa. Sin verificar en la placa todavía. **ML**: not started
 > la placa y el pilar de ML existe, fuera de `ml/`: vive en `bus-banner-recognizer`, con detector
 > entrenado, dataset de evaluación de 117 imágenes y 12 corridas guardadas. Ver `docs/tesis/07-desarrollo.md` §7.4.
 
+**La placa en uso volvió a ser la Zero 2 W (2026-09-19).** Los diez días de Pi 3 B+ prestada
+(2026-09-09 → 2026-09-18, por el CSI roto de la Zero) terminaron. La unidad que está en uso es otra
+—otra dirección BLE— y **su cámara responde**, así que el CSI de ésta está sano. Tres consecuencias
+que valen más que el dato:
+
+- **Se cae el acceso por cable.** La Zero 2 W no tiene RJ45. Entrar es ahora: `tools/ap.py` por BLE
+  (baja el AP, la placa vuelve a la WiFi conocida, ~5 s, no persiste al reiniciar) o `SIN-AP` en la
+  microSD (persistente). Detalle y trampas en la skill, `references/placa-acceso.md`.
+- **Vuelven a valer las mediciones BLE del ADR 0003**, que son de esta misma radio (BCM43438, BT 4.2)
+  y que la 3 B+ no podía reproducir. El throughput BLE hacia un iPhone, que figuraba «sin medir»,
+  vuelve a ser medible en el hardware que decide.
+- **La Zero es sólo 2,4 GHz** (la 3 B+ era dual band): una red de 5 GHz no la ve, y el AP de la placa
+  sigue siendo 2,4 GHz de todas formas.
+
 ## Verificado en dispositivo (2026-09-02)
 
 Build `202609021823` en el grupo interno de TestFlight: **el primero que sale sin ninguna clave de
@@ -297,3 +311,25 @@ value prop, and exercises the recognition/audio domain already scaffolded.
 1. The `virovision` skill loads automatically for ViroVision work.
 2. Read this file for current state.
 3. First action should likely be consolidating `main` (see the top section).
+
+### Punto de partida al 2026-09-20 (traspaso entre sesiones)
+
+Lo que estaba en vuelo cuando se cerró la sesión del 2026-09-18/19, para que la siguiente no lo
+redescubra:
+
+- **PR #98** (`fix/wifi-join-retry` → `staging`): el join al WiFi de la placa que iOS no confirma ya
+  no se anuncia como fallo. **Compilado y en TestFlight como build `202609191458`** (grupo interno),
+  **sin probar en el teléfono**: la prueba es aceptar el cartel de WiFi una vez y ver que no vuelva
+  a preguntar ni diga «no se pudo conectar». Si pasa, se mergea; si no, el texto exacto del cartel
+  rojo dice dónde mirar (entrada del 2026-09-19 en el log). Quedan ~10 s de espera conocidos y
+  aceptados por ahora.
+- **PR #99** (`docs/placa-zero-2w-sin-ethernet`): sólo documentación, la de este cambio de placa.
+- **La placa** es la Zero 2 W, en modo producto (AP arriba), con el daemon al día con `staging`
+  (byte a byte, con el `hush` del #97). No necesita nada. Para entrar: `tools/ap.py` por BLE.
+- **Telemetría muda desde el 2026-09-10**, sin explicación. Es lo primero que conviene entender
+  antes de diagnosticar nada más en el teléfono.
+- **Ramas viejas con trabajo real sin PR**: `feat/carcasa-modelo-3d` (modelo OpenSCAD v1 y boceto
+  v2, 38 archivos) y `feat/volume-button` (segundo botón de volumen + un «ADR 0010» que hoy choca
+  con el 0010 de modo oscuro que ya está en `staging`; habría que renumerarlo). Ninguna de las dos
+  está en `staging`. Las demás ramas locales o tienen PR mergeado (squash: `git branch --merged`
+  no las ve) o están cerradas como viejas.

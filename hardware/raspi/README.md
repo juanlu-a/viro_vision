@@ -91,10 +91,15 @@ computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a pro
 > cuando detecta que la nueva no tiene salida: la conexión no se sostiene, y una copia de archivos
 > cortada por la mitad deja el daemon roto. Los dos caminos buenos, en orden:
 >
-> 1. **Cable Ethernet a la placa.** Esta Pi 3 B+ tiene RJ45 (la Zero 2 W no): queda en la red de
->    casa, se la alcanza sin tocarle el WiFi a nadie y el AP sigue arriba para el teléfono.
+> 1. **Bajarle el AP por BLE**, con la app del teléfono cerrada: `tools/ap.py` sin flags. En ~5 s la
+>    placa vuelve sola a la WiFi conocida y hay SSH, sin sacar la tarjeta ni apagar nada. Dura hasta
+>    el próximo reinicio, que es justo lo que se quiere para un despliegue y no para dejarla así.
 > 2. **Pasarla a modo desarrollo desde la tarjeta**: crear `/Volumes/bootfs/SIN-AP` desde cualquier
->    computadora y arrancar. Es lo que se hizo el 2026-09-10.
+>    computadora y arrancar. Es persistente, y es lo que se hizo el 2026-09-10.
+> 3. **Cable Ethernet a la placa** — sólo si la placa lo tiene. La Pi 3 B+ prestada traía RJ45; **la
+>    Zero 2 W, que es la que está en uso desde el 2026-09-19, no**. Cuando aplica es el camino más
+>    cómodo: la placa queda en la red de casa, se la alcanza sin tocarle el WiFi a nadie y el AP sigue
+>    arriba para el teléfono.
 
 **El primer arranque.** Un `firstrun.sh` lanzado una sola vez desde `systemd.run=` en `cmdline.txt`
 (target mínimo, sin red) instala ese servicio, lo aplica para ese arranque y **se saca del
