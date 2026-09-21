@@ -321,11 +321,14 @@ redescubra:
   act. 2026-09-20; reemplaza al PR #98, que se cerró sin mergear). Tres cosas: la placa anuncia cada
   100–152,5 ms en vez de 1,28 s (**ya desplegado en la placa** por SSH, unidad reinstalada y
   verificada con `btmon`); la app sondea `/health` antes de pedirle al sistema unirse al WiFi, y sólo
-  pide si la placa no contesta; y la red no se olvida nunca. **Sin probar en el teléfono todavía**:
-  la prueba es (1) primera conexión: un solo cartel de WiFi y «red lista» en ~2 s después de
-  aceptarlo, sin «no se pudo conectar»; (2) cerrar la app, abrirla: conectado y red lista **sin
-  ningún cartel**; (3) en la tabla `events`, `wifi.ready` con `via: 'already'` en (2). Si en (2)
-  aparece `joined`, iOS no está volviendo solo a la red guardada y es el tema siguiente.
+  pide si la placa no contesta; y la red no se olvida nunca. **Probado en el teléfono el 2026-09-21**
+  (build `202609202230`, TestFlight interno desde la rama): BLE y WiFi «rapidísimo», un solo cartel,
+  sin «no se pudo conectar». **Pero al reabrir la app a la mañana, en casa, el cartel volvió**: el
+  teléfono estaba en la WiFi de casa (con internet) e iOS la prefiere sobre la de la placa (local),
+  así que la placa no contesta y hay que pedir el join. Es el escenario previsto en el ADR. Queda
+  por probar (a) en la calle, sin red conocida, donde iOS debería unirse solo; y decidir (b) si la
+  placa se une a la WiFi de casa cuando la ve y levanta el AP sólo sin red conocida — cero carteles
+  en casa y SSH sin bajar el AP.
 - **PR #99** (`docs/placa-zero-2w-sin-ethernet`): sólo documentación, la de este cambio de placa.
 - **La placa** es la Zero 2 W, en modo producto (AP arriba), con el daemon al día con `staging`
   (byte a byte, con el `hush` del #97) y la unidad systemd de esta rama (intervalo de anuncio).

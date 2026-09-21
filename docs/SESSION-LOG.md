@@ -2900,11 +2900,15 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   están, el código deriva la URL del proxy, y aun así no llega ni un `app.start` desde entonces. Sin
   esto, cualquier defecto en el teléfono se diagnostica a mano y de a una sesión por vez; con esto, el
   del WiFi se habría visto en `wifi.failed` con su `reason` en diez segundos.
-- **Probar en el teléfono la conexión rehecha el 2026-09-20** (`fix/device-connect-fast-quiet`):
-  un solo cartel de WiFi la primera vez, ninguno al cerrar y reabrir la app, y en la tabla `events`
-  `wifi.ready` con `via: 'already'` en la segunda. Si dice `joined`, iOS no está volviendo solo a la
-  red guardada (prefiere la de casa, que tiene internet) y ése es el tema siguiente; el permiso de
-  ubicación sigue descartado como atajo.
+- **El cartel de WiFi en casa** (probado el 2026-09-21 con el build `202609202230` de
+  `fix/device-connect-fast-quiet`: BLE y WiFi rápidos, un solo cartel, sin falso «no se pudo
+  conectar» — pero al reabrir la app a la mañana en casa el cartel volvió). Causa: el teléfono estaba
+  en la WiFi de casa, con internet, e iOS la prefiere sobre la de la placa, que es local; la placa no
+  contesta `/health` y la app tiene que pedir el join, que siempre muestra el cartel. Dos cosas: probar
+  en la calle, sin red conocida (iOS debería unirse solo; en casa se simula con *Conexión automática
+  OFF* en la red propia), y decidir si **la placa se une a la WiFi de casa cuando la ve y levanta el AP
+  sólo sin red conocida** — cero carteles en casa, SSH sin bajar el AP, y la app ya sabe seguir un
+  cambio de red (`ap` event). El permiso de ubicación sigue descartado: no evita el cartel.
 - **Actualizar `bus_banner` en la placa**: tiene 0.2.0 con `rel_y=0.12` y el repo va por los márgenes
   del 2026-09-16 más dos commits de crop. Y, más importante que la versión: **un destino que no
   matchea se descarta sin un solo log** (`files_to_play` filtra por `p.exists()`), así que el fallo es
