@@ -314,18 +314,25 @@ value prop, and exercises the recognition/audio domain already scaffolded.
 
 ### Punto de partida al 2026-09-20 (traspaso entre sesiones)
 
-Lo que estaba en vuelo cuando se cerró la sesión del 2026-09-18/19, para que la siguiente no lo
+Lo que estaba en vuelo cuando se cerró la sesión del 2026-09-20, para que la siguiente no lo
 redescubra:
 
-- **PR #98** (`fix/wifi-join-retry` → `staging`): el join al WiFi de la placa que iOS no confirma ya
-  no se anuncia como fallo. **Compilado y en TestFlight como build `202609191458`** (grupo interno),
-  **sin probar en el teléfono**: la prueba es aceptar el cartel de WiFi una vez y ver que no vuelva
-  a preguntar ni diga «no se pudo conectar». Si pasa, se mergea; si no, el texto exacto del cartel
-  rojo dice dónde mirar (entrada del 2026-09-19 en el log). Quedan ~10 s de espera conocidos y
-  aceptados por ahora.
+- **La conexión con la placa se rehízo entera** (rama `fix/device-connect-fast-quiet`, ADR 0003
+  act. 2026-09-20; reemplaza al PR #98, que se cerró sin mergear). Tres cosas: la placa anuncia cada
+  100–152,5 ms en vez de 1,28 s (**ya desplegado en la placa** por SSH, unidad reinstalada y
+  verificada con `btmon`); la app sondea `/health` antes de pedirle al sistema unirse al WiFi, y sólo
+  pide si la placa no contesta; y la red no se olvida nunca. **Probado en el teléfono el 2026-09-21**
+  (build `202609202230`, TestFlight interno desde la rama): BLE y WiFi «rapidísimo», un solo cartel,
+  sin «no se pudo conectar». **Pero al reabrir la app a la mañana, en casa, el cartel volvió**: el
+  teléfono estaba en la WiFi de casa (con internet) e iOS la prefiere sobre la de la placa (local),
+  así que la placa no contesta y hay que pedir el join. Es el escenario previsto en el ADR. Queda
+  por probar (a) en la calle, sin red conocida, donde iOS debería unirse solo; y decidir (b) si la
+  placa se une a la WiFi de casa cuando la ve y levanta el AP sólo sin red conocida — cero carteles
+  en casa y SSH sin bajar el AP.
 - **PR #99** (`docs/placa-zero-2w-sin-ethernet`): sólo documentación, la de este cambio de placa.
 - **La placa** es la Zero 2 W, en modo producto (AP arriba), con el daemon al día con `staging`
-  (byte a byte, con el `hush` del #97). No necesita nada. Para entrar: `tools/ap.py` por BLE.
+  (byte a byte, con el `hush` del #97) y la unidad systemd de esta rama (intervalo de anuncio).
+  Para entrar: `tools/ap.py` por BLE.
 - **Telemetría muda desde el 2026-09-10**, sin explicación. Es lo primero que conviene entender
   antes de diagnosticar nada más en el teléfono.
 - **Ramas viejas con trabajo real sin PR**: `feat/carcasa-modelo-3d` (modelo OpenSCAD v1 y boceto

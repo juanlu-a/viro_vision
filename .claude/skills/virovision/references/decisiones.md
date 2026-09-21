@@ -27,7 +27,7 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste) y 2026-09-16 (el ajuste vale para TODO lo que suena)**
+### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena) y 2026-09-20 (conectarse rápido y sin volver a pedir permiso)**
 
 Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
 dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
@@ -100,6 +100,19 @@ paso: **«conectado» no se anunciaba por voz en ningún lado** (sólo texto en 
 `audio_target` vivía sólo en el `BusWatcher`, así que una placa sin modo ómnibus tiraba la elección
 del usuario. Pendiente anotado: con el botón físico el anuncio de modo viaja placa → app → placa, así
 que **sin teléfono conectado un cambio de modo no se anuncia**.
+
+**Qué cambió el 2026-09-20 — conectarse era lento y pedía permiso; tres causas, ninguna en el radio**:
+(1) la placa anunciaba con el intervalo por defecto del kernel, **1,28 s**; medido desde la Mac, dos
+de seis búsquedas no la veían en 20 s. `virovision.service` fija **100–152,5 ms** por `debugfs`,
+como ya hacía con el intervalo de conexión. (2) La comprobación «¿ya estoy unido?» leía el SSID, que
+en iOS exige permiso de ubicación (la app no lo pide a propósito): 3 s de timeout en cada conexión y
+después preguntaba igual; y la librería confirma el join leyendo el SSID, así que llamaba fallido a un
+join que anduvo. **La única prueba de red es que la placa conteste `/health`**: se sondea primero
+(si contesta, al sistema no se le pide nada) y, si no, se pide el join **sondeando en paralelo**; la
+red está lista cuando contesta la placa, no cuando la librería termina. (3) La app **borraba** la
+configuración de la red al desconectar; olvidarla es lo que trae el cartel de vuelta. La red no se
+olvida nunca. `wifi.ready` lleva `via: 'already' | 'joined'`: después de la primera conexión tiene
+que decir `already` siempre.
 
 ### ADR 0004 — Runtime de inferencia on-device · **Proposed — actualizado 2026-08-22: se resuelve por caso de uso**
 
