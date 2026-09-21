@@ -59,6 +59,80 @@ Emit = Callable[[dict], None]
 """Sends an event to the app over BLE (the `event` characteristic)."""
 
 
+class Timeline:
+    """Writes to the journal what tells a slow detector from a slow reader.
+
+    Before this, a field run left three kinds of line - "there is a bus", "read in N ms", "115, Luis
+    Braille" - and no way to say where the seconds went between the bus entering the frame and the
+    line being spoken (2026-09-21: "sometimes it takes long to even notice the bus, sometimes it
+    reads half the sign"). Now every track gets a birth line, a status line per second while it is
+    unread, one line per read attempt, and a closing line. Everything is relative to the moment the
+    sensor first reported that bus, which is the only clock the user cares about.
+    """
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic, status_every_s: float = 1.0) -> None:
+        self._clock = clock
+        self._every = status_every_s
+        self._born: dict[int, float] = {}
+        self._last_status: dict[int, float] = {}
+        self._gone: set[int] = set()
+
+    def age(self, track_id: int) -> float:
+        born = self._born.get(track_id)
+        return self._clock() - born if born is not None else 0.0
+
+    def frame(self, tracks: list, detections: list) -> None:
+        """Called once per frame with the tracker's live tracks and the sensor's detections."""
+        now = self._clock()
+        sign_px = max((d.box.height for d in detections if d.label == "bus_sign"), default=0.0)
+        for track in tracks:
+            if track.id not in self._born:
+                self._born[track.id] = now
+                self._last_status[track.id] = now
+                log.info(
+                    "bus: track %d appeared: bus %d px high, sign %d px, conf %.2f",
+                    track.id, track.box.height, sign_px, track.conf,
+                )
+            elif track.id in self._gone:
+                # The tracker recognised a bus it had lost: same id, same announcements. Its clock
+                # keeps running from the first sighting, which is when the user could have been told.
+                self._gone.discard(track.id)
+                log.info("bus: track %d is back at %.1f s: bus %d px, sign %d px", track.id, now - self._born[track.id], track.box.height, sign_px)
+            elif not track.announced_reading and now - self._last_status[track.id] >= self._every:
+                self._last_status[track.id] = now
+                log.info(
+                    "bus: track %d at %.1f s: bus %d px, sign %d px, %d reads",
+                    track.id, now - self._born[track.id], track.box.height, sign_px, track.read_attempts,
+                )
+
+    def read_queued(self, track_id: int, attempt: int, banner_box, bus_box) -> None:
+        crop = banner_box if banner_box is not None else bus_box
+        what = "sign" if banner_box is not None else "top strip of a bus"
+        log.info(
+            "bus: track %d read #%d queued at %.1f s: %s %dx%d px",
+            track_id, attempt, self.age(track_id), what, crop.height, crop.width,
+        )
+
+    def read_done(self, track_id: int, reading, ocr_ms: int) -> None:
+        log.info(
+            "bus: track %d read in %d ms at %.1f s: %s",
+            track_id, ocr_ms, self.age(track_id), reading.raw if reading else "nothing",
+        )
+
+    def decided(self, event) -> None:
+        log.info(
+            "bus: track %d decided at %.1f s after %d reads: %s",
+            event.track, self.age(event.track), event.attempts, event.phrase(),
+        )
+
+    def lost(self, event, announced: bool) -> None:
+        log.info(
+            "bus: track %d gone at %.1f s, %s",
+            event.track, self.age(event.track), "line announced" if announced else "line never read",
+        )
+        self._gone.add(event.track)
+
+
 def is_available() -> bool:
     """Whether the reading half is installed at all. Checked before promising bus mode."""
     try:
@@ -101,6 +175,7 @@ class BusWatcher:
         self._threads: list[threading.Thread] = []
         self._jobs: queue.Queue = queue.Queue()
         self._results: queue.Queue = queue.Queue()
+        self._timeline = Timeline()
         self._last_announcement: list = []
         self._last_line: tuple = ()
         self._last_line_at: float | None = None
@@ -205,7 +280,10 @@ class BusWatcher:
     def _queue_read(self, frame, banner_box, bus_box):
         """The reader the `Watcher` calls. Hands the job to the OCR thread and returns None, which is
         how `async_reads` says "in progress": the camera loop must not wait 0.9 s here."""
-        self._jobs.put((frame, banner_box, bus_box, self._watcher.reading_track))
+        track_id = self._watcher.reading_track
+        attempts = next((t.read_attempts for t in self._watcher.tracker.tracks if t.id == track_id), 0)
+        self._timeline.read_queued(track_id, attempts, banner_box, bus_box)
+        self._jobs.put((frame, banner_box, bus_box, track_id))
         return None
 
     def _read_loop(self) -> None:
@@ -251,7 +329,9 @@ class BusWatcher:
                 request.release()
 
             self._drain_results(frame_number)
-            for event in self._watcher.process(frame, detections, frame_number):
+            events = self._watcher.process(frame, detections, frame_number)
+            self._timeline.frame(self._watcher.tracker.tracks, detections)
+            for event in events:
                 self._handle(event)
             frame_number += 1
 
@@ -261,7 +341,7 @@ class BusWatcher:
                 track_id, reading, ocr_ms = self._results.get_nowait()
             except queue.Empty:
                 return
-            log.info("bus: read in %d ms: %s", ocr_ms, reading.raw if reading else "nothing")
+            self._timeline.read_done(track_id, reading, ocr_ms)
             self._watcher.submit_reading(track_id, reading, frame_number)
 
     def _is_an_echo(self, number: str, destination: str) -> bool:
@@ -294,6 +374,7 @@ class BusWatcher:
                 return
             self._announce_presence()
         elif event.kind == "reading":
+            self._timeline.decided(event)
             if self._is_an_echo(event.number, event.destination):
                 log.info("bus: %s again, still the same bus", event.phrase())
                 return
@@ -302,6 +383,9 @@ class BusWatcher:
             self._last_announcement = self._files_for(event.number, event.destination)
             self._speak(self._last_announcement)
             self._emit(self._result_event(event))
+        elif event.kind == "lost":
+            track = next((t for t in self._watcher.tracker.recent if t.id == event.track), None)
+            self._timeline.lost(event, bool(track and track.announced_reading))
 
     def _announce_presence(self) -> None:
         from bus_banner.announcements import BUS_FILE

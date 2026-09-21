@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from virovision.bus import PRESENCE_SILENCE_S, BusWatcher  # noqa: E402
+from virovision.bus import PRESENCE_SILENCE_S, BusWatcher, Timeline  # noqa: E402
 from virovision.core import EVENT, EVENT_MAX_BYTES, Core  # noqa: E402
 from virovision.modes import Mode  # noqa: E402
 
@@ -216,6 +216,8 @@ def test_the_line_silences_the_presence_that_would_follow_it():
 
     class Event:
         kind = "reading"
+        track = 1
+        attempts = 1
         number = "115"
         destination = "LUIS BRAILLE"
 
@@ -230,3 +232,81 @@ def test_the_line_silences_the_presence_that_would_follow_it():
     watcher._result_event = lambda event: {}  # el evento BLE tiene su propio test
     watcher._handle(Event())
     assert not watcher._presence_is_worth_saying()
+
+
+class Clock:
+    def __init__(self):
+        self.now = 100.0
+
+    def __call__(self):
+        return self.now
+
+
+class Track:
+    def __init__(self, id, height, conf=0.9):
+        self.id = id
+        self.box = type("Box", (), {"height": height, "width": height * 3})()
+        self.conf = conf
+        self.read_attempts = 0
+        self.announced_reading = False
+
+
+class Sign:
+    label = "bus_sign"
+
+    def __init__(self, height):
+        self.box = type("Box", (), {"height": height, "width": height * 4})()
+
+
+class Lost:
+    kind = "lost"
+
+    def __init__(self, track):
+        self.track = track
+
+
+def test_the_timeline_tells_where_the_seconds_went(caplog):
+    """A field run used to leave "there is a bus", "read in N ms" and the line, with nothing in
+    between: no way to tell a detector that sees the bus late from a reader that reads it slowly
+    (2026-09-21). Every step is now stamped with the seconds since the sensor first reported that
+    bus, and a bus the tracker loses and finds again keeps that clock."""
+    clock = Clock()
+    timeline = Timeline(clock=clock, status_every_s=1.0)
+    bus = Track(7, height=120)
+    with caplog.at_level("INFO", logger="virovision.bus"):
+        timeline.frame([bus], [Sign(18)])
+        clock.now += 0.5
+        timeline.frame([bus], [Sign(20)])  # too soon for a status line
+        clock.now += 0.6
+        timeline.frame([bus], [Sign(24)])
+        bus.read_attempts = 1
+        timeline.read_queued(7, 1, Sign(24).box, bus.box)
+        clock.now += 1.0
+        timeline.read_done(7, None, 990)
+        timeline.lost(Lost(7), announced=False)
+        clock.now += 2.0
+        timeline.frame([bus], [Sign(30)])  # the tracker found the same bus again
+    lines = [r.getMessage() for r in caplog.records]
+    assert lines == [
+        "bus: track 7 appeared: bus 120 px high, sign 18 px, conf 0.90",
+        "bus: track 7 at 1.1 s: bus 120 px, sign 24 px, 0 reads",
+        "bus: track 7 read #1 queued at 1.1 s: sign 24x96 px",
+        "bus: track 7 read in 990 ms at 2.1 s: nothing",
+        "bus: track 7 gone at 2.1 s, line never read",
+        "bus: track 7 is back at 4.1 s: bus 120 px, sign 30 px",
+    ]
+
+
+def test_the_timeline_goes_quiet_once_the_line_is_announced(caplog):
+    """The per-second status exists to explain a bus that is NOT being read; after the line has been
+    said it would only fill the journal."""
+    clock = Clock()
+    timeline = Timeline(clock=clock)
+    bus = Track(1, height=90)
+    with caplog.at_level("INFO", logger="virovision.bus"):
+        timeline.frame([bus], [])
+        bus.announced_reading = True
+        for _ in range(5):
+            clock.now += 1.0
+            timeline.frame([bus], [])
+    assert len(caplog.records) == 1
