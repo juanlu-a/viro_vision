@@ -2891,6 +2891,115 @@ eso la red tiene que seguir guardada. **La red no se olvida nunca**; `leaveWifi`
 **Sin probar en el teléfono.** La prueba está escrita en `docs/PROJECT-STATUS.md` (traspaso): un
 solo cartel la primera vez, ninguno al reabrir, y `wifi.ready` con `via: 'already'` en la tabla.
 
+## 2026-09-22 — Por qué el modo ómnibus no leía: la caja del ómnibus vetaba el cartel
+
+Sesión abierta con un reporte de uso, no con un bug: «no me está gustando mucho cómo funciona, y no
+sé si es por cómo está entrenado o por cómo lo corremos». Tres síntomas, ninguno igual al otro: a
+veces lee sólo el número o sólo el destino, a veces tarda mucho en detectar el ómnibus, y a veces
+—con el video del 115— lo dice entero de entrada. Termina con la respuesta medida: **era cómo lo
+corremos**, y quedó leyendo «115, Luis Braille» **1,6 s** después de que el sensor ve el ómnibus, en
+la Zero 2 W.
+
+Dos ramas: `fix/read-the-sign-without-a-bus` en el repo de Magalí Dellapiazza ([PR #4](https://github.com/MagaliDellapiazza02/bus-banner-recognizer/pull/4),
+en cascada sobre el #3 y el #2) y `feat/bus-mode-timeline` acá.
+
+### Primero, poder ver
+
+El journal dejaba tres clases de línea —«hay un ómnibus», «read in N ms», la línea— y ninguna forma de
+decir dónde se fueron los segundos entre que el ómnibus entra al cuadro y la línea se dice. Con eso,
+un detector lento y un lector lento se ven iguales. Ahora cada track deja una línea de nacimiento con
+la altura del ómnibus y la del cartel, una por segundo mientras no se leyó, una por intento de lectura
+con el tamaño del recorte, y una de cierre que dice si llegó a anunciarse; todo fechado desde que el
+sensor vio ese ómnibus por primera vez.
+
+**Sin eso no se resolvía nada de lo que sigue**: las tres corridas del mismo video daban tres
+resultados distintos y el log era el mismo silencio.
+
+### El hallazgo: una caja mala de ómnibus veta un cartel bueno
+
+Con el modelo de dos clases en el sensor, la línea no se leía nunca. El log dijo por qué:
+
+- el sensor reportaba **el cartel del 115 en casi todos los cuadros** (56 a 80 px de alto, confianza
+  hasta 0,80, aspecto 3 a 4,5): perfectamente legible;
+- las únicas cajas `bus` eran **la pantalla entera** donde se reproducía el video (759x1007 px de
+  766x1024, confianza 0,35), parpadeando en cinco tracks para un solo ómnibus;
+- `pick_banner` exige el cartel en la mitad superior de la caja del ómnibus. Con esa caja la mitad
+  superior terminaba en y=383 y el cartel estaba en y≈490, así que **lo descartaba** y mandaba a leer
+  la franja superior del ómnibus —el techo de la pantalla—: vacía, 1 a 2,6 s por lectura en la única
+  cola de OCR, adelante del único recorte bueno.
+- En la tercera corrida no llegó **ninguna** caja `bus`, y como los tracks nacen sólo de cajas `bus`,
+  no se intentó nada en 23 s.
+
+El diseño asumía que la caja del ómnibus era la mitad confiable (COCO, confianza 0,9) y el cartel la
+frágil. **Con este modelo es al revés**, así que ahora el cartel puede sostenerse solo: una caja que
+cubre más del 80 % del cuadro se descarta; un cartel ancho que ninguna caja reclama se lleva una caja
+propia construida a su alrededor; si el ómnibus más grande no muestra cartel se lee el más grande que
+sí lo muestre; y con clase de cartel en el sensor la franja superior no se lee nunca.
+
+Simulado en la Mac con los pesos de dos clases: video2 lee **115, LUIS BRAILLE a 0,1 s**, video1 lee
+**102, GTA DE LOURDES a 0,6 s**, video3 sigue sin leer (20 s de ómnibus sin cartel utilizable).
+
+### Lo que rompí y hubo que deshacer
+
+Para detectar una cámara muda le puse un plazo al `capture_request` (2 s, tres strikes, reiniciar).
+Fue peor que el problema, y lo midió la propia placa:
+
+- **picamera2 convierte cada llamada en un job de una cola, y un plazo vencido no lo cancela**: queda
+  ahí y se come el frame siguiente. Cada timeout dejaba un huérfano más.
+- **El primer frame después de arrancar la cámara tarda 3,7 s** (medido: el firmware del `.rpk` sube
+  al sensor), así que el plazo de 2 s saltaba en cada arranque.
+
+Resultado: la cámara trabada para todo, **incluida la foto de supermercado** — que es el error que el
+usuario reportó desde la app («the device did not answer in 4 s»). Ahora la captura vuelve a esperar
+sin plazo y un **vigilante en su propio hilo** reabre la cámara tras 12 s sin un frame; tiene que ser
+otro hilo porque el de frames, cuando la cámara calla, está bloqueado adentro de `capture_request` y
+no puede notar nada — cerrar el sensor desde afuera es lo que lo destraba.
+
+De paso se midió lo que faltaba saber de la cámara: **quieta no se duerme**. Sesenta segundos sin que
+nadie pida un frame y el siguiente llega en 1 ms.
+
+### Un diagnóstico que inventaba un problema
+
+La línea por cuadro informaba **el cartel más alto de todo el cuadro** contra la caja de cada track,
+así que un cartel de otro ómnibus —que su propio track estaba leyendo perfectamente— aparecía como
+rechazado. Informa sólo el cartel cuyo centro cae dentro de ese ómnibus, y dice cuál de las dos reglas
+lo rechazó, si alguna. Quedó como test: un diagnóstico que inventa un problema es peor que ninguno.
+
+### Medido en la placa (Zero 2 W, video del 115)
+
+| Qué | Cuándo |
+|---|---|
+| El sensor ve el ómnibus | 0 |
+| Primera lectura (932 ms de OCR) | 1,0 s — cruda: `E s LUS TALLE` |
+| Segunda lectura (583 ms) | 1,6 s — cruda: `5 LUS TALLE` |
+| «Ómnibus 115, Luis Braille» | **1,6 s** |
+
+Y el latido: **75 frames cada 5 s, con detecciones en el 95 %**.
+
+**Lo que esto deja a la vista es que el techo está en el reconocedor.** Ninguna de las dos lecturas
+crudas era buena: lo que dijo «115, Luis Braille» fue la reparación contra el catálogo de la STM.
+Funciona porque las líneas son un conjunto finito, pero con una línea que no esté en el catálogo no
+hay red.
+
+### Los repos no se atan al orden de merge
+
+`signs_expected` sólo existe en `bus_banner` desde el PR #4, y el daemon instala ese paquete como
+wheel **sin versión fijada**: una placa con el paquete publicado se habría encontrado con un keyword
+inesperado y el modo ómnibus no habría arrancado. El daemon mira la firma: con el paquete nuevo el
+cartel se sostiene solo, con el viejo el modo funciona como antes y lo dice en el journal.
+
+### Operación
+
+- **El journal sigue sin sobrevivir al reinicio** y hoy costó caro: el log del error de supermercado
+  se perdió porque la placa se apagó antes de leerlo. Es el pendiente del 2026-09-14, y ya mordió.
+- Desplegar por hotspot de teléfono necesita más de 8 s para abrir SSH (la placa contesta pings en
+  20 ms igual): `deploy_pi.sh` acepta `SSH_TIMEOUT`.
+
+### Verificación
+
+94 tests + 2 skipped en `hardware/raspi` y 70 en `bus-banner-recognizer`, todos en verde. En la placa:
+click, vigilancia, línea dicha a 1,6 s, latido con frames, y la foto de supermercado en 35 ms.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -2909,10 +3018,21 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   OFF* en la red propia), y decidir si **la placa se une a la WiFi de casa cuando la ve y levanta el AP
   sólo sin red conocida** — cero carteles en casa, SSH sin bajar el AP, y la app ya sabe seguir un
   cambio de red (`ap` event). El permiso de ubicación sigue descartado: no evita el cartel.
-- **Actualizar `bus_banner` en la placa**: tiene 0.2.0 con `rel_y=0.12` y el repo va por los márgenes
-  del 2026-09-16 más dos commits de crop. Y, más importante que la versión: **un destino que no
-  matchea se descarta sin un solo log** (`files_to_play` filtra por `p.exists()`), así que el fallo es
-  invisible en el journal. Que deje un `log.info` con el crudo y el slug buscado.
+- ~~**Actualizar `bus_banner` en la placa**~~ — hecho el 2026-09-22 (la placa corre la rama del PR #4,
+  márgenes del 16 incluidos). Sigue abierto lo que importaba más: **un destino que no matchea se
+  descarta sin un solo log** (`files_to_play` filtra por `p.exists()`), así que el fallo es invisible
+  en el journal. Que deje un `log.info` con el crudo y el slug buscado.
+- **El reconocedor es el techo del camino de ómnibus** (2026-09-22, medido en la placa). Con el
+  detector arreglado, las dos lecturas crudas del 115 fueron `E s LUS TALLE` y `5 LUS TALLE`: lo que
+  dijo la línea fue el catálogo de la STM, no el OCR. Dos caminos, y hay que elegir uno: **fine-tune
+  del reconocedor PP-OCRv5** con recortes de carteles LED (los 117 de eval más sintéticos en matriz de
+  puntos generados desde los 239 destinos del catálogo), o medir otro reconocedor. Mientras tanto, lo
+  barato: cuando hay número y el destino no matchea ninguna salida de esa línea, decir el número solo
+  en vez de esperar los cuatro intentos de paciencia.
+- **La clase `bus` del modelo de dos clases dibuja cajas malas** (2026-09-22): la pantalla entera con
+  confianza 0,35, parpadeando. La clase `bus_sign` está bien. Es el dato que faltaba para el
+  reentrenamiento en la V100: más fotos, y **desde la perspectiva del dispositivo** (altura de cabeza,
+  en la vereda, el ómnibus llegando de lejos), no frontales y de cerca como las 140 de Roboflow.
 - **Probar el gadget Ethernet por USB en la Zero 2 W** (`dtoverlay=dwc2` + `modules-load=dwc2,g_ether`
   desde `bootfs`). Sería el reemplazo del RJ45 que se perdió al volver a esta placa: cable directo,
   con el AP arriba y sin tocarle el WiFi a nadie.

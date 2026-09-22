@@ -34,7 +34,7 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 ```
 app/        React Native (Expo) app        ← main work so far
 hardware/   Raspberry Pi Zero 2 W (de nuevo la placa en uso desde 2026-09-19; sin Ethernet) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
-ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer, rama feat/bus-banner-pipeline, PR #2)
+ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer; PRs en cascada #2 → #3 → #4)
 docs/       thesis deliverables, ADRs, this file
 docs/tesis/ capítulos del informe formal (3 a 8, 11 y 12); el documento armado vive en el Drive
             del proyecto como «ViroVision PFC v2 (completo)»
@@ -289,17 +289,25 @@ Pick a track (see the skill for pillar detail):
   guard), profile, and persist settings to Supabase.
 - **C. Real BLE:** hecho el 2026-09-04 (cliente ble-plx + medición). Falta verificarlo contra la
   placa real y correr la medición del ADR 0003.
-- **D. ML pillar:** el camino de ómnibus está en `bus-banner-recognizer` (2026-09-07/14): detector en el
-  sensor (COCO preinstalado hoy; el de 2 clases cuando haya V100) → franja/banner → OCR PP-OCRv5 vía ONNX
-  → seguimiento → anuncio. Probado en la placa el 2026-09-14: detecta y anuncia "se acerca un ómnibus"; el
-  OCR lee `115 / LUIS BRAILLE` del frame guardado. Falta la corrida en vivo con la línea anunciada, medir la
-  latencia del OCR en la Pi, y el set de evaluación con fotos del dispositivo.
+- **D. ML pillar:** el camino de ómnibus está en `bus-banner-recognizer` (2026-09-07/22): detector de
+  **2 clases en el sensor IMX500** → cartel → OCR PP-OCRv5 vía ONNX → seguimiento → anuncio pregrabado.
+  **Corriendo de punta a punta en la Zero 2 W desde el 2026-09-22**: del primer avistaje a «115, Luis
+  Braille», **1,6 s**, con 75 frames cada 5 s y detecciones en el 95 %. Lo que lo destrabó fue de
+  ejecución, no de modelo: una caja `bus` mala (la pantalla entera, confianza 0,35) vetaba un cartel
+  bueno, y el cartel ahora se sostiene solo ([PR #4](https://github.com/MagaliDellapiazza02/bus-banner-recognizer/pull/4)).
+  **El techo que queda es el reconocedor**: las dos lecturas crudas fueron `E s LUS TALLE` y
+  `5 LUS TALLE`, y lo que dijo la línea fue el catálogo de la STM. Siguen: fine-tune o reemplazo del
+  reconocedor para carteles LED, reentrenar la clase `bus` en la V100 con fotos desde la perspectiva
+  del dispositivo, validar el int8, y el set de evaluación con fotos del dispositivo.
 - **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). **Alimentación
   comprada el 2026-09-07**: Waveshare UPS HAT (C) + LiPo 1000 mAh (`hardware/README.md`, *Alimentación*).
   **Botón físico hecho el 2026-09-07** (`raspi/virovision/button.py`, GPIO 5 / pin 29).
   **El modo ómnibus entero corre en la placa desde el 2026-09-15** (detección en el sensor IMX500,
   OCR en la Pi, anuncios pregrabados por el parlante), disparado por el botón: eso cierra a la vez los
   anuncios pregrabados y el código de ómnibus en el daemon, que figuraban acá como pendientes.
+  El 2026-09-22 el modo dejó además de ser ciego en el journal (línea de tiempo por ómnibus y latido
+  de frames) y la cámara pasó a tener un vigilante que la reabre tras 12 s sin un frame — **sin ponerle
+  plazo a `capture_request`**, que es lo que la trabó para todo, foto de supermercado incluida.
   Siguen: DAC I2S, leer el INA219 del HAT → `estado.bateria`, medir el consumo real, la app mostrando
   la lectura de ómnibus, y la carcasa.
 
