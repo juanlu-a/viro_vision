@@ -407,3 +407,17 @@ def test_bus_mode_runs_against_a_pipeline_package_without_signs_expected():
         assert seen.get("built") and seen.get("signs_expected") == expected
 
     assert "inspect" in dir(bus_module), "the daemon decides this by looking at the signature"
+
+
+def test_the_journal_says_which_pipeline_checkout_is_installed(tmp_path):
+    """Every wheel of the pipeline repo calls itself 0.2.0, and its PRs are merged by someone else, so
+    a branch is the one under test for days. Reading a field run's journal used to mean grepping the
+    installed sources for a symbol to know which code produced it (2026-09-22)."""
+    from virovision.bus import pipeline_stamp
+
+    stamp = tmp_path / "bus-banner-version"
+    assert "unstamped" in pipeline_stamp(stamp), "a missing stamp is reported, not raised"
+    stamp.write_text("")
+    assert "unstamped" in pipeline_stamp(stamp)
+    stamp.write_text("fix/read-the-sign-without-a-bus 4f6be97 deployed 2026-09-22T12:40\n")
+    assert pipeline_stamp(stamp) == "fix/read-the-sign-without-a-bus 4f6be97 deployed 2026-09-22T12:40"
