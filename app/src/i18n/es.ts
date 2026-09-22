@@ -34,6 +34,7 @@ export const es = {
     modeOffHint: 'Equivale a un click largo del botón: vuelve a esperando y apaga el reconocimiento.',
     announceIdle: 'Esperando. Reconocimiento apagado.',
     announceBus: 'Modo ómnibus activado.',
+    announceBusWarmingUp: 'Modo ómnibus. Preparando la lectura, esperá unos segundos.',
     announceSupermarket: 'Modo supermercado activado.',
     readWithDeviceButton: 'Leer con el dispositivo',
     readWithDeviceHint:

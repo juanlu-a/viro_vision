@@ -84,6 +84,16 @@ export const NOTICES = {
   modeBus: { clip: 'mode_bus.wav', say: strings.reader.announceBus },
   modeSupermarket: { clip: 'mode_supermarket.wav', say: strings.reader.announceSupermarket },
   /**
+   * El modo ómnibus tarda decenas de segundos en estar listo después de prender la placa: es lo que
+   * demora en cargar el OCR. Apretar el botón dentro de esa ventana dejaba al dispositivo **mudo**
+   * (2026-09-22), que para alguien que no ve la pantalla es lo mismo que un dispositivo muerto.
+   *
+   * Va con los modos y no con las fallas del dispositivo: no es la placa en problemas, es la placa
+   * que todavía no está lista, y nada del canal de avisos está roto mientras esto suena. Lo dispara
+   * la placa, que es la única que sabe si su OCR terminó de cargar.
+   */
+  busWarmingUp: { clip: 'bus_warming_up.wav', say: strings.reader.announceBusWarmingUp },
+  /**
    * El chirp del instante en que se pide una lectura. Va con los modos y no con el enlace porque es
    * propio de la lectura: confirma que el botón hizo algo durante los segundos que tarda la nube.
    */

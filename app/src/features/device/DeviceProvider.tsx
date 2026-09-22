@@ -363,6 +363,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       // to travel through React state before anything happens is a hardware interrupt that does
       // nothing with the screen locked — which is how the button was found broken on 2026-09-10.
       client.onReadRequest(() => record('device.readRequest')),
+      client.onDeviceWarmingUp(() => {
+        // Not a failure and not on screen: the user pressed the button too early and the only thing
+        // that helps is hearing that the wait is expected. `notify` puts it wherever they chose.
+        record('device.warmingUp');
+        void notify('busWarmingUp');
+      }),
       client.onDeviceError((message) => {
         // The device has no screen: if something failed on it (bringing the AP up, the camera), the
         // app is the only place anyone can find out — and since telemetry exists, the table.

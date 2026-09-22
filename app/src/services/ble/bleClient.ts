@@ -50,6 +50,14 @@ export interface BleClient {
    * 2026-09-13.
    */
   onReadRequest(listener: (mode: number | null) => void): () => void;
+  /**
+   * The device was asked for bus mode before its OCR had finished loading, and is saying so. It fires
+   * on the board's own signal because the board is the only one that knows: the load takes tens of
+   * seconds after power-on and, until 2026-09-22, a button press inside that window left the device
+   * silent. The board plays the clip when the output is itself; this is the other half, for a phone
+   * that is doing the listening.
+   */
+  onDeviceWarmingUp(listener: () => void): () => void;
   /** Sets the mode on the device (0 idle, 1 bus, 2 supermarket). It turns its AP on or off. */
   writeMode(mode: number): Promise<void>;
 
@@ -156,6 +164,9 @@ const stubClient: BleClient = {
     return () => {};
   },
   onReadRequest() {
+    return () => {};
+  },
+  onDeviceWarmingUp() {
     return () => {};
   },
   async writeMode() {
