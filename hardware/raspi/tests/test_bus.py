@@ -11,6 +11,7 @@ daemon sees when `bus_banner` is not installed.
 import asyncio
 import inspect
 import json
+import types
 import os
 import sys
 import threading
@@ -489,3 +490,33 @@ def test_once_warm_the_notice_is_not_said_again(tmp_path):
         assert watcher.start()
     watcher.stop()
     assert said == []
+
+
+def test_a_bus_coming_is_put_on_the_wire_too(tmp_path):
+    """Until 2026-09-22 presence was played and never emitted, so with the output set to the phone the
+    phrase could not be heard at all: the board stays quiet by the user's choice and the app had
+    nothing to say. Reported from a real run as "it never says a bus is coming"."""
+    said, events = [], []
+
+    class Camera:
+        sensor = object()
+
+    # `bus_banner` is not installed on a laptop (it is the device's reading half), and all this test
+    # needs from it is the clip's name. The same shape the daemon sees when it is missing.
+    announcements = types.ModuleType("bus_banner.announcements")
+    announcements.BUS_FILE = "bus.wav"
+    sys.modules.setdefault("bus_banner", types.ModuleType("bus_banner"))
+    sys.modules["bus_banner.announcements"] = announcements
+
+    for target in ("device", "phone"):
+        said.clear()
+        events.clear()
+        clip = tmp_path / "bus.wav"
+        clip.write_bytes(b"RIFF")
+        watcher = BusWatcher(
+            Camera(), lambda files: said.append(list(files)), lambda e: events.append(e),
+            announcements=tmp_path, audio_target=target,
+        )
+        watcher._announce_presence()
+        assert events == [{"t": "bus"}], f"the app has to hear about it with the output on {target}"
+        assert said == ([[clip]] if target == "device" else []), "the speaker follows the user's choice"

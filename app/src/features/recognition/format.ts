@@ -6,7 +6,9 @@
 import type { Detection, RecognitionEvent } from './types';
 
 function describe(d: Detection): string {
-  return d.kind === 'bus_line' ? `Línea ${d.label}` : d.label;
+  if (d.kind !== 'bus_line') return d.label;
+  // The destination is what tells two buses of the same line apart, so it is said whenever it came.
+  return d.detail ? `Línea ${d.label}, ${d.detail}` : `Línea ${d.label}`;
 }
 
 /**

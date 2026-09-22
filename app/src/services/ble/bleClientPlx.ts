@@ -54,6 +54,7 @@ type DeviceEvent =
   | { t: 'ap'; on: boolean; minutes: number }
   | { t: 'error'; msg: string }
   | { t: 'warming' }
+  | { t: 'bus' }
   | { t: 'result'; event: RecognitionEvent };
 
 function withDeadline<T>(ms: number, error: () => Error, run: (resolve: (v: T) => void, reject: (e: Error) => void) => void | (() => void)): Promise<T> {
@@ -108,6 +109,7 @@ class BleClientPlx implements BleClient {
   private readonly readRequestListeners = new Set<(mode: number | null) => void>();
   private readonly errorListeners = new Set<(message: string) => void>();
   private readonly warmingListeners = new Set<() => void>();
+  private readonly busListeners = new Set<() => void>();
 
   constructor(private readonly manager: BleManager) {}
 
@@ -192,6 +194,11 @@ class BleClientPlx implements BleClient {
   onDeviceWarmingUp(listener: () => void): () => void {
     this.warmingListeners.add(listener);
     return () => this.warmingListeners.delete(listener);
+  }
+
+  onBusApproaching(listener: () => void): () => void {
+    this.busListeners.add(listener);
+    return () => this.busListeners.delete(listener);
   }
 
   onDeviceError(listener: (message: string) => void): () => void {
@@ -466,6 +473,9 @@ class BleClientPlx implements BleClient {
         break;
       case 'warming':
         for (const listener of this.warmingListeners) listener();
+        break;
+      case 'bus':
+        for (const listener of this.busListeners) listener();
         break;
       case 'ap':
         for (const listener of this.apListeners) listener(event.on);

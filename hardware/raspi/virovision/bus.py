@@ -519,10 +519,17 @@ class BusWatcher:
         self._emit({"t": "warming"})
 
     def _announce_presence(self) -> None:
+        """«Se acerca un ómnibus»: both halves, like a reading.
+
+        The event was missing until 2026-09-22 and the clip was played unconditionally, which made the
+        phrase **impossible to hear** for anyone listening on the phone: `_speak` stays quiet there,
+        and with nothing on the wire the app had nothing to say. Reported as "it never says a bus is
+        coming" after a real run with the output set to the phone."""
         from bus_banner.announcements import BUS_FILE
 
-        files = [self._announcements / BUS_FILE]
-        self._speak([f for f in files if f.exists()])
+        clip = self._announcements / BUS_FILE
+        self._speak([clip] if clip.exists() else [])
+        self._emit({"t": "bus"})
 
     def _files_for(self, number: str, destination: str) -> list:
         from bus_banner.announcements import files_to_play

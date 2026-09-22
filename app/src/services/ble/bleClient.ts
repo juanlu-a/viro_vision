@@ -58,6 +58,15 @@ export interface BleClient {
    * that is doing the listening.
    */
   onDeviceWarmingUp(listener: () => void): () => void;
+  /**
+   * A bus is in frame and its line has not been read yet. The board says it through its own speaker
+   * when that is the chosen output; this is the other half, and until 2026-09-22 it did not exist, so
+   * a user listening on the phone never heard it at all.
+   *
+   * It arrives at most once per bus and never after the line itself: by then it would only repeat
+   * what the user already knows (`bus_banner/tracking.py`).
+   */
+  onBusApproaching(listener: () => void): () => void;
   /** Sets the mode on the device (0 idle, 1 bus, 2 supermarket). It turns its AP on or off. */
   writeMode(mode: number): Promise<void>;
 
@@ -167,6 +176,9 @@ const stubClient: BleClient = {
     return () => {};
   },
   onDeviceWarmingUp() {
+    return () => {};
+  },
+  onBusApproaching() {
     return () => {};
   },
   async writeMode() {

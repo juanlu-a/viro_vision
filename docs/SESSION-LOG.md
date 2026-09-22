@@ -3026,6 +3026,30 @@ bus_warming_up.wav` por BLE. **Después de copiar a la tarjeta, `sync`** — y m
 Verificado en la Zero 2 W manejando el `BusWatcher` del propio daemon: `ready=False`, el clip suena
 desde `announcements/system/`, el evento sale, y recién entonces empieza la construcción.
 
+### El destino se leía y se tiraba: dos fallas en el camino placa → teléfono
+
+Prueba real del usuario al final del día: «detecta el número perfecto pero no dice el destino nunca, y
+nunca dice "se acerca un ómnibus"». El journal contestó las dos en una línea cada una, y **ninguna era
+el OCR**: las lecturas estaban completas (`Bus 306, CASABO` a 2,9 s; `Bus 115, LUIS BRAILLE` a 1,2 s).
+Un minuto antes de la prueba la app había mandado `audio → phone`, así que todo lo que el usuario
+escuchó lo dijo el teléfono — y ahí estaban las dos fallas.
+
+- **El destino llegaba al teléfono y se descartaba.** La placa manda `detail: "LUIS BRAILLE"` en el
+  evento BLE desde que el evento se diseñó; el tipo `Detection` de la app **no tenía ese campo** y el
+  formateador decía `Línea ${label}`. Se perdía la mitad que distingue dos ómnibus de la misma línea.
+- **«Se acerca un ómnibus» era imposible de escuchar en el teléfono.** Era el único anuncio que la
+  placa reproducía **sin emitirlo**: con la salida en teléfono `_speak` se calla por elección del
+  usuario y la app no tenía nada que decir. El evento existía en el log (19:02:49) y no salía al cable.
+
+Las dos eran invisibles en el journal porque la placa hacía su mitad bien. Es el mismo patrón que ya
+mordió con los avisos de sistema: **un camino de varios eslabones donde el eslabón que se corta no
+deja rastro**. Lo que lo destrabó fue mirar `audio → phone` en el log y preguntarse quién estaba
+hablando.
+
+Aclaración que quedó del reporte: **que a veces no diga «se acerca un ómnibus» está bien**. Si la
+línea se decide antes de que el track se confirme —pasó, 1,2 s— la frase se omite a propósito: decirla
+después de «115, Luis Braille» es contar algo que el usuario ya sabe.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
