@@ -115,10 +115,21 @@ class Camera:
 
     def capture_request(self):
         """One frame plus its metadata (which carries the detector's output tensors). The caller MUST
-        release it: picamera2 hands out a fixed pool of buffers and a leak stalls the camera."""
+        release it: picamera2 hands out a fixed pool of buffers and a leak stalls the camera.
+
+        It waits as long as it takes, **on purpose**. picamera2 turns each call into a job in a queue;
+        asking it to give up after N seconds (`wait=N`) does not cancel that job, it leaves it there to
+        swallow the next frame, and the queue only grows. Tried on the board on 2026-09-21 with a 2 s
+        limit, it jammed the camera for everything, photos included. A caller who needs to notice a
+        camera that stopped delivering watches the clock from outside and calls `restart`."""
         if self._picam is None:
             raise RuntimeError("camera not started")
         return self._picam.capture_request()
+
+    def restart(self) -> None:
+        """Closes and reopens the sensor, detector included. For a caller that saw the frames stop."""
+        with self._lock:
+            self._restart()
 
     def to_stream(self, coords, metadata) -> tuple:
         """Normalized (y1, x1, y2, x2) from the detector -> (x, y, w, h) in pixels of the main stream,

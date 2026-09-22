@@ -37,6 +37,16 @@ MIN_CONFIDENCE = 0.3
 CONFIRM_SECONDS = 0.6
 VOTES_NEEDED = 2
 MIN_BANNER_HEIGHT_PX = 22
+FRAME_SILENCE_S = 12.0
+"""How long without a single frame before the watchdog reopens the camera. The sensor delivers 15 per
+second, so this is very long on purpose: the first frame after the camera starts took **3,7 s**
+measured on the board (2026-09-22) while the detector's firmware loads, and a limit under that turns
+every start into a restart. It buys three of those and some more."""
+WATCHDOG_EVERY_S = 1.0
+HEARTBEAT_S = 5.0
+"""Bus mode says how many frames it saw, and how many carried detections, this often. A run with no
+bus in the video and a run with no frames from the camera used to leave the same empty journal."""
+
 PRESENCE_SILENCE_S = 15.0
 """«Se acerca un ómnibus» no se repite dentro de esta ventana, venga del track que venga. Un ómnibus
 que se pierde y vuelve es un track nuevo, y con eso el aviso salía una vez por corte: probando con
@@ -76,6 +86,7 @@ class Timeline:
         self._born: dict[int, float] = {}
         self._last_status: dict[int, float] = {}
         self._gone: set[int] = set()
+        self._last_orphan = float("-inf")
 
     def age(self, track_id: int) -> float:
         born = self._born.get(track_id)
@@ -84,34 +95,36 @@ class Timeline:
     def frame(self, tracks: list, detections: list) -> None:
         """Called once per frame with the tracker's live tracks and the sensor's detections."""
         now = self._clock()
-        sign_px = max((d.box.height for d in detections if d.label == "bus_sign"), default=0.0)
+        signs = [d for d in detections if d.label == "bus_sign"]
+        if signs and not tracks and now - self._last_orphan >= self._every:
+            # Third run of 2026-09-21: 23 s in bus mode and not one line, because no track was born.
+            # Whether the sensor saw nothing or saw a sign nobody used must be visible.
+            self._last_orphan = now
+            sign = max(signs, key=lambda d: d.box.height)
+            log.info("bus: no track; %s", f"sign {_box(sign.box)} aspect {sign.box.aspect:.1f} conf {sign.conf:.2f}")
         for track in tracks:
             if track.id not in self._born:
                 self._born[track.id] = now
                 self._last_status[track.id] = now
                 log.info(
-                    "bus: track %d appeared: bus %d px high, sign %d px, conf %.2f",
-                    track.id, track.box.height, sign_px, track.conf,
+                    "bus: track %d appeared: bus %s, conf %.2f, %s",
+                    track.id, _box(track.box), track.conf, _sign(signs, track.box),
                 )
             elif track.id in self._gone:
                 # The tracker recognised a bus it had lost: same id, same announcements. Its clock
                 # keeps running from the first sighting, which is when the user could have been told.
                 self._gone.discard(track.id)
-                log.info("bus: track %d is back at %.1f s: bus %d px, sign %d px", track.id, now - self._born[track.id], track.box.height, sign_px)
+                log.info("bus: track %d is back at %.1f s: bus %s, %s", track.id, now - self._born[track.id], _box(track.box), _sign(signs, track.box))
             elif not track.announced_reading and now - self._last_status[track.id] >= self._every:
                 self._last_status[track.id] = now
                 log.info(
-                    "bus: track %d at %.1f s: bus %d px, sign %d px, %d reads",
-                    track.id, now - self._born[track.id], track.box.height, sign_px, track.read_attempts,
+                    "bus: track %d at %.1f s: bus %s, %s, %d reads",
+                    track.id, now - self._born[track.id], _box(track.box), _sign(signs, track.box), track.read_attempts,
                 )
 
     def read_queued(self, track_id: int, attempt: int, banner_box, bus_box) -> None:
-        crop = banner_box if banner_box is not None else bus_box
-        what = "sign" if banner_box is not None else "top strip of a bus"
-        log.info(
-            "bus: track %d read #%d queued at %.1f s: %s %dx%d px",
-            track_id, attempt, self.age(track_id), what, crop.height, crop.width,
-        )
+        what = f"sign {_box(banner_box)}" if banner_box is not None else f"top strip of the bus {_box(bus_box)}"
+        log.info("bus: track %d read #%d queued at %.1f s: %s", track_id, attempt, self.age(track_id), what)
 
     def read_done(self, track_id: int, reading, ocr_ms: int) -> None:
         log.info(
@@ -131,6 +144,31 @@ class Timeline:
             event.track, self.age(event.track), "line announced" if announced else "line never read",
         )
         self._gone.add(event.track)
+
+
+def _box(box) -> str:
+    """`120x400 px at (10,30)`: height first, because height is what decides whether a sign is readable."""
+    return f"{box.height:.0f}x{box.width:.0f} px at ({box.x1:.0f},{box.y1:.0f})"
+
+
+def _sign(signs: list, bus) -> str:
+    """This bus's own sign, and why the picker would take it or not: the banner must sit inside the bus
+    box, in its top half, and be a wide strip (aspect >= 2).
+
+    Only signs whose center falls inside THIS bus box are considered. Reporting the tallest sign in the
+    frame instead, as the first version did, printed "NOT in the top half of the bus" for a sign that
+    belonged to a different bus and was being read perfectly well by its own track (2026-09-22) - a
+    diagnostic that invents a problem is worse than none."""
+    mine = [d for d in signs if bus.contains(d.box.center)]
+    if not mine:
+        return "no sign of its own"
+    sign = max(mine, key=lambda d: d.box.height)
+    what = f"sign {_box(sign.box)} aspect {sign.box.aspect:.1f} conf {sign.conf:.2f}"
+    if sign.box.aspect < 2.0:
+        return f"{what}, too square to be a banner"
+    if sign.box.center[1] > bus.y1 + bus.height * 0.5:
+        return f"{what}, below the bus's top half (it gets a track of its own)"
+    return what
 
 
 def is_available() -> bool:
@@ -176,6 +214,7 @@ class BusWatcher:
         self._jobs: queue.Queue = queue.Queue()
         self._results: queue.Queue = queue.Queue()
         self._timeline = Timeline()
+        self._last_frame_at = 0.0
         self._last_announcement: list = []
         self._last_line: tuple = ()
         self._last_line_at: float | None = None
@@ -217,9 +256,11 @@ class BusWatcher:
             log.error("bus mode could not start: %s", exc)
             return False
         self._stop.clear()
+        self._last_frame_at = time.monotonic()
         self._threads = [
             threading.Thread(target=self._read_loop, name="bus-ocr", daemon=True),
             threading.Thread(target=self._frame_loop, name="bus-frames", daemon=True),
+            threading.Thread(target=self._watchdog, name="bus-watchdog", daemon=True),
         ]
         for thread in self._threads:
             thread.start()
@@ -275,6 +316,7 @@ class BusWatcher:
             min_banner_height_px=MIN_BANNER_HEIGHT_PX,
             votes_needed=VOTES_NEEDED,
             async_reads=True,
+            signs_expected="bus_sign" in self._settings["labels"],
         )
 
     def _queue_read(self, frame, banner_box, bus_box):
@@ -300,17 +342,43 @@ class BusWatcher:
                 reading = None
             self._results.put((track_id, reading, round((time.monotonic() - started) * 1000)))
 
+    def _watchdog(self) -> None:
+        """Reopens the camera when no frame has arrived for FRAME_SILENCE_S.
+
+        It lives in its own thread because the frame loop, when the camera goes quiet, is blocked
+        inside `capture_request` and cannot notice anything. Closing the sensor from here is what
+        unblocks it. Giving the capture call its own deadline instead was tried on 2026-09-21 and
+        jammed the camera for good: see `Camera.capture_request`."""
+        while not self._stop.wait(WATCHDOG_EVERY_S):
+            silence = time.monotonic() - self._last_frame_at
+            if silence < FRAME_SILENCE_S:
+                continue
+            log.error("bus: no frame from the camera in %.0f s; reopening it", silence)
+            self._last_frame_at = time.monotonic()  # the restart takes seconds; do not fire again meanwhile
+            try:
+                self._camera.restart()
+            except Exception as exc:  # noqa: BLE001 — a camera that will not come back is reported, not fatal
+                log.error("bus: the camera did not come back (%s)", exc)
+                return
+            self._last_frame_at = time.monotonic()
+
+    def _heartbeat(self, frames: int, with_detections: int, buses: int, signs: int) -> None:
+        log.info("bus: %d frames in %.0f s, %d with detections (bus %d, sign %d)", frames, HEARTBEAT_S, with_detections, buses, signs)
+
     def _frame_loop(self) -> None:
         from bus_banner.imx500 import detections_from_tensors
 
         sensor = self._camera.sensor
         frame_number = 0
+        beat_at = time.monotonic()
+        frames = with_detections = buses = signs = 0
         while not self._stop.is_set():
             try:
                 request = self._camera.capture_request()
             except Exception as exc:  # noqa: BLE001
                 log.error("bus: the camera stopped delivering frames (%s)", exc)
                 return
+            self._last_frame_at = time.monotonic()
             try:
                 metadata = request.get_metadata()
                 detections = detections_from_tensors(
@@ -323,10 +391,21 @@ class BusWatcher:
                     normalize=self._settings["normalize"],
                     order=self._settings["order"],
                 )
-                # Copying the frame is the expensive part on a Pi 3 B+: only when there is a bus in it.
-                frame = request.make_array("main") if any(d.label == "bus" for d in detections) else None
+                # Copying the frame is the expensive part on a Pi 3 B+: only when there is something in
+                # it. A sign alone counts: it carries its own track when the bus box is missing or bad.
+                frame = request.make_array("main") if detections else None
             finally:
                 request.release()
+
+            frames += 1
+            if detections:
+                with_detections += 1
+                buses += sum(d.label == "bus" for d in detections)
+                signs += sum(d.label == "bus_sign" for d in detections)
+            if time.monotonic() - beat_at >= HEARTBEAT_S:
+                self._heartbeat(frames, with_detections, buses, signs)
+                beat_at = time.monotonic()
+                frames = with_detections = buses = signs = 0
 
             self._drain_results(frame_number)
             events = self._watcher.process(frame, detections, frame_number)
