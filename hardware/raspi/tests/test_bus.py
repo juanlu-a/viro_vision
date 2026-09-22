@@ -9,15 +9,18 @@ daemon sees when `bus_banner` is not installed.
 """
 
 import asyncio
+import inspect
 import json
 import os
 import sys
+import threading
+import time
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from virovision.bus import PRESENCE_SILENCE_S, BusWatcher  # noqa: E402
+from virovision.bus import FRAME_SILENCE_S, PRESENCE_SILENCE_S, BusWatcher, Timeline  # noqa: E402
 from virovision.core import EVENT, EVENT_MAX_BYTES, Core  # noqa: E402
 from virovision.modes import Mode  # noqa: E402
 
@@ -216,6 +219,8 @@ def test_the_line_silences_the_presence_that_would_follow_it():
 
     class Event:
         kind = "reading"
+        track = 1
+        attempts = 1
         number = "115"
         destination = "LUIS BRAILLE"
 
@@ -230,3 +235,175 @@ def test_the_line_silences_the_presence_that_would_follow_it():
     watcher._result_event = lambda event: {}  # el evento BLE tiene su propio test
     watcher._handle(Event())
     assert not watcher._presence_is_worth_saying()
+
+
+class Clock:
+    def __init__(self):
+        self.now = 100.0
+
+    def __call__(self):
+        return self.now
+
+
+class Box:
+    def __init__(self, x1, y1, height, width):
+        self.x1, self.y1, self.height, self.width = x1, y1, height, width
+        self.center = (x1 + width / 2, y1 + height / 2)
+        self.aspect = width / height
+
+    def contains(self, point):
+        x, y = point
+        return self.x1 <= x <= self.x1 + self.width and self.y1 <= y <= self.y1 + self.height
+
+
+class Track:
+    def __init__(self, id, height, conf=0.9):
+        self.id = id
+        self.box = Box(0, 0, height, height * 3)
+        self.conf = conf
+        self.read_attempts = 0
+        self.announced_reading = False
+
+
+class Sign:
+    label = "bus_sign"
+    conf = 0.5
+
+    def __init__(self, height, y1=10):
+        self.box = Box(20, y1, height, height * 4)
+
+
+class Lost:
+    kind = "lost"
+
+    def __init__(self, track):
+        self.track = track
+
+
+def test_the_timeline_tells_where_the_seconds_went(caplog):
+    """A field run used to leave "there is a bus", "read in N ms" and the line, with nothing in
+    between: no way to tell a detector that sees the bus late from a reader that reads it slowly
+    (2026-09-21). Every step is now stamped with the seconds since the sensor first reported that
+    bus, and a bus the tracker loses and finds again keeps that clock."""
+    clock = Clock()
+    timeline = Timeline(clock=clock, status_every_s=1.0)
+    bus = Track(7, height=120)
+    with caplog.at_level("INFO", logger="virovision.bus"):
+        timeline.frame([bus], [Sign(18)])
+        clock.now += 0.5
+        timeline.frame([bus], [Sign(20)])  # too soon for a status line
+        clock.now += 0.6
+        timeline.frame([bus], [Sign(24)])
+        bus.read_attempts = 1
+        timeline.read_queued(7, 1, Sign(24).box, bus.box)
+        clock.now += 1.0
+        timeline.read_done(7, None, 990)
+        timeline.lost(Lost(7), announced=False)
+        clock.now += 2.0
+        timeline.frame([bus], [Sign(30)])  # the tracker found the same bus again
+    lines = [r.getMessage() for r in caplog.records]
+    assert lines == [
+        "bus: track 7 appeared: bus 120x360 px at (0,0), conf 0.90, sign 18x72 px at (20,10) aspect 4.0 conf 0.50",
+        "bus: track 7 at 1.1 s: bus 120x360 px at (0,0), sign 24x96 px at (20,10) aspect 4.0 conf 0.50, 0 reads",
+        "bus: track 7 read #1 queued at 1.1 s: sign 24x96 px at (20,10)",
+        "bus: track 7 read in 990 ms at 2.1 s: nothing",
+        "bus: track 7 gone at 2.1 s, line never read",
+        "bus: track 7 is back at 4.1 s: bus 120x360 px at (0,0), sign 30x120 px at (20,10) aspect 4.0 conf 0.50",
+    ]
+
+
+def test_the_timeline_says_why_a_sign_was_not_read(caplog):
+    """The picker has two rules - a wide strip, in the top half of the bus - and the journal has to say
+    which one refused this bus's sign."""
+    clock = Clock()
+    timeline = Timeline(clock=clock)
+    bus = Track(1, height=100)  # bus box 100x300 at (0,0): its top half ends at y=50
+    with caplog.at_level("INFO", logger="virovision.bus"):
+        timeline.frame([bus], [Sign(20, y1=60)])  # a wide sign of this bus, but on its lower half
+    assert caplog.records[0].getMessage().endswith("below the bus's top half (it gets a track of its own)")
+
+
+def test_the_timeline_only_reports_a_bus_own_sign(caplog):
+    """The first version printed the tallest sign in the frame against every track, so a sign that
+    belonged to another bus - and was being read perfectly well by its own track - was reported as
+    refused (2026-09-22). A diagnostic that invents a problem is worse than none."""
+    clock = Clock()
+    timeline = Timeline(clock=clock)
+    bus = Track(1, height=100)  # 100x300 at (0,0)
+    far = Sign(60, y1=10)
+    far.box.x1, far.box.center = 800, (860, 40)  # another bus's sign, well outside this box
+    with caplog.at_level("INFO", logger="virovision.bus"):
+        timeline.frame([bus], [far])
+    assert caplog.records[0].getMessage().endswith("no sign of its own")
+
+
+def test_the_timeline_goes_quiet_once_the_line_is_announced(caplog):
+    """The per-second status exists to explain a bus that is NOT being read; after the line has been
+    said it would only fill the journal."""
+    clock = Clock()
+    timeline = Timeline(clock=clock)
+    bus = Track(1, height=90)
+    with caplog.at_level("INFO", logger="virovision.bus"):
+        timeline.frame([bus], [])
+        bus.announced_reading = True
+        for _ in range(5):
+            clock.now += 1.0
+            timeline.frame([bus], [])
+    assert len(caplog.records) == 1
+
+
+def test_a_silent_camera_is_reopened_by_the_watchdog():
+    """A camera that stops delivering blocks the frame loop inside `capture_request`, so the loop
+    cannot notice it: another thread watches the clock and reopens the sensor, which is what unblocks
+    it. Giving the capture call its own deadline was tried on 2026-09-21 and jammed the camera for
+    everything, photos included (picamera2 keeps the expired job in its queue)."""
+
+    class SilentCamera:
+        sensor = object()
+        restarts = 0
+
+        def restart(self):
+            self.restarts += 1
+
+    camera = SilentCamera()
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None)
+    watcher._last_frame_at = time.monotonic()
+    threading.Thread(target=watcher._watchdog, daemon=True).start()
+    try:
+        watcher._last_frame_at -= FRAME_SILENCE_S + 1  # as if the camera had been quiet that long
+        deadline = time.monotonic() + 5
+        while camera.restarts == 0 and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert camera.restarts == 1
+        time.sleep(1.5)
+        assert camera.restarts == 1, "the restart takes seconds; it must not fire again meanwhile"
+    finally:
+        watcher._stop.set()
+
+
+def test_bus_mode_runs_against_a_pipeline_package_without_signs_expected():
+    """The daemon installs `bus_banner` as a wheel with no version pin, and `signs_expected` only
+    exists there since PR #4. Against the published package bus mode must still start - reading the
+    bus's top strip as before - instead of dying on an unexpected keyword."""
+    import virovision.bus as bus_module
+
+    seen = {}
+
+    class OldWatcher:
+        def __init__(self, read, tracker=None, confirm_frames=3, min_banner_height_px=22, votes_needed=2, async_reads=False):
+            seen["built"] = True
+
+    class NewWatcher(OldWatcher):
+        def __init__(self, *args, signs_expected=False, **kwargs):
+            super().__init__(*args, **kwargs)
+            seen["signs_expected"] = signs_expected
+
+    for watcher_class, expected in ((OldWatcher, None), (NewWatcher, True)):
+        seen.clear()
+        options = {}
+        if "signs_expected" in inspect.signature(watcher_class).parameters:
+            options["signs_expected"] = "bus_sign" in ["bus_sign", "bus"]
+        watcher_class(lambda *a: None, **options)
+        assert seen.get("built") and seen.get("signs_expected") == expected
+
+    assert "inspect" in dir(bus_module), "the daemon decides this by looking at the signature"
