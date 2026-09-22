@@ -3000,6 +3000,32 @@ cartel se sostiene solo, con el viejo el modo funciona como antes y lo dice en e
 94 tests + 2 skipped en `hardware/raspi` y 70 en `bus-banner-recognizer`, todos en verde. En la placa:
 click, vigilancia, línea dicha a 1,6 s, latido con frames, y la foto de supermercado en 35 ms.
 
+### Apretar el botón recién prendida ya no es silencio
+
+Cierre del día, a pedido del usuario. El modo ómnibus tarda decenas de segundos en estar listo después
+de prender la placa —es lo que demora en cargar el OCR— y el botón contestaba esa ventana con **nada**.
+Para alguien que no ve la pantalla, un dispositivo que no dice nada es indistinguible de un dispositivo
+muerto, y es lo primero que pasa al encenderlo.
+
+Ahora dice «Modo ómnibus. Preparando la lectura, esperá unos segundos», **antes** de ponerse a
+construir: dicho después llegaría junto con la respuesta que venía a anticipar. Las dos mitades, como
+cada lectura: el clip cuando la salida es el dispositivo, y el evento siempre, para que un teléfono
+que esté escuchando lo diga él. Va con los modos y no con las fallas que reporta el teléfono: no es la
+placa en problemas, es la placa que todavía no está lista, y nada del canal de avisos está roto
+mientras suena. Una placa desplegada antes de que el clip existiera se queda callada en vez de negarse
+a entrar al modo.
+
+**Una trampa nueva de operación, que costó la primera verificación**: la tarjeta es la fuente de verdad
+de los avisos (`modo-red.sh` instala desde `bootfs` y **borra del home lo que la tarjeta no trae**), y
+la partición es FAT. Copiar el `.wav` a `/boot/firmware/announcements-system/` y que la placa se apague
+sin cierre limpio deja la escritura sin bajar al medio: al arrancar, la tarjeta no lo tiene, y el
+sincronizador se lleva puesta también la copia buena del home. El síntoma fue `missing notice:
+bus_warming_up.wav` por BLE. **Después de copiar a la tarjeta, `sync`** — y mejor, reiniciar con
+`sudo reboot` en vez de cortar la corriente.
+
+Verificado en la Zero 2 W manejando el `BusWatcher` del propio daemon: `ready=False`, el clip suena
+desde `announcements/system/`, el evento sale, y recién entonces empieza la construcción.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -3022,6 +3048,13 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   márgenes del 16 incluidos). Sigue abierto lo que importaba más: **un destino que no matchea se
   descarta sin un solo log** (`files_to_play` filtra por `p.exists()`), así que el fallo es invisible
   en el journal. Que deje un `log.info` con el crudo y el slug buscado.
+- **Medir el arranque en frío del modo ómnibus en la Zero 2 W** (2026-09-22). Los 47 s que figuran en
+  `mediciones/2026-09-15-omnibus-en-placa.md` son de la **3 B+ prestada**, que ya no está; de esta
+  placa sólo tenemos ~24 s de un reinicio del *servicio*, con los modelos en caché de página. Un
+  arranque desde apagado suma el booteo y una caché fría, y la Zero tiene 415 MB de RAM. Se cierra
+  leyendo `journalctl -b -o short-monotonic` después de un arranque en frío: los tiempos monotónicos
+  valen aunque la placa no tenga reloj. Mientras tanto el aviso de «preparando la lectura» hace que el
+  número importe menos.
 - **El reconocedor es el techo del camino de ómnibus** (2026-09-22, medido en la placa). Con el
   detector arreglado, las dos lecturas crudas del 115 fueron `E s LUS TALLE` y `5 LUS TALLE`: lo que
   dijo la línea fue el catálogo de la STM, no el OCR. Dos caminos, y hay que elegir uno: **fine-tune
