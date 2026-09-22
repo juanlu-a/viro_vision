@@ -21,6 +21,7 @@ unavailable and the daemon carries on: a device that cannot read bus lines still
 
 from __future__ import annotations
 
+import inspect
 import logging
 import queue
 import threading
@@ -309,6 +310,15 @@ class BusWatcher:
         self._settings = network_settings(self._camera.sensor.network_intrinsics, labels=self._labels)
         fps = self._settings["fps"]
         tracker = Tracker(max_missed=max(1, round(0.5 * fps)), memory=max(1, round(5 * fps)))
+        options = {}
+        if "signs_expected" in inspect.signature(Watcher).parameters:
+            # Only in `bus_banner` since the sign can carry its own track (PR #4 of the pipeline repo).
+            # The daemon installs that package as a wheel with no version pin, so it must run against
+            # the published one too: with an older one bus mode still works, reading the bus's top
+            # strip as it did before, instead of refusing to start.
+            options["signs_expected"] = "bus_sign" in self._settings["labels"]
+        else:
+            log.warning("bus_banner is older than PR #4: the top strip will be read when a sign is missed")
         self._watcher = Watcher(
             self._queue_read,
             tracker=tracker,
@@ -316,7 +326,7 @@ class BusWatcher:
             min_banner_height_px=MIN_BANNER_HEIGHT_PX,
             votes_needed=VOTES_NEEDED,
             async_reads=True,
-            signs_expected="bus_sign" in self._settings["labels"],
+            **options,
         )
 
     def _queue_read(self, frame, banner_box, bus_box):

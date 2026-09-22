@@ -9,6 +9,7 @@ daemon sees when `bus_banner` is not installed.
 """
 
 import asyncio
+import inspect
 import json
 import os
 import sys
@@ -378,3 +379,31 @@ def test_a_silent_camera_is_reopened_by_the_watchdog():
         assert camera.restarts == 1, "the restart takes seconds; it must not fire again meanwhile"
     finally:
         watcher._stop.set()
+
+
+def test_bus_mode_runs_against_a_pipeline_package_without_signs_expected():
+    """The daemon installs `bus_banner` as a wheel with no version pin, and `signs_expected` only
+    exists there since PR #4. Against the published package bus mode must still start - reading the
+    bus's top strip as before - instead of dying on an unexpected keyword."""
+    import virovision.bus as bus_module
+
+    seen = {}
+
+    class OldWatcher:
+        def __init__(self, read, tracker=None, confirm_frames=3, min_banner_height_px=22, votes_needed=2, async_reads=False):
+            seen["built"] = True
+
+    class NewWatcher(OldWatcher):
+        def __init__(self, *args, signs_expected=False, **kwargs):
+            super().__init__(*args, **kwargs)
+            seen["signs_expected"] = signs_expected
+
+    for watcher_class, expected in ((OldWatcher, None), (NewWatcher, True)):
+        seen.clear()
+        options = {}
+        if "signs_expected" in inspect.signature(watcher_class).parameters:
+            options["signs_expected"] = "bus_sign" in ["bus_sign", "bus"]
+        watcher_class(lambda *a: None, **options)
+        assert seen.get("built") and seen.get("signs_expected") == expected
+
+    assert "inspect" in dir(bus_module), "the daemon decides this by looking at the signature"
