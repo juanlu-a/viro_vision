@@ -51,6 +51,8 @@ export type EventType =
   | 'device.modeFailed'
   | 'device.audioTargetFailed'
   | 'device.readRequest'
+  // Bus mode asked for before its OCR finished loading: how often the user meets that window
+  | 'device.warmingUp'
   // Operating modes (ADR 0007)
   | 'mode.change'
   // One reading, end to end

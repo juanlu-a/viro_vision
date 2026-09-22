@@ -17,6 +17,7 @@ import threading
 import time
 
 import pytest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -421,3 +422,70 @@ def test_the_journal_says_which_pipeline_checkout_is_installed(tmp_path):
     assert "unstamped" in pipeline_stamp(stamp)
     stamp.write_text("fix/read-the-sign-without-a-bus 4f6be97 deployed 2026-09-22T12:40\n")
     assert pipeline_stamp(stamp) == "fix/read-the-sign-without-a-bus 4f6be97 deployed 2026-09-22T12:40"
+
+
+def test_asked_to_watch_too_early_the_device_says_so(tmp_path):
+    """The OCR takes tens of seconds to load at startup, and a button press inside that window used to
+    leave the device silent while it built - indistinguishable, for someone who cannot see the screen,
+    from a device that died (2026-09-22). It is said BEFORE building, or it would arrive together with
+    the answer it was meant to precede."""
+    from virovision.bus import NOTICES_DIR, WARMING_UP_CLIP
+
+    clip = tmp_path / NOTICES_DIR / WARMING_UP_CLIP
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"RIFF")
+    order = []
+
+    class Camera:
+        sensor = object()
+
+    watcher = BusWatcher(Camera(), lambda files: order.append(("said", list(files))), lambda e: order.append(("event", e)), announcements=tmp_path)
+    watcher._build = lambda: order.append(("built", None))
+    watcher._frame_loop = lambda: None
+    watcher._read_loop = lambda: None
+    watcher._watchdog = lambda: None
+    with patch("virovision.bus.is_available", return_value=True):
+        assert watcher.start()
+    watcher.stop()
+
+    assert [what for what, _ in order] == ["said", "event", "built"], "the notice precedes the wait it explains"
+    assert order[0][1] == [clip]
+    assert order[1][1] == {"t": "warming"}
+
+
+def test_a_board_without_the_warming_clip_still_starts(tmp_path):
+    """A board deployed before the clip existed must not fail to enter bus mode over a missing .wav."""
+    said = []
+
+    class Camera:
+        sensor = object()
+
+    watcher = BusWatcher(Camera(), lambda files: said.append(list(files)), lambda e: None, announcements=tmp_path)
+    watcher._build = lambda: None
+    watcher._frame_loop = lambda: None
+    watcher._read_loop = lambda: None
+    watcher._watchdog = lambda: None
+    with patch("virovision.bus.is_available", return_value=True):
+        assert watcher.start()
+    watcher.stop()
+    assert said == [], "nothing to play, and nothing broken"
+
+
+def test_once_warm_the_notice_is_not_said_again(tmp_path):
+    """`warm_up` at startup is what makes the button instant; after it, the notice would be a lie."""
+
+    class Camera:
+        sensor = object()
+
+    said = []
+    watcher = BusWatcher(Camera(), lambda files: said.append(list(files)), lambda e: None, announcements=tmp_path)
+    watcher._build = lambda: None
+    watcher._frame_loop = lambda: None
+    watcher._read_loop = lambda: None
+    watcher._watchdog = lambda: None
+    watcher._pipeline = object()  # as `warm_up` leaves it
+    assert watcher.ready
+    with patch("virovision.bus.is_available", return_value=True):
+        assert watcher.start()
+    watcher.stop()
+    assert said == []

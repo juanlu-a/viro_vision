@@ -31,6 +31,7 @@ NOTICES = {
     "mode_idle.wav": "Esperando. Reconocimiento apagado.",
     "mode_bus.wav": "Modo ómnibus activado.",
     "mode_supermarket.wav": "Modo supermercado activado.",
+    "bus_warming_up.wav": "Modo ómnibus. Preparando la lectura, esperá unos segundos.",
     "output_device.wav": "Dónde se escucha: en el dispositivo.",
     "audio_test.wav": "Hola, soy ViroVision. La salida de audio funciona correctamente.",
 }
@@ -47,6 +48,12 @@ the read of the `wifi` characteristic and the phone was left with no credentials
 What the board says is what is heard **with the glasses on and the phone in a pocket**: the modes,
 the reading chirp, and each mode's own readings. Plus the two that verify the output itself, because
 a confirmation of "you will hear it on the device" said by the phone confirms nothing.
+
+`bus_warming_up.wav` belongs to that list and not to the failures the phone reports: it is not the
+board in trouble, it is the board not ready yet, and nothing about the notice channel is broken while
+it plays. It exists because the OCR takes tens of seconds to load at startup and, until 2026-09-22,
+pressing the button inside that window left the device **silent** - which for someone who cannot see
+the screen is indistinguishable from a device that died.
 """
 
 EARCON_FILE = "earcon_start.wav"

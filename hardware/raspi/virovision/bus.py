@@ -34,6 +34,10 @@ log = logging.getLogger(__name__)
 DEFAULT_MODEL = Path("/home/virovision/models/bus_sign.rpk")
 DEFAULT_ANNOUNCEMENTS = Path("/home/virovision/announcements")
 DEFAULT_CATALOG = Path("/home/virovision/models/catalog_stm.csv")
+NOTICES_DIR = "system"
+WARMING_UP_CLIP = "bus_warming_up.wav"
+"""Said when the button asks for bus mode before the OCR has finished loading. Its text lives with
+the other system notices, in `notices.py`."""
 DEFAULT_PIPELINE_STAMP = Path("/home/virovision/models/bus-banner-version")
 """Branch and commit of the `bus_banner` checkout the board was deployed from, written by that repo's
 `deploy_pi.sh`. Its PRs are merged by someone else, so a branch can be the one under test for days,
@@ -240,6 +244,12 @@ class BusWatcher:
         self.running = False
 
     @property
+    def ready(self) -> bool:
+        """Whether a button press would start watching now, or first spend tens of seconds building
+        the OCR. `warm_up` at startup is what makes this true before anyone presses anything."""
+        return self._pipeline is not None
+
+    @property
     def available(self) -> bool:
         """Ready to watch: the reading half is installed and the sensor has a detector loaded."""
         return is_available() and getattr(self._camera, "sensor", None) is not None
@@ -266,6 +276,13 @@ class BusWatcher:
         if not self.available:
             log.warning("bus mode unavailable: %s", "no detector in the sensor" if is_available() else "bus_banner is not installed")
             return False
+        if not self.ready:
+            # The OCR takes tens of seconds to load and `_build` below is where that happens. Until
+            # 2026-09-22 a button press inside that window left the device silent, which for someone
+            # who cannot see the screen is the same thing as a device that died. It is said before
+            # building, not after, or it would arrive with the answer it was meant to precede.
+            log.info("bus: asked to watch before the OCR finished loading; saying so")
+            self._warming_up()
         try:
             self._build()
         except Exception as exc:  # noqa: BLE001 — a model or a catalog that will not load
@@ -490,6 +507,16 @@ class BusWatcher:
         elif event.kind == "lost":
             track = next((t for t in self._watcher.tracker.recent if t.id == event.track), None)
             self._timeline.lost(event, bool(track and track.announced_reading))
+
+    def _warming_up(self) -> None:
+        """Says «preparando la lectura» through whichever output the user chose.
+
+        Both halves, like every reading: the clip when the device is the output, and the event always,
+        so a phone that is listening says it instead. A board with no `.wav` for it (deployed before
+        the clip existed) stays quiet here rather than failing to start the mode."""
+        clip = self._announcements / NOTICES_DIR / WARMING_UP_CLIP
+        self._speak([clip] if clip.exists() else [])
+        self._emit({"t": "warming"})
 
     def _announce_presence(self) -> None:
         from bus_banner.announcements import BUS_FILE
