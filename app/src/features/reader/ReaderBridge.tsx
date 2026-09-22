@@ -16,7 +16,7 @@
  */
 import { useEffect, useRef } from 'react';
 
-import { announceRecognition } from '@/features/audio/announcer';
+import { announce, announceRecognition } from '@/features/audio/announcer';
 import { getAudioOutput } from '@/features/audio/audioOutput';
 import { useAudioOutput } from '@/features/audio/AudioOutputProvider';
 import { configureNotices } from '@/features/audio/systemNotice';
@@ -25,6 +25,7 @@ import { MODE_FROM_GATT } from '@/features/device/gatt';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
 import { configureReader, readFromDevice, setModeFromDevice } from '@/features/reader/readingService';
 import { getBleClient } from '@/services/ble/bleClient';
+import { strings } from '@/i18n';
 
 export function ReaderBridge() {
   const { model } = useProductModel();
@@ -94,6 +95,18 @@ export function ReaderBridge() {
     () =>
       getBleClient().onRecognition((event) => {
         if (getAudioOutput() === 'phone') void announceRecognition(event);
+      }),
+    [],
+  );
+
+  // «Se acerca un ómnibus», under the same rule as the reading it precedes: the board says it with
+  // its own clip when the output is the device, the phone says it when it is the phone. Added
+  // 2026-09-22, when a real run showed it could not be heard on the phone at all — the board was
+  // playing it into a speaker the user had turned off and putting nothing on the wire.
+  useEffect(
+    () =>
+      getBleClient().onBusApproaching(() => {
+        if (getAudioOutput() === 'phone') void announce(strings.reader.announceBusApproaching);
       }),
     [],
   );

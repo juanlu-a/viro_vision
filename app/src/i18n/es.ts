@@ -35,6 +35,7 @@ export const es = {
     announceIdle: 'Esperando. Reconocimiento apagado.',
     announceBus: 'Modo ómnibus activado.',
     announceBusWarmingUp: 'Modo ómnibus. Preparando la lectura, esperá unos segundos.',
+    announceBusApproaching: 'Se acerca un ómnibus.',
     announceSupermarket: 'Modo supermercado activado.',
     readWithDeviceButton: 'Leer con el dispositivo',
     readWithDeviceHint:

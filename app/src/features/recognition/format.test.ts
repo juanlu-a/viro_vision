@@ -1,5 +1,5 @@
 import { toAnnouncement } from './format';
-import type { RecognitionEvent } from './types';
+import type { Detection, RecognitionEvent } from './types';
 
 const busEvent: RecognitionEvent = {
   timestamp: 0,
@@ -32,5 +32,30 @@ describe('toAnnouncement', () => {
       others: [],
     };
     expect(toAnnouncement(product)).toBe('Yerba Canarias 1kg');
+  });
+});
+
+describe('a bus reading with a destination', () => {
+  // Reported 2026-09-22 after a real run with the output on the phone: the board decided
+  // "Bus 115, LUIS BRAILLE", the event carried `detail`, and the user heard only "Línea 115". The
+  // destination was read on the board and dropped here, silently.
+  const event = (primary: Detection): RecognitionEvent => ({ timestamp: 0, primary, others: [] });
+
+  it('says the destination when it came', () => {
+    expect(
+      toAnnouncement(event({ kind: 'bus_line', label: '115', detail: 'LUIS BRAILLE', confidence: 0.9 }))
+    ).toBe('Línea 115, LUIS BRAILLE');
+  });
+
+  it('says the line alone when it did not', () => {
+    // The device trims `detail` first when the event does not fit one BLE notification, so a reading
+    // with a number and no destination is normal, not a bug to paper over.
+    expect(toAnnouncement(event({ kind: 'bus_line', label: '115', confidence: 0.9 }))).toBe('Línea 115');
+  });
+
+  it('leaves products alone', () => {
+    expect(toAnnouncement(event({ kind: 'product', label: 'Yerba Canarias', confidence: 0.9 }))).toBe(
+      'Yerba Canarias'
+    );
   });
 });
