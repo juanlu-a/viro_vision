@@ -34,6 +34,11 @@ log = logging.getLogger(__name__)
 DEFAULT_MODEL = Path("/home/virovision/models/bus_sign.rpk")
 DEFAULT_ANNOUNCEMENTS = Path("/home/virovision/announcements")
 DEFAULT_CATALOG = Path("/home/virovision/models/catalog_stm.csv")
+DEFAULT_PIPELINE_STAMP = Path("/home/virovision/models/bus-banner-version")
+"""Branch and commit of the `bus_banner` checkout the board was deployed from, written by that repo's
+`deploy_pi.sh`. Its PRs are merged by someone else, so a branch can be the one under test for days,
+and every build calls itself 0.2.0: without this, knowing which code a field run used meant grepping
+the installed sources for a symbol."""
 MIN_CONFIDENCE = 0.3
 CONFIRM_SECONDS = 0.6
 VOTES_NEEDED = 2
@@ -172,6 +177,15 @@ def _sign(signs: list, bus) -> str:
     return what
 
 
+def pipeline_stamp(path: Path = DEFAULT_PIPELINE_STAMP) -> str:
+    """What the stamp says, or why there is none. Never raises: this is a log line, not a feature."""
+    try:
+        stamp = path.read_text().strip()
+    except OSError:
+        return "unstamped (deployed by hand, or before deploy_pi.sh stamped it)"
+    return stamp or "unstamped (the file is empty)"
+
+
 def is_available() -> bool:
     """Whether the reading half is installed at all. Checked before promising bus mode."""
     try:
@@ -242,6 +256,7 @@ class BusWatcher:
             log.warning("bus mode could not be prepared: %s", exc)
             return False
         log.info("bus mode ready (%s)", self._settings)
+        log.info("bus mode reading with bus_banner: %s", pipeline_stamp())
         return True
 
     def start(self) -> bool:
