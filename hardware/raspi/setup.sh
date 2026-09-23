@@ -65,6 +65,17 @@ mkdir -p /etc/NetworkManager/dnsmasq-shared.d
 rm -f /etc/NetworkManager/dnsmasq-shared.d/10-virovision-solo-local.conf
 printf 'dhcp-option=3\ndhcp-option=6\n' > /etc/NetworkManager/dnsmasq-shared.d/10-virovision-local-only.conf
 
+echo "→ a journal that survives a reboot"
+# Raspberry Pi OS ships /usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf with
+# Storage=volatile: the journal lives in RAM and every power-off erases it. That, and not the clock
+# jump of a board with no RTC, is why only the current boot was ever visible — and on 2026-09-22 and
+# 2026-09-23 it cost the log of a jammed camera, twice. /etc wins over /usr/lib; the cap keeps a
+# microSD from filling up.
+mkdir -p /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\nSystemMaxUse=64M\n' > /etc/systemd/journald.conf.d/50-virovision-persistent.conf
+systemctl restart systemd-journald
+journalctl --flush || true
+
 echo "→ systemd service"
 sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$INSTALL_DIR/virovision.service" > /etc/systemd/system/virovision.service
 systemctl daemon-reload
