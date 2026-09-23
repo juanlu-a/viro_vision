@@ -10,6 +10,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from virovision import camera  # noqa: E402
 from virovision.camera import Camera  # noqa: E402
 
 
@@ -21,13 +22,14 @@ class FakePicam:
     def capture_file(self, buffer, format):
         if self.behaviour == "ok":
             buffer.write(b"\xff\xd8JPEG")
-        elif self.behaviour == "hangs":
+        elif self.behaviour in ("hangs", "will not close"):
             threading.Event().wait(2)  # longer than the test's timeout
         else:
             raise RuntimeError("frontend timeout")
 
     def stop(self):
-        pass
+        if self.behaviour == "will not close":
+            threading.Event().wait(2)
 
     def close(self):
         self.closed = True
@@ -63,3 +65,28 @@ def test_a_capture_that_fails_propagates_the_error_and_restarts():
 def test_without_a_started_camera_it_says_so():
     with pytest.raises(RuntimeError, match="not started"):
         Camera().capture_jpeg()
+
+
+def test_a_sensor_that_will_not_close_ends_the_process_instead_of_holding_the_lock(monkeypatch):
+    """2026-09-23: the phone asked for a photo and got nothing at all, not even an error. A jammed
+    sensor blocks in `stop()` under the capture lock; waiting on it forever leaves the whole board
+    mute. Past the deadline the process gives up so systemd can start a clean one."""
+    monkeypatch.setattr(camera, "CLOSE_TIMEOUT_S", 0.2)
+    c = with_picam("will not close")
+    gave_up = threading.Event()
+    c._give_up = gave_up.set
+    with pytest.raises(TimeoutError, match="did not deliver"):
+        c.capture_jpeg(timeout_s=0.2)
+    assert gave_up.is_set()
+    assert not c.available
+
+
+def test_a_photo_behind_a_restart_fails_on_time_instead_of_waiting_for_it():
+    c = with_picam("ok")
+    c._lock.acquire()  # a restart in progress
+    try:
+        with pytest.raises(TimeoutError, match="busy restarting"):
+            c.capture_jpeg(timeout_s=0.2)
+    finally:
+        c._lock.release()
+    assert c.capture_jpeg(timeout_s=1) == b"\xff\xd8JPEG"
