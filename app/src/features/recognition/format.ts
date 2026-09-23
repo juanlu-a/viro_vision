@@ -8,6 +8,9 @@ import type { Detection, RecognitionEvent } from './types';
 function describe(d: Detection): string {
   if (d.kind !== 'bus_line') return d.label;
   // The destination is what tells two buses of the same line apart, so it is said whenever it came.
+  // With no number the device sends `label: ""`, and "Línea" followed by nothing is a pause where the
+  // user waits for a number that never comes: say the destination alone, like `phraseBusReading`.
+  if (!d.label.trim()) return d.detail ?? '';
   return d.detail ? `Línea ${d.label}, ${d.detail}` : `Línea ${d.label}`;
 }
 
