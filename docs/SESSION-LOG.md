@@ -3050,6 +3050,81 @@ Aclaración que quedó del reporte: **que a veces no diga «se acerca un ómnibu
 línea se decide antes de que el track se confirme —pasó, 1,2 s— la frase se omite a propósito: decirla
 después de «115, Luis Braille» es contar algo que el usuario ya sabe.
 
+## 2026-09-23 — La cámara trabada dejaba muda a la placa, el journal vivía en RAM y la telemetría llevaba dos semanas apagada
+
+Reporte de uso: el modo supermercado daba «el dispositivo no pudo mandar la foto en menos de 4 s» y el
+modo ómnibus no andaba. Rama `fix/camera-hang-and-telemetry`.
+
+### Primero: la placa no contestaba ni con error
+
+Con la placa en modo producto, sin SSH, se la probó por BLE desde la Mac (un script con los comandos
+`photo` y `mode`, sin el teléfono): el `photo` se aceptaba y **no volvía nada** en 15 s —ni bytes ni
+error— y en modo ómnibus pasaban 45 s sin un solo evento. `capture_jpeg` tiene un plazo de 8 s, así
+que un silencio total sólo podía salir de un `_restart` colgado: cerraba la cámara **con el lock de
+captura tomado**, y un sensor trabado se queda en `picam.stop()` para siempre. Cada foto posterior
+esperaba ese lock, en silencio.
+
+Arreglo (`camera.py`): el cierre corre en su propio hilo con plazo de 10 s, y si no vuelve **el proceso
+termina** para que systemd levante uno limpio (`Restart=always`): mientras el handle viejo vive,
+libcamera no deja reabrir el sensor, y un proceso que muere es lo único que lo libera. Y la foto toma
+el lock con plazo: detrás de un reinicio falla diciendo por qué en vez de esperar.
+
+**Quedó confirmado en la prueba real, sin buscarlo**: el usuario desenchufó el cable de la cámara sin
+querer, libcamera reportó `Camera frontend has timed out!`, el vigilante del modo ómnibus intentó
+reabrirla a los 13 s, el cierre se colgó —exactamente la hipótesis— y a los 10 s el daemon se
+reinició solo. Antes de esto, la placa habría quedado muda hasta que alguien la desenchufara. Lo que
+dispara la traba original sigue sin saberse: recién arrancada no se reprodujo en 10 minutos de fotos y
+modo ómnibus, con y sin AP.
+
+### El journal vivía en RAM
+
+La nota vieja lo atribuía al salto de reloj de una placa sin RTC. No: Raspberry Pi OS trae
+`/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf` con `Storage=volatile`, y
+`/var/log/journal/` existía vacío. Un drop-in en `/etc` (`Storage=persistent`, tope 64 MB) lo gana;
+está en `setup.sh` y aplicado en la placa. Ya rindió en la misma sesión: la prueba del usuario se leyó
+entera **después** de reiniciar, con tres arranques en `journalctl --list-boots`.
+
+### La telemetría no registraba nada desde el 2026-09-10
+
+La tabla `events` tenía su último evento a las 01:54 UTC del 2026-09-10; la función `telemetry` se
+desplegó a las 01:58, cuando se renombró desde `telemetria`. La URL configurada —el secret
+`EXPO_PUBLIC_TELEMETRY_URL` y el `app/.env` local— seguía apuntando a `/telemetria`, que ahora da
+404. La cola reintenta tres veces y descarta, así que fallaba en silencio. Se corrigió el secret y el
+`.env`; **vuelve con el próximo build de TestFlight**. Es la misma trampa que ya advierte la derivación
+en `config.ts`: una URL armada a mano que se desincroniza del nombre real.
+
+### «Línea… (silencio)… Ciudad Vieja»
+
+Del log de la prueba: algunas lecturas se decidieron **sin número** (`Bus CIUDAD VIEJA`, `Bus
+CIUDADELA`). La placa manda `label: ""` y el formateador de la app decía `Línea ${label}, ${detail}`:
+la pausa donde el usuario espera un número que no llega. Ahora dice sólo el destino, igual que
+`phraseBusReading`. El parlante de la placa ya lo resolvía (tiene un clip propio para «sin número»).
+
+### Lo que el log dice del modo ómnibus, sin tocar
+
+- 115 a 1,2 s y 1,7 s, bien. **El techo es la cola única de OCR**: en una escena con varias cajas se
+  llenó de lecturas de carteles basura (`P`, `T`, `.`, vacías) de 0,7 a 1,5 s cada una, y el cartel
+  bueno esperó atrás; el track 12 tardó 16,8 s. No se ajustó el umbral: ni la confianza ni el aspecto
+  del cartel separan buenos de basura en este log (uno de 0,84 salió vacío, uno de 0,62 se leyó bien),
+  y fijarlo con una corrida sobre un video es ajustar al set.
+- **Una línea equivocada**: `12 NEPENDENC` se decidió como `Bus 2, NEPENDENC`. Decir una línea
+  incorrecta es peor que no decir nada; es de la reparación contra el catálogo en `bus-banner-recognizer`.
+
+### Operación
+
+- **El conector CSI no es hot-plug**: tras desenchufar y volver a enchufar la cámara, el daemon
+  arranca diciendo `camera ready` pero cada buffer da `Input/output error`, y el estado BLE dice
+  `camera: true`. Sólo un reinicio de la placa la recupera.
+- Recordatorio que costó una vuelta: **modo desarrollo = `SIN-AP` = sin AP** (la placa en la WiFi de
+  casa, con SSH); **modo producto = AP** (el teléfono se une a «ViroVision»). Para probar con el
+  teléfono como se usa, modo producto; el journal persistente permite leer la prueba después.
+
+### Verificación
+
+101 tests + 2 skipped en `hardware/raspi`; en `app`, lint, typecheck y 298 tests. En la placa: fotos
+y modo ómnibus con y sin AP, el reinicio automático ante la cámara desconectada, y la foto de nuevo
+después de reiniciar.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
@@ -3216,10 +3291,17 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   si aparece en la tabla, el atajo está trabajando.
 - Mirar si aparece `NOT advertising` tras una desconexión: es la única hipótesis del lado de la placa
   que sigue sin descartarse.
-- **El journal tiene que sobrevivir a un reinicio** (del 2026-09-14). Es persistente y aun así sólo
-  se ve el último arranque, por el salto de reloj de una placa sin RTC. Es lo que hizo que se
-  perdiera el log de la prueba en modo producto. Sin esto, cualquier falla en la calle es
-  irrecuperable en cuanto alguien apaga y prende.
+- ~~**El journal tiene que sobrevivir a un reinicio**~~ — **cerrado el 2026-09-23**: era
+  `Storage=volatile` de Raspberry Pi OS, no el reloj. Drop-in persistente en `setup.sh`.
+- **Qué traba la cámara** (del 2026-09-23). La placa ya se recupera sola (reinicia el daemon), pero
+  el disparador no se reprodujo. Con el journal persistente, la próxima vez queda el rastro:
+  buscar `frontend has timed out` y `did not close`.
+- **La cola única de OCR se llena de carteles basura** (del 2026-09-23): 16,8 s para decidir un
+  track. Hace falta un criterio medido sobre el set de evaluación, no sobre una corrida.
+- **`Bus 2, NEPENDENC`**: la reparación contra el catálogo dijo una línea equivocada. En
+  `bus-banner-recognizer`.
+- **Verificar la telemetría con el próximo build de TestFlight**: que aparezcan filas nuevas en
+  `events`.
 - **La rotación de conexiones BLE durante el arranque** (del 2026-09-14): cinco conexiones de menos
   de 1,5 s en 30 s, y se calma sola. Sospecha: el GATT se registra ~45 s antes del anuncio, mientras
   la cámara inicializa, y iOS entra con un connect encolado. Cerrarlo con `btmon` durante un arranque.
