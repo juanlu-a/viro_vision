@@ -43,7 +43,9 @@ for wheel in "$INSTALL_DIR"/wheels/*.whl; do
 done
 
 echo "→ Bluetooth: powered on and with the adapter's power saving off"
-rfkill unblock bluetooth || true
+# Through sysfs: the `rfkill` binary is not installed on Raspberry Pi OS Lite. The unit repeats this on
+# every start, because systemd-rfkill restores a saved block on each boot (2026-10-05).
+for d in /sys/class/rfkill/rfkill*; do [ "$(cat "$d/type")" = bluetooth ] && echo 0 > "$d/soft"; done || true
 systemctl enable --now bluetooth.service
 bluetoothctl power on >/dev/null || true
 

@@ -215,7 +215,16 @@ async def _main(args: argparse.Namespace) -> None:
     agent = NoIoAgent()
     await agent.register(bus)
 
-    await adapter.set_powered(True)
+    try:
+        await adapter.set_powered(True)
+    except Exception as exc:
+        # BlueZ answers a blocked radio with a bare `DBusError: Failed`, which says nothing. The usual
+        # cause is an rfkill soft block restored at boot (2026-10-05); the unit lifts it before
+        # starting, so reaching this means something blocked it again or the controller is gone.
+        raise SystemExit(
+            f"could not power the Bluetooth adapter on ({exc}); check `bluetoothctl show` for "
+            "PowerState: off-blocked and /sys/class/rfkill/*/soft"
+        ) from exc
     await adapter.set_alias(args.name)
     # No bonding by default (`link.py` explains why): the app needs no bond, and a bond the phone and
     # the board stop agreeing on is what turns every reconnection into a pairing alert.
