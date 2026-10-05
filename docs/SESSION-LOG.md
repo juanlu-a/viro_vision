@@ -3125,6 +3125,55 @@ la pausa donde el usuario espera un número que no llega. Ahora dice sólo el de
 y modo ómnibus con y sin AP, el reinicio automático ante la cámara desconectada, y la foto de nuevo
 después de reiniciar.
 
+## 2026-10-05 — «No la encuentra ni por BT ni por WiFi»: el Bluetooth estaba bloqueado por rfkill
+
+Reporte: placa prendida hace rato, la app no la encuentra. Sesión abierta para repasar toda la
+conexión; terminó primero en una caída total.
+
+### Diagnóstico
+
+La Mac veía 123 dispositivos BLE y ninguno era la placa: no anunciaba. Sin BLE no hay `tools/ap.py`,
+así que se entró por la microSD: `SIN-AP` y el perfil `Iphone de Juanlu` que ya estaba en `bootfs`,
+con la Mac en el mismo hotspot. La placa apareció en `172.20.10.3`.
+
+El journal (persistente desde el 2026-09-23, y rindió) mostró al daemon en bucle: cada ~5 s
+`adapter.set_powered(True)` → `DBusError: Failed`, `Restart=always`, otra vez. `bluetoothctl show`:
+`PowerState: off-blocked`. **El Bluetooth tenía un bloqueo rfkill por software** y `systemd-rfkill`
+lo reponía en cada arranque desde `/var/lib/systemd/rfkill/platform-soc-amba-3f201000.serial:bluetooth`
+(un `1`). Quién lo bloqueó primero no se sabe; lo que importa es que una vez guardado sobrevive a todo.
+`setup.sh` tenía `rfkill unblock bluetooth || true`, que nunca hizo nada: el binario `rfkill` no
+está instalado en Raspberry Pi OS Lite, y el `|| true` se tragaba el error.
+
+### Arreglo
+
+- `virovision.service`: un `ExecStartPre` que pone en 0 el `soft` de cada rfkill de tipo bluetooth
+  por sysfs, en cada arranque del servicio.
+- `setup.sh`: lo mismo por sysfs en vez del binario que no existe.
+- `__main__.py`: si `set_powered` igual falla, el daemon sale con un mensaje que nombra rfkill en
+  vez de un traceback con `Failed`.
+
+Desplegado en la placa (bytes verificados) y probado a propósito: se bloqueó el Bluetooth
+(`off-blocked`), se reinició el servicio y volvió solo a `on`, anunciando; `tools/ap.py --status`
+la encuentra desde la Mac.
+
+### Lo que quedó
+
+- **La cámara no se detecta**: `rpicam-hello --list-cameras` → «No cameras available!», y el kernel
+  ni la sondea. Es físico (cinta o conector): apagar y reasentar.
+- **La placa volvió a modo producto** al final: `SIN-AP` se borró por SSH desde `/boot/firmware`
+  (sin sacar la tarjeta) y, tras reiniciar, `tools/ap.py --status` la mostró con `ap True` en
+  `10.42.0.1`. Alineada con `staging` salvo `camera.py`, que es el del #105 (más nuevo).
+- El reloj de la placa estaba congelado en el 2026-09-23 (sin RTC, sin NTP mientras no tuvo red):
+  las fechas de `journalctl --list-boots` de esos días no son reales.
+- **La tarjeta ya tiene Ethernet por USB configurado** (`dtoverlay=dwc2` + `modules-load=dwc2,g_ether`)
+  y sigue sin probarse: sería la entrada que no depende de ninguna WiFi.
+- Del repaso de la conexión, sin tocar todavía: (1) **la placa anuncia recién al final del arranque**,
+  después de la cámara y del AP con sus reintentos: cualquier traba ahí la deja invisible (el mismo
+  efecto que hoy, por otra puerta). Anunciar primero. (2) La app reintenta con espera creciente
+  hasta 30 s, sumando hasta medio minuto después de que la placa ya está; en iOS un `connect` sin
+  timeout al identificador recordado se cumple solo al primer anuncio. (3) La telemetría sigue muerta
+  hasta el próximo build de TestFlight (el último es del 2026-09-22; la URL se corrigió el 23).
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

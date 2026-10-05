@@ -114,6 +114,15 @@ con el reloj atrasado) y `getent hosts deb.debian.org` antes de instalar nada.
 - **La cámara no se desenchufa en caliente.** Tras sacar y volver a poner el cable, el daemon dice
   `camera ready` pero cada buffer da `Input/output error` (y el estado BLE, `camera: true`). Sólo
   reiniciar la placa la recupera.
+- **Bluetooth bloqueado por rfkill = placa invisible** (2026-10-05). Síntoma: la app no encuentra la
+  placa, la Mac tampoco (`tools/ap.py --status` → «No apareció»), y la placa está prendida. El journal
+  muestra al daemon cayéndose en bucle en `adapter.set_powered(True)` con `DBusError: Failed`, y
+  `bluetoothctl show` dice `PowerState: off-blocked`. `systemd-rfkill` guarda el bloqueo al apagar y lo
+  repone en cada arranque (`/var/lib/systemd/rfkill/*bluetooth` con un `1`), así que un bloqueo se
+  vuelve permanente. Desde ese día la unidad lo levanta en su `ExecStartPre`; si reaparece, a mano:
+  `echo 0 | sudo tee /sys/class/rfkill/rfkill0/soft` (el binario `rfkill` no está instalado).
+  Sin BLE, el único camino de entrada es la microSD (`SIN-AP` + una WiFi guardada; el hotspot del
+  iPhone sirve si tiene «Maximizar compatibilidad», porque la Zero es sólo 2,4 GHz).
 
 - **`SIN-AP` puede estar «presente» y no existir.** macOS deja un `._SIN-AP` al lado de cada archivo
   que copia a una FAT, y si se borra el real el compañero sobrevive: en un `ls` a los ojos parece que
