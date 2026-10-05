@@ -53,6 +53,14 @@ describe('a bus reading with a destination', () => {
     expect(toAnnouncement(event({ kind: 'bus_line', label: '115', confidence: 0.9 }))).toBe('Línea 115');
   });
 
+  it('says the destination alone when the number was not read', () => {
+    // Reported 2026-09-23: the board decided "Bus CIUDAD VIEJA" with no number and the phone said
+    // "Línea…" then a silence, then the destination.
+    expect(toAnnouncement(event({ kind: 'bus_line', label: '', detail: 'CIUDAD VIEJA', confidence: 0.9 }))).toBe(
+      'CIUDAD VIEJA'
+    );
+  });
+
   it('leaves products alone', () => {
     expect(toAnnouncement(event({ kind: 'product', label: 'Yerba Canarias', confidence: 0.9 }))).toBe(
       'Yerba Canarias'

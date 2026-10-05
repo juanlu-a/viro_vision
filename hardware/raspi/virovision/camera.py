@@ -25,6 +25,18 @@ WATCH_FPS = 15.0
 asking for more only adds frames the Pi drops."""
 # A normal capture takes 200-500 ms; 8 s is "something jammed", not "it is slow". The app waits 20.
 CAPTURE_TIMEOUT_S = 8.0
+CLOSE_TIMEOUT_S = 10.0
+"""How long closing the sensor may take before the camera is given up for this process. Closing a
+healthy camera takes well under a second; a jammed one can block in `stop()` forever, and it does it
+**holding the capture lock**, so every photo after it waits in silence (2026-09-23: the phone got
+nothing, not even an error, and bus mode got no frames)."""
+
+
+def _exit_for_systemd() -> None:
+    """Ends the process so systemd starts a fresh one (`Restart=always`). A dying process is the one
+    thing that makes the kernel release a camera that libcamera will not let go of."""
+    logging.shutdown()
+    os._exit(1)
 
 
 class Camera:
@@ -36,6 +48,8 @@ class Camera:
         self._imx500 = None
         # One capture at a time: BLE (`photo`) and HTTP (`/photos/latest`) can ask at the same time.
         self._lock = threading.Lock()
+        # What to do when the sensor will not even close. Injectable so the tests do not exit.
+        self._give_up = _exit_for_systemd
 
     @property
     def available(self) -> bool:
@@ -148,8 +162,14 @@ class Camera:
         """
         if self._picam is None:
             raise RuntimeError("camera not started")
-        with self._lock:
+        # With a deadline on the lock too: a restart in progress holds it, and a photo that waits
+        # behind a restart that never ends is a photo that never answers. Failing says why.
+        if not self._lock.acquire(timeout=timeout_s):
+            raise TimeoutError(f"the camera is busy restarting; no photo in {timeout_s:.0f} s")
+        try:
             picam = self._picam
+            if picam is None:
+                raise RuntimeError("camera not started")
             result: dict = {}
 
             def capture():
@@ -172,17 +192,35 @@ class Camera:
                 self._restart()
                 raise result["error"]
             return result["jpeg"]
+        finally:
+            self._lock.release()
 
     def _restart(self) -> None:
-        """Closes and reopens the sensor. If it cannot, the camera is left as unavailable and the
-        daemon carries on (the app says the device has no camera)."""
-        try:
-            if self._picam is not None:
-                self._picam.stop()
-                self._picam.close()
-        except Exception as exc:  # noqa: BLE001
-            log.warning("while closing the camera: %s", exc)
-        self._picam = None
+        """Closes and reopens the sensor. If it cannot reopen, the camera is left as unavailable and
+        the daemon carries on (the app says the device has no camera).
+
+        The close has a deadline, in its own thread: a jammed sensor can block in `stop()` for good,
+        and this runs under the capture lock. Past CLOSE_TIMEOUT_S nothing in this process can get the
+        camera back —libcamera will not open it again while the old handle lives— so the process ends
+        and systemd starts a clean one, ~2 s later plus the detector's load. A board that reconnects
+        in under a minute is recoverable; one that answers nothing until someone unplugs it is not."""
+        picam, self._picam = self._picam, None
+        if picam is not None:
+
+            def close():
+                try:
+                    picam.stop()
+                    picam.close()
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("while closing the camera: %s", exc)
+
+            closer = threading.Thread(target=close, name="camera-close", daemon=True)
+            closer.start()
+            closer.join(CLOSE_TIMEOUT_S)
+            if closer.is_alive():
+                log.critical("the camera did not close in %.0f s; restarting the daemon to free it", CLOSE_TIMEOUT_S)
+                self._give_up()
+                return
         self.start()
 
 
