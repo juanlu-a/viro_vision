@@ -9,6 +9,13 @@ Requires=bluetooth.service
 [Service]
 Type=simple
 WorkingDirectory=__INSTALL_DIR__
+# Lift any rfkill soft block on Bluetooth before BlueZ is asked to power the adapter on. systemd-rfkill
+# saves the block state on shutdown and restores it on every boot, so one block — whoever set it —
+# becomes permanent: on 2026-10-05 the board booted with `PowerState: off-blocked`, `set_powered`
+# failed with a bare `DBusError: Failed`, and the daemon crash-looped without ever advertising: the
+# phone could not find it at all. Written to sysfs because the `rfkill` binary is not installed on
+# Raspberry Pi OS Lite (which is also why setup.sh's `rfkill unblock` never did anything).
+ExecStartPre=-/bin/sh -c 'for d in /sys/class/rfkill/rfkill*; do [ "$(cat $d/type)" = bluetooth ] && echo 0 > $d/soft; done; true'
 # Ask the controller for the shortest connection interval it allows (7.5-15 ms): each interval
 # carries a few notifications, so the interval IS the throughput. iOS negotiates it towards 15 ms.
 # The "-" makes a missing debugfs not prevent startup.
