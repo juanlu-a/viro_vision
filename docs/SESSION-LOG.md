@@ -3579,3 +3579,65 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   está cargando; calibrar la curva contra una descarga real con el medidor USB; anunciar la batería por
   voz al conectar.
 
+
+## 2026-10-06 (cont. 4) — Revisión del codebase entero, y los errores sólo a la telemetría (ADR 0011)
+
+- **Pedido**: revisar todo el código (app y placa) con el loop de revisión multi-modelo, optimizar y
+  ordenar, todo en un PR; y que **la app no muestre errores**: cualquier error o log va a Supabase,
+  y el usuario no se entera.
+- **Cómo**: rama `chore/codebase-review-silent-telemetry` en un worktree aparte (hay sesiones
+  paralelas sobre el checkout). Revisores en paralelo — Opus sobre la app, Opus sobre la placa y
+  Supabase, Sonnet transversal, Haiku (sin hallazgos) — y después dos rondas más sobre el diff hasta
+  que no quedó ningún crítico ni mayor. Codex no corrió: la cuenta de ChatGPT no soporta el modelo
+  que pide.
+- **La decisión (ADR 0011)**: el texto de un error no llega nunca a la pantalla ni a la voz. Se
+  cortaron `La nube no respondió (VISION_HTTP_500)`, la foto fallida que leía en voz alta `the
+  device did not answer in 4 s`, la IP y el error del sistema al unirse a la red, y los avisos de la
+  placa dichos tal cual (`unknown command: say`). Lo que queda es una frase fija de `es.ts` que dice
+  qué hacer — **callar del todo no es opción**: el silencio después del botón es un dispositivo roto
+  para quien no ve. Los avisos internos (placa, escritura de modo) sí se callan del todo, y la
+  pestaña Dispositivo perdió el panel de «último aviso».
+- **Lo que antes no llegaba a ningún lado y ahora llega a `events`**: `console.*` (`app.log`, con
+  presupuesto), promesas rechazadas sin manejar (tracker de Hermes, sólo en release), errores de
+  dibujo (`ErrorBoundary` raíz con pantalla neutra → `app.renderError`), los `catch` silenciosos del
+  cliente BLE (`ble.monitorError`, `ble.readFailed`) y **los logs de la placa**: `log_relay.py` manda
+  las líneas WARNING+ como `{t:'log'}` por BLE (10/min, las últimas 20 guardadas mientras no hay
+  teléfono, con `ago` al reenviarlas) y la app las guarda como `device.log`. La telemetría arranca a
+  nivel de módulo: desde el efecto del layout se encendía después de que montaban los providers.
+- **Bugs reales encontrados y arreglados en la app**:
+  - `withTimeout` de `join.ts` lanzaba dentro del timer: **el tope de 25 s de la unión al WiFi nunca
+    cortaba nada** y la red podía quedar «uniéndose» para siempre.
+  - Refrescar la pestaña Dispositivo estando conectado **apilaba otra tanda de monitores BLE**: todo
+    evento, modo y estado llegaba dos veces. Además ble-plx no cancela el monitor nativo al
+    `remove()`, así que los callbacks llevan ahora una generación de enlace.
+  - Una espera de cuota de 45 s se anunciaba («Sigo en 45 s») dentro de un plazo de 12 s y el plazo
+    la cortaba con «Tardó demasiado». Ahora, si no entra (con 5 s de reserva para la llamada), falla
+    al instante como cuota agotada.
+  - La entrega de la lectura al parlante de la placa no tenía tope: un POST colgado dejaba la
+    lectura «en curso» y cada botón se ignoraba. Tope de 8 s; si vence, habla el teléfono.
+  - El caché de fotos y de MP3 crecía sin límite; ahora queda el último.
+  - Bluetooth apagado decía «no encontré el dispositivo»; ahora tiene su error y su frase.
+  - Desconectar mientras conectaba anunciaba igual la conexión.
+- **Bugs reales en la placa**: el **modo ómnibus moría para siempre después de un reinicio de la
+  cámara** (el loop de frames quedaba con el handle viejo y el watchdog reiniciaba en bucle,
+  recargando el `.rpk`); un nombre de red largo pasaba el `status` de 180 bytes y **el daemon
+  entraba en crash-loop**; `measure` por BLE aceptaba cualquier tamaño (OOM); `/audio` llenaba
+  `/tmp` (tmpfs = RAM); `ip`/`nmcli` corrían sobre el loop que atiende BLE; carreras en la cola de
+  audio y en el arranque/parada del modo ómnibus. La función de telemetría valida evento por evento y
+  reintenta fila por fila: un evento malo ya no tira un lote de 100.
+- **Ordenado**: comentarios en español traducidos (ADR 0009), docblocks que contradecían el código,
+  código muerto (`storage/settings.ts`, `text-field.tsx`, el `reset-project` de la plantilla de Expo,
+  cadenas sin uso).
+
+### Pendientes de esta sesión
+- **Probar en la placa** lo que no se pudo probar acá: forzar un reinicio de la cámara en modo
+  ómnibus y ver que siguen llegando detecciones (se reutiliza el handle del IMX500; si vuelven frames
+  sin detecciones, el fallback es `self._imx500 = None` en `_restart`); reiniciar el daemon con el
+  teléfono conectado y ver `device.log` en la tabla; `systemctl stop` con NetworkManager lento.
+- **Desplegar las dos funciones** (`telemetry`, `vision`) y verificar qué cabecera de IP llega
+  (`cf-connecting-ip` / `x-real-ip`), como dice el docblock de `vision`.
+- **Sin tocar, a decidir**: `features/auth` y `services/supabase` no se montan en ningún lado
+  (login planeado); dependencias que nadie importa (`@expo/ui`, `expo-device`, `expo-web-browser`,
+  `expo-glass-effect`) — sacarlas cambia el build nativo; el botón de leer en modo ómnibus corre OCR
+  en el teléfono y descarga ~250 MB la primera vez; anunciar la batería baja por voz; selector de
+  modelo y de salida duplicados (`RadioSheet`); la AP con contraseña fija en el repo.
