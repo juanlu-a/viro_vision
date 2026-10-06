@@ -167,6 +167,13 @@ interface ReachDeps {
   /** Cheap check before asking the system: two quick probes. Pays ~1 s at most, saves a prompt. */
   quickAttempts?: number;
   quickTimeoutMs?: number;
+  /**
+   * Cap on each probe while waiting for the join. A probe sent before the phone has an address on the
+   * device's network cannot succeed and only ends when it times out, so the cap is how late the
+   * first good probe can start. Measured 2026-10-06: the phone got its DHCP lease and the next
+   * `/health` landed 2.5 s later, with the old 3 s cap. The device answers in well under 1 s.
+   */
+  joinProbeTimeoutMs?: number;
   /** How long to keep probing after the system said it joined: DHCP and the route take a moment. */
   settleMs?: number;
   /** Probe-only budget, for a device on the same network as the phone (no AP, nothing to join). */
@@ -200,6 +207,7 @@ export async function reachDeviceNetwork(
     now = Date.now,
     quickAttempts = 2,
     quickTimeoutMs = 1_000,
+    joinProbeTimeoutMs = 1_000,
     settleMs = 8_000,
     plainMs = 9_000,
     intervalMs = 300,
@@ -235,7 +243,7 @@ export async function reachDeviceNetwork(
   );
 
   while (true) {
-    if (await probe(target, 3_000)) return { ok: true, via: 'joined' };
+    if (await probe(target, joinProbeTimeoutMs)) return { ok: true, via: 'joined' };
     const done = request.settled;
     if (done?.error) {
       const err = done.error;

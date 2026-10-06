@@ -3213,6 +3213,40 @@ busca. Una placa que terminaba de arrancar durante una pausa esperaba al próxim
   anuncio) quedó sin hacer: con un identificador viejo nunca escanearía. Con pausas de 5 s rinde
   menos de lo que costaría.
 
+## 2026-10-06 (cont.) — Los 15 s entre el «OK» del cartel y la red lista, desarmados
+
+Reporte: Bluetooth lento y, tras aceptar el cartel de la WiFi, ~15 s hasta conectar; reabrir la app
+después conectó rápido. **La telemetría volvió** (build `202610052158`, el del #105) y es lo que
+permitió desarmarlo. Para leerla: un token personal de la cuenta de ViroVision en
+`~/.config/virovision/supabase-token` y `SUPABASE_ACCESS_TOKEN=$(cat …) supabase db query --linked`
+(la CLI de la Mac está logueada en otra organización).
+
+- **El Bluetooth no fue lento**: `ble.connected` 1,6 s, 0,4 s, 1,5 s y 1,7 s en las cuatro sesiones.
+- Las reaperturas: `wifi.ready` en 0,14–0,45 s, `via: already`, sin cartel. Eso ya anda.
+- **La WiFi de la primera: 15,8 s**, `via: joined`. Cruzado con el journal de la placa (que atrasaba
+  140,4 s: en modo AP no hay NTP; se alineó con el instante de la conexión BLE):
+
+| tramo | duración |
+|---|---|
+| `wifi.joining` → cartel aceptado | 3,6 s (la persona) |
+| OK → `AP-STA-CONNECTED` + 4-way | 3,3 s (iOS) |
+| asociado → primer `DHCPDISCOVER` | **5,2 s** |
+| DISCOVER → `DHCPACK` | 1,1 s |
+| `DHCPACK` → primer `/health` que contesta | **2,5 s** |
+
+El último tramo es de la app: cada sondeo durante el join tenía tope de 3 s, y uno mandado antes de
+tener IP sólo termina al vencer. Baja a 1 s (`joinProbeTimeoutMs`).
+
+El de 5,2 s queda abierto: los dos `DHCPDISCOVER` llegaron a dnsmasq **en el mismo milisegundo**, y
+iOS los manda separados por ≥1 s, así que algo los retuvo del lado de la placa. No es el ahorro de
+energía (ya está en `wifi.powersave = 2`, `iw` dice off). La sospecha es la **coexistencia BT/WiFi**
+del BCM43436 con el intervalo de conexión BLE en 7,5–15 ms, que se fijó cuando la foto viajaba por
+BLE y ya no hace falta. Sin probar: la prueba es un `tcpdump` en `wlan0` durante un join forzado
+(olvidar la red en el iPhone).
+
+De paso: **la cámara volvió** y, con el arranque nuevo, el anuncio salió 1,8 s después del
+`Started` y la cámara con el detector quedó lista 4 s después — no el minuto que temíamos.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
