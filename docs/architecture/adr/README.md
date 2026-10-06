@@ -13,6 +13,8 @@ Format: short Markdown, numbered `NNNN-title.md`, status one of Proposed / Accep
 | [0007](0007-botones-fisicos-modos-de-operacion.md) | Botones físicos y modos de operación del dispositivo | Proposed — a validar con tutor (actualizado 2026-09-13 — tiempos del botón calibrados y el pedido de lectura usa el modo que manda la placa) |
 | [0008](0008-proxy-propio-para-claves-de-nube.md) | Un proxy propio para las claves de los modelos de nube | Accepted |
 | [0009](0009-idioma-del-codigo.md) | El código en inglés, la app y la tesis en español | Accepted |
+| [0010](0010-modo-oscuro-unico.md) | Un solo tema (oscuro) y una sola línea de estado del dispositivo | Accepted |
+| [0011](0011-errores-solo-en-telemetria.md) | Los errores van a la telemetría, nunca al usuario | Accepted |
 
 ### To backfill (decisions already made in the thesis, not yet written as ADRs)
 - Hardware platform: **Raspberry Pi Zero 2 W + AI Camera (IMX500)** (el Coral y la Camera Module 3 salieron el 2026-09-07 / 2026-09-05).

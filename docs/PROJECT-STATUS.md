@@ -126,6 +126,9 @@ tests via `jest-expo`.
   `features/recognition/`. Cola con tope que descarta lo viejo, porque unido al AP de la placa hay
   WiFi sin internet y los envíos fallan seguido. Se enciende con `EXPO_PUBLIC_TELEMETRY_URL`; vacía,
   queda apagada entera. Detalle en [`docs/supabase.md`](supabase.md).
+  **Desde el 2026-10-06 (ADR 0011) es el único lugar de los errores**: la app no muestra ni dice el
+  texto de ninguno, y además captura `console.*`, rechazos de promesas sin manejar, errores de dibujo
+  (`ErrorBoundary` raíz) y los logs WARNING+ de la placa, que llegan por BLE (`device.log`).
 - **Idioma del código (2026-09-09, ADR 0009)**: todo el código pasó a inglés — identificadores,
   archivos, comentarios, tests, y también las **fronteras**: el protocolo BLE, los endpoints de la
   placa (`/health`, `/measure/<n>`, `/photos/latest`), los flags del daemon (`--no-ap`) y el esquema

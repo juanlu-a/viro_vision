@@ -100,6 +100,12 @@ error transporta un dato accionable (cuánto esperar, qué status), va como camp
 **alguien tiene que leerlo**: hubo un bug real donde `VISION_STREAM_ERROR` mostraba su propio nombre
 y el detalle quedaba en un campo que nadie miraba.
 
+**El texto de un error nunca llega al usuario (ADR 0011, 2026-10-06).** Ni en pantalla ni en voz:
+nada de `` `${t.algo} ${err.message}` ``. El error va a la telemetría con
+`record(tipo, { detail: { message: errorDetail(err), type: errorType(err) } })` y al usuario le llega
+una clave fija de `es.ts` que dice qué hacer. Un `catch` que no registra nada es un bug: si el error
+no le importa al usuario, igual le importa a quien lee la tabla `events`.
+
 ## Tests
 
 - **Co-locados**: `foo.test.ts` al lado de `foo.ts`. No hay carpeta `__tests__/`.
