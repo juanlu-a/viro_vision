@@ -227,6 +227,9 @@ function scheduleNextUpload(): void {
 export function startTelemetry(options: TelemetryOptions = {}): () => void {
   const url = options.url ?? defaultUrl;
   if (url.length === 0) return () => {};
+  // Once per process: a second call (a fast refresh re-running the root layout's module) would
+  // chain the global handler to itself and wrap the console twice, recording every line double.
+  if (state.enabled) return () => {};
 
   state.url = url;
   state.fetchImpl = options.fetchImpl ?? fetch;

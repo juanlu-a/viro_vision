@@ -4,12 +4,8 @@
  * Keep every user-facing string here so screen-reader labels stay consistent and translatable.
  */
 export const es = {
-  common: {
-    back: 'Atrás',
-  },
   app: {
     name: 'ViroVision',
-    tagline: 'Asistente de reconocimiento por voz',
   },
   tabs: {
     home: 'Inicio',
@@ -47,6 +43,7 @@ export const es = {
     preparing: 'Preparando el lector… la primera vez descarga unos 250 MB.',
     reading: 'Leyendo…',
     line: 'Línea',
+    alsoSeen: 'También',
     nothingRead: 'No pude leer el cartel. Probá con una foto más de cerca.',
     // «Elemento no reconocible» y no «no pude identificar el producto»: desde el 2026-09-11 el modo
     // no se limita a productos envasados —identifica cualquier alimento— así que «producto» era

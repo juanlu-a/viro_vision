@@ -3,15 +3,21 @@
  * auditory feedback consistent and easy to tune (the thesis calls for clear, non-overwhelming
  * announcements that prioritize the most relevant item).
  */
+import { strings } from '@/i18n';
+
 import type { Detection, RecognitionEvent } from './types';
+
+const t = strings.reader;
 
 function describe(d: Detection): string {
   if (d.kind !== 'bus_line') return d.label;
   // The destination is what tells two buses of the same line apart, so it is said whenever it came.
   // With no number the device sends `label: ""`, and "Línea" followed by nothing is a pause where the
   // user waits for a number that never comes: say the destination alone, like `phraseBusReading`.
-  if (!d.label.trim()) return d.detail ?? '';
-  return d.detail ? `Línea ${d.label}, ${d.detail}` : `Línea ${d.label}`;
+  // And with neither, an empty string was a silent announcement — the one outcome a voice interface
+  // cannot have. What is known is that a bus is there.
+  if (!d.label.trim()) return d.detail || t.announceBusApproaching;
+  return d.detail ? `${t.line} ${d.label}, ${d.detail}` : `${t.line} ${d.label}`;
 }
 
 /**
@@ -23,5 +29,5 @@ export function toAnnouncement(event: RecognitionEvent, mentionOthers = false): 
   if (!mentionOthers || event.others.length === 0) return primary;
 
   const others = event.others.map(describe).join(', ');
-  return `${primary}. También: ${others}`;
+  return `${primary}. ${t.alsoSeen}: ${others}`;
 }

@@ -56,6 +56,7 @@ describe('a bus reading with a destination', () => {
   it('says the destination alone when the number was not read', () => {
     // Reported 2026-09-23: the board decided "Bus CIUDAD VIEJA" with no number and the phone said
     // "Línea…" then a silence, then the destination.
+    expect(toAnnouncement(event({ kind: 'bus_line', label: '', confidence: 0.9 }))).toBe('Se acerca un ómnibus.');
     expect(toAnnouncement(event({ kind: 'bus_line', label: '', detail: 'CIUDAD VIEJA', confidence: 0.9 }))).toBe(
       'CIUDAD VIEJA'
     );

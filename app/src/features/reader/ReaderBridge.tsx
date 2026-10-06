@@ -25,6 +25,7 @@ import { MODE_FROM_GATT } from '@/features/device/gatt';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
 import { configureReader, readFromDevice, setModeFromDevice } from '@/features/reader/readingService';
 import { getBleClient } from '@/services/ble/bleClient';
+import { record } from '@/services/telemetry';
 import { strings } from '@/i18n';
 
 export function ReaderBridge() {
@@ -94,7 +95,11 @@ export function ReaderBridge() {
   useEffect(
     () =>
       getBleClient().onRecognition((event) => {
-        if (getAudioOutput() === 'phone') void announceRecognition(event);
+        // Recorded like every other spoken path: this is the bus surveillance — the product's main
+        // mode — and until 2026-10-06 it was the one voice that left no row at all.
+        const target = getAudioOutput();
+        record('audio.spoken', { detail: { mode: 'bus', source: 'recognition', target } });
+        if (target === 'phone') void announceRecognition(event);
       }),
     [],
   );
@@ -106,7 +111,9 @@ export function ReaderBridge() {
   useEffect(
     () =>
       getBleClient().onBusApproaching(() => {
-        if (getAudioOutput() === 'phone') void announce(strings.reader.announceBusApproaching);
+        const target = getAudioOutput();
+        record('audio.spoken', { detail: { mode: 'bus', source: 'approaching', target } });
+        if (target === 'phone') void announce(strings.reader.announceBusApproaching);
       }),
     [],
   );

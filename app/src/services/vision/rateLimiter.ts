@@ -73,11 +73,17 @@ export interface SlotOptions {
 /** Sleeps `ms`, or cuts short when the run is cancelled. */
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    const id = setTimeout(resolve, ms);
-    signal?.addEventListener('abort', () => {
+    const onAbort = () => {
       clearTimeout(id);
       resolve();
-    });
+    };
+    // Removed when the wait ends on its own: one reading's signal goes through several waits, and
+    // each left a listener behind.
+    const id = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 
