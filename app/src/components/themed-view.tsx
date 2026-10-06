@@ -1,5 +1,5 @@
 /**
- * Vista con fondo del tema. Por defecto el fondo de pantalla.
+ * View with the theme background. Defaults to the screen background.
  */
 import { View, type ViewProps } from 'react-native';
 

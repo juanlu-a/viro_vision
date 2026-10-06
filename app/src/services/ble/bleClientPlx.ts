@@ -98,11 +98,11 @@ export function createBleClientPlx(): BleClient | null {
 class BleClientPlx implements BleClient {
   private device: Device | null = null;
   /**
-   * Toda operación de característica pasa por acá, en el orden en que se pidió.
+   * Every characteristic operation goes through here, in the order it was requested.
    *
-   * El motivo completo está en `serialize.ts`: un aviso escrito sin `await` mientras la app leía la
-   * característica `wifi` dejaba al teléfono sin credenciales para unirse al AP. No cubre las
-   * notificaciones, que no son operaciones.
+   * The full reason is in `serialize.ts`: a notice written without `await` while the app read the
+   * `wifi` characteristic left the phone without credentials to join the AP. It does not cover
+   * notifications, which are not operations.
    */
   private readonly gatt = createSerializer();
   private subscriptions: Subscription[] = [];
@@ -288,9 +288,9 @@ class BleClientPlx implements BleClient {
   }
 
   /**
-   * Calla el parlante de la placa. Sin respuesta y sin esperar: se manda justo antes de que el
-   * teléfono empiece a hablar, y un ack tardío no cambiaría nada — lo que importa es que el `aplay`
-   * de la placa reciba su `terminate` cuanto antes.
+   * Silences the board's speaker. Without a response and without waiting: it is sent right before
+   * the phone starts speaking, and a late ack would change nothing — what matters is that the
+   * board's `aplay` gets its `terminate` as soon as possible.
    */
   async hushDevice(): Promise<void> {
     const device = this.device;

@@ -45,10 +45,10 @@ export const es = {
     line: 'Línea',
     alsoSeen: 'También',
     nothingRead: 'No pude leer el cartel. Probá con una foto más de cerca.',
-    // «Elemento no reconocible» y no «no pude identificar el producto»: desde el 2026-09-11 el modo
-    // no se limita a productos envasados —identifica cualquier alimento— así que «producto» era
-    // angosto, y esto también cubre el caso de apuntar a algo que no es un alimento. Conserva el qué
-    // hacer: quien no ve la pantalla no tiene otra forma de saber que hay un remedio.
+    // «Elemento no reconocible» and not «no pude identificar el producto»: since 2026-09-11 the mode
+    // is not limited to packaged products —it identifies any food— so «producto» was too narrow,
+    // and this also covers pointing at something that is not food. It keeps the what-to-do: someone
+    // who cannot see the screen has no other way of knowing there is a remedy.
     nothingReadProduct: 'Elemento no reconocible. Probá con una foto más de cerca.',
     error: 'No pude leer. Probá de nuevo.',
     readTimedOut: 'Tardó demasiado. Probá de nuevo.',
@@ -99,8 +99,9 @@ export const es = {
     batteryUnknown: 'todavía sin informar',
     batteryLow: 'batería baja',
     wifiReadyAnnounce: 'Red con el dispositivo lista.',
-    // Sin el motivo, a propósito (2026-10-06): qué paso de la unión falló, la IP o el texto del
-    // sistema van a la telemetría. Al oído llega sólo que falta la red y qué se puede hacer.
+    // Without the reason, on purpose (2026-10-06): which step of the join failed, the IP or the
+    // system's text go to telemetry. The ear only gets that the network is missing and what can be
+    // done.
     wifiFailedAnnounce: 'Todavía no pude conectarme a la red del dispositivo. Sigo intentando.',
   },
   settings: {
@@ -115,15 +116,15 @@ export const es = {
     audioOutputDevice: 'En el dispositivo',
     audioOutputDeviceHint:
       'Los modos y las lecturas salen por el parlante del dispositivo. Los anuncios de modo y el modo ómnibus están grabados y no necesitan internet; sólo la lectura del supermercado se sintetiza en la nube y tarda un poco más. Si el dispositivo no está disponible, suena en el teléfono.',
-    // El reparto quedó fijado el 2026-09-17 (ADR 0003): la conexión y la red las dice SIEMPRE el
-    // teléfono, porque cuando se anuncian el dispositivo recién existe para la app y el usuario está
-    // emparejando con el teléfono en la mano. La nota dice lo que este ajuste NO alcanza, que es lo
-    // único que puede sorprender.
+    // The split was fixed on 2026-09-17 (ADR 0003): the connection and the network are ALWAYS
+    // spoken by the phone, because when they are announced the device has just come into existence
+    // for the app and the user is pairing with the phone in hand. The note says what this setting
+    // does NOT reach, which is the only thing that can surprise.
     audioOutputBusNote:
       'Los avisos de conexión y de red se escuchan siempre en el teléfono. En el dispositivo los anuncios de modo están grabados, así que funcionan sin internet.',
-    // La confirmación del selector, entera por destino: es el texto que el teléfono dice y también
-    // el que está grabado en la placa (`hardware/raspi/virovision/notices.py`), y los dos tienen que
-    // decir lo mismo o el usuario escucha una frase distinta según dónde la escuche.
+    // The selector's confirmation, whole per destination: it is the text the phone says and also
+    // the one recorded on the board (`hardware/raspi/virovision/notices.py`), and both must say the
+    // same thing or the user hears a different phrase depending on where they hear it.
     audioOutputSetToPhone: 'Dónde se escucha: en el teléfono.',
     audioOutputSetToDevice: 'Dónde se escucha: en el dispositivo.',
     audioOutputNotConfigured: 'En esta versión la lectura del supermercado va a sonar en el teléfono.',
@@ -148,8 +149,8 @@ export const es = {
     signOut: 'Cerrar sesión',
     signOutHint: 'Cierra tu sesión en este dispositivo.',
   },
-  // La pantalla que reemplaza a una que se rompió al dibujarse (2026-10-06). Sin la palabra «error»
-  // ni ningún detalle, a propósito: el detalle va a la telemetría y al usuario le llega sólo qué hacer.
+  // The screen that replaces one that broke while rendering (2026-10-06). Without the word «error»
+  // or any detail, on purpose: the detail goes to telemetry and the user only gets what to do.
   recovery: {
     message: 'Volvamos a empezar.',
     restart: 'Volver a empezar',
@@ -160,8 +161,8 @@ export const es = {
     scanning: 'Buscando dispositivo…',
     connecting: 'Conectando…',
     connected: 'Conectado',
-    // Dicho en voz alta, no mostrado: «Conectado» a secas alcanza en pantalla, donde está al lado
-    // del nombre del dispositivo, pero suelto en el oído no dice conectado a qué.
+    // Said aloud, not shown: a bare «Conectado» is enough on screen, where it sits next to the
+    // device name, but on its own in the ear it does not say connected to what.
     connectedAnnounce: 'Dispositivo conectado.',
     // Amber on the Device tab: the Bluetooth link is up but the photo path is not. Only what is
     // missing, in brackets; the reason and the remedy go in the notice below, not here.

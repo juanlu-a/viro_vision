@@ -46,53 +46,54 @@ export interface Notice {
  */
 export const NOTICES = {
   /**
-   * El enlace y la red son del teléfono, siempre (decisión del 2026-09-17).
+   * The link and the network are the phone's, always (decision of 2026-09-17).
    *
-   * No es una limitación técnica sino el orden de los hechos: cuando se anuncia que el dispositivo
-   * se conectó, el dispositivo **acaba de existir** para la app, y el usuario está con el teléfono
-   * en la mano emparejando, no con los anteojos puestos. Un aviso sobre el enlace que viaja por ese
-   * mismo enlace es circular, y el que dice que la red falló no puede ir por la red.
+   * This is not a technical limitation but the order of events: when the device's connection is
+   * announced, the device **has just come into existence** for the app, and the user is pairing
+   * with the phone in hand, not wearing the glasses. A notice about the link that travels over that
+   * same link is circular, and the one saying the network failed cannot go over the network.
    *
-   * La versión anterior sí los mandaba a la placa y costó caro: la escritura BLE del aviso salía en
-   * el mismo instante en que la app leía la característica `wifi` para unirse al AP, y el teléfono
-   * se quedaba sin credenciales. Con la salida en «teléfono» el mismo build andaba. Ver
+   * The previous version did send them to the board and it cost dearly: the BLE write of the notice
+   * went out at the very moment the app read the `wifi` characteristic to join the AP, and the phone
+   * was left without credentials. With the output set to "phone" the same build worked. See
    * `services/ble/serialize.ts`.
    */
   connected: { clip: null, say: strings.connection.connectedAnnounce },
-  /** La placa no puede anunciar su propia ausencia. */
+  /** The board cannot announce its own absence. */
   connectionLost: { clip: null, say: strings.connection.lost },
   networkReady: { clip: null, say: strings.connect.wifiReadyAnnounce },
   networkFailed: { clip: null, say: strings.connect.wifiFailedAnnounce },
 
   /**
-   * Los modos sí: son lo que el usuario escucha **con los anteojos puestos y el teléfono guardado**,
-   * que es la situación del producto. Junto con las lecturas de cada modo, es todo lo que la placa
-   * dice.
+   * The modes do go to the board: they are what the user hears **with the glasses on and the phone
+   * put away**, which is the product's situation. Together with each mode's readings, it is
+   * everything the board says.
    */
   modeIdle: { clip: 'mode_idle.wav', say: strings.reader.announceIdle },
   modeBus: { clip: 'mode_bus.wav', say: strings.reader.announceBus },
   modeSupermarket: { clip: 'mode_supermarket.wav', say: strings.reader.announceSupermarket },
   /**
-   * El modo ómnibus tarda decenas de segundos en estar listo después de prender la placa: es lo que
-   * demora en cargar el OCR. Apretar el botón dentro de esa ventana dejaba al dispositivo **mudo**
-   * (2026-09-22), que para alguien que no ve la pantalla es lo mismo que un dispositivo muerto.
+   * Bus mode takes tens of seconds to be ready after the board is switched on: that is how long
+   * the OCR takes to load. Pressing the button inside that window left the device **mute**
+   * (2026-09-22), which for someone who cannot see the screen is the same as a dead device.
    *
-   * Va con los modos y no con las fallas del dispositivo: no es la placa en problemas, es la placa
-   * que todavía no está lista, y nada del canal de avisos está roto mientras esto suena. Lo dispara
-   * la placa, que es la única que sabe si su OCR terminó de cargar.
+   * It goes with the modes and not with the device failures: the board is not in trouble, it is
+   * just not ready yet, and nothing in the notice channel is broken while this plays. The board
+   * triggers it, being the only one that knows whether its OCR has finished loading.
    */
   busWarmingUp: { clip: 'bus_warming_up.wav', say: strings.reader.announceBusWarmingUp },
   /**
-   * El chirp del instante en que se pide una lectura. Va con los modos y no con el enlace porque es
-   * propio de la lectura: confirma que el botón hizo algo durante los segundos que tarda la nube.
+   * The chirp at the instant a reading is requested. It goes with the modes and not with the link
+   * because it belongs to the reading: it confirms the button did something during the seconds the
+   * cloud takes.
    */
   readingStarted: { clip: 'earcon_start.wav', say: null },
 
   /**
-   * Las dos que verifican la salida misma, y por eso siguen el ajuste aunque no sean de un modo:
-   * una confirmación de «se escucha en el dispositivo» dicha por el teléfono no confirma nada, y un
-   * botón de «probar audio» que suena siempre en el teléfono prueba justo lo que no se preguntó.
-   * Ninguna de las dos corre durante una secuencia BLE: las dispara el usuario desde Ajustes.
+   * The two that verify the output itself, and so follow the setting even though they belong to no
+   * mode: a "heard on the device" confirmation spoken by the phone confirms nothing, and a "test
+   * audio" button that always plays on the phone tests exactly what was not asked. Neither runs
+   * during a BLE sequence: the user triggers them from Settings.
    */
   outputSetToPhone: { clip: null, say: strings.settings.audioOutputSetToPhone },
   outputSetToDevice: { clip: 'output_device.wav', say: strings.settings.audioOutputSetToDevice },

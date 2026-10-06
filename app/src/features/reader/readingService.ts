@@ -233,9 +233,9 @@ async function deliverReading(text: string): Promise<void> {
     synthesisEnabled: isSynthesisEnabled,
   });
   if (delivery.target === 'device') {
-    // Una voz por vez: el teléfono se calla antes de que hable la placa. Cada salida ya se
-    // interrumpía a sí misma y ninguna a la otra, y dos voces encimadas no son información para
-    // quien no ve la pantalla.
+    // One voice at a time: the phone goes quiet before the board speaks. Each output already
+    // interrupted itself and neither the other, and overlapping voices are not information for
+    // someone who cannot see the screen.
     stopSpeaking();
     if (await sendReadingToDevice(text)) {
       record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'device' } });
@@ -245,8 +245,8 @@ async function deliverReading(text: string): Promise<void> {
   } else if (delivery.fallback) {
     record('audio.fallback', { detail: { reason: delivery.fallback } });
   }
-  // Y al revés: si habla el teléfono, la placa se calla. Sin `await`, para no demorar la lectura
-  // detrás de una escritura BLE.
+  // And the other way round: if the phone speaks, the board goes quiet. No `await`, so the reading
+  // is not delayed behind a BLE write.
   void deps.hushDevice().catch(() => {});
   await announce(text);
   record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'phone' } });
@@ -345,7 +345,10 @@ async function readBus(uri: string): Promise<void> {
   // bus mode has to work with no internet (ADR 0001, ADR 0006) and sending it to the device needs a
   // cloud synthesis, so it can never be the only output here. The phone has already spoken; this is
   // unawaited and swallows its own errors. ADR 0003's real answer for the bus is **prerecorded clips
-  // on the board's SD**, which do not exist yet.
+  // on the board's SD**: the board has them now (`bus_banner.announcements`, a `.wav` per line and
+  // destination, plus the notices in `hardware/raspi/virovision/notices.py`), but this reading is
+  // OCR'd on the phone and nothing here asks the board to play a clip for it, so this copy still
+  // goes through synthesis.
   if (isSynthesisEnabled) void sendReadingToDevice(spoken);
 }
 
@@ -448,9 +451,10 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   }
   reading = true;
 
-  // Both of these happen BEFORE the first await, and that order is the point. The session has to be
-  // taken while iOS is still giving us the execution slot the BLE notification bought, and the chirp
-  // is the user's only sign —and ours— that the button did something at all.
+  // Both of these happen right at the start, before any of the slow work (photo, OCR, cloud), and
+  // that order is the point. The session is the first thing awaited, while iOS is still giving us
+  // the execution slot the BLE notification bought, and the chirp follows immediately: it is the
+  // user's only sign —and ours— that the button did something at all.
   const audio = await beginReadingAudio();
   record('audio.session', { detail: { ok: audio, source } });
   // Through the notice router since 2026-09-16, so the chirp comes out of the same place as the

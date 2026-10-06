@@ -75,9 +75,9 @@ export async function notify(id: SystemNotice): Promise<AudioOutput> {
   // The whole device path is inside the try, the decision included: `isLinked` is the BLE client
   // reaching into a native module, and a notice that throws instead of falling back to the phone
   // would take down whatever BLE callback called it.
-  // Consultado una sola vez y guardado: lo necesitan la decisión y, más abajo, el silenciado de la
-  // placa. Si `isLinked` explota queda en `false`, que es la respuesta segura — no se le habla a un
-  // enlace que no sabemos si existe.
+  // Queried once and kept: the decision needs it and, further down, so does hushing the board. If
+  // `isLinked` blows up it stays `false`, the safe answer — we do not talk to a link we do not know
+  // exists.
   let linked = false;
   try {
     linked = deps.isLinked();
@@ -89,10 +89,10 @@ export async function notify(id: SystemNotice): Promise<AudioOutput> {
       hasClip: notice.clip !== null,
     });
     if (delivery.target === 'device' && notice.clip) {
-      // Una voz por vez, venga de donde venga. Cada salida ya se interrumpía a sí misma —el teléfono
-      // con `Speech.stop()`, la placa cortando el `aplay` anterior— y ninguna interrumpía a la otra,
-      // así que cambiar el ajuste a mitad de un anuncio dejaba las dos hablando encimadas. Para quien
-      // no ve la pantalla, dos voces simultáneas no son información: son ruido.
+      // One voice at a time, wherever it comes from. Each output already interrupted itself —the
+      // phone with `Speech.stop()`, the board cutting the previous `aplay`— and neither interrupted
+      // the other, so changing the setting mid-announcement left both talking over each other. For
+      // someone who cannot see the screen, two simultaneous voices are not information: they are noise.
       stopSpeaking();
       await deps.playNotice(notice.clip);
       return 'device';
@@ -103,8 +103,8 @@ export async function notify(id: SystemNotice): Promise<AudioOutput> {
     // and for the same reason: paying twice is much better than leaving the user with nothing.
   }
 
-  // La otra mitad de la misma regla: si habla el teléfono, la placa se calla. Sin `await` y tragando
-  // su error — es mejor arriesgar un solapamiento que demorar el aviso detrás de una escritura BLE.
+  // The other half of the same rule: if the phone speaks, the board goes quiet. No `await`, and
+  // swallowing its error — better to risk an overlap than to delay the notice behind a BLE write.
   if (linked) void deps.hushDevice().catch(() => {});
 
   // Not wrapped: both halves of this are non-throwing by contract (`announce` resolves on failure,

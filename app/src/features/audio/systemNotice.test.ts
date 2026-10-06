@@ -165,14 +165,15 @@ describe('notify', () => {
   });
 
   it('silences the other output before speaking, in both directions', async () => {
-    // Reportado el 2026-09-18 probando en la placa: con la salida en dispositivo, «Probar audio»
-    // empezaba a sonar por el parlante; cambiando el ajuste a teléfono y volviendo a tocar el botón,
-    // el celular arrancaba la misma frase SIN cortar la de la placa, y quedaban dos voces encimadas.
+    // Reported on 2026-09-18 testing on the board: with the output on the device, "Probar audio"
+    // started playing through the speaker; after switching the setting to phone and tapping the
+    // button again, the phone started the same phrase WITHOUT cutting the board's, and two voices
+    // ended up overlapping.
     //
-    // La causa era que cada salida sólo sabía interrumpirse a sí misma: el teléfono con
-    // `Speech.stop()`, la placa cortando su `aplay` anterior. Para quien no ve la pantalla, dos
-    // voces simultáneas no son información: son ruido. La regla es una voz por vez, venga de donde
-    // venga.
+    // The cause was that each output only knew how to interrupt itself: the phone with
+    // `Speech.stop()`, the board cutting its previous `aplay`. For someone who cannot see the
+    // screen, two simultaneous voices are not information: they are noise. The rule is one voice at
+    // a time, wherever it comes from.
     boardIsThere();
 
     setAudioOutput('device');
@@ -185,7 +186,7 @@ describe('notify', () => {
   });
 
   it('does not reach for the board to hush it when there is no link', async () => {
-    // Sin enlace no hay nada que callar, y pedirlo sería una escritura que sólo puede fallar.
+    // Without a link there is nothing to hush, and asking would be a write that can only fail.
     setAudioOutput('phone');
     configureNotices({
       isLinked: () => false,
