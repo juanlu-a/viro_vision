@@ -8,7 +8,7 @@
  */
 import { NativeModules } from 'react-native';
 
-import { WifiUnavailableError, WifiJoinError, joinWifi, probeDevice, reachDeviceNetwork } from './join';
+import { WifiUnavailableError, WifiJoinError, joinWifi, probeDevice, reachDeviceNetwork, withTimeout } from './join';
 
 const address = { ip: '10.42.0.1', port: 8080 };
 const credentials = { ssid: 'ViroVision', password: 'virovision2026' };
@@ -180,6 +180,36 @@ describe('joinWifi', () => {
       await expect(joinWifi(credentials)).resolves.toBe('joined');
     } finally {
       restore();
+    }
+  });
+});
+
+describe('withTimeout', () => {
+  // The regression of 2026-10-06: `joinWifi`'s timeout handler throws, and a throw inside a timer
+  // callback used to escape the promise — the cap meant to end a hung join left it pending forever,
+  // and the network check with it.
+  it('rejects when the timeout handler throws, instead of never settling', async () => {
+    jest.useFakeTimers();
+    try {
+      const never = new Promise<string>(() => {});
+      const capped = withTimeout(never, 1_000, () => {
+        throw new WifiJoinError('timed out', 'timeout');
+      });
+      jest.advanceTimersByTime(1_000);
+      await expect(capped).rejects.toBeInstanceOf(WifiJoinError);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('resolves with the handler value when it returns one', async () => {
+    jest.useFakeTimers();
+    try {
+      const capped = withTimeout(new Promise<string>(() => {}), 10, () => 'fallback');
+      jest.advanceTimersByTime(10);
+      await expect(capped).resolves.toBe('fallback');
+    } finally {
+      jest.useRealTimers();
     }
   });
 });

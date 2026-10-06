@@ -151,6 +151,13 @@ export const es = {
     signOut: 'Cerrar sesión',
     signOutHint: 'Cierra tu sesión en este dispositivo.',
   },
+  // La pantalla que reemplaza a una que se rompió al dibujarse (2026-10-06). Sin la palabra «error»
+  // ni ningún detalle, a propósito: el detalle va a la telemetría y al usuario le llega sólo qué hacer.
+  recovery: {
+    message: 'Volvamos a empezar.',
+    restart: 'Volver a empezar',
+    restartHint: 'Vuelve a cargar la pantalla.',
+  },
   connection: {
     idle: 'Sin conectar',
     scanning: 'Buscando dispositivo…',

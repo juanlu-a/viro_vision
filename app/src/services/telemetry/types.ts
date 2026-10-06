@@ -25,6 +25,11 @@ export type EventType =
   | 'app.background'
   | 'app.foreground'
   | 'app.error'
+  // `console.*` from the app or a library, captured (`capture.ts`). `detail.level` says which.
+  | 'app.log'
+  // A screen that threw while rendering, caught by the root error boundary: the user saw a neutral
+  // screen and a button to start again, never the error.
+  | 'app.renderError'
   // BLE link (control plane, ADR 0003)
   | 'ble.scanning'
   // How the peripheral was reached: already connected to the system, remembered from last time, or

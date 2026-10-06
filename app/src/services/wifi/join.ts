@@ -56,9 +56,18 @@ interface NativeWifiManager {
  * answered on iOS (without location permission the system may not reply) and the app stayed on
  * "connecting…" forever: a promise that never comes back is worse than an error.
  */
-function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () => T): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () => T): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => resolve(onTimeout()), ms);
+    // `onTimeout` may throw — `joinWifi`'s does, to turn the timeout into a `WifiJoinError` — and a
+    // throw inside a timer callback escapes the promise: it never settled, so the 25 s cap that
+    // exists precisely to end a hung join never ended anything (found 2026-10-06).
+    const timer = setTimeout(() => {
+      try {
+        resolve(onTimeout());
+      } catch (err) {
+        reject(err);
+      }
+    }, ms);
     promise.then(
       (v) => {
         clearTimeout(timer);
