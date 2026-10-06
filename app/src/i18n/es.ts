@@ -54,6 +54,7 @@ export const es = {
     readTimedOut: 'Tardó demasiado. Probá de nuevo.',
     quotaExhausted: 'El modo supermercado está ocupado. Probá de nuevo en',
     seconds: 'segundos.',
+    second: 'segundo.',
     waitingSlot: 'Esperando cupo del modelo. Sigo en',
     cloudNotConfigured: 'El modo supermercado no está disponible en esta versión. Podés seguir usando el modo ómnibus.',
     cloudUnavailable: 'Sin conexión a internet. El modo supermercado necesita internet; probá de nuevo cuando tengas señal.',
@@ -103,6 +104,8 @@ export const es = {
     // system's text go to telemetry. The ear only gets that the network is missing and what can be
     // done.
     wifiFailedAnnounce: 'Todavía no pude conectarme a la red del dispositivo. Sigo intentando.',
+    wifiUnusableAnnounce:
+      'No puedo usar la red del dispositivo. Apagá y prendé el Bluetooth del teléfono y volvé a conectar.',
   },
   settings: {
     title: 'Ajustes',

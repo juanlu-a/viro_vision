@@ -77,6 +77,8 @@ export type EventType =
   | 'cloud.wait'
   | 'audio.synthesis'
   | 'audio.send'
+  // Why the POST of a reading to the device failed (status or network error).
+  | 'audio.sendFailed'
   | 'audio.session'
   // `audio.spoken` carries `target`: 'phone' or 'device'. `audio.fallback` is the row that matters
   // when comparing the two paths — it says the user asked for the device and heard the phone, and

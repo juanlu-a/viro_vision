@@ -18,6 +18,7 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import type { ThemeColor } from '@/constants/theme';
+import { notify } from '@/features/audio/systemNotice';
 import { useDevice } from '@/features/device/DeviceProvider';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -51,9 +52,10 @@ export default function ConnectScreen() {
       // gesture, applied to the only thing this screen reports. If an operation is already in
       // flight, the gesture does not step on it.
       onRefresh={async () => {
-        // Connected already means fresh: the status arrives on its own every 15 s, and reconnecting
-        // a working link only re-announced "Dispositivo conectado" for nothing.
-        if (!isBusy && !isConnected) await connect();
+        // Connected already means fresh: the status arrives on its own every 15 s, so the gesture
+        // only confirms out loud — a silent gesture is indistinguishable from a broken one.
+        if (isConnected) await notify('connected');
+        else if (!isBusy) await connect();
       }}>
       <ScreenHeader title={t.title} subtitle={t.intro} />
 

@@ -140,7 +140,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     // system error string or a step of the join. They hear one fixed sentence, because a silent
     // failure leaves them waiting for a button that never comes.
     record('wifi.failed', { detail: { reason, ...extra } });
-    void notify('networkFailed');
+    // Two reasons never fix themselves, and "still trying" would be false for them: no credentials
+    // (the remedy is the user's) and a build with no WiFi module.
+    void notify(reason === 'noCredentials' || reason === 'unavailable' ? 'networkUnusable' : 'networkFailed');
   }, []);
 
   const syncNetwork = useCallback(
@@ -330,6 +332,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
           message: errorDetail(err),
         },
       });
+      // Disconnect was tapped while this attempt was failing: no retry is coming, so "still looking"
+      // would be a false sentence.
+      if (!autoConnect.current) {
+        setConnection(initialConnection);
+        return;
+      }
       setConnection({ status: 'error', device: null, message: errorMessage(err) });
       // With no native module there is nothing to retry: the app runs without the device.
       if (!(err instanceof BleNotImplementedError)) scheduleRetry();
@@ -490,10 +498,11 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
           body: encodeBase64(bytes),
           signal,
         });
-        if (!r.ok) record('audio.send', { detail: { sent: false, status: r.status } });
+        // The why of a failed send; the caller's `audio.send` row carries the timing and the outcome.
+        if (!r.ok) record('audio.sendFailed', { detail: { status: r.status } });
         return r.ok;
       } catch (err) {
-        record('audio.send', { detail: { sent: false, message: errorDetail(err) } });
+        record('audio.sendFailed', { detail: { message: errorDetail(err) } });
         return false;
       }
     },

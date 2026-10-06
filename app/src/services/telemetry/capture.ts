@@ -97,7 +97,9 @@ interface PromiseEngine {
  */
 export function captureRejections(
   onUnhandled: (error: unknown) => void,
-  engine: PromiseEngine | undefined = (globalThis as { HermesInternal?: PromiseEngine }).HermesInternal
+  // Release builds only by default: in development React Native installs its own tracker to show
+  // the warning, and replacing it would hide unhandled rejections from whoever is writing the code.
+  engine: PromiseEngine | undefined = __DEV__ ? undefined : (globalThis as { HermesInternal?: PromiseEngine }).HermesInternal
 ): () => void {
   let active = true;
   try {

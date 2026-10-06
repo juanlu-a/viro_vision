@@ -63,6 +63,7 @@ export const NOTICES = {
   connectionLost: { clip: null, say: strings.connection.lost },
   networkReady: { clip: null, say: strings.connect.wifiReadyAnnounce },
   networkFailed: { clip: null, say: strings.connect.wifiFailedAnnounce },
+  networkUnusable: { clip: null, say: strings.connect.wifiUnusableAnnounce },
 
   /**
    * The modes do go to the board: they are what the user hears **with the glasses on and the phone

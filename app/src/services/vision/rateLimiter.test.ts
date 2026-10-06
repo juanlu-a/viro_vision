@@ -120,3 +120,30 @@ describe('acquireSlot with a wait cap', () => {
     expect(waits).toBe(0);
   });
 });
+
+describe('acquireSlot under the wait cap', () => {
+  it('still waits and announces when the wait fits, and reports the seconds when it does not', async () => {
+    resetRateLimiter();
+    let t = 0;
+    const now = () => t;
+    await acquireSlot('fits', { now, maxPerWindow: 1 });
+    const waits: number[] = [];
+    await acquireSlot('fits', {
+      now,
+      maxPerWindow: 1,
+      maxWaitMs: 120_000,
+      onWait: (ms) => waits.push(ms),
+      sleep: async (ms) => {
+        t += ms;
+      },
+    });
+    expect(waits).toHaveLength(1);
+
+    resetRateLimiter();
+    t = 0;
+    await acquireSlot('tight', { now, maxPerWindow: 1 });
+    const err = await acquireSlot('tight', { now, maxPerWindow: 1, maxWaitMs: 1_000 }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(VisionQuotaError);
+    expect((err as VisionQuotaError).retryAfterSeconds).toBeGreaterThan(1);
+  });
+});

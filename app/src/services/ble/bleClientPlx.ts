@@ -9,7 +9,7 @@
  * only moves bytes between ble-plx and that module.
  */
 import { Platform } from 'react-native';
-import { BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
+import { BleErrorCode, BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 
 import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, hushCommand, noticeCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
@@ -121,10 +121,13 @@ class BleClientPlx implements BleClient {
   async connect(): Promise<DeviceInfo> {
     // A second connect while linked (pull-to-refresh on the Device tab) used to stack a second set
     // of monitors on top of the first: every event, mode and status then fired twice, and "connection
-    // lost" was said twice. The old subscriptions go first; the link itself is reused by `reach()`.
-    this.cleanup();
+    // lost" was said twice. The old subscriptions are dropped only once the new link is in hand: a
+    // reconnect that fails (radio off, scan timeout) must not make the client forget a link that is
+    // still alive and stop hearing about its drop.
     await this.waitForRadio();
     const device = await this.reach();
+    for (const s of this.subscriptions) s.remove();
+    this.subscriptions = [];
     this.device = device;
     // Remembered so the next connection can skip the scan (see `services/storage/lastDevice`).
     void saveLastDeviceId(device.id);
@@ -526,8 +529,10 @@ class BleClientPlx implements BleClient {
    * That is the "the button does nothing" case, and until 2026-10-06 the error was dropped. A stream
    * torn down by our own `cleanup()` also errors, and that one is not news.
    */
-  private monitorFailed(char: string, error: { message?: string }): void {
-    if (!this.device) return;
+  private monitorFailed(char: string, error: { message?: string; errorCode?: number }): void {
+    // A plain link drop errors every monitor before `onDeviceDisconnected` runs; that is `ble.lost`,
+    // already recorded, and three more rows per drop would bury the streams that really died.
+    if (!this.device || error.errorCode === BleErrorCode.DeviceDisconnected) return;
     record('ble.monitorError', { detail: { char, message: errorDetail(error.message ?? error) } });
   }
 

@@ -171,7 +171,10 @@ function update(patch: Partial<ReaderState>): void {
 function errorMessage(err: unknown): string {
   if (err instanceof VisionNotConfiguredError) return t.cloudNotConfigured;
   if (err instanceof VisionNetworkError) return t.cloudUnavailable;
-  if (err instanceof VisionQuotaError) return `${t.quotaExhausted} ${err.retryAfterSeconds} ${t.seconds}`;
+  if (err instanceof VisionQuotaError) {
+    const s = Math.max(1, Math.ceil(err.retryAfterSeconds));
+    return `${t.quotaExhausted} ${s} ${s === 1 ? t.second : t.seconds}`;
+  }
   return t.cloudFailed;
 }
 
