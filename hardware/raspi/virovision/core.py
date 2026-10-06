@@ -352,7 +352,9 @@ class Core:
             return
         if current is Mode.BUS:
             self._loop.run_in_executor(None, self._bus.start)
-        elif self._bus.running:
+        else:
+            # Always, not only when it is running: a start still building (a cold OCR, up to minutes)
+            # is not running yet, and only `stop` tells it the user already left (2026-10-06).
             self._loop.run_in_executor(None, self._bus.stop)
 
     @staticmethod

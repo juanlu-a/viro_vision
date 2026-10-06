@@ -571,3 +571,158 @@ def test_a_bus_coming_is_put_on_the_wire_too(tmp_path):
         watcher._announce_presence()
         assert events == [{"t": "bus"}], f"the app has to hear about it with the output on {target}"
         assert said == ([[clip]] if target == "device" else []), "the speaker follows the user's choice"
+
+
+def _fake_pipeline_modules(created):
+    """`bus_banner` is not installed on the Mac: just enough of it for `_build` to run."""
+
+    def module(name, **attrs):
+        m = types.ModuleType(name)
+        m.__dict__.update(attrs)
+        return m
+
+    class Catalog:
+        @staticmethod
+        def from_csv(path):
+            return None
+
+    class Watcher:
+        def __init__(self, *a, **kw):
+            pass
+
+    return {
+        "bus_banner": module("bus_banner"),
+        "bus_banner.catalog": module("bus_banner.catalog", Catalog=Catalog),
+        "bus_banner.detection": module("bus_banner.detection", NullDetector=lambda: None),
+        "bus_banner.imx500": module("bus_banner.imx500", network_settings=lambda *a, **kw: {"fps": 15.0, "labels": ["bus_sign"]}),
+        "bus_banner.ocr": module("bus_banner.ocr", create_ocr=lambda name: created.append(("in-process", name))),
+        "bus_banner.pipeline": module("bus_banner.pipeline", Pipeline=lambda detector, ocr, catalog: ("pipeline", ocr)),
+        "bus_banner.tracking": module("bus_banner.tracking", Tracker=lambda **kw: None, Watcher=Watcher),
+    }
+
+
+def test_two_builds_at_once_start_one_ocr_process(tmp_path):
+    """`warm_up` at startup and a button press during it both build, from two executor threads.
+    Before the lock each spawned its own OCR process: two engines building at once on a 512 MB board.
+
+    Deterministic: the first worker's `start` does not return until the second thread has reached the
+    build lock, so without the lock both would be inside `_make_ocr` at once and this would fail."""
+    created = []
+    second_arrived = threading.Event()
+
+    class CountingLock:
+        def __init__(self):
+            self._lock = threading.Lock()
+            self._arrivals = 0
+
+        def __enter__(self):
+            self._arrivals += 1
+            if self._arrivals == 2:
+                second_arrived.set()
+            self._lock.acquire()
+
+        def __exit__(self, *exc):
+            self._lock.release()
+
+    class Worker:
+        def start(self):
+            created.append("worker")
+            second_arrived.wait(2)
+
+    class Camera:
+        sensor = types.SimpleNamespace(network_intrinsics=None)
+
+    watcher = BusWatcher(Camera(), lambda files: None, lambda e: None, announcements=tmp_path, catalog=tmp_path / "none.csv")
+    watcher._build_lock = CountingLock()
+    watcher._make_ocr = lambda create_ocr, **kw: BusWatcher._make_ocr(create_ocr, worker_factory=Worker, **kw)
+    with patch.dict("sys.modules", _fake_pipeline_modules(created)):
+        threads = [threading.Thread(target=watcher._build) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    assert second_arrived.is_set(), "the second build never reached the lock: the test proved nothing"
+    assert created == ["worker"]
+
+
+def test_the_ocr_falls_back_to_the_daemon_only_when_its_process_cannot_run():
+    from virovision.ocr_worker import OcrEngineFailed
+
+    built = []
+
+    class CannotSpawn:
+        def start(self):
+            raise OSError("fork failed")
+
+    class EngineBroken:
+        def start(self):
+            raise OcrEngineFailed("no model")
+
+    BusWatcher._make_ocr(lambda name: built.append(name), worker_factory=CannotSpawn)
+    assert built == ["rapid"], "no process at all: build it here rather than lose bus mode"
+    with pytest.raises(OcrEngineFailed):
+        BusWatcher._make_ocr(lambda name: built.append(name), worker_factory=EngineBroken)
+    assert built == ["rapid"], "the engine itself fails: building it here would only freeze the daemon"
+
+
+def test_two_overlapping_starts_launch_one_set_of_threads(tmp_path):
+    """Bus, another mode, bus again, all inside a cold build: both starts used to see `running` False
+    and each launched three threads on the same camera."""
+    launched = []
+    building = threading.Event()
+
+    class Camera:
+        sensor = object()
+
+    watcher = BusWatcher(Camera(), lambda files: None, lambda e: None, announcements=tmp_path)
+
+    def slow_build():
+        building.set()
+        time.sleep(0.2)
+        watcher._pipeline = object()
+
+    watcher._build = slow_build
+    watcher._frame_loop = lambda: launched.append("frames")
+    watcher._read_loop = lambda: None
+    watcher._watchdog = lambda: None
+    with patch("virovision.bus.is_available", return_value=True):
+        first = threading.Thread(target=watcher.start)
+        first.start()
+        building.wait(2)
+        assert watcher.start(), "the second start waits for the first and finds it running"
+        first.join()
+    watcher.stop()
+    assert launched == ["frames"]
+
+
+def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path):
+    """Bus pressed, then supermarket inside a cold build: the start used to finish anyway and keep the
+    camera in bus mode while the user was in another one."""
+    launched = []
+    building = threading.Event()
+
+    class Camera:
+        sensor = object()
+
+    watcher = BusWatcher(Camera(), lambda files: None, lambda e: None, announcements=tmp_path)
+
+    def slow_build():
+        building.set()
+        time.sleep(0.2)
+        watcher._pipeline = object()
+
+    watcher._build = slow_build
+    watcher._frame_loop = lambda: launched.append("frames")
+    watcher._read_loop = lambda: None
+    watcher._watchdog = lambda: None
+    result = []
+    with patch("virovision.bus.is_available", return_value=True):
+        first = threading.Thread(target=lambda: result.append(watcher.start()))
+        first.start()
+        building.wait(2)
+        watcher.stop()  # the user switched modes; this must not wait for the build
+        first.join()
+    assert result == [False]
+    assert launched == []
+    assert not watcher.running
+
