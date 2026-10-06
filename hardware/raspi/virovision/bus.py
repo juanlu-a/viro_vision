@@ -273,6 +273,14 @@ class BusWatcher:
         """Begins watching. Returns False when bus mode cannot run, so the caller can say so."""
         if self.running:
             return True
+        if getattr(self._camera, "starting", False):
+            # The board advertises before the camera is up (2026-10-05), so a press in the first
+            # minute after a boot lands here. Checked before `available`, which can already be true
+            # halfway through the start: the sensor handle exists before the camera delivers frames. Said out loud for the same reason as the OCR warm-up
+            # below; `__main__` starts the mode for real once the camera is ready.
+            log.info("bus: asked to watch while the camera is still starting; saying so")
+            self._warming_up()
+            return False
         if not self.available:
             log.warning("bus mode unavailable: %s", "no detector in the sensor" if is_available() else "bus_banner is not installed")
             return False

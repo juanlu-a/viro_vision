@@ -67,6 +67,15 @@ def test_without_a_started_camera_it_says_so():
         Camera().capture_jpeg()
 
 
+def test_while_starting_it_says_it_is_coming():
+    from virovision.camera import CameraNotReady
+
+    c = Camera()
+    c.starting = True
+    with pytest.raises(CameraNotReady, match="still starting"):
+        c.capture_jpeg()
+
+
 def test_a_sensor_that_will_not_close_ends_the_process_instead_of_holding_the_lock(monkeypatch):
     """2026-09-23: the phone asked for a photo and got nothing at all, not even an error. A jammed
     sensor blocks in `stop()` under the capture lock; waiting on it forever leaves the whole board

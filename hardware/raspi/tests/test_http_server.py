@@ -60,6 +60,24 @@ def test_photo_without_a_camera_is_503(server):
     assert exc.value.code == 503
 
 
+def test_photo_while_the_camera_starts_is_503_not_500():
+    """A 500 reads as a crash; a camera still loading its detector after a boot is not one."""
+    from virovision.camera import CameraNotReady
+
+    def capture():
+        raise CameraNotReady("the camera is still starting")
+
+    s = HttpServer(lambda: {}, bytes, capture=capture, port=0)
+    s.start()
+    try:
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(s, "/photos/latest")
+        assert exc.value.code == 503
+        assert "still starting" in json.loads(exc.value.read())["error"]
+    finally:
+        s.stop()
+
+
 def test_photo_with_a_camera_returns_the_jpeg():
     s = HttpServer(lambda: {}, bytes, capture=lambda: b"\xff\xd8JPEG", port=0)
     s.start()

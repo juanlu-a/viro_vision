@@ -29,6 +29,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import ThreadingMixIn
 from typing import Callable, Optional
 
+from .camera import CameraNotReady
+
 log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8080
@@ -110,6 +112,10 @@ class HttpServer:
                     t0 = time.monotonic()
                     try:
                         jpeg = server._capture()
+                    except CameraNotReady as exc:
+                        # Still starting after a boot (it takes about a minute), or it never came up.
+                        self._json(503, {"error": str(exc)[:200]})
+                        return
                     except TimeoutError as exc:
                         # The camera jammed: we say so right away (the app would wait 20 s) and the
                         # camera is already restarting on the device's side.

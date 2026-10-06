@@ -72,8 +72,17 @@ const DeviceContext = createContext<DeviceValue | null>(null);
 
 const initialConnection: ConnectionState = { status: 'idle', device: null, message: strings.connection.idle };
 
-// Reconnection: fast at first (the device has just rebooted), then without insisting (phone battery).
-const RETRIES_MS = [3_000, 5_000, 10_000, 20_000, 30_000];
+/**
+ * The pause BETWEEN connection attempts, which is blind time: nothing is listening for the board.
+ *
+ * Each attempt already listens for up to 30 s (a direct connect to the remembered identifier, then a
+ * scan; `bleClientPlx.ts`), so the listening is the attempt, not the pause. The old schedule grew to
+ * 20-30 s and a board that came back during one of those pauses waited for the next attempt with
+ * nobody looking — and a board takes about a minute to boot, which is exactly when the pauses had
+ * grown (2026-10-05). Capped at 5 s: the battery cost is a scan the phone was going to run anyway,
+ * and iOS throttles timers in the background on its own.
+ */
+const RETRIES_MS = [1_000, 2_000, 3_000, 5_000];
 
 function errorMessage(err: unknown): string {
   if (err instanceof BleNotImplementedError) return strings.connection.unavailable;
