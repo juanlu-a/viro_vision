@@ -45,6 +45,10 @@ export type EventType =
   | 'ble.retry'
   | 'ble.disconnected'
   | 'ble.event'
+  // A notification stream that errored while linked: the board may be notifying into the void.
+  | 'ble.monitorError'
+  // A characteristic read that failed (`detail.char`); the caller carried on with null.
+  | 'ble.readFailed'
   // WiFi network with the device (where the photo travels)
   | 'wifi.joining'
   | 'wifi.ready'
@@ -52,6 +56,8 @@ export type EventType =
   // What the device reports about itself
   | 'device.status'
   | 'device.warning'
+  // The daemon's own log lines at WARNING and above, forwarded over BLE (`{t:'log'}`).
+  | 'device.log'
   | 'device.mode'
   | 'device.modeFailed'
   | 'device.audioTargetFailed'

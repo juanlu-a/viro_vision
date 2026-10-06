@@ -171,6 +171,7 @@ export const es = {
     connectedWithoutWifi: 'Conectado (falta el WiFi)',
     error: 'Sin conectar. Sigo buscando el dispositivo.',
     notFound: 'No encontré el dispositivo. Fijate que esté prendido y cerca.',
+    radioOff: 'No puedo usar el Bluetooth del teléfono. Fijate que esté prendido y que ViroVision tenga permiso.',
     lost: 'Se perdió la conexión con el dispositivo. Buscalo de nuevo.',
     // Expo Go and web lack the native Bluetooth module; the real client needs a development build.
     unavailable: 'Esta versión de la app no puede usar Bluetooth.',

@@ -51,7 +51,9 @@ export default function ConnectScreen() {
       // gesture, applied to the only thing this screen reports. If an operation is already in
       // flight, the gesture does not step on it.
       onRefresh={async () => {
-        if (!isBusy) await connect();
+        // Connected already means fresh: the status arrives on its own every 15 s, and reconnecting
+        // a working link only re-announced "Dispositivo conectado" for nothing.
+        if (!isBusy && !isConnected) await connect();
       }}>
       <ScreenHeader title={t.title} subtitle={t.intro} />
 

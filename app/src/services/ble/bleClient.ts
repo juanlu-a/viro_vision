@@ -121,6 +121,18 @@ export class BleDeviceNotFoundError extends Error {
   }
 }
 
+/**
+ * The phone's Bluetooth is off or the app is not allowed to use it. Its own type because the remedy
+ * is the user's and different: until 2026-10-06 this surfaced as "device not found — check it is on
+ * and near", sending someone who cannot see the screen to fiddle with a device that was fine.
+ */
+export class BleRadioOffError extends Error {
+  constructor(readonly state: string) {
+    super('BLE_RADIO_OFF');
+    this.name = 'BleRadioOffError';
+  }
+}
+
 /** Something requiring a connection was asked for and there is none. */
 export class BleNotConnectedError extends Error {
   constructor() {

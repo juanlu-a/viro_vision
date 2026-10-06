@@ -28,6 +28,7 @@ import { strings } from '@/i18n';
 import {
   BleDeviceNotFoundError,
   BleNotImplementedError,
+  BleRadioOffError,
   getBleClient,
 } from '@/services/ble/bleClient';
 import { encodeBase64 } from '@/services/ble/base64';
@@ -83,6 +84,7 @@ const RETRIES_MS = [1_000, 2_000, 3_000, 5_000];
 function errorMessage(err: unknown): string {
   if (err instanceof BleNotImplementedError) return strings.connection.unavailable;
   if (err instanceof BleDeviceNotFoundError) return strings.connection.notFound;
+  if (err instanceof BleRadioOffError) return strings.connection.radioOff;
   return strings.connection.error;
 }
 
@@ -245,9 +247,14 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         record('device.status', { detail: { ...status } });
       }
       setAp(status.ap);
-      setAddress(target);
+      // The previous object is kept when nothing changed. A fresh one every 15 s re-rendered every
+      // consumer of this context — Home, the reader bridge, the Device tab — on each heartbeat, and
+      // recreated the callbacks that close over the address.
+      setAddress((prev) => (prev?.ip === target?.ip && prev?.port === target?.port ? prev : target));
       setConnection((c) =>
-        c.device ? { ...c, device: { ...c.device, batteryLevel: status.battery, firmwareVersion: status.version } } : c
+        c.device && (c.device.batteryLevel !== status.battery || c.device.firmwareVersion !== status.version)
+          ? { ...c, device: { ...c.device, batteryLevel: status.battery, firmwareVersion: status.version } }
+          : c
       );
       // `status` arrives every 15 s. Restarting the network check on every heartbeat cancelled the
       // previous one before it finished and the network never became "ready" (2026-09-06):
@@ -277,6 +284,13 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     try {
       const client = getBleClient();
       const device: DeviceInfo = await client.connect();
+      // The user tapped Disconnect while this was connecting: honour the tap instead of announcing a
+      // connection they just asked to end.
+      if (!autoConnect.current) {
+        await client.disconnect().catch(() => {});
+        setConnection(initialConnection);
+        return;
+      }
       retry.current = 0;
       // How long it took to show up, and in what state: it is the context for everything that comes
       // later in the session.
@@ -298,7 +312,13 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       void notify('connected');
       setAddress(device.address);
       setAp(device.ap);
+      const run = networkSyncRun.current;
       credentials.current = await client.readWifi().catch(() => null);
+      // The link can drop during that read (the disconnect handlers bump `networkSyncRun`), and
+      // joining and announcing "network ready" for a device that is already gone would be a sentence
+      // about nothing. A heartbeat that started its own check meanwhile bumps it too, and then that
+      // check is the one that counts.
+      if (run !== networkSyncRun.current) return;
       ensureNetwork(device.ap, device.address);
     } catch (err) {
       // The error's TYPE, not just its message: it tells "this build has no Bluetooth" apart from
