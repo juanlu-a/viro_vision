@@ -39,6 +39,13 @@ def _exit_for_systemd() -> None:
     os._exit(1)
 
 
+class CameraNotReady(RuntimeError):
+    """The camera has not finished starting, or never will. It is its own type so the HTTP server can
+    answer 503 ("no camera right now") instead of a 500 that reads as a crash: since 2026-10-05 the
+    camera starts in the background, after the board is already discoverable, and a photo can be asked
+    for during that minute."""
+
+
 class Camera:
     def __init__(self, long_side: int = MAX_LONG_SIDE, quality: int = JPEG_QUALITY, model: Optional[Path] = None) -> None:
         self._long_side = long_side
@@ -46,6 +53,10 @@ class Camera:
         self._model = model
         self._picam = None
         self._imx500 = None
+        # True while `start()` runs. Loading the detector into the IMX500 takes about a minute after a
+        # boot, and since 2026-10-05 that minute happens with the board already advertising: whoever
+        # asks for the camera meanwhile is told it is coming, not that it does not exist.
+        self.starting = False
         # One capture at a time: BLE (`photo`) and HTTP (`/photos/latest`) can ask at the same time.
         self._lock = threading.Lock()
         # What to do when the sensor will not even close. Injectable so the tests do not exit.
@@ -64,6 +75,13 @@ class Camera:
         takes about a minute, and a button that answers a minute later is a broken button. Once
         loaded it stays in the sensor and costs nothing per frame on the Pi.
         """
+        self.starting = True
+        try:
+            return self._start()
+        finally:
+            self.starting = False
+
+    def _start(self) -> bool:
         try:
             from picamera2 import Picamera2  # late import: it does not exist on the Mac
         except ImportError:
@@ -137,7 +155,7 @@ class Camera:
         limit, it jammed the camera for everything, photos included. A caller who needs to notice a
         camera that stopped delivering watches the clock from outside and calls `restart`."""
         if self._picam is None:
-            raise RuntimeError("camera not started")
+            raise CameraNotReady("the camera is still starting" if self.starting else "camera not started")
         return self._picam.capture_request()
 
     def restart(self) -> None:
@@ -161,7 +179,7 @@ class Camera:
         camera.
         """
         if self._picam is None:
-            raise RuntimeError("camera not started")
+            raise CameraNotReady("the camera is still starting" if self.starting else "camera not started")
         # With a deadline on the lock too: a restart in progress holds it, and a photo that waits
         # behind a restart that never ends is a photo that never answers. Failing says why.
         if not self._lock.acquire(timeout=timeout_s):

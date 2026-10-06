@@ -109,6 +109,13 @@ class Core:
         # the current target rather than starting on its own default and speaking over the choice.
         bus.audio_target = self.audio_target
 
+    def camera_ready(self) -> None:
+        """The camera finished starting in the background (`__main__`, since 2026-10-05). If the user
+        entered bus mode while it was still starting, the watcher could not begin then: it begins now,
+        without them having to press again."""
+        if self.modes.current is Mode.BUS:
+            self._apply_bus_mode(Mode.BUS)
+
     def emit_event(self, obj: dict) -> None:
         """Send an event from ANY thread. Bus mode announces from its own frame thread, and
         `create_task` off the loop thread is a silent no-op that would lose every reading."""

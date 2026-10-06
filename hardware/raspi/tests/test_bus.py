@@ -112,6 +112,39 @@ def test_a_repeated_click_in_bus_mode_repeats_the_announcement(loop):
     loop.run_until_complete(scenario())
 
 
+def test_bus_mode_entered_while_the_camera_starts_begins_once_it_is_ready(loop):
+    """The board advertises before the camera is up (2026-10-05). A press in that minute leaves the
+    watcher unable to start; when the camera is ready the mode begins without a second press."""
+    bus = FakeBus()
+    bus.start = lambda: False  # what BusWatcher.start answers while the camera is still starting
+    core, _ = build(loop, bus)
+
+    async def scenario():
+        core.from_button(1)
+        await _drain(loop)
+        assert not bus.running
+        bus.start = FakeBus.start.__get__(bus)
+        core.camera_ready()
+        await _drain(loop)
+        assert bus.running
+
+    loop.run_until_complete(scenario())
+
+
+def test_camera_ready_outside_bus_mode_starts_nothing(loop):
+    bus = FakeBus()
+    core, _ = build(loop, bus)
+
+    async def scenario():
+        core.from_button(2)
+        await _drain(loop)
+        core.camera_ready()
+        await _drain(loop)
+        assert not bus.running
+
+    loop.run_until_complete(scenario())
+
+
 def test_supermarket_does_not_start_the_watcher(loop):
     bus = FakeBus()
     core, _ = build(loop, bus)
@@ -452,6 +485,24 @@ def test_asked_to_watch_too_early_the_device_says_so(tmp_path):
     assert [what for what, _ in order] == ["said", "event", "built"], "the notice precedes the wait it explains"
     assert order[0][1] == [clip]
     assert order[1][1] == {"t": "warming"}
+
+
+def test_asked_to_watch_while_the_camera_starts_the_device_says_so(tmp_path):
+    """Since 2026-10-05 the camera starts after the board is discoverable. A press in that minute
+    must be heard, and must not try to watch a camera that delivers no frames yet - even though the
+    sensor handle already exists halfway through the start."""
+    events = []
+
+    class Camera:
+        sensor = object()
+        starting = True
+
+    watcher = BusWatcher(Camera(), lambda files: None, events.append, announcements=tmp_path)
+    watcher._build = lambda: events.append("built")
+    with patch("virovision.bus.is_available", return_value=True):
+        assert not watcher.start()
+    assert events == [{"t": "warming"}]
+    assert not watcher.running
 
 
 def test_a_board_without_the_warming_clip_still_starts(tmp_path):

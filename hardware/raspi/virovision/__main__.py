@@ -28,6 +28,7 @@ from .notices import SYSTEM_DIR
 from .state import local_ip, read_status
 from .http_server import DEFAULT_PORT, HttpServer
 from .gatt import ADVERTISED_NAME, SERVICE_UUID, ViroVisionService
+from .modes import Mode
 from .link import CentralWatcher, log_existing_bonds, report_visibility, set_bonding
 
 log = logging.getLogger("virovision")
@@ -92,8 +93,12 @@ async def _main(args: argparse.Namespace) -> None:
     loop = asyncio.get_running_loop()
 
     camera = Camera(model=None if args.no_bus else args.bus_model)
-    has_camera = False if args.no_camera else camera.start()
-    capture = (lambda: loop.run_in_executor(None, camera.capture_jpeg)) if has_camera else None
+    # The camera is NOT started here: it starts in the background once the board is advertising
+    # (`_bring_camera_up`, below). Loading the detector into the IMX500 takes about a minute after a
+    # boot, and while it ran here the board was invisible to every phone; any hang in it left the board
+    # invisible for good (2026-10-05). Capture is wired now and answers "still starting" until then.
+    wants_camera = not args.no_camera
+    capture = (lambda: loop.run_in_executor(None, camera.capture_jpeg)) if wants_camera else None
 
     # The HTTP server (ADR 0003's plan B) runs on its own thread; its port travels through `status` so
     # the app knows where to download the photo from. The capture is the same blocking function BLE
@@ -135,11 +140,11 @@ async def _main(args: argparse.Namespace) -> None:
     http = None
     if not args.no_http:
         http = HttpServer(
-            # `camera.available` and not `has_camera`: if a capture hangs the camera restarts, and if
+            # `camera.available` and not a flag taken at startup: if a capture hangs the camera restarts, and if
             # it does not come back, the status has to say so.
             read_status=lambda: read_status(camera=camera.available, http_port=args.port, ap=ap.on, network=ap.active_connection()),
             synthetic_payload=synthetic_payload,
-            capture=camera.capture_jpeg if has_camera else None,
+            capture=camera.capture_jpeg if wants_camera else None,
             port=args.port,
             # THE closing of the supermarket loop: until this was passed, `/audio` wrote the MP3 to
             # /tmp, answered 202 and nobody ever heard it. `--no-audio` keeps that old behaviour for
@@ -172,7 +177,7 @@ async def _main(args: argparse.Namespace) -> None:
     # wired here is who speaks and where the reading goes. Built after the service because it emits
     # its readings through this core, and the core starts and stops it on every mode change.
     bus_watcher = None
-    if not args.no_bus and has_camera:
+    if not args.no_bus and wants_camera:
         labels = [name.strip() for name in args.bus_labels.split(",") if name.strip()] if args.bus_labels else None
         # Derived, never passed separately: a detector that emits a `bus` class gives real bus boxes,
         # and synthesizing one from the sign on top of that would give the tracker two boxes per bus.
@@ -189,12 +194,6 @@ async def _main(args: argparse.Namespace) -> None:
             signs_only=signs_only,
         )
         service.core.attach_bus(bus_watcher)
-        if bus_watcher.available:
-            # Loading the OCR takes about 17 s the first time on a Pi 3 B+ (two ONNX models). Doing it
-            # now, while the user is not waiting, is what makes the button answer in a second later.
-            loop.run_in_executor(None, bus_watcher.warm_up)
-        else:
-            log.warning("bus mode unavailable: no detector in the sensor or the reading half is not installed")
 
     # The physical button (ADR 0007) goes against the same core as BLE: it is a user gesture, not a
     # transport. If there is no button (or no gpiozero, or no permissions on the pin) the daemon starts
@@ -235,6 +234,38 @@ async def _main(args: argparse.Namespace) -> None:
     centrals = CentralWatcher()
     await centrals.start(bus)
 
+    # timeout 0 = advertise until the process dies; the device has to be discoverable always, because
+    # the app reconnects on its own when it comes back into range.
+    advert = Advertisement(args.name, [SERVICE_UUID], 0x0000, 0)
+    await advert.register(bus, adapter)
+    log.info("advertising \"%s\" with service %s (camera: %s)", args.name, SERVICE_UUID, "starting" if wants_camera else "no")
+
+    # Discoverable first, everything slow after (2026-10-05). The camera and the AP each take from
+    # seconds to a minute, and the phone can connect meanwhile: `status` says what is not up yet and
+    # is pushed again the moment each one is.
+    async def _bring_camera_up() -> None:
+        if not await loop.run_in_executor(None, camera.start):
+            return
+        service.notify_status()
+        if bus_watcher is None:
+            return
+        if not bus_watcher.available:
+            log.warning("bus mode unavailable: no detector in the sensor or the reading half is not installed")
+            return
+        # Loading the OCR takes tens of seconds (two ONNX models). Doing it now, while the user is not
+        # waiting, is what makes the button answer in a second later. Unless they already pressed it:
+        # then the mode starts right away and `start` builds the OCR itself.
+        # (A press during the warm-up needs nothing from here: the camera is up by then, so `start`
+        # runs normally and says it is preparing.)
+        if service.core.modes.current is Mode.BUS:
+            service.core.camera_ready()
+        else:
+            await loop.run_in_executor(None, bus_watcher.warm_up)
+
+    # Held in a variable because asyncio keeps only a weak reference to a task: an unreferenced one
+    # can be garbage-collected halfway.
+    camera_task = asyncio.create_task(_bring_camera_up()) if wants_camera else None
+
     # The AP stays on while the device is powered (ADR 0003, 2026-09-07 update): the phone joins when
     # it connects over BLE and the photo is available the instant a mode is activated. With no time
     # cap: the user configures nothing and cannot "reactivate" it. It costs battery; that is measured.
@@ -256,12 +287,9 @@ async def _main(args: argparse.Namespace) -> None:
                 log.error("could not bring the AP up (attempt %d): %s", attempt, exc)
         else:
             log.error("the AP did not end up operational after several attempts; carrying on without it")
-
-    # timeout 0 = advertise until the process dies; the device has to be discoverable always, because
-    # the app reconnects on its own when it comes back into range.
-    advert = Advertisement(args.name, [SERVICE_UUID], 0x0000, 0)
-    await advert.register(bus, adapter)
-    log.info("advertising \"%s\" with service %s (camera: %s)", args.name, SERVICE_UUID, "yes" if has_camera else "no")
+        # Pushed now and not on the next 15 s heartbeat: a phone that connected before the AP was up
+        # learns the address to join the instant there is one.
+        service.notify_status()
 
     stop = asyncio.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
