@@ -1,9 +1,12 @@
 [Unit]
 Description=ViroVision — the device's BLE daemon
-# NetworkManager ready before starting: the daemon brings the WiFi AP up at startup (ADR 0003) and
-# with NM half-started nmcli failed or left the interface without an IP (2026-09-07).
-After=bluetooth.target NetworkManager.service network-online.target
-Wants=network-online.target
+# Only Bluetooth before starting. It used to wait for network-online.target as well, from when the AP
+# came up before the board advertised (2026-09-07: with NM half-started, nmcli failed). Since
+# 2026-10-05 the board advertises first and brings the AP up afterwards, with its own retries and a
+# check of the interface's real address — so that wait only delayed the one thing the phone needs:
+# measured on 2026-10-06, the daemon started 7 s after Bluetooth was ready, waiting on NetworkManager
+# and network-online. And in the street there is no known network to be "online" on.
+After=bluetooth.target
 Requires=bluetooth.service
 
 [Service]

@@ -275,7 +275,11 @@ async def _main(args: argparse.Namespace) -> None:
     if not args.no_ap:
         # At startup NetworkManager may not be ready yet (on 2026-09-07 the device was left "with no
         # network" after the first boot with the AP): it is retried with growing backoff and it is
-        # verified that the interface has the AP's IP, not just that nmcli returned.
+        # verified that the interface has the AP's IP, not just that nmcli returned. And since the
+        # daemon stopped waiting for NetworkManager to start (2026-10-06), it first waits for NM to
+        # answer, polling, so the first attempt is not wasted on "NetworkManager is not running".
+        if not await loop.run_in_executor(None, ap.wait_for_network_manager):
+            log.warning("NetworkManager did not answer in 30 s; trying the AP anyway")
         for attempt, wait in enumerate((0, 5, 10, 20, 30), start=1):
             if wait:
                 await asyncio.sleep(wait)

@@ -3342,6 +3342,28 @@ OCR listo a los 44 s del arranque, modo ómnibus a 15 fps.
 - El mensaje «la placa no informó una dirección de red» es técnico; durante una transición de red
   debería decir que espere unos segundos.
 
+## 2026-10-06 (cont. 3) — 11 s menos de arranque: la placa anuncia a los 16 s y no a los 27
+
+Escenario A repetido con el teléfono tras el #109: **sin «se perdió la conexión»**, y el teléfono
+conectó 0,3 s después de que la placa empezó a anunciar. Lo que se sentía lento era antes y después:
+~25 s de Linux antes de que corriera el daemon, y el cartel de la WiFi (pendiente aparte). Reabrir la
+app: BLE en 1,4 s y red en 0,26 s (`via: already`), sin cartel — el objetivo.
+
+`systemd-analyze critical-chain virovision.service` mostró el arranque esperando cosas que el daemon
+ya no necesita desde que anuncia primero (#107):
+
+| eslabón | costo | qué se hizo |
+|---|---|---|
+| `cloud-init` (main + local + network), en cada arranque | 6,1 s | `/etc/cloud/cloud-init.disabled` en `setup.sh`: sólo sirve en el primer arranque de una tarjeta grabada; el `user-data` no tiene nada por arranque |
+| `NetworkManager` + `NetworkManager-wait-online` | 6,6 s | la unidad depende sólo de `bluetooth.target` |
+| `virovision-modo-red.service` | 3,5 s | sólo hace `daemon-reload` si cambió el drop-in de `SIN-AP` (2,4 s) e instala perfiles/avisos sólo si difieren (`cmp`): 0,27 s sin cambios, ~2,2 s al cambiar de modo; probado en los dos sentidos |
+
+Sin esperar a NM, el primer intento del AP fallaba con «NetworkManager is not running» y el
+reintento de 5 s fijos lo atrasaba 2,3 s: `AccessPoint.wait_for_network_manager` sondea cada 0,5 s.
+
+Medido en la placa, desde el kernel: **anuncio 27,0 → 16,2 s; AP ~29 → 21,7 s; cámara 31,4 → 21,3 s;
+OCR 44,0 → 33,6 s**. Arranque total (`systemd-analyze`) 27,0 → ~21 s.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
