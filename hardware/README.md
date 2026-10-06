@@ -64,8 +64,10 @@ lo tiene (los pogo pins lo necesitan); y, sólo si la medición lo pide, la 1034
 protección y JST PH 2.0. Plan B sin electrónica: power bank de 5000 mAh en el bolsillo y un cable a
 los pads de 5 V de la Pi.
 
-**Con el HAT en mano**: leer el INA219 desde el daemon (I2C, dirección 0x43 según Waveshare; verificar
-con `i2cdetect`) y publicar el porcentaje en `estado.bateria`; medir la separación de los pogo pins y la
+**Batería leída desde el 2026-10-06** (`raspi/virovision/battery.py`): el INA219 está en la 0x43 del
+bus I2C 1 (confirmado escaneando el bus), sólo se lee el registro de tensión y el porcentaje sale de la
+curva de descarga de una LiPo, suavizado. Requiere `dtparam=i2c_arm=on` en `config.txt`, que Raspberry Pi
+OS Lite trae comentado (`setup.sh` lo habilita; hace falta un reinicio). **Falta**: medir la separación de los pogo pins y la
 altura de los componentes para la carcasa.
 
 ## Software de la placa

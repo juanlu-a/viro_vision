@@ -30,7 +30,7 @@ export const GATT = {
      * this comment exists so nobody wires it up again believing it is the photo path.
      */
     transfer: '4380c504-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** read · notify — JSON: `version`, `temp`, `uptime`, `battery` (null today), `camera`, `wifi`, `ip`, `port`, `ap`. */
+    /** read · notify — JSON: `version`, `temp`, `uptime`, `battery` (0-100 from the UPS HAT, null without one), `camera`, `wifi`, `ip`, `port`, `ap`. */
     status: '4380c505-7ca3-4e37-b27d-f60e8d8d73d1',
     /** read — JSON `{ ssid, password, ip, port }` of the device's access point; `{}` when it has none. */
     wifi: '4380c506-7ca3-4e37-b27d-f60e8d8d73d1',

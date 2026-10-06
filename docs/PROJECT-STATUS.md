@@ -308,7 +308,8 @@ Pick a track (see the skill for pillar detail):
   El 2026-09-22 el modo dejó además de ser ciego en el journal (línea de tiempo por ómnibus y latido
   de frames) y la cámara pasó a tener un vigilante que la reabre tras 12 s sin un frame — **sin ponerle
   plazo a `capture_request`**, que es lo que la trabó para todo, foto de supermercado incluida.
-  Siguen: DAC I2S, leer el INA219 del HAT → `estado.bateria`, medir el consumo real, la app mostrando
+  La batería se lee del INA219 del HAT desde el 2026-10-06 (`battery.py`) y llega a la app por `status`.
+  Siguen: DAC I2S, medir el consumo real, la app mostrando
   la lectura de ómnibus, y la carcasa.
 
 **Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core

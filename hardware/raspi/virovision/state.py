@@ -1,7 +1,7 @@
 """Minimal device telemetry for the `status` characteristic.
 
-Battery is `null` on purpose: the Zero 2 W does not measure its own. When there is a sensor (or the
-enclosure's UPS), it gets filled in here and the app does not change. `wifi` is there for the
+Battery comes from the UPS HAT's INA219 (`battery.py`) and is `null` when there is no HAT to read:
+the Zero 2 W does not measure its own. `wifi` is there for the
 ADR 0003 measurement: BLE has to be measured with the WiFi off and on, because they share an antenna.
 """
 
@@ -14,10 +14,12 @@ from pathlib import Path
 from typing import Optional
 
 from . import VERSION
+from .battery import Battery
 
 _THERMAL = Path("/sys/class/thermal/thermal_zone0/temp")
 _WLAN = Path("/sys/class/net/wlan0/operstate")
 _STARTED_AT = time.monotonic()
+_BATTERY = Battery()
 
 
 def _read(path: Path) -> Optional[str]:
@@ -56,7 +58,7 @@ def read_status(camera: bool, http_port: Optional[int] = None, ap: bool = False,
         "version": VERSION,
         "temp": round(int(temp) / 1000, 1) if temp and temp.isdigit() else None,
         "uptime": int(time.monotonic() - _STARTED_AT),
-        "battery": None,
+        "battery": _BATTERY.level(),
         "camera": camera,
         "wifi": wifi,
         # ADR 0003's plan B: the app downloads the photo over HTTP from here. `ip` null = no network;
