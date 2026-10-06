@@ -112,6 +112,13 @@ class Player:
         self._queue: queue.Queue = queue.Queue()
         self._queue_lock = threading.Lock()
         self._worker: Optional[threading.Thread] = None
+        # Guards `_process` and `_generation`. `stop` comes from the BLE loop (`hush`), the clips
+        # start on the audio worker and the readings on the HTTP thread: unguarded, a clip the worker
+        # was launching while `stop` ran was never stopped — the board talking over the phone it had
+        # just been told to yield to (2026-10-06).
+        self._process_lock = threading.Lock()
+        # Bumped by every `stop`. A clip dequeued before a stop must not start after it.
+        self._generation = 0
         # Reported once, at startup, because it is the difference between "the audio did not arrive"
         # and "the audio arrived and there was nothing to play it with" — and on a device with no
         # screen the log is the only place anyone can tell them apart.
@@ -131,15 +138,17 @@ class Player:
             return
         self.stop()
         try:
-            # Output to DEVNULL: mpg123 and aplay write progress to stderr, and at one line per
-            # reading the journal would be mostly theirs.
-            self._process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            with self._process_lock:
+                # Output to DEVNULL: mpg123 and aplay write progress to stderr, and at one line per
+                # reading the journal would be mostly theirs.
+                process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self._process = process
         except (OSError, subprocess.SubprocessError) as exc:
             # Typically FileNotFoundError: the decoder is not installed. It is a warning and not a
             # raise because the caller is an HTTP handler answering the phone.
             log.warning("audio: could not play %s: %s", path, exc)
             return
-        log.info("audio: playing %s (pid %d)", path, self._process.pid)
+        log.info("audio: playing %s (pid %d)", path, process.pid)
 
     def play_sequence(self, paths: list) -> None:
         """Play these files one after another, without cutting each other off. Returns immediately.
@@ -160,20 +169,29 @@ class Player:
 
     def _play_queued(self) -> None:
         while True:
-            try:
-                path = self._queue.get_nowait()
-            except queue.Empty:
-                return
+            # Empty-check and exit under the same lock `play_sequence` enqueues under. Outside it, a
+            # clip queued between this worker finding the queue empty and returning saw a live worker,
+            # started none, and was never played (2026-10-06).
+            with self._queue_lock:
+                try:
+                    path = self._queue.get_nowait()
+                except queue.Empty:
+                    self._worker = None
+                    return
+                generation = self._generation
             command = command_for(path)
             if command is None:
                 log.warning("audio: nothing can play %s", path)
                 continue
             try:
-                process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                with self._process_lock:
+                    if generation != self._generation:
+                        continue  # stopped after this clip was dequeued: it is not to be heard
+                    process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    self._process = process
             except (OSError, subprocess.SubprocessError) as exc:
                 log.warning("audio: could not play %s: %s", path, exc)
                 continue
-            self._process = process
             process.wait()
 
     def stop(self) -> None:
@@ -183,8 +201,9 @@ class Player:
                 self._queue.get_nowait()
             except queue.Empty:
                 break
-        process = self._process
-        self._process = None
+        with self._process_lock:
+            self._generation += 1
+            process, self._process = self._process, None
         if process is None or process.poll() is not None:
             return
         log.debug("audio: interrupting pid %d", process.pid)

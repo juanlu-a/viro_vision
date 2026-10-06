@@ -726,3 +726,89 @@ def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path)
     assert launched == []
     assert not watcher.running
 
+
+
+def test_the_frame_loop_survives_a_camera_restart_and_a_bad_frame(monkeypatch):
+    """2026-10-06. A restart —the watchdog's, or a phone photo that timed out— closes the camera
+    under the frame loop, and that is what unblocks `capture_request`: with an error. The loop used
+    to return there, with `running` still True, so nothing drained the camera again and the watchdog
+    reopened it every 12 s for good. It also kept the sensor handle from before the restart. And one
+    frame whose processing raised ended the mode the same silent way."""
+    import virovision.bus as bus_module
+
+    monkeypatch.setattr(bus_module, "CAMERA_RETRY_S", 0.01)
+    released, sensors_used, processed = [], [], []
+
+    class Request:
+        def __init__(self, n):
+            self.n = n
+
+        def get_metadata(self):
+            return {"n": self.n}
+
+        def make_array(self, name):
+            return f"frame {self.n}"
+
+        def release(self):
+            released.append(self.n)
+
+    class Sensor:
+        def __init__(self, name):
+            self.name = name
+
+        def get_outputs(self, metadata):
+            sensors_used.append(self.name)
+            return metadata
+
+        def get_input_size(self):
+            return (640, 640)
+
+    class RestartingCamera:
+        def __init__(self):
+            self.sensor = Sensor("before")
+            self.calls = 0
+
+        def capture_request(self):
+            self.calls += 1
+            if self.calls == 2:
+                self.sensor = Sensor("after")  # what a restart leaves behind
+                raise RuntimeError("Camera frontend has timed out")
+            if self.calls == 3:
+                raise RuntimeError("camera not started")  # still reopening
+            if self.calls > 7:
+                watcher._stop.set()  # the user left bus mode
+                raise RuntimeError("closed by stop")
+            return Request(self.calls)
+
+        def to_stream(self, coords, metadata):
+            return (0, 0, 1, 1)
+
+    def detections_from_tensors(outputs, labels, **kwargs):
+        if outputs["n"] == 5:
+            raise ValueError("a tensor of the wrong shape")
+        return []
+
+    class FakeWatcher:
+        tracker = types.SimpleNamespace(tracks=[])
+
+        def process(self, frame, detections, frame_number):
+            processed.append(frame_number)
+            return []
+
+    imx500 = types.ModuleType("bus_banner.imx500")
+    imx500.detections_from_tensors = detections_from_tensors
+    monkeypatch.setitem(sys.modules, "bus_banner", types.ModuleType("bus_banner"))
+    monkeypatch.setitem(sys.modules, "bus_banner.imx500", imx500)
+
+    watcher = BusWatcher(RestartingCamera(), lambda files: None, lambda event: None)
+    watcher._watcher = FakeWatcher()
+    watcher._settings = {"labels": ["bus_sign"], "normalize": False, "order": None}
+    thread = threading.Thread(target=watcher._frame_loop, daemon=True)
+    thread.start()
+    thread.join(5)
+
+    assert not thread.is_alive(), "the loop ends when the mode is left, and only then"
+    assert released == [1, 4, 5, 6, 7], "every request is released, the bad frame's included"
+    assert sensors_used[0] == "before" and set(sensors_used[1:]) == {"after"}, "the handle after the restart"
+    assert len(processed) == 4, "the bad frame is skipped, the rest are watched"
+

@@ -82,3 +82,46 @@ def test_a_sequence_with_no_player_installed_does_not_raise():
     player = Player()
     player.play_sequence(["/tmp/one.wav", "/tmp/two.wav"])
     player.stop()
+
+
+def test_a_clip_dequeued_before_a_hush_is_not_played_after_it(monkeypatch):
+    """`hush` means the phone is about to speak (2026-10-06). The worker had already taken the next
+    clip off the queue when `stop` ran, and started it right after: the board talking over the phone
+    it had just been told to yield to."""
+    import threading
+
+    import virovision.audio as audio
+
+    started = []
+
+    class Process:
+        pid = 1
+
+        def __init__(self, command, **kwargs):
+            started.append(command[-1])
+
+        def wait(self):
+            pass
+
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Process)
+    player = Player()
+    dequeued, resume = threading.Event(), threading.Event()
+    real_command_for = audio.command_for
+
+    def slow_command_for(path):
+        dequeued.set()
+        resume.wait(2)
+        return real_command_for(path)
+
+    monkeypatch.setattr(audio, "command_for", slow_command_for)
+    player.play_sequence(["/tmp/115.wav"])
+    assert dequeued.wait(2)
+    worker = player._worker
+    player.stop()  # the hush, while the worker holds the clip
+    resume.set()
+    worker.join(2)
+    assert started == []
+    assert player._worker is None, "a finished worker clears itself, so the next sequence starts one"

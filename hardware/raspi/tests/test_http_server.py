@@ -126,3 +126,30 @@ def test_an_unknown_path_is_404(server):
     with pytest.raises(urllib.error.HTTPError) as exc:
         _get(server, "/nothing")
     assert exc.value.code == 404
+
+
+def test_a_malformed_content_length_is_400_not_a_traceback(server):
+    import socket
+
+    with socket.create_connection(("127.0.0.1", server.port), timeout=5) as s:
+        s.sendall(b"POST /audio HTTP/1.1\r\nHost: board\r\nContent-Length: lots\r\n\r\n")
+        assert s.recv(64).startswith(b"HTTP/1.1 400")
+
+
+def test_old_readings_are_deleted_so_tmp_does_not_eat_the_ram(server, tmp_path, monkeypatch):
+    """/tmp is a tmpfs on Trixie: every MP3 the phone sent stayed in RAM until the next boot
+    (2026-10-06). The newest few stay, so the file a player was just handed is never pulled away."""
+    import virovision.http_server as m
+
+    monkeypatch.setattr(m, "AUDIO_DIRECTORY", str(tmp_path))
+    for stamp in (1000000000001, 1000000000002, 1000000000003, 1000000000004):
+        (tmp_path / f"audio-{stamp}.mp3").write_bytes(b"old")
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{server.port}/audio", data=b"ID3mp3", method="POST", headers={"Content-Type": "audio/mpeg"}
+    )
+    with urllib.request.urlopen(req, timeout=5) as r:
+        newest = json.loads(r.read())["file"]
+    left = sorted(p.name for p in tmp_path.iterdir())
+    assert len(left) == m.AUDIO_FILES_KEPT
+    assert os.path.basename(newest) in left
+    assert "audio-1000000000001.mp3" not in left and "audio-1000000000004.mp3" in left

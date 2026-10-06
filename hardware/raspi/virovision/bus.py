@@ -29,12 +29,13 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
+from .notices import SYSTEM_DIR as NOTICES_DIR
+
 log = logging.getLogger(__name__)
 
 DEFAULT_MODEL = Path("/home/virovision/models/bus_sign.rpk")
 DEFAULT_ANNOUNCEMENTS = Path("/home/virovision/announcements")
 DEFAULT_CATALOG = Path("/home/virovision/models/catalog_stm.csv")
-NOTICES_DIR = "system"
 WARMING_UP_CLIP = "bus_warming_up.wav"
 """Said when the button asks for bus mode before the OCR has finished loading. Its text lives with
 the other system notices, in `notices.py`."""
@@ -55,16 +56,22 @@ second, so this is very long on purpose: the first frame after the camera starts
 measured on the board (2026-09-22) while the detector's firmware loads, and a limit under that turns
 every start into a restart. It buys three of those and some more."""
 WATCHDOG_EVERY_S = 1.0
+CAMERA_RETRY_S = 0.5
+"""How often the frame loop asks again for a frame while the camera is down (restarting, or failed to
+come back). Short next to FRAME_SILENCE_S, and long enough not to spin a core of a Zero 2 W."""
+FRAME_ERROR_LOG_S = 5.0
+"""At most one traceback per this many seconds for frames that fail to process. A bad frame repeats
+at 15 per second, and every ERROR line also travels to the app (`log_relay.py`)."""
 HEARTBEAT_S = 5.0
 """Bus mode says how many frames it saw, and how many carried detections, this often. A run with no
 bus in the video and a run with no frames from the camera used to leave the same empty journal."""
 
 PRESENCE_SILENCE_S = 15.0
-"""«Se acerca un ómnibus» no se repite dentro de esta ventana, venga del track que venga. Un ómnibus
-que se pierde y vuelve es un track nuevo, y con eso el aviso salía una vez por corte: probando con
-videos el 2026-09-15 se repitió muchas veces seguidas. La frase no distingue un ómnibus de otro, así
-que repetirla no agrega información aunque el segundo ómnibus sea real; lo que sí distingue es la
-línea, y ésa tiene su propia ventana."""
+"""«Se acerca un ómnibus» is not repeated within this window, whichever track it comes from. A bus that
+is lost and comes back is a new track, so the notice went out once per dropout: testing with videos
+on 2026-09-15 it repeated many times in a row. The phrase does not tell one bus from another, so
+repeating it adds no information even when the second bus is real; what does tell them apart is the
+line, and that has its own window."""
 
 SAME_LINE_SILENCE_S = 10.0
 """A line just announced is not announced again this soon. One bus is one announcement, and the
@@ -259,10 +266,19 @@ class BusWatcher:
         self._last_line: tuple = ()
         self._last_line_at: float | None = None
         self._last_voice_at: float | None = None
-        """None means «todavía no habló». Cero no sirve: `time.monotonic()` cuenta desde el arranque
-        del proceso en macOS y desde el arranque de la máquina en Linux, así que un cero literal
-        silencia el primer aviso en una plataforma y no en la otra."""
+        """None means "has not spoken yet". Zero will not do: `time.monotonic()` counts from process
+        start on macOS and from machine boot on Linux, so a literal zero silences the first notice on
+        one platform and not on the other."""
         self.running = False
+        # Serialises launching and halting the threads, and only that — never held across a build.
+        # `stop` cannot take the build lock (it must cancel a cold build, not wait minutes for it), so
+        # without this a stop landing between `start`'s last `_wanted` check and `running = True` saw
+        # nothing running, returned, and left the camera watching in another mode (2026-10-06).
+        self._run_lock = threading.Lock()
+        self.unavailable_reason: Optional[str] = None
+        """Why the last `start` could not watch, in words the app can show; None when it started, or
+        when not starting was not a failure (the camera still starting, the user already gone). The
+        core reports it as an error event instead of dropping `start`'s False (2026-10-06)."""
 
     @property
     def ready(self) -> bool:
@@ -304,6 +320,7 @@ class BusWatcher:
             return self._start_locked()
 
     def _start_locked(self) -> bool:
+        self.unavailable_reason = None
         if self.running:
             return True
         if getattr(self._camera, "starting", False):
@@ -316,10 +333,12 @@ class BusWatcher:
             self._warming_up()
             return False
         if not self.available:
-            log.warning("bus mode unavailable: %s", "no detector in the sensor" if is_available() else "bus_banner is not installed")
+            self.unavailable_reason = "no detector in the sensor" if is_available() else "bus_banner is not installed"
+            log.warning("bus mode unavailable: %s", self.unavailable_reason)
             return False
         if self._engine_failed_at is not None and time.monotonic() - self._engine_failed_at < ENGINE_RETRY_S:
-            log.warning("bus mode unavailable: the OCR engine failed to build %.0f s ago", time.monotonic() - self._engine_failed_at)
+            self.unavailable_reason = f"the OCR engine failed to build {time.monotonic() - self._engine_failed_at:.0f} s ago"
+            log.warning("bus mode unavailable: %s", self.unavailable_reason)
             return False
         if not self.ready:
             # The OCR takes tens of seconds to load and `_build` below is where that happens. Until
@@ -332,21 +351,35 @@ class BusWatcher:
             self._build()
         except Exception as exc:  # noqa: BLE001 — a model or a catalog that will not load
             self._note_build_failure(exc)
+            self.unavailable_reason = f"could not start: {exc}"
             log.error("bus mode could not start: %s", exc)
             return False
         if not self._wanted:
             log.info("bus: the mode was left while it was being prepared; not starting")
             return False
-        self._stop.clear()
-        self._last_frame_at = time.monotonic()
-        self._threads = [
-            threading.Thread(target=self._read_loop, name="bus-ocr", daemon=True),
-            threading.Thread(target=self._frame_loop, name="bus-frames", daemon=True),
-            threading.Thread(target=self._watchdog, name="bus-watchdog", daemon=True),
-        ]
-        for thread in self._threads:
-            thread.start()
-        self.running = True
+        with self._run_lock:
+            # Fresh per run, never cleared and reused (2026-10-06). A thread of the previous run that
+            # outlived `stop`'s 3 s join —an OCR read in flight, a frame loop stuck in the camera— reads
+            # these when it starts and keeps ITS copies: reusing them, `_stop.clear()` revived it as a
+            # second frame loop, and stale jobs and readings of tracks that no longer exist leaked
+            # into the new run.
+            self._stop = threading.Event()
+            self._jobs = queue.Queue()
+            self._results = queue.Queue()
+            self._last_frame_at = time.monotonic()
+            self._threads = [
+                threading.Thread(target=self._read_loop, name="bus-ocr", daemon=True),
+                threading.Thread(target=self._frame_loop, name="bus-frames", daemon=True),
+                threading.Thread(target=self._watchdog, name="bus-watchdog", daemon=True),
+            ]
+            for thread in self._threads:
+                thread.start()
+            self.running = True
+        if not self._wanted:
+            # `stop` ran between the check above and `running = True`, and found nothing to stop.
+            log.info("bus: the mode was left while it was starting; stopping")
+            self._halt()
+            return False
         log.info("bus mode watching (%s)", self._settings)
         return True
 
@@ -354,14 +387,18 @@ class BusWatcher:
         """Stops watching and gives the camera back. Safe to call when it is not running — including
         while a start is still building, which this cancels (see `_wanted`)."""
         self._wanted = False
-        if not self.running:
-            return
-        self._stop.set()
-        self._jobs.put(None)
-        for thread in self._threads:
-            thread.join(timeout=3)
-        self._threads = []
-        self.running = False
+        self._halt()
+
+    def _halt(self) -> None:
+        with self._run_lock:
+            if not self.running:
+                return
+            self._stop.set()
+            self._jobs.put(None)
+            for thread in self._threads:
+                thread.join(timeout=3)
+            self._threads = []
+            self.running = False
         log.info("bus mode stopped")
 
     def repeat_last(self) -> bool:
@@ -471,8 +508,9 @@ class BusWatcher:
         return None
 
     def _read_loop(self) -> None:
+        jobs, results = self._jobs, self._results  # this run's (see `_start_locked`)
         while True:
-            job = self._jobs.get()
+            job = jobs.get()
             if job is None:
                 return
             frame, banner_box, bus_box, track_id = job
@@ -482,7 +520,7 @@ class BusWatcher:
             except Exception as exc:  # noqa: BLE001 — one bad frame must not end the mode
                 log.warning("bus: the reading failed: %s", exc)
                 reading = None
-            self._results.put((track_id, reading, round((time.monotonic() - started) * 1000)))
+            results.put((track_id, reading, round((time.monotonic() - started) * 1000)))
 
     def _watchdog(self) -> None:
         """Reopens the camera when no frame has arrived for FRAME_SILENCE_S.
@@ -491,9 +529,15 @@ class BusWatcher:
         inside `capture_request` and cannot notice anything. Closing the sensor from here is what
         unblocks it. Giving the capture call its own deadline instead was tried on 2026-09-21 and
         jammed the camera for good: see `Camera.capture_request`."""
-        while not self._stop.wait(WATCHDOG_EVERY_S):
+        stop = self._stop  # this run's (see `_start_locked`)
+        # Restarts in a row that left the camera unavailable. Each one doubles the wait before the
+        # next (up to 32x, ~6 min): a camera that does not reopen gets its detector reloaded on every
+        # try, under the capture lock, and retrying that every 12 s kept every photo waiting behind
+        # it for as long as the mode lasted (2026-10-06).
+        failed = 0
+        while not stop.wait(WATCHDOG_EVERY_S):
             silence = time.monotonic() - self._last_frame_at
-            if silence < FRAME_SILENCE_S:
+            if silence < FRAME_SILENCE_S * (2 ** min(failed, 5)):
                 continue
             log.error("bus: no frame from the camera in %.0f s; reopening it", silence)
             self._last_frame_at = time.monotonic()  # the restart takes seconds; do not fire again meanwhile
@@ -503,58 +547,96 @@ class BusWatcher:
                 log.error("bus: the camera did not come back (%s)", exc)
                 return
             self._last_frame_at = time.monotonic()
+            failed = 0 if getattr(self._camera, "available", True) else failed + 1
 
     def _heartbeat(self, frames: int, with_detections: int, buses: int, signs: int) -> None:
         log.info("bus: %d frames in %.0f s, %d with detections (bus %d, sign %d)", frames, HEARTBEAT_S, with_detections, buses, signs)
 
     def _frame_loop(self) -> None:
+        """Drains frames for as long as the mode lasts — through camera restarts included.
+
+        Until 2026-10-06 it returned on the first failed capture. But a failed capture is exactly what
+        a restart produces: closing the sensor (the watchdog's, or a phone photo that timed out) is
+        what unblocks `capture_request`, with an error. The loop died, `running` stayed True, nothing
+        drained the camera, and the watchdog reopened it every 12 s for good — the user in bus mode
+        hearing nothing, with every restart blocking the photos behind the capture lock. Now it waits
+        for the camera to come back and carries on, asking the camera for the CURRENT sensor on every
+        frame rather than the handle it saw when the mode began."""
         from bus_banner.imx500 import detections_from_tensors
 
-        sensor = self._camera.sensor
+        stop = self._stop  # this run's (see `_start_locked`)
         frame_number = 0
         beat_at = time.monotonic()
         frames = with_detections = buses = signs = 0
-        while not self._stop.is_set():
+        down_since: float | None = None
+        last_error_logged = float("-inf")
+        errors_unlogged = 0
+        while not stop.is_set():
             try:
                 request = self._camera.capture_request()
-            except Exception as exc:  # noqa: BLE001
-                log.error("bus: the camera stopped delivering frames (%s)", exc)
-                return
+            except Exception as exc:  # noqa: BLE001 — closed under us, restarting, or not back yet
+                if stop.is_set():
+                    return
+                if down_since is None:
+                    down_since = time.monotonic()
+                    log.error("bus: the camera stopped delivering frames (%s); waiting for it", exc)
+                # `_last_frame_at` is NOT refreshed: a camera that never comes back is still the
+                # watchdog's to reopen.
+                stop.wait(CAMERA_RETRY_S)
+                continue
+            if down_since is not None:
+                log.warning("bus: frames again after %.1f s without the camera", time.monotonic() - down_since)
+                down_since = None
             self._last_frame_at = time.monotonic()
+            # One bad frame must not end the mode (2026-10-06): an exception here used to kill this
+            # thread silently, with the same consequences as a dead camera. The frame is skipped.
             try:
-                metadata = request.get_metadata()
-                detections = detections_from_tensors(
-                    sensor.get_outputs(metadata),
-                    self._settings["labels"],
-                    input_size=sensor.get_input_size(),
-                    to_stream=lambda y1, x1, y2, x2, m=metadata: self._camera.to_stream((y1, x1, y2, x2), m),
-                    min_conf=self._min_conf,
-                    signs_only=self._signs_only,
-                    normalize=self._settings["normalize"],
-                    order=self._settings["order"],
-                )
-                # Copying the frame is the expensive part on a Pi 3 B+: only when there is something in
-                # it. A sign alone counts: it carries its own track when the bus box is missing or bad.
-                frame = request.make_array("main") if detections else None
-            finally:
-                request.release()
+                detections, frame = self._read_request(request, detections_from_tensors)
+                frames += 1
+                if detections:
+                    with_detections += 1
+                    buses += sum(d.label == "bus" for d in detections)
+                    signs += sum(d.label == "bus_sign" for d in detections)
+                if time.monotonic() - beat_at >= HEARTBEAT_S:
+                    self._heartbeat(frames, with_detections, buses, signs)
+                    beat_at = time.monotonic()
+                    frames = with_detections = buses = signs = 0
 
-            frames += 1
-            if detections:
-                with_detections += 1
-                buses += sum(d.label == "bus" for d in detections)
-                signs += sum(d.label == "bus_sign" for d in detections)
-            if time.monotonic() - beat_at >= HEARTBEAT_S:
-                self._heartbeat(frames, with_detections, buses, signs)
-                beat_at = time.monotonic()
-                frames = with_detections = buses = signs = 0
-
-            self._drain_results(frame_number)
-            events = self._watcher.process(frame, detections, frame_number)
-            self._timeline.frame(self._watcher.tracker.tracks, detections)
-            for event in events:
-                self._handle(event)
+                self._drain_results(frame_number)
+                events = self._watcher.process(frame, detections, frame_number)
+                self._timeline.frame(self._watcher.tracker.tracks, detections)
+                for event in events:
+                    self._handle(event)
+            except Exception:  # noqa: BLE001
+                errors_unlogged += 1
+                if time.monotonic() - last_error_logged >= FRAME_ERROR_LOG_S:
+                    log.exception("bus: frame %d failed; skipped (%d failed since the last report)", frame_number, errors_unlogged)
+                    last_error_logged = time.monotonic()
+                    errors_unlogged = 0
             frame_number += 1
+
+    def _read_request(self, request, detections_from_tensors) -> tuple:
+        """The sensor's detections and, only if there are any, a copy of the frame. Always releases the
+        request: picamera2 has a fixed pool of buffers and a leaked one stalls the camera."""
+        try:
+            sensor = self._camera.sensor  # the current handle, not the one from before a restart
+            metadata = request.get_metadata()
+            detections = detections_from_tensors(
+                sensor.get_outputs(metadata),
+                self._settings["labels"],
+                input_size=sensor.get_input_size(),
+                to_stream=lambda y1, x1, y2, x2, m=metadata: self._camera.to_stream((y1, x1, y2, x2), m),
+                min_conf=self._min_conf,
+                signs_only=self._signs_only,
+                normalize=self._settings["normalize"],
+                order=self._settings["order"],
+            )
+            # Copying the frame is the expensive part on a Pi 3 B+: only when there is something in
+            # it. A sign alone counts: it carries its own track when the bus box is missing or bad.
+            frame = request.make_array("main") if detections else None
+        finally:
+            request.release()
+        return detections, frame
 
     def _drain_results(self, frame_number: int) -> None:
         while True:

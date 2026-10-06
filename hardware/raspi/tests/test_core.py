@@ -193,3 +193,109 @@ def test_status_can_be_requested_by_command(loop):
     core.write_control(b'{"cmd":"status"}')
     loop.run_until_complete(_drain(loop))
     assert json.loads(n.of(STATUS)[0]) == {"version": "t"}
+
+
+# --- review of 2026-10-06: nothing the air or the network sends may take the daemon down ----------
+
+
+def _until(loop_, condition, timeout_s=2.0):
+    """For work that crosses an executor thread: `_drain` only waits for tasks."""
+
+    async def wait():
+        deadline = loop_.time() + timeout_s
+        while not condition():
+            assert loop_.time() < deadline, "the condition never became true"
+            await asyncio.sleep(0.01)
+
+    loop_.run_until_complete(wait())
+
+
+def test_a_long_network_name_is_trimmed_instead_of_crashing_the_heartbeat(loop):
+    """The status JSON went over EVENT_MAX_BYTES with a long NetworkManager profile name, `_json`
+    raised in the 15 s heartbeat, and the daemon crash-looped for as long as the board stayed on that
+    network. Trimmed by UTF-8 bytes: an emoji or an accent is several bytes per character."""
+    from virovision.core import EVENT_MAX_BYTES
+
+    status = {"version": "0.1.0", "temp": 51.2, "uptime": 123456, "battery": 87, "camera": True, "wifi": True,
+              "ip": "192.168.100.123", "port": 8080, "ap": False, "network": "Casa de la abuela ñandú 📶" * 10}
+    core = Core(loop, lambda: status, None, bytes, Notifications())
+    data = core.read_status()
+    assert len(data) <= EVENT_MAX_BYTES
+    decoded = json.loads(data)
+    assert decoded["network"].startswith("Casa de la abuela") and decoded["ip"] == "192.168.100.123"
+
+
+def test_a_long_multibyte_error_still_fits_one_notification(loop):
+    """`[:150]` counted characters; 150 accented or emoji characters are far past 180 bytes."""
+    from virovision.core import EVENT_MAX_BYTES
+
+    core, n = build(loop)
+    core.write_control(json.dumps({"cmd": "ñ" * 200}, ensure_ascii=False).encode())
+    loop.run_until_complete(_drain(loop))
+    raw = n.of(EVENT)[0]
+    assert len(raw) <= EVENT_MAX_BYTES
+    assert json.loads(raw)["msg"].startswith("unknown command: ñ")
+
+
+def test_measure_never_generates_more_than_the_cap(loop):
+    """The byte count arrives over the air and went straight to `os.urandom`: one write asking for
+    gigabytes was an out-of-memory kill on a 512 MB board."""
+    from virovision.core import MEASURE_MAX_BYTES
+
+    asked = []
+    n = Notifications()
+    core = Core(loop, lambda: {}, None, lambda amount: asked.append(amount) or b"x", n)
+    core.write_control(b'{"cmd":"measure","bytes":4000000000}')
+    loop.run_until_complete(_drain(loop))
+    assert asked == [MEASURE_MAX_BYTES]
+
+
+@pytest.mark.parametrize("command", [b"[]", b'"photo"', b"3", b'{"cmd":"measure","bytes":"lots"}',
+                                     b'{"cmd":"mode","value":null}', b'{"cmd":"ap","minutes":"x"}',
+                                     b'{"cmd":"measure","bytes":1e400}'])
+def test_a_malformed_command_is_an_error_event_not_an_exception(loop, command):
+    """These raised inside BlueZ's D-Bus setter: the app got no answer at all, the journal a trace."""
+    core, n = build(loop, ap_control=lambda on: None)
+    core.write_control(command)
+    loop.run_until_complete(_drain(loop))
+    assert [e["t"] for e in n.events()] == ["error"]
+
+
+def test_bus_mode_that_cannot_start_says_why(loop):
+    """`start`'s False died in the executor's future: the user heard "modo ómnibus activado" from the
+    app and then nothing, ever, with no way to tell why from the phone."""
+
+    class UnavailableBus:
+        audio_target = "device"
+        unavailable_reason = "no detector in the sensor"
+
+        def start(self):
+            return False
+
+        def stop(self):
+            pass
+
+    core, n = build(loop)
+    core.attach_bus(UnavailableBus())
+    core.from_button(1)
+    # `start` runs on an executor thread and its event comes back through `emit_event`.
+    _until(loop, lambda: {"t": "error", "msg": "bus unavailable: no detector in the sensor"} in n.events())
+
+
+def test_a_background_failure_reaches_the_journal(loop, caplog):
+    """Executor futures nobody awaited swallowed their exceptions without a trace."""
+
+    class BrokenBus:
+        audio_target = "device"
+
+        def start(self):
+            raise RuntimeError("the OCR process died")
+
+        def stop(self):
+            pass
+
+    core, _ = build(loop)
+    core.attach_bus(BrokenBus())
+    with caplog.at_level("ERROR", logger="virovision.core"):
+        core.from_button(1)
+        _until(loop, lambda: any(r.exc_info and "the OCR process died" in str(r.exc_info[1]) for r in caplog.records))

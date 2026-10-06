@@ -87,8 +87,16 @@ class Camera:
         except ImportError:
             log.warning("picamera2 is not installed; carrying on without a camera")
             return False
+        picam = None
         try:
-            self._imx500 = self._load_model()
+            # Loaded once per process and reused by every restart (2026-10-06). A restart is about the
+            # frames stopping, which is libcamera's side (`Picamera2`); the network sits in the sensor
+            # and its handle survives the close. Reloading it on each restart pushed the `.rpk` again
+            # and held the capture lock through it, and a watchdog that kept restarting kept every
+            # photo waiting behind that. A failed start below drops the handle, so the next try does
+            # load it fresh.
+            if self._imx500 is None:
+                self._imx500 = self._load_model()
             picam = Picamera2() if self._imx500 is None else Picamera2(self._imx500.camera_num)
             width, height = picam.sensor_resolution
             scale = self._long_side / max(width, height)
@@ -120,6 +128,12 @@ class Camera:
             return True
         except Exception as exc:  # picamera2 throws all sorts of things when no camera is attached
             log.warning("could not start the camera (%s); carrying on without it", exc)
+            # Opened but not configured or started: closed here, or libcamera keeps the camera
+            # acquired by a handle nobody holds, and every later start fails with "busy" until the
+            # process dies (2026-10-06).
+            if picam is not None and not self._close(picam):
+                log.error("the half-started camera did not close in %.0f s", CLOSE_TIMEOUT_S)
+            self._imx500 = None
             return False
 
     def _load_model(self):
@@ -223,23 +237,28 @@ class Camera:
         and systemd starts a clean one, ~2 s later plus the detector's load. A board that reconnects
         in under a minute is recoverable; one that answers nothing until someone unplugs it is not."""
         picam, self._picam = self._picam, None
-        if picam is not None:
-
-            def close():
-                try:
-                    picam.stop()
-                    picam.close()
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("while closing the camera: %s", exc)
-
-            closer = threading.Thread(target=close, name="camera-close", daemon=True)
-            closer.start()
-            closer.join(CLOSE_TIMEOUT_S)
-            if closer.is_alive():
-                log.critical("the camera did not close in %.0f s; restarting the daemon to free it", CLOSE_TIMEOUT_S)
-                self._give_up()
-                return
+        if picam is not None and not self._close(picam):
+            log.critical("the camera did not close in %.0f s; restarting the daemon to free it", CLOSE_TIMEOUT_S)
+            self._give_up()
+            return
         self.start()
+
+    @staticmethod
+    def _close(picam) -> bool:
+        """Stops and closes `picam` with a deadline, in its own thread: a jammed sensor can block in
+        `stop()` for good. Returns False when it did not finish in CLOSE_TIMEOUT_S."""
+
+        def close():
+            try:
+                picam.stop()
+                picam.close()
+            except Exception as exc:  # noqa: BLE001
+                log.warning("while closing the camera: %s", exc)
+
+        closer = threading.Thread(target=close, name="camera-close", daemon=True)
+        closer.start()
+        closer.join(CLOSE_TIMEOUT_S)
+        return not closer.is_alive()
 
 
 def synthetic_payload(byte_count: int) -> bytes:

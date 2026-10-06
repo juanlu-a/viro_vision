@@ -25,7 +25,7 @@ export function describeError(error: unknown): Record<string, unknown> {
   return {
     name: typeof err?.name === 'string' ? err.name : null,
     message: errorDetail(error),
-    // The stack trimmed: with an 8 KB cap for ALL of the detail, a whole one takes the event with it.
+    // The stack trimmed: with a ~6 KB cap for ALL of the detail, a whole one takes the event with it.
     stack: typeof err?.stack === 'string' ? err.stack.slice(0, 2_000) : null,
   };
 }

@@ -28,7 +28,7 @@ them distinguishable with a single `journalctl`.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Callable, Optional
 
 from dbus_next import Message, MessageType
 from dbus_next.aio import MessageBus
@@ -126,8 +126,19 @@ class CentralWatcher:
     hold a proxy on, and a match rule survives all of it.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, on_change: Optional[Callable[[bool], None]] = None) -> None:
         self.connected: set[str] = set()
+        # Told whether ANY central is connected after every change. `log_relay` uses it to stop
+        # sending into a link nobody is on and buffer instead (2026-10-06).
+        self._on_change = on_change
+
+    def _changed(self) -> None:
+        if self._on_change is None:
+            return
+        try:
+            self._on_change(bool(self.connected))
+        except Exception as exc:  # noqa: BLE001 — a listener must not break the journal of the link
+            log.debug("central listener failed: %s", exc)
 
     async def start(self, bus: MessageBus) -> None:
         # The match rule first: without it the handler is installed and never called, which is a
@@ -157,6 +168,7 @@ class CentralWatcher:
             log.debug("could not seed the connected centrals: %s", exc)
         if self.connected:
             log.info("central already connected at startup: %s", ", ".join(sorted(self.connected)))
+        self._changed()
 
     def _handle(self, message: Message) -> None:
         if message.message_type is not MessageType.SIGNAL:
@@ -180,6 +192,7 @@ class CentralWatcher:
             # like from the app's side.
             self.connected.discard(address)
             log.info("central disconnected: %s (advertising should resume)", address)
+        self._changed()
 
 
 async def report_visibility(adapter, centrals: CentralWatcher) -> None:

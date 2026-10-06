@@ -54,7 +54,7 @@ type DeviceEvent =
   | { t: 'ap'; on: boolean; minutes: number }
   | { t: 'error'; msg: string }
   /** A daemon log line at WARNING or above, forwarded for telemetry only (2026-10-06). */
-  | { t: 'log'; lvl?: string; src?: string; msg?: string }
+  | { t: 'log'; lvl?: string; src?: string; msg?: string; drop?: number }
   | { t: 'warming' }
   | { t: 'bus' }
   | { t: 'result'; event: RecognitionEvent };
@@ -510,6 +510,8 @@ class BleClientPlx implements BleClient {
             level: typeof event.lvl === 'string' ? event.lvl.slice(0, 16) : null,
             source: typeof event.src === 'string' ? event.src.slice(0, 64) : null,
             message: event.msg == null ? null : errorDetail(event.msg),
+            // How many lines the daemon's rate limit discarded before this one: a hole, made visible.
+            dropped: typeof event.drop === 'number' ? event.drop : 0,
           },
         });
         break;

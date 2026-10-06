@@ -4,7 +4,7 @@
  * Since 2026-10-06 the user never sees nor hears an error's text — the table is its only reader —
  * so every call site was writing the same `err instanceof Error ? err.message : String(err)`. One
  * helper means one cap: a body echoed back by a provider can be kilobytes long, and the function
- * replaces a detail over 8 KB with `{trimmed: true}`, losing the whole row's context with it.
+ * replaces a detail over 6000 bytes with `{trimmed: true}`, losing the whole row's context with it.
  *
  * Pure: no React Native, so it is tested without mocks.
  */

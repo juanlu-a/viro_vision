@@ -99,3 +99,79 @@ def test_a_photo_behind_a_restart_fails_on_time_instead_of_waiting_for_it():
     finally:
         c._lock.release()
     assert c.capture_jpeg(timeout_s=1) == b"\xff\xd8JPEG"
+
+
+class FakePicamera2:
+    """Just enough of picamera2's class for `Camera._start` to run on the Mac."""
+
+    opened: list = []
+    fail_on = None
+
+    def __init__(self, camera_num=None):
+        FakePicamera2.opened.append(self)
+        self.camera_num = camera_num
+        self.options = {}
+        self.sensor_resolution = (4056, 3040)
+        self.closed = False
+
+    def create_preview_configuration(self, **kwargs):
+        return kwargs
+
+    def create_still_configuration(self, **kwargs):
+        return kwargs
+
+    def configure(self, config):
+        if FakePicamera2.fail_on == "configure":
+            raise RuntimeError("Failed to configure")
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def close(self):
+        self.closed = True
+
+
+@pytest.fixture
+def picamera2(monkeypatch):
+    import types
+
+    module = types.ModuleType("picamera2")
+    module.Picamera2 = FakePicamera2
+    monkeypatch.setitem(sys.modules, "picamera2", module)
+    FakePicamera2.opened = []
+    FakePicamera2.fail_on = None
+    return FakePicamera2
+
+
+def test_a_restart_reopens_the_camera_and_keeps_the_detector(picamera2):
+    """2026-10-06. Each restart used to load the `.rpk` into the sensor again, holding the capture
+    lock through it; a watchdog restarting over and over kept every photo waiting behind that."""
+    import types
+
+    c = Camera(model="/home/virovision/models/bus_sign.rpk")
+    sensor = types.SimpleNamespace(camera_num=1)
+    c._imx500 = sensor
+    c._picam = old = FakePicamera2(1)
+    loads = []
+    c._load_model = lambda: loads.append("loaded")
+    c.restart()
+    assert loads == [], "the detector is not pushed again"
+    assert c.sensor is sensor and c.available
+    assert old.closed and c._picam is not old and c._picam.camera_num == 1
+
+
+def test_a_half_started_camera_is_closed_and_the_detector_dropped(picamera2):
+    """Opened but failing to configure: unclosed, libcamera keeps it acquired by a handle nobody
+    holds and every later start fails as busy. The detector handle is dropped so the next try loads
+    it fresh instead of reusing whatever state the failure left."""
+    import types
+
+    picamera2.fail_on = "configure"
+    c = Camera(model="/home/virovision/models/bus_sign.rpk")
+    c._load_model = lambda: types.SimpleNamespace(camera_num=1)
+    assert not c.start()
+    assert picamera2.opened and picamera2.opened[-1].closed
+    assert c.sensor is None and not c.available

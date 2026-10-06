@@ -8,7 +8,8 @@
  *   - an event **with no `type` or no `at` is dropped without an error**: the response says
  *     `{stored: 0}` with status 200, so a misplaced field is never noticed. That is why the type
  *     makes them mandatory and `record()` fills `at` in itself;
- *   - `detail` is serialized and if it goes past 8 KB it is replaced entirely by `{trimmed: true}` —
+ *   - `detail` is serialized and if it goes past 6000 UTF-8 bytes (the function keeps a margin under
+ *     the column's 8 KB jsonb check) it is replaced entirely by `{trimmed: true}` —
  *     ALL of the detail is lost, not just the excess. Never put an image or a long text in here.
  */
 
@@ -93,7 +94,7 @@ export interface TelemetryEvent {
   at: string;
   /** Duration of what the event measures, when it measures something. The function rounds it to an integer. */
   ms?: number;
-  /** The event's context. Serialized it has to stay under 8 KB (see above). */
+  /** The event's context. Serialized it has to stay under 6000 bytes (see above). */
   detail?: Record<string, unknown>;
 }
 
