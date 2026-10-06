@@ -32,12 +32,12 @@ import {
 } from '@/services/ble/bleClient';
 import { encodeBase64 } from '@/services/ble/base64';
 import { downloadDevicePhoto, type DevicePhoto } from '@/services/camera';
-import { record } from '@/services/telemetry';
+import { errorDetail, record } from '@/services/telemetry';
 import { deviceUrl, type DeviceAddress } from '@/services/wifi/deviceHttp';
 import { reachDeviceNetwork } from '@/services/wifi/join';
 
 import { MODE_FROM_GATT, GATT_MODE, type DeviceStatus, type WifiCredentials } from './gatt';
-import type { ConnectionState, DeviceInfo } from './types';
+import { DeviceNoAddressError, type ConnectionState, type DeviceInfo } from './types';
 
 export type WifiState = 'off' | 'joining' | 'ready' | 'error';
 export type DeviceMode = (typeof MODE_FROM_GATT)[number];
@@ -48,10 +48,6 @@ interface DeviceValue {
   /** Where the device is on the network right now (it changes when it turns its AP on). */
   address: DeviceAddress | null;
   wifi: WifiState;
-  /** Why the network is in error, for the screen and the voice; null when there is no error. */
-  wifiDetail: string | null;
-  /** The last error notice the device sent over BLE, or null. */
-  lastNotice: string | null;
   /** True when a photo can be requested over WiFi: connected, with a network and `/health` answering. */
   photoAvailable: boolean;
   /** True while the device is an access point (with a mode active). */
@@ -95,8 +91,6 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<DeviceAddress | null>(null);
   const [ap, setAp] = useState(false);
   const [wifi, setWifi] = useState<WifiState>('off');
-  const [wifiDetail, setWifiDetail] = useState<string | null>(null);
-  const [lastNotice, setLastNotice] = useState<string | null>(null);
   const [deviceMode, setDeviceMode] = useState<DeviceMode | null>(null);
 
   const credentials = useRef<WifiCredentials | null>(null);
@@ -135,24 +129,22 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
    * status), never from an effect. Every run carries a number: if the situation changed while it
    * waited, its results are discarded.
    */
-  const failNetwork = useCallback((detail: string) => {
+  const failNetwork = useCallback((reason: string, extra?: Record<string, unknown>) => {
     // Cleared here and on every other way out of `ready` below: the guard must suppress a repeated
     // announcement, never a real one. A network that failed and came back has to be announced again.
     announcedReadyFor.current = null;
     setWifi('error');
-    setWifiDetail(detail);
-    record('wifi.failed', { detail: { reason: detail } });
-    // Voice is the interface: a silent failure leaves the user waiting for a button that never comes.
-    // Out of whatever output the user chose (`features/audio/systemNotice.ts`): the BLE link is up —
-    // it is how we learned the AP exists — so the board can say it even though its WiFi is what failed.
-    void notify('networkFailed', detail);
+    // The reason lives in the table and nowhere else (2026-10-06): the user never hears an IP, a
+    // system error string or a step of the join. They hear one fixed sentence, because a silent
+    // failure leaves them waiting for a button that never comes.
+    record('wifi.failed', { detail: { reason, ...extra } });
+    void notify('networkFailed');
   }, []);
 
   const syncNetwork = useCallback(
     async (apOn: boolean, target: DeviceAddress | null): Promise<boolean> => {
       const run = ++networkSyncRun.current;
       const current = () => run === networkSyncRun.current;
-      setWifiDetail(null);
       if (!target) {
         announcedReadyFor.current = null;
         setWifi('off');
@@ -165,7 +157,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         credentials.current = await getBleClient().readWifi().catch(() => null);
         if (!current()) return false;
         if (!credentials.current) {
-          failNetwork(strings.connect.wifiNoCredentials);
+          failNetwork('noCredentials');
           return false;
         }
       }
@@ -192,13 +184,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         }
         return true;
       }
-      failNetwork(
-        outcome.reason === 'unavailable'
-          ? strings.connect.wifiModuleMissing
-          : outcome.reason === 'refused'
-            ? `${strings.connect.wifiJoinFailed} ${outcome.message}`
-            : strings.connect.wifiNoResponse.replace('{ip}', target.ip)
-      );
+      failNetwork(outcome.reason, { ip: target.ip, message: outcome.message });
       return false;
     },
     [failNetwork]
@@ -242,7 +228,6 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     setAddress(null);
     setWifi('joining');
-    setWifiDetail(null);
   }, []);
 
   const applyStatus = useCallback(
@@ -322,7 +307,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         ms: Date.now() - t0,
         detail: {
           type: err instanceof Error ? err.name : typeof err,
-          message: err instanceof Error ? err.message : String(err),
+          message: errorDetail(err),
         },
       });
       setConnection({ status: 'error', device: null, message: errorMessage(err) });
@@ -379,13 +364,10 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         void notify('busWarmingUp');
       }),
       client.onDeviceError((message) => {
-        // The device has no screen: if something failed on it (bringing the AP up, the camera), the
-        // app is the only place anyone can find out — and since telemetry exists, the table.
+        // The device has no screen, so the table is the only place anyone finds out that something
+        // failed on it (bringing the AP up, the camera). Only the table: since 2026-10-06 the user
+        // never sees nor hears the board's own error strings — they are diagnosis, not guidance.
         record('device.warning', { detail: { message } });
-        setLastNotice(message);
-        // The board says the fixed sentence and the phone the whole thing, detail included: nobody
-        // can pre-record a clip per error message, and the message is on screen and in the table above.
-        void notify('deviceWarning', message);
       }),
     ];
     // The first connection comes out of the mount effect but on the next tick: the effect only
@@ -439,8 +421,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // The device kept its previous target, so bus readings may come out of the wrong speaker.
         // Not worth interrupting the user for, and not worth hiding either: this is exactly the bug
         // that made a reading come out of the board with the setting on "phone" (2026-09-15).
-        const detail = err instanceof Error ? err.message : String(err);
-        record('device.audioTargetFailed', { detail: { target, message: detail } });
+        record('device.audioTargetFailed', { detail: { target, message: errorDetail(err) } });
       }
     },
     [connection.status]
@@ -455,12 +436,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // and restarting the check here hid the device button for ~10 s for nothing. The transition
         // only starts if the device announces that its AP changed (the `ap` event).
       } catch (err) {
-        // The device did not learn about the mode: the app carries on, but it says so. On 2026-09-06
-        // the mode was not reaching the device and nobody knew until reading its log.
-        const detail = err instanceof Error ? err.message : String(err);
-        record('device.modeFailed', { detail: { mode, message: detail } });
-        setLastNotice(`${strings.connect.modeWriteFailed} ${detail}`);
-        void notify('modeWriteFailed', detail);
+        // The device did not learn about the mode: the app carries on and the table says so. On
+        // 2026-09-06 the mode was not reaching the device and nobody knew until reading its log.
+        record('device.modeFailed', { detail: { mode, message: errorDetail(err) } });
       }
     },
     [connection.status]
@@ -470,7 +448,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
 
   const downloadPhoto = useCallback(
     async (options?: { timeoutMs?: number }) => {
-      if (!address) throw new Error(strings.connect.noAddress);
+      if (!address) throw new DeviceNoAddressError();
       // The caller sets the deadline. With the screen locked the whole cycle has seconds, not the
       // 20 s the download would take by default (`readingService.ts`).
       return downloadDevicePhoto(address, options);
@@ -491,8 +469,10 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
           headers: { 'Content-Type': 'audio/mpeg', 'X-Encoding': 'base64' },
           body: encodeBase64(bytes),
         });
+        if (!r.ok) record('audio.send', { detail: { sent: false, status: r.status } });
         return r.ok;
-      } catch {
+      } catch (err) {
+        record('audio.send', { detail: { sent: false, message: errorDetail(err) } });
         return false;
       }
     },
@@ -500,8 +480,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<DeviceValue>(
-    () => ({ connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio }),
-    [connection, address, wifi, wifiDetail, lastNotice, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio]
+    () => ({ connection, address, wifi, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio }),
+    [connection, address, wifi, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio]
   );
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;

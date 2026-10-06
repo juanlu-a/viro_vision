@@ -7,8 +7,8 @@
  *
  *   1. a sentence with the output on the device goes to the board as a clip, and NOT to the phone
  *      as well: hearing it twice, from two places, is its own bug;
- *   2. the variable detail is appended on the phone and dropped on the board — a deliberate loss
- *      that has to stay deliberate, because nobody can record a clip per error message;
+ *   2. a notice is a fixed sentence: no error text is ever appended (2026-10-06 — errors go to
+ *      telemetry, never to the user's ear);
  *   3. every way the board path can fail ends with the phone speaking. Silence is the one outcome
  *      this app must never produce;
  *   4. the chirp is a sound and not a sentence, and still obeys the setting.
@@ -86,15 +86,15 @@ describe('notify', () => {
     expect(played).toEqual([]);
   });
 
-  it('appends the detail, and keeps it on the phone whatever the setting says', async () => {
-    // Every notice that carries a detail is about the link or the network, and since 2026-09-17
-    // those are the phone's (see `notices.ts`). So the detail always arrives: there is no longer a
-    // combination where it is dropped.
+  it('says the network failure as its fixed sentence, on the phone whatever the setting says', async () => {
+    // Link and network notices are the phone's since 2026-09-17 (see `notices.ts`), and since
+    // 2026-10-06 they carry no detail: the IP or the system's error string would be an error shown
+    // to the user, which is exactly what the app no longer does.
     setAudioOutput('device');
     boardIsThere();
 
-    await expect(notify('networkFailed', 'no responde en 10.42.0.1')).resolves.toBe('phone');
-    expect(spoken).toEqual([`${NOTICES.networkFailed.say} no responde en 10.42.0.1`]);
+    await expect(notify('networkFailed')).resolves.toBe('phone');
+    expect(spoken).toEqual([NOTICES.networkFailed.say]);
     expect(played).toEqual([]);
   });
 
@@ -111,21 +111,6 @@ describe('notify', () => {
       await expect(notify(id)).resolves.toBe('phone');
     }
     expect(played).toEqual([]);
-  });
-
-  it('never sends a board complaint back to the board', async () => {
-    // The regression, and it is not a corner case — it ran on the board on 2026-09-16, within the
-    // hour of shipping. The app reached a daemon that did not know `say` yet; the board answered
-    // with an error event, the app turns every board error into this notice, and routing it to the
-    // board produced another unknown `say`, another error, and around again. Nothing was ever
-    // spoken and the writes never stopped, so from the outside it looked exactly like the feature
-    // simply not working.
-    setAudioOutput('device');
-    boardIsThere();
-
-    await expect(notify('deviceWarning', 'unknown command: say')).resolves.toBe('phone');
-    expect(played).toEqual([]);
-    expect(spoken).toEqual([`${NOTICES.deviceWarning.say} unknown command: say`]);
   });
 
   it('falls back to the phone with no link', async () => {

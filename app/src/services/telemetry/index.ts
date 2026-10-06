@@ -10,4 +10,5 @@
  * Pure barrel: the single import surface (`@/services/telemetry`).
  */
 export { record, flush, startTelemetry, isTelemetryConfigured } from './recorder';
+export { errorDetail, errorType } from './errorDetail';
 export type { TelemetryEvent, TelemetryBatch, EventType } from './types';

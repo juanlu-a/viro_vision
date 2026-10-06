@@ -74,6 +74,7 @@ jest.mock('@/services/ondevice', () => ({
 
 const mockEvents: string[] = [];
 jest.mock('@/services/telemetry', () => ({
+  ...jest.requireActual('@/services/telemetry/errorDetail'),
   record: (type: string) => void mockEvents.push(type),
   flush: () => Promise.resolve(),
 }));
@@ -209,7 +210,10 @@ describe('a reading with nothing on screen', () => {
     await requestReading('device');
 
     expect(mockAudio).toContain('end');
-    expect(mockSpeak).toHaveBeenCalledWith(expect.stringContaining('no route to host'));
+    // Something is said — silence would leave the user waiting — but never the error's own text:
+    // since 2026-10-06 that lives only in the telemetry row.
+    expect(mockSpeak).toHaveBeenCalled();
+    expect(mockSpeak).not.toHaveBeenCalledWith(expect.stringContaining('no route to host'));
     expect(mockEvents).toContain('photo.failed');
   });
 

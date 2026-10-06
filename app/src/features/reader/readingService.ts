@@ -35,13 +35,14 @@ import { MODE_NOTICE } from '@/features/audio/notices';
 import { notify } from '@/features/audio/systemNotice';
 import { guessBusReading, phraseBusReading, phraseProduct } from '@/features/reader/reading';
 import type { BusReading } from '@/features/reader/reading';
+import { DeviceNoAddressError } from '@/features/device/types';
 import { requestsReading, transition } from '@/features/reader/modes';
 import type { Gesture, Mode } from '@/features/reader/modes';
 import { strings } from '@/i18n';
 import { beginReadingAudio, endReadingAudio } from '@/services/audio/session';
 import { stopSpeaking } from '@/services/audio/tts';
 import { isSynthesisEnabled, synthesizeToFile } from '@/services/audio/synthesis';
-import { flush, record } from '@/services/telemetry';
+import { errorDetail, errorType, flush, record } from '@/services/telemetry';
 import { HttpDownloadError } from '@/services/wifi/deviceHttp';
 import type { CloudImage, DevicePhoto } from '@/services/camera';
 import { loadOcr, readImage, isOcrLoaded } from '@/services/ondevice';
@@ -123,7 +124,7 @@ export interface ReaderDeps {
 
 const noDeps: ReaderDeps = {
   getModel: () => null,
-  downloadPhoto: () => Promise.reject(new Error(strings.connect.noAddress)),
+  downloadPhoto: () => Promise.reject(new DeviceNoAddressError()),
   sendAudio: () => Promise.resolve(false),
   writeMode: () => Promise.resolve(),
   isDeviceReady: () => false,
@@ -160,12 +161,15 @@ function update(patch: Partial<ReaderState>): void {
  * What we tell the user when something fails. **By error type, never by parsing strings** — and when
  * the error carries an actionable datum (how long to wait), it is used: that is why it travels as a
  * field of the class.
+ *
+ * **Never the error's own text** (2026-10-06): the user hears what to do, in plain language, and the
+ * technical detail goes only to the telemetry row recorded next to every call of this.
  */
 function errorMessage(err: unknown): string {
   if (err instanceof VisionNotConfiguredError) return t.cloudNotConfigured;
   if (err instanceof VisionNetworkError) return t.cloudUnavailable;
-  if (err instanceof VisionQuotaError) return `${t.quotaExhausted} ${err.retryAfterSeconds} s.`;
-  return `${t.cloudFailed} (${err instanceof Error ? err.message : String(err)})`;
+  if (err instanceof VisionQuotaError) return `${t.quotaExhausted} ${err.retryAfterSeconds} ${t.seconds}`;
+  return t.cloudFailed;
 }
 
 /**
@@ -197,7 +201,7 @@ async function sendReadingToDevice(text: string): Promise<boolean> {
   } catch (err) {
     record('audio.send', {
       ms: Date.now() - t0,
-      detail: { sent: false, message: err instanceof Error ? err.message : String(err) },
+      detail: { sent: false, message: errorDetail(err) },
     });
     return false;
   }
@@ -398,8 +402,8 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal): Promise<
         mode: 'supermarket',
         stage: timedOut ? 'deadline' : 'cloud',
         requestedModel: chosen.id,
-        type: err instanceof Error ? err.name : typeof err,
-        message: err instanceof Error ? err.message : String(err),
+        type: errorType(err),
+        message: errorDetail(err),
         ...(err instanceof VisionQuotaError ? { waitS: err.retryAfterSeconds } : null),
       },
     });
@@ -464,13 +468,12 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
       record('photo.failed', {
         ms: Date.now() - t0,
         // The 503 is "the device has no camera" and it says so itself; the rest is the network.
-        detail: { mode, status, message: err instanceof Error ? err.message : String(err) },
+        detail: { mode, status, message: errorDetail(err) },
       });
-      // The reason is spoken: someone who cannot see the screen has no other way of knowing why the
-      // button did nothing.
-      const message = `${t.deviceCaptureFailed} ${err instanceof Error ? err.message : String(err)}`;
-      update({ status: 'idle', progress: null, message });
-      await announce(message);
+      // Something is spoken: someone who cannot see the screen has no other way of knowing why the
+      // button did nothing. The reason itself is not — it is in the row above.
+      update({ status: 'idle', progress: null, message: t.deviceCaptureFailed });
+      await announce(t.deviceCaptureFailed);
       return;
     }
 
@@ -484,13 +487,13 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
         detail: {
           mode,
           stage: timedOut ? 'deadline' : mode === 'bus' ? 'ocr' : 'cloud',
-          type: err instanceof Error ? err.name : typeof err,
-          message: err instanceof Error ? err.message : String(err),
+          type: errorType(err),
+          message: errorDetail(err),
         },
       });
-      const message = timedOut ? t.readTimedOut : `${t.error}: ${err instanceof Error ? err.message : String(err)}`;
+      const message = timedOut ? t.readTimedOut : t.error;
       update({ status: 'idle', progress: null, message });
-      await announce(timedOut ? t.readTimedOut : t.error);
+      await announce(message);
     }
   } finally {
     clearTimeout(deadline);

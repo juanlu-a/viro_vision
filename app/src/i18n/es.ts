@@ -43,7 +43,7 @@ export const es = {
     readNeedsDeviceHint:
       'Para leer hace falta el dispositivo prendido y cerca. Fijate en la pestaña Dispositivo en qué anda.',
     readingFromDevice: 'Pidiendo la foto al dispositivo…',
-    deviceCaptureFailed: 'El dispositivo no pudo mandar la foto.',
+    deviceCaptureFailed: 'El dispositivo no pudo sacar la foto. Probá de nuevo.',
     preparing: 'Preparando el lector… la primera vez descarga unos 250 MB.',
     reading: 'Leyendo…',
     line: 'Línea',
@@ -53,12 +53,12 @@ export const es = {
     // angosto, y esto también cubre el caso de apuntar a algo que no es un alimento. Conserva el qué
     // hacer: quien no ve la pantalla no tiene otra forma de saber que hay un remedio.
     nothingReadProduct: 'Elemento no reconocible. Probá con una foto más de cerca.',
-    error: 'No se pudo leer',
+    error: 'No pude leer. Probá de nuevo.',
     readTimedOut: 'Tardó demasiado. Probá de nuevo.',
-    quotaExhausted: 'Cuota de la nube agotada. Reintentá en',
+    quotaExhausted: 'El modo supermercado está ocupado. Probá de nuevo en',
+    seconds: 'segundos.',
     waitingSlot: 'Esperando cupo del modelo. Sigo en',
-    cloudNotConfigured:
-      'El modo supermercado usa un modelo en la nube y este build no tiene ninguna clave configurada. Podés seguir usando el modo ómnibus.',
+    cloudNotConfigured: 'El modo supermercado no está disponible en esta versión. Podés seguir usando el modo ómnibus.',
     cloudUnavailable: 'Sin conexión a internet. El modo supermercado necesita internet; probá de nuevo cuando tengas señal.',
     cloudFailed: 'La nube no respondió. Probá de nuevo en un momento.',
     modelLabel: 'Modelo seleccionado',
@@ -101,18 +101,10 @@ export const es = {
     batteryLabel: 'Batería',
     batteryUnknown: 'todavía sin informar',
     batteryLow: 'batería baja',
-    noAddress:
-      'La placa no informó una dirección de red. Tiene que estar conectada a un WiFi y con el servidor corriendo.',
     wifiReadyAnnounce: 'Red con el dispositivo lista.',
-    wifiFailedAnnounce: 'No se pudo usar la red del dispositivo.',
-    wifiModuleMissing: 'Este build no puede unirse a redes WiFi. Hace falta un development build.',
-    wifiJoinFailed: 'El teléfono no pudo unirse al WiFi del dispositivo:',
-    wifiNoResponse: 'El dispositivo no responde en {ip}.',
-    deviceErrorLabel: 'Último aviso del dispositivo',
-    deviceErrorAnnounce: 'El dispositivo avisa:',
-    modeWriteFailed: 'No pude avisarle el modo al dispositivo:',
-    wifiNoCredentials:
-      'El dispositivo no informó los datos de su red WiFi. Apagá y prendé el Bluetooth del teléfono desde Ajustes y volvé a conectar.',
+    // Sin el motivo, a propósito (2026-10-06): qué paso de la unión falló, la IP o el texto del
+    // sistema van a la telemetría. Al oído llega sólo que falta la red y qué se puede hacer.
+    wifiFailedAnnounce: 'Todavía no pude conectarme a la red del dispositivo. Sigo intentando.',
   },
   settings: {
     title: 'Ajustes',
@@ -137,8 +129,7 @@ export const es = {
     // decir lo mismo o el usuario escucha una frase distinta según dónde la escuche.
     audioOutputSetToPhone: 'Dónde se escucha: en el teléfono.',
     audioOutputSetToDevice: 'Dónde se escucha: en el dispositivo.',
-    audioOutputNotConfigured:
-      'Este build no puede sintetizar audio para el dispositivo, así que la lectura va a sonar en el teléfono.',
+    audioOutputNotConfigured: 'En esta versión la lectura del supermercado va a sonar en el teléfono.',
   },
   auth: {
     loading: 'Cargando sesión…',
@@ -171,11 +162,11 @@ export const es = {
     // Amber on the Device tab: the Bluetooth link is up but the photo path is not. Only what is
     // missing, in brackets; the reason and the remedy go in the notice below, not here.
     connectedWithoutWifi: 'Conectado (falta el WiFi)',
-    error: 'Error de conexión',
+    error: 'Sin conectar. Sigo buscando el dispositivo.',
     notFound: 'No encontré el dispositivo. Fijate que esté prendido y cerca.',
     lost: 'Se perdió la conexión con el dispositivo. Buscalo de nuevo.',
     // Expo Go and web lack the native Bluetooth module; the real client needs a development build.
-    unavailable: 'Este build no tiene Bluetooth. Hace falta un development build.',
+    unavailable: 'Esta versión de la app no puede usar Bluetooth.',
   },
 } as const;
 

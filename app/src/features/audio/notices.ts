@@ -62,18 +62,7 @@ export const NOTICES = {
   /** La placa no puede anunciar su propia ausencia. */
   connectionLost: { clip: null, say: strings.connection.lost },
   networkReady: { clip: null, say: strings.connect.wifiReadyAnnounce },
-  /** Lleva un detalle: qué paso de la unión a la red falló. */
   networkFailed: { clip: null, say: strings.connect.wifiFailedAnnounce },
-  /**
-   * Lleva un detalle: el mensaje de la propia placa.
-   *
-   * Sin clip desde el 2026-09-16, y por un motivo más fuerte que el resto: **la placa no reporta sus
-   * propias fallas.** Mandárselo cerraba un lazo —la placa contesta con un error lo que no entiende,
-   * la app convierte todo error de la placa en este aviso, y volvía— en el que nunca se decía nada.
-   */
-  deviceWarning: { clip: null, say: strings.connect.deviceErrorAnnounce },
-  /** Lleva un detalle: por qué falló la escritura. Es una falla del enlace, así que del teléfono. */
-  modeWriteFailed: { clip: null, say: strings.connect.modeWriteFailed },
 
   /**
    * Los modos sí: son lo que el usuario escucha **con los anteojos puestos y el teléfono guardado**,

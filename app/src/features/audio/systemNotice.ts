@@ -62,16 +62,15 @@ export function resetNoticesForTests(): void {
 /**
  * Says `id`, and resolves with where it was actually heard.
  *
- * `detail` is the variable part some notices carry — which network failed, what the board
- * complained about. **The phone appends it; the board does not get it**, because the board speaks
- * with clips recorded ahead of time and nobody can record one per error message. That is a
- * deliberate loss and a bounded one: the detail is already on screen and in telemetry, which is
- * where a technical string belongs, and the fixed sentence still names the thing that failed.
+ * There is no variable part. Until 2026-10-06 some notices carried a `detail` — which network step
+ * failed, what the board complained about — that the phone appended; now the user never hears an
+ * error's text, which lives only in telemetry, so every notice is the same fixed sentence on both
+ * outputs.
  *
  * It **never rejects**. Same rule as `announce()` and for the same reason (ADR 0001): nothing on the
  * announcement path may throw at a caller that is often a BLE callback with no one to catch it.
  */
-export async function notify(id: SystemNotice, detail?: string): Promise<AudioOutput> {
+export async function notify(id: SystemNotice): Promise<AudioOutput> {
   const notice = NOTICES[id];
   // The whole device path is inside the try, the decision included: `isLinked` is the BLE client
   // reaching into a native module, and a notice that throws instead of falling back to the phone
@@ -110,16 +109,16 @@ export async function notify(id: SystemNotice, detail?: string): Promise<AudioOu
 
   // Not wrapped: both halves of this are non-throwing by contract (`announce` resolves on failure,
   // `playStartEarcon` swallows its own errors). Wrapping it too would hide a broken one of those.
-  await sayOnPhone(id, detail);
+  await sayOnPhone(id);
   return 'phone';
 }
 
-async function sayOnPhone(id: SystemNotice, detail?: string): Promise<void> {
+async function sayOnPhone(id: SystemNotice): Promise<void> {
   const { say } = NOTICES[id];
   // The one notice that is not a sentence: the reading chirp is a sound file, not speech.
   if (say === null) {
     playStartEarcon();
     return;
   }
-  await announce(detail ? `${say} ${detail}` : say);
+  await announce(say);
 }
