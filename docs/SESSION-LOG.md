@@ -3174,6 +3174,45 @@ la encuentra desde la Mac.
   timeout al identificador recordado se cumple solo al primer anuncio. (3) La telemetría sigue muerta
   hasta el próximo build de TestFlight (el último es del 2026-09-22; la URL se corrigió el 23).
 
+## 2026-10-06 — Visible primero, lento después: la placa anuncia antes de la cámara y del AP
+
+Continuación del 2026-10-05: del repaso de la conexión quedaban dos demoras sin tocar.
+
+### La placa anunciaba al final del arranque
+
+`__main__` abría la cámara —con el IMX500, cargar el detector tarda alrededor de un minuto después
+de un arranque, según el propio `camera.start`— y levantaba el AP —con reintentos de 0+5+10+20+30 s—
+**antes** de registrar el anuncio. Todo ese tiempo la placa estaba prendida, con el GATT listo, e
+invisible para cualquier teléfono. Y cualquier traba en esos pasos la dejaba invisible para siempre:
+el mismo efecto que el rfkill del día anterior, por otra puerta.
+
+Ahora anuncia en cuanto el servicio está registrado. La cámara arranca en segundo plano
+(`_bring_camera_up`) y el AP después. Mientras la cámara arranca:
+- una foto por HTTP contesta **503** (`CameraNotReady`), no un 500 que parece un crash;
+- un toque al modo ómnibus dice «preparando la lectura» y el modo empieza solo cuando la cámara
+  está (`Core.camera_ready`). `starting` se mira **antes** que `available`, porque el handle del
+  sensor existe a mitad del arranque, cuando todavía no hay frames;
+- `status` se empuja apenas sube el AP y apenas está la cámara, no en el próximo latido de 15 s.
+
+Medido en la placa (sin cámara conectada): del `Started virovision.service` al anuncio, **7,4 s →
+1,7 s**. Con la cámara conectada la diferencia suma el minuto de carga del detector, que ya no
+precede al anuncio. Falta medir eso con la cámara puesta.
+
+### La app esperaba a ciegas entre intentos
+
+Las pausas entre intentos de conexión crecían a 20 y 30 s; cada intento ya escucha hasta 30 s
+(conexión directa al identificador recordado + escaneo), así que la pausa es tiempo en que nadie
+busca. Una placa que terminaba de arrancar durante una pausa esperaba al próximo intento. Tope en
+5 s (`RETRIES_MS = [1, 2, 3, 5] s`).
+
+### Pendientes
+
+- Medir el arranque con la cámara conectada y ver el `ble.connected.ms` real en la telemetría, que
+  vuelve con el build del #105.
+- La idea de dejar un `connect` sin timeout al identificador recordado (iOS lo cumple solo al primer
+  anuncio) quedó sin hacer: con un identificador viejo nunca escanearía. Con pausas de 5 s rinde
+  menos de lo que costaría.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
