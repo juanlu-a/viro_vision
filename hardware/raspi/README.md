@@ -420,6 +420,18 @@ placa.
 `requirements-bus.txt`. Ese grupo se instala **con `--no-deps`, y no es opcional**: sin eso pip pisa
 el numpy con el que se compiló picamera2 y la cámara deja de abrir.
 
+**El OpenCV que usa el daemon no es el de apt** (desde el 2026-10-06): `requirements-bus.txt` trae
+`opencv-python-headless` 4.x, que dentro del venv tapa a `python3-opencv`. El de Debian enlaza 380
+librerías (VTK, OpenGL, GTK…) y tarda **13 s en importarse** en la Zero 2 W, con caché o sin ella;
+ese import retiene el GIL y dejaba al daemon sin contestar por BLE justo después de empezar a anunciar.
+El headless tarda 0,7 s. Se comprueba con
+`sudo .venv/bin/python -c "import cv2; print(cv2.__file__)"`: tiene que decir `.venv/`, no
+`/usr/lib/python3/dist-packages`.
+
+**El OCR corre en su propio proceso** (`virovision/ocr_worker.py`, mismo 2026-10-06): armar los
+modelos de onnxruntime también retiene el GIL, 10–20 s. En el journal se ve como
+`OCR running in its own process (pid N)`.
+
 Dos trampas que ya costaron una tarde:
 
 - **`pip` sin `sudo` instala en `~/.local` y el daemon (que corre como root) no lo ve.** El venv es de

@@ -3264,6 +3264,61 @@ explicar.
 De paso: **la cámara volvió** y, con el arranque nuevo, el anuncio salió 1,8 s después del
 `Started` y la cámara con el detector quedó lista 4 s después — no el minuto que temíamos.
 
+## 2026-10-06 (cont. 2) — «Se perdió la conexión» al prender la placa: el daemon congelado por OpenCV
+
+Prueba del flujo entero (apagar, prender, conectar) en dos escenarios. **B** (abrir la app con la
+placa ya arrancada): BLE en 1,3 s. **A** (la app abierta esperando mientras la placa arranca): el
+teléfono la encontró a los 6 s del anuncio, la conexión quedó colgada 31 s, se cortó y el reintento
+conectó en 1,5 s. La telemetría lo mostró como `ble.connected` con 46,8 s y `firmware: null` en el
+mismo milisegundo que `ble.lost`.
+
+### Diagnóstico
+
+Reproducido desde la Mac reiniciando la placa en frío y leyendo `status` cada segundo con bleak
+(macOS se rinde a los 5 s; iOS, a los 30 del timeout ATT). El journal mostraba al daemon **sin una
+línea durante 13–17 s** después de `camera ready`, y luego varios `central connected/disconnected`
+en el mismo instante: el event loop, que es el que le contesta a BlueZ, estaba congelado.
+
+**Lo agravó el #107**: antes la placa cargaba el modo ómnibus antes de anunciar y en esa ventana era
+invisible; ahora anuncia primero y el teléfono llegaba justo al congelamiento. La «rotación de
+conexiones BLE durante el arranque» del 2026-09-14 era esto mismo, más chico.
+
+Lo que se descartó en el camino, midiendo cada vez:
+- el chequeo `bus_watcher.available` (importa `bus_banner` y `rapidocr`): 0,3 s, inocente; igual pasó
+  a un executor;
+- precalentar la caché de disco desde otro proceso: corrió el congelamiento de lugar, no lo sacó —
+  con la caché caliente seguía;
+- el OCR en un executor: no sirve, armar las sesiones de onnxruntime retiene el GIL.
+
+Las dos causas reales, medidas con `python -X importtime` en la placa:
+1. **`import cv2` tarda 13 s**, con caché fría o caliente: es el `python3-opencv` de Debian, que
+   enlaza 380 librerías (VTK, OpenGL…). Lo importa `bus_banner.crop`.
+2. **Las tres sesiones de onnxruntime** del OCR, 10–20 s más con el GIL tomado.
+
+### Arreglo
+
+- **OpenCV headless** (`opencv-python-headless>=4.10,<5` en `requirements-bus.txt`, con `--no-deps`
+  para no tocar el numpy de apt que usa picamera2): **0,7 s**.
+- **El OCR en su propio proceso** (`virovision/ocr_worker.py`, `OcrProcess`): misma interfaz `read`
+  que `bus_banner.ocr`, así que el repo de Magalí no cambia; `spawn` y no `fork` (el daemon tiene
+  hilos); timeout de 10 s por lectura y un proceso nuevo si el anterior murió o se colgó; si no
+  arranca, el OCR vuelve a armarse en el daemon como antes.
+
+Medido en arranque en frío: **ninguna lectura fallida** (peor, 1,6 s), contra dos cortes de 5 s de
+macOS / uno de 30 s de iOS antes. En la placa: foto por HTTP (19,5 KB en 146 ms), modo ómnibus a 15
+fps sin errores, y el OCR real a través del proceso leyendo «115 LUIS BRAILLE» (0,97) en ~1,1 s.
+
+### Pendientes
+
+- Repetir el escenario A con el teléfono.
+- `CentralWatcher` no registra la **primera** conexión de una dirección nueva: llega como
+  `InterfacesAdded`, no como `PropertiesChanged`. Diagnóstico, no funcionalidad.
+- El cartel de la WiFi volvió en A y B: con la placa apagada el iPhone vuelve a la red de casa y no
+  regresa solo a «ViroVision». En la calle debería; sin verificar (probar desactivando la conexión
+  automática a `Jack_2.4`).
+- El mensaje «la placa no informó una dirección de red» es técnico; durante una transición de red
+  debería decir que espere unos segundos.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

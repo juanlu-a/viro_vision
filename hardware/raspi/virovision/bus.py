@@ -333,6 +333,21 @@ class BusWatcher:
 
     # --- internals -------------------------------------------------------------------------
 
+    @staticmethod
+    def _make_ocr(create_ocr):
+        """The OCR in its own process (`ocr_worker.py`), so building it cannot freeze the daemon. If
+        that process will not start, the OCR is built here as before: bus mode working with a frozen
+        startup beats bus mode not working."""
+        from .ocr_worker import OcrProcess
+
+        ocr = OcrProcess()
+        try:
+            ocr.start()
+            return ocr
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not run the OCR in its own process (%s); building it in the daemon", exc)
+            return create_ocr("rapid")
+
     def _build(self) -> None:
         from bus_banner.catalog import Catalog
         from bus_banner.detection import NullDetector
@@ -346,7 +361,7 @@ class BusWatcher:
             if catalog is None:
                 log.warning("no catalog at %s: readings will not be corrected", self._catalog)
             # The detector is the sensor's, so the pipeline needs none of its own.
-            self._pipeline = Pipeline(NullDetector(), create_ocr("rapid"), catalog)
+            self._pipeline = Pipeline(NullDetector(), self._make_ocr(create_ocr), catalog)
         self._settings = network_settings(self._camera.sensor.network_intrinsics, labels=self._labels)
         fps = self._settings["fps"]
         tracker = Tracker(max_missed=max(1, round(0.5 * fps)), memory=max(1, round(5 * fps)))

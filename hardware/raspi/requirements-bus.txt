@@ -1,8 +1,9 @@
 # Bus mode: the reading half (ADR 0006). Installed with --no-deps ON PURPOSE — see setup.sh.
 #
-# pip must not resolve these dependencies, because it would pull numpy and opencv from PyPI and
-# shadow the ones picamera2 was built against (apt's), and the camera stops working in a way that
-# looks like a camera fault. Everything listed here is either pure Python or has an aarch64 wheel.
+# pip must not resolve these dependencies, because it would pull numpy from PyPI and shadow the one
+# picamera2 was built against (apt's), and the camera stops working in a way that looks like a camera
+# fault. Everything listed here is either pure Python or has an aarch64 wheel. OpenCV is the one
+# package deliberately taken from PyPI instead of apt (below), and --no-deps is what keeps that safe.
 #
 # The pipeline itself lives in its own repo (bus-banner-recognizer), shared with the Mac where it is
 # developed and evaluated. It is NOT listed here: both that repo and its fork are private, and a
@@ -29,3 +30,11 @@ tqdm
 # Pinned: omegaconf's parser is generated with ANTLR 4.9 and refuses a newer runtime with
 # "Could not deserialize ATN with version 3 (expected 4)". Measured on the board, 2026-09-15.
 antlr4-python3-runtime==4.9.3
+
+# OpenCV without the GUI, shadowing apt's python3-opencv inside the venv. Debian's build links 380
+# libraries (VTK, OpenGL, GTK...) and takes 13 s to import on the Zero 2 W, warm cache or not; the
+# import holds the GIL, so the daemon froze right after it started advertising and a phone connecting
+# then lost its link (2026-10-06). This one imports in 0.7 s. Pinned to 4.x, the API apt's 4.10 has
+# and `bus_banner` is written against; with --no-deps it keeps apt's numpy. Verified on the board:
+# camera photo, bus mode at 15 fps, and the OCR reading "115 LUIS BRAILLE".
+opencv-python-headless>=4.10,<5

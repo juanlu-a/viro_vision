@@ -107,6 +107,15 @@ con el reloj atrasado) y `getent hosts deb.debian.org` antes de instalar nada.
 
 ## Trampas que ya mordieron
 
+- **«Se perdió la conexión» al prender la placa con la app abierta** (2026-10-06). No es la radio: el
+  daemon se congelaba 10–20 s justo después de anunciar, cargando el modo ómnibus (`import cv2` de
+  Debian, 13 s; y las sesiones de onnxruntime), y un teléfono que se conectaba ahí no recibía
+  respuesta a su primera lectura GATT; iOS corta a los 30 s. Arreglado con OpenCV headless y el OCR
+  en otro proceso. **Para medirlo sin el teléfono**: reiniciar la placa y, desde la Mac, leer
+  `status` en bucle con bleak (macOS se rinde a los 5 s con `BleakGATTProtocolError`, iOS a los 30);
+  el journal muestra el congelamiento como un hueco sin líneas y después varios
+  `central connected/disconnected` en el mismo instante.
+
 - **El journal sobrevive a un reinicio desde el 2026-09-23** (antes Raspberry Pi OS lo guardaba en RAM,
   `Storage=volatile`). Para leer una prueba hecha en modo producto: bajar el AP con `tools/ap.py`,
   entrar por SSH y `journalctl -u virovision -b -1` (el arranque anterior) o `--list-boots`. Si una
