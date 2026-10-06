@@ -28,6 +28,10 @@ export function toAnnouncement(event: RecognitionEvent, mentionOthers = false): 
   const primary = describe(event.primary);
   if (!mentionOthers || event.others.length === 0) return primary;
 
-  const others = event.others.map(describe).join(', ');
+  // A bus with neither number nor destination says nothing worth hearing among "the others": its
+  // fallback ("se acerca un ómnibus") only makes sense as the primary.
+  const named = event.others.filter((d) => d.kind !== 'bus_line' || d.label.trim() || d.detail);
+  if (named.length === 0) return primary;
+  const others = named.map(describe).join(', ');
   return `${primary}. ${t.alsoSeen}: ${others}`;
 }

@@ -188,7 +188,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         }
         return true;
       }
-      failNetwork(outcome.reason, { ip: target.ip, message: outcome.message });
+      failNetwork(outcome.reason, { ip: target.ip, message: errorDetail(outcome.message) });
       return false;
     },
     [failNetwork]
@@ -395,7 +395,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // The device has no screen, so the table is the only place anyone finds out that something
         // failed on it (bringing the AP up, the camera). Only the table: since 2026-10-06 the user
         // never sees nor hears the board's own error strings — they are diagnosis, not guidance.
-        record('device.warning', { detail: { message } });
+        record('device.warning', { detail: { message: errorDetail(message) } });
       }),
     ];
     // The first connection comes out of the mount effect but on the next tick: the effect only

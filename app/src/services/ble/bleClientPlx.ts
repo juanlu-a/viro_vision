@@ -106,6 +106,8 @@ class BleClientPlx implements BleClient {
    */
   private readonly gatt = createSerializer();
   private subscriptions: Subscription[] = [];
+  /** Bumped every time the monitors are dropped; a callback from an older value is ignored. */
+  private link = 0;
   private readonly recognitionListeners = new Set<(event: RecognitionEvent) => void>();
   private readonly disconnectListeners = new Set<() => void>();
   private readonly statusListeners = new Set<(status: DeviceStatus) => void>();
@@ -126,9 +128,13 @@ class BleClientPlx implements BleClient {
     // still alive and stop hearing about its drop.
     await this.waitForRadio();
     const device = await this.reach();
-    for (const s of this.subscriptions) s.remove();
-    this.subscriptions = [];
+    this.dropSubscriptions();
     this.device = device;
+    const link = this.link;
+    // In ble-plx `Subscription.remove()` does not cancel the native monitor: a superseded one can
+    // still call back — with a value, or with the error of its teardown. Only the current link's
+    // callbacks count.
+    const current = () => link === this.link;
     // Remembered so the next connection can skip the scan (see `services/storage/lastDevice`).
     void saveLastDeviceId(device.id);
 
@@ -142,11 +148,13 @@ class BleClientPlx implements BleClient {
         for (const listener of this.disconnectListeners) listener();
       }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.event, (error, c) => {
+        if (!current()) return;
         if (error) return this.monitorFailed('event', error);
         if (!c?.value) return;
         this.receiveEvent(c.value);
       }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.status, (error, c) => {
+        if (!current()) return;
         if (error) return this.monitorFailed('status', error);
         if (!c?.value) return;
         try {
@@ -159,6 +167,7 @@ class BleClientPlx implements BleClient {
         }
       }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.mode, (error, c) => {
+        if (!current()) return;
         if (error) return this.monitorFailed('mode', error);
         if (!c?.value) return;
         const bytes = decodeBase64(c.value);
@@ -497,7 +506,11 @@ class BleClientPlx implements BleClient {
         // The daemon's own warnings and errors, which otherwise live only in its journal. Straight
         // to the table, never to a listener: nothing about them is for the user (2026-10-06).
         record('device.log', {
-          detail: { level: event.lvl ?? null, source: event.src ?? null, message: event.msg ?? null },
+          detail: {
+            level: typeof event.lvl === 'string' ? event.lvl.slice(0, 16) : null,
+            source: typeof event.src === 'string' ? event.src.slice(0, 64) : null,
+            message: event.msg == null ? null : errorDetail(event.msg),
+          },
         });
         break;
       case 'warming':
@@ -536,9 +549,15 @@ class BleClientPlx implements BleClient {
     record('ble.monitorError', { detail: { char, message: errorDetail(error.message ?? error) } });
   }
 
-  private cleanup(): void {
+  /** Removes the monitors and invalidates their callbacks (see `link`). */
+  private dropSubscriptions(): void {
     for (const s of this.subscriptions) s.remove();
     this.subscriptions = [];
+    this.link += 1;
+  }
+
+  private cleanup(): void {
+    this.dropSubscriptions();
     this.device = null;
   }
 }

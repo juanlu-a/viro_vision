@@ -168,7 +168,7 @@ export const es = {
     // device name, but on its own in the ear it does not say connected to what.
     connectedAnnounce: 'Dispositivo conectado.',
     // Amber on the Device tab: the Bluetooth link is up but the photo path is not. Only what is
-    // missing, in brackets; the reason and the remedy go in the notice below, not here.
+    // missing, in brackets. The reason goes to telemetry; the remedy, when there is one, is spoken.
     connectedWithoutWifi: 'Conectado (falta el WiFi)',
     error: 'Sin conectar. Sigo buscando el dispositivo.',
     notFound: 'No encontré el dispositivo. Fijate que esté prendido y cerca.',

@@ -68,3 +68,14 @@ describe('a bus reading with a destination', () => {
     );
   });
 });
+
+describe('toAnnouncement with an unnamed bus among the others', () => {
+  it('leaves it out instead of saying "También: Se acerca un ómnibus"', () => {
+    const event: RecognitionEvent = {
+      timestamp: 0,
+      primary: { kind: 'bus_line', label: '183', confidence: 0.9 },
+      others: [{ kind: 'bus_line', label: '', confidence: 0.5 }],
+    };
+    expect(toAnnouncement(event, true)).toBe('Línea 183');
+  });
+});

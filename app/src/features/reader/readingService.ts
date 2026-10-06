@@ -70,6 +70,14 @@ export const READING_DEADLINE_MS = 12_000;
 /** The photo cannot have the whole budget: 4 s is ~80× the measured 46 ms over the device's AP. */
 const PHOTO_TIMEOUT_MS = 4_000;
 
+/**
+ * What a quota wait must leave of the reading deadline for the cloud call that follows it. The
+ * measured medians are 0.8-1.7 s and the worst non-Gemini call 2.5 s
+ * (`docs/mediciones/2026-09-02-modelos-supermercado.md`); a wait that eats this reserve is announced
+ * and then cut short by the deadline, which is the two-sentence failure the cap exists to prevent.
+ */
+const CLOUD_CALL_RESERVE_MS = 5_000;
+
 /** Synthesis + POST to the device's speaker. Past it the phone says the reading instead. */
 const DEVICE_DELIVERY_TIMEOUT_MS = 8_000;
 
@@ -379,7 +387,8 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal, deadlineA
       signal,
       // A quota wait longer than what is left of the deadline is not announced: it could never
       // finish. It fails at once as an exhausted quota, which says how long to wait instead.
-      maxWaitMs: Math.max(0, deadlineAt - Date.now()),
+      // The cloud call itself needs time after the wait, so that time is kept back too.
+      maxWaitMs: Math.max(0, deadlineAt - Date.now() - CLOUD_CALL_RESERVE_MS),
       // The quota wait is announced. The limiter already handled it, but silently: for someone who
       // cannot see the screen, an app that sleeps for up to a minute is indistinguishable from a
       // frozen one.

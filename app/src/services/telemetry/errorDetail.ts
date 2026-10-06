@@ -12,7 +12,9 @@ const MAX_LENGTH = 500;
 
 export function errorDetail(err: unknown): string {
   let text: string;
-  if (err instanceof Error) text = err.message || err.name;
+  // `typeof` checked: a bridged native error can carry a non-string `message`, and this runs inside
+  // `catch` blocks, where a throw of its own would escape the very handler recording it.
+  if (err instanceof Error) text = typeof err.message === 'string' && err.message ? err.message : String(err.name);
   else if (typeof err === 'string') text = err;
   else {
     try {
@@ -21,7 +23,7 @@ export function errorDetail(err: unknown): string {
       text = String(err);
     }
   }
-  return text.slice(0, MAX_LENGTH);
+  return String(text).slice(0, MAX_LENGTH);
 }
 
 /** The error's type, for grouping rows: the class name when there is one. */

@@ -37,3 +37,11 @@ describe('errorType', () => {
     expect(errorType('x')).toBe('string');
   });
 });
+
+describe('errorDetail with a bridged error', () => {
+  it('does not throw when message is not a string', () => {
+    const err = new Error('x');
+    (err as unknown as { message: unknown }).message = { code: 7 };
+    expect(() => errorDetail(err)).not.toThrow();
+  });
+});
