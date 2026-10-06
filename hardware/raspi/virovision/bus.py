@@ -47,6 +47,8 @@ MIN_CONFIDENCE = 0.3
 CONFIRM_SECONDS = 0.6
 VOTES_NEEDED = 2
 MIN_BANNER_HEIGHT_PX = 22
+ENGINE_RETRY_S = 60.0
+"""After the OCR engine fails to build (`OcrEngineFailed`), how long bus mode refuses to try again."""
 FRAME_SILENCE_S = 12.0
 """How long without a single frame before the watchdog reopens the camera. The sensor delivers 15 per
 second, so this is very long on purpose: the first frame after the camera starts took **3,7 s**
@@ -191,13 +193,18 @@ def pipeline_stamp(path: Path = DEFAULT_PIPELINE_STAMP) -> str:
 
 
 def is_available() -> bool:
-    """Whether the reading half is installed at all. Checked before promising bus mode."""
+    """Whether the reading half is installed at all. Checked before promising bus mode.
+
+    Located, not imported: importing holds the GIL in whatever thread does it, and this is asked on
+    the daemon's startup path, where a held GIL is a BLE link that stops answering (2026-10-06). So it
+    says the packages are THERE, not that they import: a broken install is caught later, by the OCR
+    process failing to build (`OcrEngineFailed`), and bus mode then refuses to start."""
+    from importlib.util import find_spec
+
     try:
-        import bus_banner  # noqa: F401
-        import rapidocr  # noqa: F401
-    except ImportError:
+        return all(find_spec(name) is not None for name in ("bus_banner", "rapidocr", "onnxruntime"))
+    except (ImportError, ValueError):  # a half-imported module with no spec, a broken parent package
         return False
-    return True
 
 
 class BusWatcher:
@@ -226,6 +233,20 @@ class BusWatcher:
         self._min_conf = min_conf
         self.audio_target = audio_target
         self._pipeline = None
+        self._ocr = None
+        self._closed = False
+        # What the user last asked for. `stop` lowers it WITHOUT the build lock, so leaving bus mode
+        # during a cold build (20-120 s) is heard by the start that is still building: it checks this
+        # again before launching its threads instead of taking the camera in the wrong mode.
+        self._wanted = False
+        # When the OCR engine last failed to build. A broken install fails the same way on every
+        # press, and each try can hold the build for minutes: one try per window is enough.
+        self._engine_failed_at: float | None = None
+        # `warm_up` (at startup) and `start` (a button press during it) both build, from different
+        # executor threads. Unserialised, each spawned its own OCR process: two engines building at
+        # once on a 512 MB board, and the loser's never stopped.
+        # Reentrant: `start` holds it across its whole sequence and calls `_build`, which takes it too.
+        self._build_lock = threading.RLock()
         self._watcher = None
         self._settings: dict = {}
         self._stop = threading.Event()
@@ -263,6 +284,9 @@ class BusWatcher:
         try:
             self._build()
         except Exception as exc:  # noqa: BLE001
+            # Remembered here too: a boot-time failure is the likeliest one, and without it the first
+            # press would say "preparando" and sit through the same failing build again.
+            self._note_build_failure(exc)
             log.warning("bus mode could not be prepared: %s", exc)
             return False
         log.info("bus mode ready (%s)", self._settings)
@@ -270,19 +294,32 @@ class BusWatcher:
         return True
 
     def start(self) -> bool:
-        """Begins watching. Returns False when bus mode cannot run, so the caller can say so."""
+        """Begins watching. Returns False when bus mode cannot run, so the caller can say so.
+
+        Under the build lock from the first check to `running = True`. Two starts can overlap —
+        bus, another mode, bus again, all inside a cold build — and both used to see `running` False
+        and launch their own three threads on the same camera."""
+        self._wanted = True
+        with self._build_lock:
+            return self._start_locked()
+
+    def _start_locked(self) -> bool:
         if self.running:
             return True
         if getattr(self._camera, "starting", False):
             # The board advertises before the camera is up (2026-10-05), so a press in the first
             # minute after a boot lands here. Checked before `available`, which can already be true
-            # halfway through the start: the sensor handle exists before the camera delivers frames. Said out loud for the same reason as the OCR warm-up
-            # below; `__main__` starts the mode for real once the camera is ready.
+            # halfway through the start: the sensor handle exists before the camera delivers frames.
+            # Said out loud for the same reason as the OCR warm-up below; `__main__` starts the mode
+            # for real once the camera is ready.
             log.info("bus: asked to watch while the camera is still starting; saying so")
             self._warming_up()
             return False
         if not self.available:
             log.warning("bus mode unavailable: %s", "no detector in the sensor" if is_available() else "bus_banner is not installed")
+            return False
+        if self._engine_failed_at is not None and time.monotonic() - self._engine_failed_at < ENGINE_RETRY_S:
+            log.warning("bus mode unavailable: the OCR engine failed to build %.0f s ago", time.monotonic() - self._engine_failed_at)
             return False
         if not self.ready:
             # The OCR takes tens of seconds to load and `_build` below is where that happens. Until
@@ -294,7 +331,11 @@ class BusWatcher:
         try:
             self._build()
         except Exception as exc:  # noqa: BLE001 — a model or a catalog that will not load
+            self._note_build_failure(exc)
             log.error("bus mode could not start: %s", exc)
+            return False
+        if not self._wanted:
+            log.info("bus: the mode was left while it was being prepared; not starting")
             return False
         self._stop.clear()
         self._last_frame_at = time.monotonic()
@@ -310,7 +351,9 @@ class BusWatcher:
         return True
 
     def stop(self) -> None:
-        """Stops watching and gives the camera back. Safe to call when it is not running."""
+        """Stops watching and gives the camera back. Safe to call when it is not running — including
+        while a start is still building, which this cancels (see `_wanted`)."""
+        self._wanted = False
         if not self.running:
             return
         self._stop.set()
@@ -334,19 +377,41 @@ class BusWatcher:
     # --- internals -------------------------------------------------------------------------
 
     @staticmethod
-    def _make_ocr(create_ocr):
-        """The OCR in its own process (`ocr_worker.py`), so building it cannot freeze the daemon. If
-        that process will not start, the OCR is built here as before: bus mode working with a frozen
-        startup beats bus mode not working."""
-        from .ocr_worker import OcrProcess
+    def _make_ocr(create_ocr, worker_factory=None, register=None):
+        """The OCR in its own process (`ocr_worker.py`), so building it cannot freeze the daemon.
 
-        ocr = OcrProcess()
+        If the process cannot be run at all, the OCR is built here as before: bus mode working with a
+        frozen startup beats bus mode not working. But not when the process ran and its ENGINE failed
+        to build: the same build here fails the same way, after freezing the daemon for nothing."""
+        from .ocr_worker import OcrEngineFailed, OcrProcess
+
+        ocr = (worker_factory or OcrProcess)()
+        if register is not None:
+            # Known before it starts: building takes up to minutes, and a shutdown meanwhile has to be
+            # able to end this child (`close`), not wait for the build to finish.
+            register(ocr)
         try:
             ocr.start()
             return ocr
+        except OcrEngineFailed:
+            raise
         except Exception as exc:  # noqa: BLE001
             log.warning("could not run the OCR in its own process (%s); building it in the daemon", exc)
             return create_ocr("rapid")
+
+    def _note_build_failure(self, exc: Exception) -> None:
+        from .ocr_worker import OcrEngineFailed
+
+        if isinstance(exc, OcrEngineFailed):
+            self._engine_failed_at = time.monotonic()
+
+    def close(self) -> None:
+        """Ends the OCR process, if there is one. Called on daemon shutdown only: leaving bus mode
+        keeps it on purpose, so entering again answers in a second instead of rebuilding."""
+        self._closed = True  # a build still running when we shut down stops its own worker (`_build`)
+        stop = getattr(self._ocr, "stop", None)
+        if stop is not None:
+            stop()
 
     def _build(self) -> None:
         from bus_banner.catalog import Catalog
@@ -356,33 +421,45 @@ class BusWatcher:
         from bus_banner.pipeline import Pipeline
         from bus_banner.tracking import Tracker, Watcher
 
-        if self._pipeline is None:
-            catalog = Catalog.from_csv(self._catalog) if self._catalog.exists() else None
-            if catalog is None:
-                log.warning("no catalog at %s: readings will not be corrected", self._catalog)
-            # The detector is the sensor's, so the pipeline needs none of its own.
-            self._pipeline = Pipeline(NullDetector(), self._make_ocr(create_ocr), catalog)
-        self._settings = network_settings(self._camera.sensor.network_intrinsics, labels=self._labels)
-        fps = self._settings["fps"]
-        tracker = Tracker(max_missed=max(1, round(0.5 * fps)), memory=max(1, round(5 * fps)))
-        options = {}
-        if "signs_expected" in inspect.signature(Watcher).parameters:
-            # Only in `bus_banner` since the sign can carry its own track (PR #4 of the pipeline repo).
-            # The daemon installs that package as a wheel with no version pin, so it must run against
-            # the published one too: with an older one bus mode still works, reading the bus's top
-            # strip as it did before, instead of refusing to start.
-            options["signs_expected"] = "bus_sign" in self._settings["labels"]
-        else:
-            log.warning("bus_banner is older than PR #4: the top strip will be read when a sign is missed")
-        self._watcher = Watcher(
-            self._queue_read,
-            tracker=tracker,
-            confirm_frames=max(1, round(CONFIRM_SECONDS * fps)),
-            min_banner_height_px=MIN_BANNER_HEIGHT_PX,
-            votes_needed=VOTES_NEEDED,
-            async_reads=True,
-            **options,
-        )
+        with self._build_lock:
+            # The whole build, not only the OCR: `warm_up` finishing after `start` launched its
+            # threads would otherwise swap the watcher under them, and the frame loop would then
+            # feed tracks to a watcher that never saw them.
+            if self.running:
+                return
+            if self._pipeline is None:
+                catalog = Catalog.from_csv(self._catalog) if self._catalog.exists() else None
+                if catalog is None:
+                    log.warning("no catalog at %s: readings will not be corrected", self._catalog)
+                self._ocr = self._make_ocr(create_ocr, register=lambda worker: setattr(self, "_ocr", worker))
+                if self._closed:
+                    # Shut down while this build ran: nobody will ever stop this worker otherwise. And
+                    # raised, not returned: both callers would otherwise go on with no pipeline.
+                    self.close()
+                    raise RuntimeError("bus mode is closing")
+                # The detector is the sensor's, so the pipeline needs none of its own.
+                self._pipeline = Pipeline(NullDetector(), self._ocr, catalog)
+            self._settings = network_settings(self._camera.sensor.network_intrinsics, labels=self._labels)
+            fps = self._settings["fps"]
+            tracker = Tracker(max_missed=max(1, round(0.5 * fps)), memory=max(1, round(5 * fps)))
+            options = {}
+            if "signs_expected" in inspect.signature(Watcher).parameters:
+                # Only in `bus_banner` since the sign can carry its own track (PR #4 of the pipeline repo).
+                # The daemon installs that package as a wheel with no version pin, so it must run against
+                # the published one too: with an older one bus mode still works, reading the bus's top
+                # strip as it did before, instead of refusing to start.
+                options["signs_expected"] = "bus_sign" in self._settings["labels"]
+            else:
+                log.warning("bus_banner is older than PR #4: the top strip will be read when a sign is missed")
+            self._watcher = Watcher(
+                self._queue_read,
+                tracker=tracker,
+                confirm_frames=max(1, round(CONFIRM_SECONDS * fps)),
+                min_banner_height_px=MIN_BANNER_HEIGHT_PX,
+                votes_needed=VOTES_NEEDED,
+                async_reads=True,
+                **options,
+            )
 
     def _queue_read(self, frame, banner_box, bus_box):
         """The reader the `Watcher` calls. Hands the job to the OCR thread and returns None, which is

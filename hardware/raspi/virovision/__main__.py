@@ -253,9 +253,9 @@ async def _main(args: argparse.Namespace) -> None:
             log.warning("bus mode unavailable: no detector in the sensor or the reading half is not installed")
             return
         # Loading the OCR takes tens of seconds (two ONNX models), in its own process so it cannot
-        # freeze this one (`ocr_worker.py`). Doing it now, while the user is not
-        # waiting, is what makes the button answer in a second later. Unless they already pressed it:
-        # then the mode starts right away and `start` builds the OCR itself.
+        # freeze this one (`ocr_worker.py`). Doing it now, while the user is not waiting, is what
+        # makes the button answer in a second later. Unless they already pressed it: then the mode
+        # starts right away and `start` builds the OCR itself.
         # (A press during the warm-up needs nothing from here: the camera is up by then, so `start`
         # runs normally and says it is preparing.)
         if service.core.modes.current is Mode.BUS:
@@ -326,6 +326,7 @@ async def _main(args: argparse.Namespace) -> None:
     player.stop()
     if bus_watcher:
         bus_watcher.stop()
+        bus_watcher.close()
     if http:
         http.stop()
     bus.disconnect()

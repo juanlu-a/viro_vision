@@ -24,3 +24,12 @@ def echo():
 
 def broken():
     raise ImportError("onnxruntime is not installed")
+
+
+def slow_start():
+    time.sleep(30)
+    return Echo()
+
+
+def dies_while_building():
+    os._exit(1)  # what the out-of-memory killer looks like from the parent
