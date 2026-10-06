@@ -47,9 +47,10 @@ describe('reachDeviceNetwork', () => {
     const outcome = await reachDeviceNetwork(address, credentials, { ...clock(), probe, join, quickTimeoutMs: 1_000 });
     expect(outcome).toEqual({ ok: true, via: 'joined' });
     expect(join).toHaveBeenCalledTimes(1);
-    // The two quick probes carry the short cap; the ones after the join, the normal one.
+    // The two quick probes carry the short cap, and so do the ones after the join: a probe sent before
+    // the phone has its lease only ends when it times out, delaying the first one that can succeed.
     expect(calls.slice(0, 2)).toEqual([1_000, 1_000]);
-    expect(calls[2]).toBe(3_000);
+    expect(calls[2]).toBe(1_000);
   });
 
   it('is ready the moment the device answers, even if the library has not settled the join yet', async () => {

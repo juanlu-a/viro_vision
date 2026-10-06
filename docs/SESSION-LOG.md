@@ -3213,6 +3213,57 @@ busca. Una placa que terminaba de arrancar durante una pausa esperaba al próxim
   anuncio) quedó sin hacer: con un identificador viejo nunca escanearía. Con pausas de 5 s rinde
   menos de lo que costaría.
 
+## 2026-10-06 (cont.) — Los 15 s entre el «OK» del cartel y la red lista, desarmados
+
+Reporte: Bluetooth lento y, tras aceptar el cartel de la WiFi, ~15 s hasta conectar; reabrir la app
+después conectó rápido. **La telemetría volvió** (build `202610052158`, el del #105) y es lo que
+permitió desarmarlo. Para leerla: un token personal de la cuenta de ViroVision en
+`~/.config/virovision/supabase-token` y `SUPABASE_ACCESS_TOKEN=$(cat …) supabase db query --linked`
+(la CLI de la Mac está logueada en otra organización).
+
+- **El Bluetooth no fue lento**: `ble.connected` 1,6 s, 0,4 s, 1,5 s y 1,7 s en las cuatro sesiones.
+- Las reaperturas: `wifi.ready` en 0,14–0,45 s, `via: already`, sin cartel. Eso ya anda.
+- **La WiFi de la primera: 15,8 s**, `via: joined`. Cruzado con el journal de la placa (que atrasaba
+  140,4 s: en modo AP no hay NTP; se alineó con el instante de la conexión BLE):
+
+| tramo | duración |
+|---|---|
+| `wifi.joining` → cartel aceptado | 3,6 s (la persona) |
+| OK → `AP-STA-CONNECTED` + 4-way | 3,3 s (iOS) |
+| asociado → primer `DHCPDISCOVER` | **5,2 s** |
+| DISCOVER → `DHCPACK` | 1,1 s |
+| `DHCPACK` → primer `/health` que contesta | **2,5 s** |
+
+El último tramo es de la app: cada sondeo durante el join tenía tope de 3 s, y uno mandado antes de
+tener IP sólo termina al vencer. Baja a 1 s (`joinProbeTimeoutMs`).
+
+El de 5,2 s **era de la placa, pero no de la radio**. Se repitió la unión desde cero (olvidar la red
+en el iPhone) con `tcpdump` en `wlan0` y los relojes ya alineados: el `DHCPDISCOVER` llegó a la
+interfaz **90 ms** después de asociarse el iPhone, y la oferta salió **3,0 s** después. Es el *ping
+check* de dnsmasq: antes de ofrecer una dirección le hace ping y espera hasta 3 s (se ven las tres
+consultas ARP por la dirección candidata). dnsmasq anota el DISCOVER recién al decidir, por eso la
+primera vez aparecieron «dos en el mismo milisegundo». Se descartó primero el ahorro de energía (ya
+en `wifi.powersave = 2`) y después la coexistencia BT/WiFi, que era la sospecha anterior.
+
+Arreglo: `no-ping` en `dnsmasq-shared.d` (en `setup.sh`, que de paso reemplaza el archivo con el
+nombre viejo en español que la placa todavía tenía). Repetida la prueba: **oferta en 5 ms**.
+
+| tramo | antes | con `no-ping` |
+|---|---|---|
+| OK → asociado (iOS) | 5,6 s | 5,8 s (con un `AP-STA-POSSIBLE-PSK-MISMATCH` primero) |
+| asociado → DISCOVER (iOS) | 0,09 s | 1,1 s |
+| DISCOVER → OFFER (placa) | **3,0 s** | **0,005 s** |
+| OFFER → ACK (iOS) | 1,05 s | 1,02 s |
+| ACK → `/health` (sondeo ARP de iOS, RFC 5227) | 1,85 s | 1,9 s |
+| **OK → red lista** | **11,7 s** | **10,4 s** |
+
+Lo que queda (~10 s) es todo de iOS, y pasa **una vez por teléfono**: las reaperturas dan
+`via: already` en menos de medio segundo. El `PSK-MISMATCH` del primer intento queda anotado sin
+explicar.
+
+De paso: **la cámara volvió** y, con el arranque nuevo, el anuncio salió 1,8 s después del
+`Started` y la cámara con el detector quedó lista 4 s después — no el minuto que temíamos.
+
 ## Open threads / next
 
 Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.

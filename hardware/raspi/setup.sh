@@ -65,7 +65,11 @@ mkdir -p /etc/NetworkManager/dnsmasq-shared.d
 # The file used to be called 10-virovision-solo-local.conf; a stale copy would apply the same options
 # twice, so it is removed rather than left behind.
 rm -f /etc/NetworkManager/dnsmasq-shared.d/10-virovision-solo-local.conf
-printf 'dhcp-option=3\ndhcp-option=6\n' > /etc/NetworkManager/dnsmasq-shared.d/10-virovision-local-only.conf
+# `no-ping`: by default dnsmasq pings an address and waits up to 3 s for an answer before offering it.
+# Measured on 2026-10-06: the iPhone's DHCPDISCOVER reached wlan0 90 ms after it associated and the
+# offer left 3.0 s later, a third of the wait between accepting the join prompt and the network being
+# ready. On an AP whose only clients are this user's phones, the address cannot be in use by anyone.
+printf 'dhcp-option=3\ndhcp-option=6\nno-ping\n' > /etc/NetworkManager/dnsmasq-shared.d/10-virovision-local-only.conf
 
 echo "→ a journal that survives a reboot"
 # Raspberry Pi OS ships /usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf with
