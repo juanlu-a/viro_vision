@@ -3237,12 +3237,29 @@ permitió desarmarlo. Para leerla: un token personal de la cuenta de ViroVision 
 El último tramo es de la app: cada sondeo durante el join tenía tope de 3 s, y uno mandado antes de
 tener IP sólo termina al vencer. Baja a 1 s (`joinProbeTimeoutMs`).
 
-El de 5,2 s queda abierto: los dos `DHCPDISCOVER` llegaron a dnsmasq **en el mismo milisegundo**, y
-iOS los manda separados por ≥1 s, así que algo los retuvo del lado de la placa. No es el ahorro de
-energía (ya está en `wifi.powersave = 2`, `iw` dice off). La sospecha es la **coexistencia BT/WiFi**
-del BCM43436 con el intervalo de conexión BLE en 7,5–15 ms, que se fijó cuando la foto viajaba por
-BLE y ya no hace falta. Sin probar: la prueba es un `tcpdump` en `wlan0` durante un join forzado
-(olvidar la red en el iPhone).
+El de 5,2 s **era de la placa, pero no de la radio**. Se repitió la unión desde cero (olvidar la red
+en el iPhone) con `tcpdump` en `wlan0` y los relojes ya alineados: el `DHCPDISCOVER` llegó a la
+interfaz **90 ms** después de asociarse el iPhone, y la oferta salió **3,0 s** después. Es el *ping
+check* de dnsmasq: antes de ofrecer una dirección le hace ping y espera hasta 3 s (se ven las tres
+consultas ARP por la dirección candidata). dnsmasq anota el DISCOVER recién al decidir, por eso la
+primera vez aparecieron «dos en el mismo milisegundo». Se descartó primero el ahorro de energía (ya
+en `wifi.powersave = 2`) y después la coexistencia BT/WiFi, que era la sospecha anterior.
+
+Arreglo: `no-ping` en `dnsmasq-shared.d` (en `setup.sh`, que de paso reemplaza el archivo con el
+nombre viejo en español que la placa todavía tenía). Repetida la prueba: **oferta en 5 ms**.
+
+| tramo | antes | con `no-ping` |
+|---|---|---|
+| OK → asociado (iOS) | 5,6 s | 5,8 s (con un `AP-STA-POSSIBLE-PSK-MISMATCH` primero) |
+| asociado → DISCOVER (iOS) | 0,09 s | 1,1 s |
+| DISCOVER → OFFER (placa) | **3,0 s** | **0,005 s** |
+| OFFER → ACK (iOS) | 1,05 s | 1,02 s |
+| ACK → `/health` (sondeo ARP de iOS, RFC 5227) | 1,85 s | 1,9 s |
+| **OK → red lista** | **11,7 s** | **10,4 s** |
+
+Lo que queda (~10 s) es todo de iOS, y pasa **una vez por teléfono**: las reaperturas dan
+`via: already` en menos de medio segundo. El `PSK-MISMATCH` del primer intento queda anotado sin
+explicar.
 
 De paso: **la cámara volvió** y, con el arranque nuevo, el anuncio salió 1,8 s después del
 `Started` y la cámara con el detector quedó lista 4 s después — no el minuto que temíamos.
