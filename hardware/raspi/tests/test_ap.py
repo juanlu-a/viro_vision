@@ -149,3 +149,25 @@ def test_an_nmcli_that_fails_raises_with_the_reason():
 
     with pytest.raises(RuntimeError, match="wlan0 does not exist"):
         AccessPoint(nm, sleep=lambda _s: None).turn_on()
+
+
+def test_it_waits_for_networkmanager_to_answer_before_the_first_attempt():
+    """Since the daemon stopped waiting for NetworkManager to start (2026-10-06), it reaches the AP
+    while NM is still coming up; the first attempt used to fail and the retry waited a fixed 5 s."""
+    answers = iter([
+        subprocess.CompletedProcess([], 8, stdout="", stderr="Error: NetworkManager is not running."),
+        subprocess.CompletedProcess([], 8, stdout="", stderr="Error: NetworkManager is not running."),
+        subprocess.CompletedProcess([], 0, stdout="running\n", stderr=""),
+    ])
+    slept = []
+    ap = AccessPoint(lambda args: next(answers), sleep=slept.append)
+    assert ap.wait_for_network_manager(poll_s=0.5)
+    assert slept == [0.5, 0.5], "polled every half second, not a fixed five"
+
+
+def test_it_gives_up_waiting_for_networkmanager_after_the_timeout():
+    slept = []
+    ap = AccessPoint(lambda args: subprocess.CompletedProcess(args, 8, stdout="", stderr=""), sleep=slept.append)
+    assert not ap.wait_for_network_manager(timeout_s=2, poll_s=0.5)
+    assert sum(slept) == 2
+

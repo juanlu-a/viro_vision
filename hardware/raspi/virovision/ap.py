@@ -64,6 +64,27 @@ class AccessPoint:
                             "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", self._password]))
         log.info("connection %s created (ssid %s)", CONNECTION_NAME, self._ssid)
 
+    def wait_for_network_manager(self, timeout_s: float = 30.0, poll_s: float = 0.5) -> bool:
+        """Waits until NetworkManager answers, polling. True if it did within `timeout_s`.
+
+        Since 2026-10-06 the daemon no longer waits for NetworkManager before starting (it advertises
+        first), so on a boot it reaches the AP while NM is still coming up: the first `con up` failed
+        with "NetworkManager is not running" and the retry's fixed 5 s pushed the AP 2.3 s later than
+        before. Polling every half second brings the AP up as soon as NM can take it.
+        """
+        waited = 0.0
+        while True:
+            try:
+                result = self._run(["-t", "-f", "RUNNING", "general"])
+                if result.returncode == 0 and (result.stdout or "").strip() == "running":
+                    return True
+            except Exception:  # noqa: BLE001 — nmcli itself failing is just "not yet"
+                pass
+            if waited >= timeout_s:
+                return False
+            self._sleep(poll_s)
+            waited += poll_s
+
     def turn_on(self) -> None:
         self._ensure_connection()
         self._ok(self._run(["con", "up", CONNECTION_NAME]))

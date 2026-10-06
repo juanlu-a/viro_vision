@@ -15,17 +15,31 @@ set -x
 
 DROPIN=/etc/systemd/system/virovision.service.d/10-sin-ap.conf
 
+# Este script está en la cadena crítica del arranque: el daemon no arranca —y la placa no anuncia—
+# hasta que termina. Por eso cada paso trabaja sólo si algo cambió (2026-10-06: corría 3,5 s en
+# cada arranque, 2,4 de ellos en un `daemon-reload` que casi nunca hacía falta).
+RELOAD_UNITS=0
 if [ -f /boot/firmware/SIN-AP ]; then
   mkdir -p "$(dirname "$DROPIN")"
-  cat > "$DROPIN" <<'EOF'
+  NEW=$(mktemp)
+  cat > "$NEW" <<'EOF'
 [Service]
 ExecStart=
 EnvironmentFile=-/etc/default/virovision
 ExecStart=/home/virovision/virovision/.venv/bin/python -m virovision --no-ap $VIROVISION_ARGS
 EOF
+  if cmp -s "$NEW" "$DROPIN"; then
+    rm -f "$NEW"
+  else
+    install -m 644 "$NEW" "$DROPIN" && rm -f "$NEW"
+    RELOAD_UNITS=1
+  fi
   echo "modo DESARROLLO (--no-ap): hay SSH, la app no verá red de la placa"
 else
-  rm -f "$DROPIN"
+  if [ -e "$DROPIN" ]; then
+    rm -f "$DROPIN"
+    RELOAD_UNITS=1
+  fi
   rmdir "$(dirname "$DROPIN")" 2>/dev/null || true
   echo "modo PRODUCTO: la placa levanta su AP, no habrá SSH"
 fi
@@ -38,9 +52,12 @@ for f in /boot/firmware/*.nmconnection; do
   # como si fuera un perfil y NetworkManager escupe un error por cada arranque.
   case "$(basename "$f")" in ._*) continue ;; esac
   dst="/etc/NetworkManager/system-connections/$(basename "$f")"
-  install -m 600 -o root -g root "$f" "$dst" && echo "perfil WiFi instalado: $dst"
+  cmp -s "$f" "$dst" && continue
+  install -m 600 -o root -g root "$f" "$dst" && echo "perfil WiFi instalado: $dst" && RELOAD_NM=1
 done
-nmcli connection reload 2>/dev/null || true
+if [ -n "$RELOAD_NM" ]; then
+  nmcli connection reload 2>/dev/null || true
+fi
 
 # Avisos de sistema pregrabados (ADR 0003, act. 2026-09-16). Van por la tarjeta y no por `scp` para
 # que una placa en modo producto -sin SSH- también se pueda actualizar, que es exactamente la
@@ -54,6 +71,7 @@ if [ -d "$SRC" ]; then
   for w in "$SRC"/*.wav; do
     [ -f "$w" ] || continue
     case "$(basename "$w")" in ._*) continue ;; esac
+    cmp -s "$w" "$DST/$(basename "$w")" && continue
     install -m 644 -o virovision -g virovision "$w" "$DST/$(basename "$w")" && n=$((n + 1))
   done
   # Y se borra lo que la tarjeta ya no trae: el catálogo se achicó una vez (de 10 a 6 avisos el
@@ -64,7 +82,10 @@ if [ -d "$SRC" ]; then
     [ -f "$w" ] || continue
     [ -f "$SRC/$(basename "$w")" ] || { rm -f "$w" && echo "aviso retirado: $(basename "$w")"; }
   done
-  echo "avisos de sistema instalados: $n en $DST"
+  echo "avisos de sistema actualizados: $n en $DST"
 fi
 
-systemctl daemon-reload
+# Sólo si el drop-in cambió (se cambió de modo): sin eso systemd no lo ve, y con él son 2,4 s.
+if [ "$RELOAD_UNITS" = 1 ]; then
+  systemctl daemon-reload
+fi

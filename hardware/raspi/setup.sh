@@ -71,6 +71,13 @@ rm -f /etc/NetworkManager/dnsmasq-shared.d/10-virovision-solo-local.conf
 # ready. On an AP whose only clients are this user's phones, the address cannot be in use by anyone.
 printf 'dhcp-option=3\ndhcp-option=6\nno-ping\n' > /etc/NetworkManager/dnsmasq-shared.d/10-virovision-local-only.conf
 
+echo "→ cloud-init off once the board is installed"
+# cloud-init is how the SD card configures the board on its FIRST boot (user, hostname, the daemon's
+# install: boot/user-data). Left on, it runs again on every boot and sits at the front of the critical
+# chain: measured on 2026-10-06, 6.1 s of every boot spent before Bluetooth could even start. This
+# script runs after that first boot, so nothing is lost; deleting the file brings it back.
+touch /etc/cloud/cloud-init.disabled
+
 echo "→ a journal that survives a reboot"
 # Raspberry Pi OS ships /usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf with
 # Storage=volatile: the journal lives in RAM and every power-off erases it. That, and not the clock
