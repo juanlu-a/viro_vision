@@ -77,12 +77,10 @@ class LogRelay(logging.Handler):
         per_minute: int = PER_MINUTE,
         buffered: int = BUFFERED,
         clock: Callable[[], float] = time.monotonic,
-        wall: Callable[[], float] = time.time,
     ) -> None:
         super().__init__(level=logging.WARNING)
         self._per_minute = per_minute
         self._clock = clock
-        self._wall = wall
         self._emit_event: Optional[Emit] = None
         self._sent: deque = deque()
         self._buffer: deque = deque(maxlen=buffered)
@@ -104,7 +102,10 @@ class LogRelay(logging.Handler):
             self._live = True
             pending = list(self._buffer)
             self._buffer.clear()
-            now = self._wall()
+            # Monotonic, not `record.created`: the Zero 2 W has no RTC, and a line logged at boot
+            # carries the pre-NTP time; once NTP corrects the clock, a wall-clock `ago` came out hours
+            # off — on exactly the boot errors this field exists for.
+            now = self._clock()
         finally:
             self.release()
         for event, created in pending:
@@ -125,7 +126,7 @@ class LogRelay(logging.Handler):
         try:
             event = to_event(record)
             if not self._live or self._emit_event is None:
-                self._buffer.append((event, record.created))
+                self._buffer.append((event, self._clock()))
                 return
             now = self._clock()
             while self._sent and now - self._sent[0] >= 60.0:

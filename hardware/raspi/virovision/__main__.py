@@ -286,10 +286,10 @@ async def _main(args: argparse.Namespace) -> None:
     # link at all, and "the app finds nothing" had two indistinguishable causes.
     centrals = CentralWatcher(on_change=lambda anyone: None if anyone else relay.central_gone())
     await centrals.start(bus)
-    if centrals.connected:
-        # Restarted under a live link: the phone stays subscribed and never reads `status` again, so
-        # without this the relay would buffer for the whole session (2026-10-06).
-        relay.subscriber_ready()
+    # A phone already connected at startup (the daemon restarted under a live link) is NOT taken as
+    # subscribed: the GATT application was registered again with fresh notify state, and replaying
+    # the boot buffer then would send the boot errors to nobody. The buffer waits for the first
+    # `status` read — the next connection's, at worst (2026-10-06).
 
     # timeout 0 = advertise until the process dies; the device has to be discoverable always, because
     # the app reconnects on its own when it comes back into range.

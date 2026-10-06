@@ -403,7 +403,7 @@ def test_a_silent_camera_is_reopened_by_the_watchdog():
     camera = SilentCamera()
     watcher = BusWatcher(camera, lambda files: None, lambda event: None)
     watcher._last_frame_at = time.monotonic()
-    threading.Thread(target=watcher._watchdog, daemon=True).start()
+    threading.Thread(target=watcher._watchdog, args=(watcher._stop,), daemon=True).start()
     try:
         watcher._last_frame_at -= FRAME_SILENCE_S + 1  # as if the camera had been quiet that long
         deadline = time.monotonic() + 5
@@ -475,9 +475,9 @@ def test_asked_to_watch_too_early_the_device_says_so(tmp_path):
 
     watcher = BusWatcher(Camera(), lambda files: order.append(("said", list(files))), lambda e: order.append(("event", e)), announcements=tmp_path)
     watcher._build = lambda: order.append(("built", None))
-    watcher._frame_loop = lambda: None
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: None
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     with patch("virovision.bus.is_available", return_value=True):
         assert watcher.start()
     watcher.stop()
@@ -514,9 +514,9 @@ def test_a_board_without_the_warming_clip_still_starts(tmp_path):
 
     watcher = BusWatcher(Camera(), lambda files: said.append(list(files)), lambda e: None, announcements=tmp_path)
     watcher._build = lambda: None
-    watcher._frame_loop = lambda: None
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: None
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     with patch("virovision.bus.is_available", return_value=True):
         assert watcher.start()
     watcher.stop()
@@ -532,9 +532,9 @@ def test_once_warm_the_notice_is_not_said_again(tmp_path):
     said = []
     watcher = BusWatcher(Camera(), lambda files: said.append(list(files)), lambda e: None, announcements=tmp_path)
     watcher._build = lambda: None
-    watcher._frame_loop = lambda: None
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: None
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     watcher._pipeline = object()  # as `warm_up` leaves it
     assert watcher.ready
     with patch("virovision.bus.is_available", return_value=True):
@@ -682,9 +682,9 @@ def test_two_overlapping_starts_launch_one_set_of_threads(tmp_path):
         watcher._pipeline = object()
 
     watcher._build = slow_build
-    watcher._frame_loop = lambda: launched.append("frames")
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: launched.append("frames")
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     with patch("virovision.bus.is_available", return_value=True):
         first = threading.Thread(target=watcher.start)
         first.start()
@@ -712,9 +712,9 @@ def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path)
         watcher._pipeline = object()
 
     watcher._build = slow_build
-    watcher._frame_loop = lambda: launched.append("frames")
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: launched.append("frames")
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     result = []
     with patch("virovision.bus.is_available", return_value=True):
         first = threading.Thread(target=lambda: result.append(watcher.start()))
@@ -803,7 +803,11 @@ def test_the_frame_loop_survives_a_camera_restart_and_a_bad_frame(monkeypatch):
     watcher = BusWatcher(RestartingCamera(), lambda files: None, lambda event: None)
     watcher._watcher = FakeWatcher()
     watcher._settings = {"labels": ["bus_sign"], "normalize": False, "order": None}
-    thread = threading.Thread(target=watcher._frame_loop, daemon=True)
+    thread = threading.Thread(
+        target=watcher._frame_loop,
+        args=(watcher._stop, watcher._jobs, watcher._results, watcher._watcher),
+        daemon=True,
+    )
     thread.start()
     thread.join(5)
 
@@ -843,5 +847,5 @@ def test_a_frame_released_after_stop_is_not_processed(monkeypatch):
     monkeypatch.setitem(sys.modules, "bus_banner.imx500", imx500)
     watcher = BusWatcher(LateCamera(), lambda files: None, lambda event: None)
     watcher._watcher = FakeWatcher()
-    watcher._frame_loop()
+    watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
     assert released == [1] and processed == []

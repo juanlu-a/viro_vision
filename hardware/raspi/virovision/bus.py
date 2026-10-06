@@ -27,7 +27,7 @@ import queue
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from .notices import SYSTEM_DIR as NOTICES_DIR
 
@@ -372,9 +372,17 @@ class BusWatcher:
             self._results = queue.Queue()
             self._last_frame_at = time.monotonic()
             self._threads = [
-                threading.Thread(target=self._read_loop, name="bus-ocr", daemon=True),
-                threading.Thread(target=self._frame_loop, name="bus-frames", daemon=True),
-                threading.Thread(target=self._watchdog, name="bus-watchdog", daemon=True),
+                # The run's state goes in as arguments, bound HERE: `Thread.start()` returns before the
+                # target's first line, and a thread that read `self._stop` itself could pick up the
+                # NEXT run's if a stop and a start landed in between.
+                threading.Thread(target=self._read_loop, args=(self._jobs, self._results), name="bus-ocr", daemon=True),
+                threading.Thread(
+                    target=self._frame_loop,
+                    args=(self._stop, self._jobs, self._results, self._watcher),
+                    name="bus-frames",
+                    daemon=True,
+                ),
+                threading.Thread(target=self._watchdog, args=(self._stop,), name="bus-watchdog", daemon=True),
             ]
             for thread in self._threads:
                 thread.start()
@@ -515,8 +523,7 @@ class BusWatcher:
         jobs.put((frame, banner_box, bus_box, track_id))
         return None
 
-    def _read_loop(self) -> None:
-        jobs, results = self._jobs, self._results  # this run's (see `_start_locked`)
+    def _read_loop(self, jobs: queue.Queue, results: queue.Queue) -> None:
         while True:
             job = jobs.get()
             if job is None:
@@ -530,14 +537,13 @@ class BusWatcher:
                 reading = None
             results.put((track_id, reading, round((time.monotonic() - started) * 1000)))
 
-    def _watchdog(self) -> None:
+    def _watchdog(self, stop: threading.Event) -> None:
         """Reopens the camera when no frame has arrived for FRAME_SILENCE_S.
 
         It lives in its own thread because the frame loop, when the camera goes quiet, is blocked
         inside `capture_request` and cannot notice anything. Closing the sensor from here is what
         unblocks it. Giving the capture call its own deadline instead was tried on 2026-09-21 and
         jammed the camera for good: see `Camera.capture_request`."""
-        stop = self._stop  # this run's (see `_start_locked`)
         # Restarts in a row that left the camera unavailable. Each one doubles the wait before the
         # next (up to 32x, ~6 min): a camera that does not reopen gets its detector reloaded on every
         # try, under the capture lock, and retrying that every 12 s kept every photo waiting behind
@@ -560,7 +566,9 @@ class BusWatcher:
     def _heartbeat(self, frames: int, with_detections: int, buses: int, signs: int) -> None:
         log.info("bus: %d frames in %.0f s, %d with detections (bus %d, sign %d)", frames, HEARTBEAT_S, with_detections, buses, signs)
 
-    def _frame_loop(self) -> None:
+    def _frame_loop(
+        self, stop: threading.Event, jobs: queue.Queue, results: queue.Queue, watcher: Any
+    ) -> None:
         """Drains frames for as long as the mode lasts — through camera restarts included.
 
         Until 2026-10-06 it returned on the first failed capture. But a failed capture is exactly what
@@ -573,8 +581,7 @@ class BusWatcher:
         from bus_banner.imx500 import detections_from_tensors
 
         # This run's (see `_start_locked`): a loop that outlives `stop` must not feed the next run.
-        stop, results, watcher = self._stop, self._results, self._watcher
-        self._run_local.run = (watcher, self._jobs)
+        self._run_local.run = (watcher, jobs)
         frame_number = 0
         beat_at = time.monotonic()
         frames = with_detections = buses = signs = 0

@@ -126,12 +126,14 @@ def test_an_emit_that_raises_never_reaches_the_code_that_logged():
 
 def test_a_replayed_event_says_how_old_it_is_and_still_fits():
     """A boot error replayed minutes later read as happening now."""
-    relay = LogRelay(wall=lambda: 10_000_000_000.0)
+    now = [100.0]
+    relay = LogRelay(clock=lambda: now[0])
     _logger(relay).error("camera did not start: %s", "ñ" * 200)
+    now[0] += 42
     sent = []
     relay.attach(sent.append)
     relay.subscriber_ready()
-    assert sent[0]["ago"] > 0
+    assert sent[0]["ago"] == 42
     data = event_bytes(sent[0])
     assert len(data) <= EVENT_MAX_BYTES and "ago" in json.loads(data)
 
