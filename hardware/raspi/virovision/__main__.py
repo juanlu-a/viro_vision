@@ -35,6 +35,8 @@ from .link import CentralWatcher, log_existing_bonds, report_visibility, set_bon
 log = logging.getLogger("virovision")
 
 STATUS_EVERY_SECONDS = 15
+AP_REFRESH_WAIT_S = 10.0
+"""How long an AP change waits for a network refresh already in flight before giving up on its own."""
 
 
 def _arguments() -> argparse.Namespace:
@@ -135,7 +137,7 @@ async def _main(args: argparse.Namespace) -> None:
             else:
                 ap.turn_off()
         finally:
-            network.refresh(wait=True)
+            network.refresh(wait_s=AP_REFRESH_WAIT_S)
 
     def status() -> dict:
         """The one status, for BLE and HTTP alike. It reads only memory: the network lookups are
@@ -210,6 +212,11 @@ async def _main(args: argparse.Namespace) -> None:
     relay.attach(service.core.emit_event)
     service.on_status_read = relay.subscriber_ready
 
+    def _push_status(refresh: asyncio.Future) -> None:
+        if not refresh.cancelled() and refresh.exception() is not None:
+            log.error("network refresh failed", exc_info=refresh.exception())
+        service.notify_status()
+
     async def _refresh_network() -> None:
         await loop.run_in_executor(None, network.refresh)
         service.notify_status()
@@ -279,6 +286,10 @@ async def _main(args: argparse.Namespace) -> None:
     # link at all, and "the app finds nothing" had two indistinguishable causes.
     centrals = CentralWatcher(on_change=lambda anyone: None if anyone else relay.central_gone())
     await centrals.start(bus)
+    if centrals.connected:
+        # Restarted under a live link: the phone stays subscribed and never reads `status` again, so
+        # without this the relay would buffer for the whole session (2026-10-06).
+        relay.subscriber_ready()
 
     # timeout 0 = advertise until the process dies; the device has to be discoverable always, because
     # the app reconnects on its own when it comes back into range.
@@ -352,7 +363,7 @@ async def _main(args: argparse.Namespace) -> None:
             log.error("the AP did not end up operational after several attempts; carrying on without it")
         # Pushed now and not on the next 15 s heartbeat: a phone that connected before the AP was up
         # learns the address to join the instant there is one.
-        await loop.run_in_executor(None, lambda: network.refresh(wait=True))
+        await loop.run_in_executor(None, lambda: network.refresh(wait_s=AP_REFRESH_WAIT_S))
         service.notify_status()
 
     no_network_since = None
@@ -361,8 +372,11 @@ async def _main(args: argparse.Namespace) -> None:
         try:
             await asyncio.wait_for(stop.wait(), STATUS_EVERY_SECONDS)
         except asyncio.TimeoutError:
-            await loop.run_in_executor(None, network.refresh)
-            service.notify_status()
+            # Not awaited (2026-10-06): `nmcli` can take its whole 30 s timeout, and awaiting it held
+            # the status push and the SIGTERM check that long. The status goes out when the refresh
+            # ends; a refresh still running from the last beat makes this one return at once.
+            refresh = loop.run_in_executor(None, network.refresh)
+            refresh.add_done_callback(_push_status)
             # Once a minute: could a phone find this board at all right now (see `link.py`)? It is
             # the one hypothesis for "the app finds nothing" that could not be tested from the app.
             heartbeats += 1

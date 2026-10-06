@@ -30,7 +30,7 @@ from socketserver import ThreadingMixIn
 from typing import Callable, Optional
 
 from .camera import CameraNotReady
-from .core import MEASURE_MAX_BYTES  # noqa: F401 — one cap for BLE and HTTP; re-exported for the tests
+from .core import MEASURE_MAX_BYTES
 
 log = logging.getLogger(__name__)
 

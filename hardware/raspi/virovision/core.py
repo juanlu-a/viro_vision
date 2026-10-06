@@ -58,6 +58,10 @@ daemon on a 512 MB board (review of 2026-10-06). 5 MB is ~100 photos, far past a
 INTERVAL_MAX_MS = 1_000
 """Pause between chunks a `measure` may ask for. Unbounded, one write could hold the single transfer
 slot for hours, and every photo after it would answer "a transfer is already in progress"."""
+MEASURE_MAX_PAUSED_MS = 60_000
+"""And the pauses of one `measure` added up: 5 MB in 182-byte chunks at 1 s each is still eight hours
+of a held transfer slot. Refused with an error rather than shortened, so a measurement is never
+silently a different one from the one asked for."""
 
 
 def _json(obj: dict) -> bytes:
@@ -249,6 +253,9 @@ class Core:
             # Parsed before the source exists: a bad `chunk` raising after it would leave an
             # un-awaited coroutine (or, for a photo, a capture already running for nobody).
             chunk, interval_ms = self._chunk(cmd, mtu), self._interval(cmd)
+            if chunk > 0 and -(-amount // chunk) * interval_ms > MEASURE_MAX_PAUSED_MS:
+                self._event({"t": "error", "msg": f"measure: chunks x interval_ms over {MEASURE_MAX_PAUSED_MS // 1000} s"})
+                return
             self._start_transfer(source=self._synthetic_source(amount), chunk=chunk, interval_ms=interval_ms, kind="measurement")
         elif name == "photo":
             if self._capture is None:

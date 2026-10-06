@@ -299,3 +299,13 @@ def test_a_background_failure_reaches_the_journal(loop, caplog):
     with caplog.at_level("ERROR", logger="virovision.core"):
         core.from_button(1)
         _until(loop, lambda: any(r.exc_info and "the OCR process died" in str(r.exc_info[1]) for r in caplog.records))
+
+
+def test_a_measure_whose_pauses_add_up_past_a_minute_is_refused(loop):
+    """5 MB in 182-byte chunks at 1 s each held the single transfer slot for eight hours."""
+    asked = []
+    n = Notifications()
+    core = Core(loop, lambda: {}, None, lambda amount: asked.append(amount) or b"x", n)
+    core.write_control(b'{"cmd":"measure","bytes":53000,"interval_ms":1000}', mtu=185)
+    loop.run_until_complete(_drain(loop))
+    assert asked == [] and [e["t"] for e in n.events()] == ["error"]

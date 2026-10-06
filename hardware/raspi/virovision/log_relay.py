@@ -5,12 +5,13 @@ and nobody can read it. The app already records telemetry and ships it to Supaba
 network, so the cheapest witness is to hand it the journal's important half. Each WARNING or worse
 becomes one event on the `event` characteristic:
 
-    {"t": "log", "lvl": "warning" | "error" | "critical", "src": "bus", "msg": "...", "drop": 3}
+    {"t": "log", "lvl": "warning" | "error" | "critical", "src": "bus", "msg": "...", "drop": 3, "ago": 42}
 
 `src` is the logger's name without the `virovision.` prefix; `msg` is the message (plus the
 exception's type and text, when there is one), trimmed by UTF-8 bytes so the whole event fits one
 notification at iOS's MTU (`core.event_bytes`); `drop` is present only when the rate limit swallowed
-events before this one, and says how many.
+events before this one, and says how many; `ago` only on a replayed event, the seconds between the
+line being logged and the replay — without it a boot error from minutes ago reads as happening now.
 
 Three things keep it from becoming a problem of its own:
 
@@ -21,7 +22,11 @@ Three things keep it from becoming a problem of its own:
   subscribed, which is when it reads `status` right after connecting (`bleClientPlx.connect`): a
   notification sent before that, at the moment BlueZ reports the connection, reaches nobody.
 - **No recursion.** Sending an event can itself log (a loop that is closing, a D-Bus error); a record
-  produced while this handler is already emitting on the same thread is dropped.
+  produced while this handler is already emitting on the same thread is dropped. The send itself
+  happens later, on the loop thread (`call_soon_threadsafe`), out of reach of that guard: what fails
+  there is logged by `asyncio` ("Task exception was never retrieved") or by the D-Bus library, and
+  relaying those fed each failed send back as another send, burning the whole budget on the relay's
+  own echo. Those loggers are not relayed (IGNORED_LOGGERS); the journal still has them.
 
 INSTRUMENTATION BOUNDARY: this is diagnostics, never control. Nothing on the board may depend on a
 log event arriving, and nothing here may block or raise into the code that logged.
@@ -41,6 +46,7 @@ MSG_MAX_CHARS = 300
 """A first cut before the byte-exact trim in `core.event_bytes`, so a 10 KB traceback text is not
 serialized again and again while it is being shortened."""
 SRC_MAX_CHARS = 24
+IGNORED_LOGGERS = ("asyncio", "dbus_next", "bluez_peripheral")
 
 Emit = Callable[[dict], None]
 
@@ -71,10 +77,12 @@ class LogRelay(logging.Handler):
         per_minute: int = PER_MINUTE,
         buffered: int = BUFFERED,
         clock: Callable[[], float] = time.monotonic,
+        wall: Callable[[], float] = time.time,
     ) -> None:
         super().__init__(level=logging.WARNING)
         self._per_minute = per_minute
         self._clock = clock
+        self._wall = wall
         self._emit_event: Optional[Emit] = None
         self._sent: deque = deque()
         self._buffer: deque = deque(maxlen=buffered)
@@ -96,10 +104,11 @@ class LogRelay(logging.Handler):
             self._live = True
             pending = list(self._buffer)
             self._buffer.clear()
+            now = self._wall()
         finally:
             self.release()
-        for event in pending:
-            self._send(event)
+        for event, created in pending:
+            self._send({**event, "ago": max(0, int(now - created))})
 
     def central_gone(self) -> None:
         """No central left: buffer again until the next one is subscribed."""
@@ -110,13 +119,13 @@ class LogRelay(logging.Handler):
             self.release()
 
     def emit(self, record: logging.LogRecord) -> None:
-        if getattr(self._busy, "on", False):
+        if getattr(self._busy, "on", False) or record.name.split(".", 1)[0] in IGNORED_LOGGERS:
             return
         self._busy.on = True
         try:
             event = to_event(record)
             if not self._live or self._emit_event is None:
-                self._buffer.append(event)
+                self._buffer.append((event, record.created))
                 return
             now = self._clock()
             while self._sent and now - self._sent[0] >= 60.0:

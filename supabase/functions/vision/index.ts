@@ -106,17 +106,24 @@ function overTheBrake(ip: string, now: number): boolean {
 /**
  * Who is asking, as far as the brake can tell.
  *
- * `cf-connecting-ip` first: Supabase's edge sits behind Cloudflare, which sets that header itself
- * and overwrites whatever the client sent, so it cannot be forged from outside. The FIRST entry of
- * `x-forwarded-for` —all this used until 2026-10-06— is whatever the client wrote there: one header
- * per request walked around the brake. It stays only as the fallback for a runtime without the
- * Cloudflare header (`supabase functions serve`), where it is no worse than before. Not the LAST
- * entry: that is the nearest proxy's own address, the same for every phone, and keying on it would
- * turn a per-phone brake into one shared by all of them.
+ * ⚠️ UNVERIFIED (2026-10-06): which of these headers the Supabase edge runtime actually forwards,
+ * and which of them it overwrites rather than passes through from the client, has not been checked
+ * against a deployed function. Check it after deploying (log the three headers from a phone and
+ * from a curl that sets them by hand) and drop whatever turns out to be forgeable.
+ *
+ * The order is what is safest without that check:
+ *   - `cf-connecting-ip`: if Supabase's edge sits behind Cloudflare, Cloudflare sets it itself and
+ *     overwrites whatever the client sent.
+ *   - `x-real-ip`: set by the usual reverse proxies (nginx, Kong) to the address they saw.
+ *   - the FIRST entry of `x-forwarded-for`: all this used until 2026-10-06, and whatever the client
+ *     wrote there. Last resort only, so no ordering here is worse than before.
+ * Not the LAST `x-forwarded-for` entry: that is the nearest proxy's own address, the same for every
+ * phone, and keying on it would turn a per-phone brake into one shared by all of them.
  */
 function clientIp(request: Request): string {
   return (
     request.headers.get('cf-connecting-ip')?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     'unknown'
   );

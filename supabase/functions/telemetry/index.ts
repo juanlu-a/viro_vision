@@ -77,20 +77,30 @@ function reply(status: number, body: Record<string, unknown>): Response {
 const encoder = new TextEncoder();
 
 /**
- * The detail as Postgres will accept it, or `{trimmed: true}`.
- *
- * NUL is stripped from every string because jsonb rejects `\u0000` ("unsupported Unicode escape
- * sequence") — and a rejected row used to be a rejected batch. Stripped through the replacer and
- * not from the serialized text: a literal backslash followed by `u0000` in a string serializes as
- * `\\u0000`, and a textual replace would leave a dangling backslash, i.e. invalid JSON.
+ * NUL removed from every string of a parsed JSON value, keys included: jsonb rejects `\u0000`
+ * ("unsupported Unicode escape sequence"), and a rejected row used to be a rejected batch. On the
+ * parsed value and not on the serialized text: a literal backslash followed by `u0000` serializes as
+ * `\\u0000`, and a textual replace would leave a dangling backslash, i.e. invalid JSON. Keys too
+ * since 2026-10-06 — a `JSON.stringify` replacer only sees values.
  */
-function cleanDetail(raw: unknown): unknown {
-  let serialized: string;
-  try {
-    serialized = JSON.stringify(raw ?? {}, (_key, value) =>
-      typeof value === 'string' ? value.replaceAll('\u0000', '') : value
+function withoutNul(value: unknown): unknown {
+  if (typeof value === 'string') return value.replaceAll('\u0000', '');
+  if (Array.isArray(value)) return value.map(withoutNul);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k.replaceAll('\u0000', ''), withoutNul(v)])
     );
+  }
+  return value;
+}
+
+/** The detail as Postgres will accept it, or `{trimmed: true}`. */
+function cleanDetail(raw: unknown): unknown {
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(withoutNul(raw ?? {}));
   } catch {
+    // Nesting deep enough to overflow the stack: not something the app sends.
     return { trimmed: true };
   }
   if (serialized === undefined || encoder.encode(serialized).length > MAX_DETAIL_BYTES) {

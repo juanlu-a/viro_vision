@@ -46,3 +46,19 @@ def test_a_refresh_already_running_is_not_stacked_on():
     release.set()
     first.join(2)
     assert snapshot.current[0] == "casa"
+
+
+def test_an_ap_change_waits_for_a_hung_refresh_only_so_long():
+    import time
+
+    hold, entered = threading.Event(), threading.Event()
+    snapshot = NetworkSnapshot(lambda: entered.set() or (hold.wait(2) and "casa"), ip=lambda: None)
+    first = threading.Thread(target=snapshot.refresh)
+    first.start()
+    assert entered.wait(2)
+
+    started = time.monotonic()
+    snapshot.refresh(wait_s=0.2)
+    assert time.monotonic() - started < 1.0
+    hold.set()
+    first.join(2)

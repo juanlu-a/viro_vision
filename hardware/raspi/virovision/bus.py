@@ -275,6 +275,10 @@ class BusWatcher:
         # without this a stop landing between `start`'s last `_wanted` check and `running = True` saw
         # nothing running, returned, and left the camera watching in another mode (2026-10-06).
         self._run_lock = threading.Lock()
+        # The frame thread's own run: its watcher and its jobs queue. `_queue_read` is called by the
+        # `Watcher` with no way to pass them, and a frame loop of a previous run that outlived `stop`
+        # must feed ITS queue, not the new run's (2026-10-06).
+        self._run_local = threading.local()
         self.unavailable_reason: Optional[str] = None
         """Why the last `start` could not watch, in words the app can show; None when it started, or
         when not starting was not a failure (the camera still starting, the user already gone). The
@@ -395,10 +399,13 @@ class BusWatcher:
                 return
             self._stop.set()
             self._jobs.put(None)
-            for thread in self._threads:
-                thread.join(timeout=3)
-            self._threads = []
+            threads, self._threads = self._threads, []
             self.running = False
+        # Joined outside the lock: three threads at up to 3 s each, and a `start` waiting on the lock
+        # meanwhile is a button press that answers 9 s late. Each run has its own stop event and
+        # queues, so a thread still finishing cannot touch the next run.
+        for thread in threads:
+            thread.join(timeout=3)
         log.info("bus mode stopped")
 
     def repeat_last(self) -> bool:
@@ -501,10 +508,11 @@ class BusWatcher:
     def _queue_read(self, frame, banner_box, bus_box):
         """The reader the `Watcher` calls. Hands the job to the OCR thread and returns None, which is
         how `async_reads` says "in progress": the camera loop must not wait 0.9 s here."""
-        track_id = self._watcher.reading_track
-        attempts = next((t.read_attempts for t in self._watcher.tracker.tracks if t.id == track_id), 0)
+        watcher, jobs = getattr(self._run_local, "run", None) or (self._watcher, self._jobs)
+        track_id = watcher.reading_track
+        attempts = next((t.read_attempts for t in watcher.tracker.tracks if t.id == track_id), 0)
         self._timeline.read_queued(track_id, attempts, banner_box, bus_box)
-        self._jobs.put((frame, banner_box, bus_box, track_id))
+        jobs.put((frame, banner_box, bus_box, track_id))
         return None
 
     def _read_loop(self) -> None:
@@ -564,7 +572,9 @@ class BusWatcher:
         frame rather than the handle it saw when the mode began."""
         from bus_banner.imx500 import detections_from_tensors
 
-        stop = self._stop  # this run's (see `_start_locked`)
+        # This run's (see `_start_locked`): a loop that outlives `stop` must not feed the next run.
+        stop, results, watcher = self._stop, self._results, self._watcher
+        self._run_local.run = (watcher, self._jobs)
         frame_number = 0
         beat_at = time.monotonic()
         frames = with_detections = buses = signs = 0
@@ -584,6 +594,11 @@ class BusWatcher:
                 # watchdog's to reopen.
                 stop.wait(CAMERA_RETRY_S)
                 continue
+            if stop.is_set():
+                # Blocked in the camera past `stop`'s join and only now released: the user already
+                # left bus mode, and processing this frame could still announce a bus (2026-10-06).
+                request.release()
+                return
             if down_since is not None:
                 log.warning("bus: frames again after %.1f s without the camera", time.monotonic() - down_since)
                 down_since = None
@@ -602,10 +617,12 @@ class BusWatcher:
                     beat_at = time.monotonic()
                     frames = with_detections = buses = signs = 0
 
-                self._drain_results(frame_number)
-                events = self._watcher.process(frame, detections, frame_number)
-                self._timeline.frame(self._watcher.tracker.tracks, detections)
+                self._drain_results(frame_number, results, watcher)
+                events = watcher.process(frame, detections, frame_number)
+                self._timeline.frame(watcher.tracker.tracks, detections)
                 for event in events:
+                    if stop.is_set():
+                        break  # left mid-frame: nothing more is said
                     self._handle(event)
             except Exception:  # noqa: BLE001
                 errors_unlogged += 1
@@ -638,14 +655,14 @@ class BusWatcher:
             request.release()
         return detections, frame
 
-    def _drain_results(self, frame_number: int) -> None:
+    def _drain_results(self, frame_number: int, results: queue.Queue, watcher) -> None:
         while True:
             try:
-                track_id, reading, ocr_ms = self._results.get_nowait()
+                track_id, reading, ocr_ms = results.get_nowait()
             except queue.Empty:
                 return
             self._timeline.read_done(track_id, reading, ocr_ms)
-            self._watcher.submit_reading(track_id, reading, frame_number)
+            watcher.submit_reading(track_id, reading, frame_number)
 
     def _is_an_echo(self, number: str, destination: str) -> bool:
         """True when this line was just announced, so saying it again would be an echo of the same

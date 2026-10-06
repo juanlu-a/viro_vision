@@ -812,3 +812,36 @@ def test_the_frame_loop_survives_a_camera_restart_and_a_bad_frame(monkeypatch):
     assert sensors_used[0] == "before" and set(sensors_used[1:]) == {"after"}, "the handle after the restart"
     assert len(processed) == 4, "the bad frame is skipped, the rest are watched"
 
+
+
+def test_a_frame_released_after_stop_is_not_processed(monkeypatch):
+    """A frame loop blocked in the camera past `stop`'s 3 s join used to process the frame it finally
+    got — and could announce a bus after the user had left bus mode (2026-10-06)."""
+    released, processed = [], []
+
+    class Request:
+        def release(self):
+            released.append(1)
+
+    class LateCamera:
+        sensor = object()
+
+        def capture_request(self):
+            watcher._stop.set()  # the user left while this call was blocked
+            return Request()
+
+    class FakeWatcher:
+        tracker = types.SimpleNamespace(tracks=[])
+
+        def process(self, *args):
+            processed.append(args)
+            return []
+
+    imx500 = types.ModuleType("bus_banner.imx500")
+    imx500.detections_from_tensors = lambda *a, **kw: []
+    monkeypatch.setitem(sys.modules, "bus_banner", types.ModuleType("bus_banner"))
+    monkeypatch.setitem(sys.modules, "bus_banner.imx500", imx500)
+    watcher = BusWatcher(LateCamera(), lambda files: None, lambda event: None)
+    watcher._watcher = FakeWatcher()
+    watcher._frame_loop()
+    assert released == [1] and processed == []

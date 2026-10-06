@@ -69,12 +69,13 @@ class NetworkSnapshot:
         self.current: Tuple[Optional[str], Optional[str]] = (None, None)
         """(network name, IPv4), replaced whole so a reader never sees one from each refresh."""
 
-    def refresh(self, wait: bool = False) -> None:
-        """Blocking: call it from an executor. Skipped when another refresh is already running,
-        unless `wait`: `nmcli` stuck on its 30 s timeout would otherwise pile up one thread per
-        heartbeat in a pool of eight. `wait` is for right after an AP change, when the next status has
-        to show it."""
-        if not self._lock.acquire(blocking=wait):
+    def refresh(self, wait_s: float = 0.0) -> None:
+        """Blocking: call it from an executor. Skipped when another refresh is already running:
+        `nmcli` stuck on its 30 s timeout would otherwise pile up one thread per heartbeat in a pool of
+        eight. `wait_s` is for right after an AP change, when the next status has to show it — bounded,
+        so a refresh hung on `nmcli` does not hold the AP's answer for another 30 s."""
+        acquired = self._lock.acquire(timeout=wait_s) if wait_s > 0 else self._lock.acquire(blocking=False)
+        if not acquired:
             return
         try:
             network = self._active_connection()
