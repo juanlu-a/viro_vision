@@ -3308,9 +3308,32 @@ Medido en arranque en frío: **ninguna lectura fallida** (peor, 1,6 s), contra d
 macOS / uno de 30 s de iOS antes. En la placa: foto por HTTP (19,5 KB en 146 ms), modo ómnibus a 15
 fps sin errores, y el OCR real a través del proceso leyendo «115 LUIS BRAILLE» (0,97) en ~1,1 s.
 
+### Revisión (tackle-review, 4 rondas, opus + sonnet)
+
+Dos majors compartidos y dos más que ya existían antes de este cambio, todos arreglados con tests
+(los de concurrencia, verificados quitando el arreglo: fallan sin él):
+- `warm_up` y un botón durante el arranque armaban **dos procesos de OCR** a la vez → lock en `_build`.
+- Un hijo que se colgaba o moría armando el motor caía al fallback **dentro del daemon** — el
+  congelamiento que esto evita, y en 512 MB el que muere suele ser por memoria → `OcrEngineFailed`.
+- Dos `start()` superpuestos (ómnibus, otro modo, ómnibus, dentro de un armado en frío) lanzaban
+  **dos juegos de hilos** sobre la cámara → `start()` entero bajo el lock (RLock).
+- Salir de ómnibus durante un armado en frío **no lo cancelaba** → `_wanted`, que `stop()` baja sin
+  esperar el lock; el core llama a `stop` siempre que se sale de ómnibus.
+
+Más: el proceso se registra antes de arrancar (el apagado lo puede cortar), espera tras dos caídas
+en 60 s, `is_available` sólo localiza paquetes (`find_spec`). Codex no corrió (modelo no habilitado
+para la cuenta) y haiku cortó por el límite de gasto. **Queda sin aplicar** una propuesta: que un
+segundo `start` no espere el lock — lo toma también `warm_up`, y sin esperar nadie arrancaría el modo.
+
+Repetido el arranque en frío con el código revisado: **ninguna lectura lenta** (140–200 ms todas),
+OCR listo a los 44 s del arranque, modo ómnibus a 15 fps.
+
 ### Pendientes
 
 - Repetir el escenario A con el teléfono.
+- **`Camera frontend has timed out!` unos 5 s después de bajar el AP**, dos veces hoy (11:09 y
+  19:43). En uso real el AP no se baja y el arreglo del 2026-09-23 recupera la cámara, pero apunta a
+  algo (¿caída de tensión al cambiar el modo de la WiFi?).
 - `CentralWatcher` no registra la **primera** conexión de una dirección nueva: llega como
   `InterfacesAdded`, no como `PropertiesChanged`. Diagnóstico, no funcionalidad.
 - El cartel de la WiFi volvió en A y B: con la placa apagada el iPhone vuelve a la red de casa y no
