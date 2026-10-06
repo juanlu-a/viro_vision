@@ -3558,3 +3558,24 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 
 ### Suelto
 - Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
+
+## 2026-10-06 — La batería de la placa llega a la app
+
+- **Pedido**: con la UPS HAT (C) y su LiPo conectadas, ver el porcentaje de batería en la pestaña
+  Dispositivo.
+- **La app ya estaba lista** (`DeviceSummary` muestra `status.battery` como texto y barra, y anuncia
+  «batería baja» por debajo de 20 %); el hueco era el daemon, que publicaba `battery: null` a propósito.
+- **I2C estaba apagado**: `dtparam=i2c_arm=on` venía comentado en `config.txt` y no había `/dev/i2c-1`.
+  Se habilitó en la placa (más `i2c-dev` en `modules-load.d`) y quedó en `setup.sh`. Escaneando el bus
+  aparece **un solo dispositivo, 0x43**: el INA219 en la dirección que dice Waveshare.
+- **`battery.py`**: sólo **lee** el registro de tensión (nunca escribe la calibración, así una placa sin
+  HAT o el emulador no quedan mal configurados). El porcentaje sale de la **curva de descarga de una
+  LiPo**, no del `(V − 3) / 1,2` lineal de Waveshare, que en la meseta de 3,75–3,85 V decía 60 % donde
+  hay ~35 %. Suavizado exponencial (0,3 por lectura de 15 s) para que el pico de consumo de la cámara no
+  haga saltar el número. Sin HAT o sin `smbus2` → `null` («todavía sin informar»), nunca 0.
+- **Medido en la placa**: 4,16 V → **96 %**, con +56 mA por el shunt (probablemente cargando por USB).
+- **Pendientes**: confirmar el signo de la corriente (desenchufar el USB y ver que se vuelve negativa) y,
+  con eso, publicar `charging` para que la app no diga «96 %» de una celda que sólo marca alto porque
+  está cargando; calibrar la curva contra una descarga real con el medidor USB; anunciar la batería por
+  voz al conectar.
+

@@ -19,9 +19,10 @@ apt-get update -qq
 # alsa-utils + mpg123: playing the reading the phone sends back (`audio.py`). alsa-utils brings
 # `aplay` (WAV) and `amixer`; mpg123 decodes the MP3 the app actually sends. Without mpg123 the audio
 # arrives at the device and is never heard, which is exactly the failure this closed.
+# python3-smbus2: reading the UPS HAT's INA219 over I2C for the battery level (`battery.py`).
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
   bluez python3-venv python3-pip python3-picamera2 python3-gpiozero python3-lgpio \
-  alsa-utils mpg123 python3-opencv imx500-all imx500-tools git
+  alsa-utils mpg123 python3-smbus2 python3-opencv imx500-all imx500-tools git
 
 echo "→ venv (with the system packages, because of picamera2)"
 if [ ! -d "$INSTALL_DIR/.venv" ]; then
@@ -41,6 +42,13 @@ for wheel in "$INSTALL_DIR"/wheels/*.whl; do
   "$INSTALL_DIR/.venv/bin/pip" install -q --no-deps --force-reinstall "$wheel" ||
     echo "WARNING: could not install $wheel"
 done
+
+echo "→ I2C on, for the battery"
+# Raspberry Pi OS Lite ships it commented out, and without /dev/i2c-1 `status` reports the battery as
+# null forever with the HAT plugged in (2026-10-06). Takes effect on the next boot.
+sed -i 's/^#dtparam=i2c_arm=on/dtparam=i2c_arm=on/' /boot/firmware/config.txt
+grep -q '^dtparam=i2c_arm=on' /boot/firmware/config.txt || echo 'dtparam=i2c_arm=on' >> /boot/firmware/config.txt
+echo i2c-dev > /etc/modules-load.d/i2c.conf
 
 echo "→ Bluetooth: powered on and with the adapter's power saving off"
 # Through sysfs: the `rfkill` binary is not installed on Raspberry Pi OS Lite. The unit repeats this on

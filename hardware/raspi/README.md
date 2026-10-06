@@ -192,7 +192,7 @@ Servicio `4380c500-7ca3-4e37-b27d-f60e8d8d73d1`. Copiado a mano en
 | `control` | 02 | write · write w/o response | JSON con `cmd` (abajo) |
 | `event` | 03 | notify | JSON ≤ 180 bytes |
 | `transfer` | 04 | notify | binario: header 4 B (`seq` u16 LE, `total` u16 LE) + datos |
-| `status` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `battery` (null), `camera`, `wifi`, `ip`, `port`, `ap` |
+| `status` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `battery` (0-100 del UPS HAT; null sin HAT), `camera`, `wifi`, `ip`, `port`, `ap` |
 | `wifi` | 06 | read | JSON `{ssid, password, ip, port}` del punto de acceso; la app se une sola con esto |
 
 Comandos de `control`:
