@@ -11,6 +11,7 @@ import asyncio
 import logging
 from pathlib import Path
 import signal
+import sys
 
 from bluez_peripheral.advert import Advertisement
 from bluez_peripheral.agent import NoIoAgent
@@ -240,6 +241,30 @@ async def _main(args: argparse.Namespace) -> None:
     await advert.register(bus, adapter)
     log.info("advertising \"%s\" with service %s (camera: %s)", args.name, SERVICE_UUID, "starting" if wants_camera else "no")
 
+    async def _warm_ocr_cache() -> None:
+        """Builds the OCR once in a throwaway process, only to pull its files into the page cache.
+
+        Building it in this process on a cold boot froze the whole daemon for ~17 s right after it
+        started advertising (2026-10-06): an executor does not help, because loading OpenCV,
+        onnxruntime and the ONNX models holds the GIL, and on a cold SD most of that time is waiting
+        for the card. A phone that connected then got no answer to its first GATT read and iOS
+        dropped the link after 30 s. Done first in another process — at the lowest disk and CPU
+        priority, so nothing else queues behind it — the build here finds everything in memory and
+        holds the GIL for seconds, not tens of seconds.
+        """
+        started = loop.time()
+        try:
+            child = await asyncio.create_subprocess_exec(
+                "ionice", "-c3", "nice", "-n19", sys.executable, "-c",
+                "from bus_banner.ocr import create_ocr; from bus_banner.pipeline import Pipeline; "
+                "from bus_banner.tracking import Tracker; create_ocr('rapid')",
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )
+            await child.wait()
+        except Exception as exc:  # noqa: BLE001 — only a cache warm-up: the real build still runs
+            log.warning("could not pre-load the OCR in a separate process: %s", exc)
+        log.info("OCR files pre-loaded in %.1f s", loop.time() - started)
+
     # Discoverable first, everything slow after (2026-10-05). The camera and the AP each take from
     # seconds to a minute, and the phone can connect meanwhile: `status` says what is not up yet and
     # is pushed again the moment each one is.
@@ -249,9 +274,10 @@ async def _main(args: argparse.Namespace) -> None:
         service.notify_status()
         if bus_watcher is None:
             return
-        if not bus_watcher.available:
+        if not await loop.run_in_executor(None, lambda: bus_watcher.available):
             log.warning("bus mode unavailable: no detector in the sensor or the reading half is not installed")
             return
+        await _warm_ocr_cache()
         # Loading the OCR takes tens of seconds (two ONNX models). Doing it now, while the user is not
         # waiting, is what makes the button answer in a second later. Unless they already pressed it:
         # then the mode starts right away and `start` builds the OCR itself.
