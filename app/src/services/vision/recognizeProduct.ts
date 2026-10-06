@@ -49,6 +49,8 @@ export async function recognizeProduct(options: {
   model?: ModelProfile;
   /** Called when a slot has to be waited for, with the estimated milliseconds, so it can be announced. */
   onWait?: (waitMs: number) => void;
+  /** The longest quota wait worth starting; past it a `VisionQuotaError` is thrown (`rateLimiter.ts`). */
+  maxWaitMs?: number;
   signal?: AbortSignal;
 }): Promise<ProductRecognition> {
   const model = options.model ?? PRODUCT_MODEL;
@@ -78,6 +80,7 @@ export async function recognizeProduct(options: {
     signal: options.signal,
     maxPerWindow: perMinuteLimit(model.provider),
     onWait: options.onWait,
+    maxWaitMs: options.maxWaitMs,
   });
   if (options.signal?.aborted) throw new VisionStreamError('cancelled');
 

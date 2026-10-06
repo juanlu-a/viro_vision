@@ -2,6 +2,7 @@
  * The clock and the wait are injected in every case: a test relying on the real `Date.now()` and
  * `setTimeout` would have to wait an actual minute to exercise the sliding window.
  */
+import { VisionQuotaError } from './errors';
 import { acquireSlot, remainingSlots, resetRateLimiter } from './rateLimiter';
 
 afterEach(resetRateLimiter);
@@ -103,5 +104,19 @@ describe('acquireSlot', () => {
 describe('remainingSlots', () => {
   it('starts with the whole window available', () => {
     expect(remainingSlots('model', 1_000_000)).toBe(17);
+  });
+});
+
+describe('acquireSlot with a wait cap', () => {
+  // The bug of 2026-10-06: a 45 s wait announced inside a 12 s reading deadline could never finish.
+  it('throws an exhausted quota instead of starting a wait longer than the cap', async () => {
+    resetRateLimiter();
+    const now = () => 0;
+    await acquireSlot('capped', { now, maxPerWindow: 1 });
+    let waits = 0;
+    await expect(
+      acquireSlot('capped', { now, maxPerWindow: 1, maxWaitMs: 5_000, onWait: () => (waits += 1) })
+    ).rejects.toBeInstanceOf(VisionQuotaError);
+    expect(waits).toBe(0);
   });
 });

@@ -9,6 +9,7 @@
  * It uses `Date.now()` on purpose, not `performance.now()`: the quota window is wall-clock time on
  * the server side, not a measured duration.
  */
+import { VisionQuotaError } from './errors';
 import type { VisionProviderId } from './types';
 
 /** The quota window. */
@@ -59,6 +60,14 @@ export interface SlotOptions {
   maxPerWindow?: number;
   /** Injectable wait for tests: otherwise a window test would take a real minute. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * The longest wait worth starting. Past it, `acquireSlot` throws `VisionQuotaError` at once
+   * instead of announcing a wait that the caller's own deadline is going to cut short: before
+   * 2026-10-06 a 45 s wait was announced ("Sigo en 45 s") and 12 s later the reading deadline
+   * aborted it with "Tardó demasiado" — the wait could never finish, and the user heard two
+   * contradictory sentences for one press.
+   */
+  maxWaitMs?: number;
 }
 
 /** Sleeps `ms`, or cuts short when the run is cancelled. */
@@ -105,6 +114,9 @@ export async function acquireSlot(modelId: string, options: SlotOptions = {}): P
 
     // We have to wait for the oldest timestamp to leave the window.
     const waitMs = WINDOW_MS - (t - recent[0]) + 250;
+    if (options.maxWaitMs !== undefined && waitMs > options.maxWaitMs) {
+      throw new VisionQuotaError('local window full', Math.ceil(waitMs / 1000));
+    }
     options.onWait?.(waitMs);
     await sleep(waitMs);
   }

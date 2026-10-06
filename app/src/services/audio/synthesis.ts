@@ -19,11 +19,12 @@
  * accessibility to be the design criterion and not a layer — the file exists for hardware that does
  * not exist yet, and it cannot degrade what works today.
  */
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 
 import { isProxyConfigured, proxyUrl, resolveTransport } from '@/services/cloud';
 import type { CloudRequest } from '@/services/cloud';
+import { cacheFolder } from '@/services/storage/cacheFolder';
 
 import { SpeechNotConfiguredError, SpeechHttpError } from './errors';
 
@@ -124,6 +125,7 @@ export function speechFileName(when: Date): string {
 export async function synthesizeToFile(
   text: string,
   when: Date = new Date(),
+  signal?: AbortSignal,
 ): Promise<string> {
   if (!isSynthesisEnabled) throw new SpeechNotConfiguredError('AUDIO_FILE_DISABLED');
   // With the proxy on, the server supplies the key, so not having it here is not a problem.
@@ -136,6 +138,7 @@ export async function synthesizeToFile(
     method: 'POST',
     headers: request.headers,
     body: JSON.stringify(request.body),
+    signal,
   });
 
   if (!response.ok) {
@@ -145,8 +148,8 @@ export async function synthesizeToFile(
   // The endpoint returns the MP3 as binary, not base64: bytes have to be written, not a string.
   const bytes = new Uint8Array(await response.arrayBuffer());
 
-  const folder = new Directory(Paths.cache, FOLDER);
-  if (!folder.exists) folder.create({ idempotent: true });
+  // The previous one may still be playing on the device; older ones are never read again.
+  const folder = cacheFolder(FOLDER, 1);
 
   const file = new File(folder, speechFileName(when));
   file.create({ overwrite: true });

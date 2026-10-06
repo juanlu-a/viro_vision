@@ -10,9 +10,10 @@
  * **The size is set by the device**: if it ever captures larger, that is paid in transport and in
  * tokens without gaining accuracy. The place to fix it is `hardware/raspi/virovision/camera.py`.
  */
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 
 import { encodeBase64 } from '@/services/ble/base64';
+import { cacheFolder } from '@/services/storage/cacheFolder';
 import { HttpDownloadError, deviceUrl } from '@/services/wifi/deviceHttp';
 
 const FOLDER = 'device-photos';
@@ -39,8 +40,8 @@ interface Deps {
 }
 
 function saveToCache(bytes: Uint8Array): string {
-  const folder = new Directory(Paths.cache, FOLDER);
-  if (!folder.exists) folder.create({ idempotent: true });
+  // The previous photo is kept: it is still on screen until this one replaces it.
+  const folder = cacheFolder(FOLDER, 1);
   const file = new File(folder, `device-${Date.now()}.jpg`);
   file.create({ overwrite: true });
   file.write(bytes);

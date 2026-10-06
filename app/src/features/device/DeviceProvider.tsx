@@ -61,7 +61,7 @@ interface DeviceValue {
   writeAudioTarget: (target: AudioOutput) => Promise<void>;
   downloadPhoto: (options?: { timeoutMs?: number }) => Promise<DevicePhoto>;
   /** Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. */
-  sendAudio: (uri: string) => Promise<boolean>;
+  sendAudio: (uri: string, signal?: AbortSignal) => Promise<boolean>;
 }
 
 const DeviceContext = createContext<DeviceValue | null>(null);
@@ -457,7 +457,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const sendAudio = useCallback(
-    async (uri: string): Promise<boolean> => {
+    async (uri: string, signal?: AbortSignal): Promise<boolean> => {
       if (!photoAvailable || !address) return false;
       try {
         const { File } = await import('expo-file-system');
@@ -468,6 +468,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'audio/mpeg', 'X-Encoding': 'base64' },
           body: encodeBase64(bytes),
+          signal,
         });
         if (!r.ok) record('audio.send', { detail: { sent: false, status: r.status } });
         return r.ok;

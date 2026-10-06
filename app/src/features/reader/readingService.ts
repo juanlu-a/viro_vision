@@ -70,6 +70,9 @@ export const READING_DEADLINE_MS = 12_000;
 /** The photo cannot have the whole budget: 4 s is ~80× the measured 46 ms over the device's AP. */
 const PHOTO_TIMEOUT_MS = 4_000;
 
+/** Synthesis + POST to the device's speaker. Past it the phone says the reading instead. */
+const DEVICE_DELIVERY_TIMEOUT_MS = 8_000;
+
 export interface ReaderState {
   mode: Mode;
   status: 'idle' | 'preparing' | 'reading';
@@ -107,7 +110,7 @@ const initialState: ReaderState = {
 export interface ReaderDeps {
   getModel(): ModelProfile | null;
   downloadPhoto(options?: { timeoutMs?: number }): Promise<DevicePhoto>;
-  sendAudio(uri: string): Promise<boolean>;
+  sendAudio(uri: string, signal?: AbortSignal): Promise<boolean>;
   writeMode(mode: Mode): Promise<void>;
   /**
    * Whether the device can receive audio right now (connected, on its network, answering). Asked
@@ -188,22 +191,30 @@ function errorMessage(err: unknown): string {
  */
 async function sendReadingToDevice(text: string): Promise<boolean> {
   const t0 = Date.now();
+  // Bounded, because nothing else bounds it: this leg runs after the reading deadline was already
+  // cleared, and a POST to a phone that just left the device's AP hangs until the OS gives up. Until
+  // 2026-10-06 that kept `reading` true and the session open, and every press meanwhile was dropped
+  // as "already reading". On abort the phone speaks instead.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEVICE_DELIVERY_TIMEOUT_MS);
   try {
-    const uri = await synthesizeToFile(text);
+    const uri = await synthesizeToFile(text, new Date(), controller.signal);
     // The call to the cloud TTS, measured separately from the send: they are two things that fail
     // for different reasons and take time for different reasons, and together they look like a
     // single "it was slow". Same criterion as separating the photo's ms from the pipeline's.
     record('audio.synthesis', { ms: Date.now() - t0, detail: { characters: text.length } });
     const t1 = Date.now();
-    const sent = await deps.sendAudio(uri);
+    const sent = await deps.sendAudio(uri, controller.signal);
     record('audio.send', { ms: Date.now() - t1, detail: { sent } });
     return sent;
   } catch (err) {
     record('audio.send', {
       ms: Date.now() - t0,
-      detail: { sent: false, message: errorDetail(err) },
+      detail: { sent: false, timedOut: controller.signal.aborted, message: errorDetail(err) },
     });
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -343,7 +354,7 @@ async function readBus(uri: string): Promise<void> {
  * error type) and does not read; an exhausted quota says how long to wait — that field exists to be
  * read.
  */
-async function readSupermarket(image: CloudImage, signal: AbortSignal): Promise<void> {
+async function readSupermarket(image: CloudImage, signal: AbortSignal, deadlineAt: number): Promise<void> {
   const chosen = deps.getModel();
   if (!chosen) {
     record('reading.failed', { detail: { mode: 'supermarket', stage: 'model', reason: 'no model configured' } });
@@ -360,6 +371,9 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal): Promise<
       model: chosen,
       ...image,
       signal,
+      // A quota wait longer than what is left of the deadline is not announced: it could never
+      // finish. It fails at once as an exhausted quota, which says how long to wait instead.
+      maxWaitMs: Math.max(0, deadlineAt - Date.now()),
       // The quota wait is announced. The limiter already handled it, but silently: for someone who
       // cannot see the screen, an app that sleeps for up to a minute is indistinguishable from a
       // frozen one.
@@ -479,7 +493,7 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
 
     try {
       if (mode === 'bus') await readBus(photo.uri);
-      else await readSupermarket(photo.image, controller.signal);
+      else await readSupermarket(photo.image, controller.signal, t0 + READING_DEADLINE_MS);
     } catch (err) {
       const timedOut = controller.signal.aborted;
       record('reading.failed', {
