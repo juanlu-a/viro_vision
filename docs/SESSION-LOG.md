@@ -3656,3 +3656,35 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   `expo-glass-effect`) — sacarlas cambia el build nativo; el botón de leer en modo ómnibus corre OCR
   en el teléfono y descarga ~250 MB la primera vez; anunciar la batería baja por voz; selector de
   modelo y de salida duplicados (`RadioSheet`); la AP con contraseña fija en el repo.
+
+## 2026-10-06 (cont. 5) — El ómnibus se detecta bien; la línea y el destino, no: sólo se dice lo que el catálogo conoce
+
+- **Prueba de campo** (fotos de ómnibus en el celular delante de la cámara): la detección del
+  ómnibus anduvo siempre, pero la línea y el destino salían mal o **deletreados**. Sólo la foto
+  nítida de la 330 Mendoza se leyó bien.
+- **El journal lo explica, y no es la cámara**: los carteles llegan al OCR con unos 30 px de alto de
+  texto y con moiré de pantalla, así que muchas lecturas son basura (`1M12 MITEUE`, `U2 NOEVR`). Lo
+  que fallaba era la decisión: (1) un número que no existe se votaba a medio voto y cuatro lecturas
+  de `1M12` sumaban «Bus 1»; (2) un destino que el catálogo no reconocía se anunciaba **tal cual**, y
+  el TTS no puede hacer otra cosa con `U2 NOEVR` que deletrearlo; (3) la regla del ícono pegado
+  recortaba dígitos hasta encontrar una línea (`92` → línea 2).
+- **Arreglo en `bus-banner-recognizer`, PR #5** (apilado sobre el #4): sólo se dice lo que el
+  catálogo conoce. Destino sin coincidencia → no se dice (queda en `raw`); línea inexistente → no se
+  dice; la regla del ícono saca un solo dígito. La coincidencia aproximada mejoró (dígitos por letras
+  en palabras, sin espacios: `MEMID0ZAE` y `ME MDOZA E` son MENDOZA) con resguardos contra elegir un
+  destino real pero equivocado (mínimo 4 letras, margen de 0,05 sobre el mejor lugar *distinto*, las
+  variantes ortográficas del mismo lugar no compiten). `FUERA DE SERVICIO` se sumó al catálogo.
+- **Medido** (`bus-banner evaluate`, 117 imágenes): destino **76,8 % → 89,3 %**, lectura completa
+  87,5 % → 89,6 %, número igual (89,6 %). Revisión multi-modelo en tres rondas hasta no dejar críticos
+  ni mayores; dos de las rondas encontraron fallas reales de la primera versión (las variantes del
+  mismo lugar se anulaban entre sí: 41 de 257 destinos dejaban de reconocerse).
+- **Desplegado en la placa** (`b08a8c4`), con el catálogo nuevo en `~/models/catalog_stm.csv`
+  (respaldo `.bak-20261006`).
+
+### Pendientes
+- **Volver a probar** con las mismas fotos: lo esperable es menos anuncios con destino, pero ninguno
+  inventado ni deletreado.
+- El techo real es la **resolución del cartel**: ~30 px de alto en un cuadro de 1024 px. Probar un
+  stream principal más grande o un recorte del cartel a resolución completa del sensor, midiendo el
+  costo en la Zero 2 W.
+- Probar con un ómnibus de verdad: el moiré de una pantalla fotografiada no es el de un LED.
