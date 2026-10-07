@@ -3637,15 +3637,20 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   sensor`). Y el relay de logs anduvo de punta a punta: los dos avisos del reinicio llegaron por BLE
   como `{t:'log', lvl:'error'|'warning', src:'bus'}`.
 
+- **Funciones desplegadas desde la rama, antes del merge** (`telemetry` y `vision`, `--use-api`).
+  `telemetry` probada con un lote de tres eventos, uno con `at` inválido: `{"stored":2,"dropped":1}`
+  (antes el malo tiraba el lote entero); JSON roto → 400. Las filas de prueba (`phone =
+  'deploy-check'`) se borraron. `vision` responde 405/400 como antes.
+
 ### Pendientes de esta sesión
+- **La cabecera de IP de `vision`** sigue sin verificar (`cf-connecting-ip` / `x-real-ip`): hace
+  falta loguearlas un momento y pegarle desde el teléfono y con un `curl` que las falsifique.
 - **Detecciones después del reinicio**: en la prueba no había nada delante de la cámara (0
   detecciones antes y después), así que falta confirmar que el detector del sensor sigue detectando
   con el handle del IMX500 reutilizado: repetir con un cartel o un ómnibus en pantalla delante de la
   cámara. Si vuelven frames sin detecciones, el fallback es `self._imx500 = None` en `_restart`.
 - Reiniciar el daemon con el teléfono conectado y ver `device.log` en la tabla; `systemctl stop` con
   NetworkManager lento.
-- **Desplegar las dos funciones** (`telemetry`, `vision`) y verificar qué cabecera de IP llega
-  (`cf-connecting-ip` / `x-real-ip`), como dice el docblock de `vision`.
 - **Sin tocar, a decidir**: `features/auth` y `services/supabase` no se montan en ningún lado
   (login planeado); dependencias que nadie importa (`@expo/ui`, `expo-device`, `expo-web-browser`,
   `expo-glass-effect`) — sacarlas cambia el build nativo; el botón de leer en modo ómnibus corre OCR
