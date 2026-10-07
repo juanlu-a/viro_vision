@@ -3629,11 +3629,21 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   código muerto (`storage/settings.ts`, `text-field.tsx`, el `reset-project` de la plantilla de Expo,
   cadenas sin uso).
 
+- **Probado en la placa (Zero 2 W, 21:17)**: daemon de la rama desplegado (respaldo en
+  `~/virovision/virovision.old-20261006-211301`). Nuevo comando BLE `restart_camera` +
+  `tools/restart_camera.py` para forzar el reinicio, que hasta ahora sólo pasaba si la cámara fallaba.
+  En modo ómnibus: 76 frames cada 5 s → `restart_camera` → **frames otra vez a los 1,5 s**, 75-77 cada
+  5 s durante el minuto siguiente, **sin recargar el `.rpk`** (no aparece `detector loaded into the
+  sensor`). Y el relay de logs anduvo de punta a punta: los dos avisos del reinicio llegaron por BLE
+  como `{t:'log', lvl:'error'|'warning', src:'bus'}`.
+
 ### Pendientes de esta sesión
-- **Probar en la placa** lo que no se pudo probar acá: forzar un reinicio de la cámara en modo
-  ómnibus y ver que siguen llegando detecciones (se reutiliza el handle del IMX500; si vuelven frames
-  sin detecciones, el fallback es `self._imx500 = None` en `_restart`); reiniciar el daemon con el
-  teléfono conectado y ver `device.log` en la tabla; `systemctl stop` con NetworkManager lento.
+- **Detecciones después del reinicio**: en la prueba no había nada delante de la cámara (0
+  detecciones antes y después), así que falta confirmar que el detector del sensor sigue detectando
+  con el handle del IMX500 reutilizado: repetir con un cartel o un ómnibus en pantalla delante de la
+  cámara. Si vuelven frames sin detecciones, el fallback es `self._imx500 = None` en `_restart`.
+- Reiniciar el daemon con el teléfono conectado y ver `device.log` en la tabla; `systemctl stop` con
+  NetworkManager lento.
 - **Desplegar las dos funciones** (`telemetry`, `vision`) y verificar qué cabecera de IP llega
   (`cf-connecting-ip` / `x-real-ip`), como dice el docblock de `vision`.
 - **Sin tocar, a decidir**: `features/auth` y `services/supabase` no se montan en ningún lado
