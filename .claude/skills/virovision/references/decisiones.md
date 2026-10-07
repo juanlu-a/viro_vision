@@ -257,6 +257,20 @@ en ámbar (token `warning`), y nada más. Inicio muestra sólo el nombre del mod
 **Qué NO cambió**: la paleta clara sigue en `colors.js` y verificada por `theme.test.ts`, porque es
 la del manual y la usa la tesis. Nadie la renderiza.
 
+### ADR 0011 — Los errores van a la telemetría, nunca al usuario · **Accepted (2026-10-06)**
+
+Antes, el texto de un error llegaba a la pantalla y a la voz (`VISION_HTTP_500`, la IP de la placa,
+`unknown command: say`), y muchos errores no llegaban a ningún lado (`console.*`, promesas sin
+`catch`, errores de dibujo, el journal de la placa). **Qué cambió**: el texto de un error va **sólo**
+a `events` (acotado con `errorDetail()`); al usuario le llega una frase fija de `es.ts` que dice qué
+hacer, o nada si es una falla interna (avisos de la placa, escritura de modo). Se capturan
+`console.*` (`app.log`), rechazos sin manejar, errores de dibujo (`ErrorBoundary` raíz →
+`app.renderError`) y los logs WARNING+ de la placa (`log_relay.py` → `{t:'log'}` → `device.log`).
+
+**Qué NO cambió**: ante una lectura fallida **algo se dice** — el silencio tras el botón es
+indistinguible de un dispositivo roto. **Regla para código nuevo**: nunca concatenar `err.message`
+en una cadena que el usuario ve u oye; `record(...)` con `errorDetail(err)` y una clave de `es.ts`.
+
 ## Decisiones sin ADR, pero vigentes
 
 **Ojo al medir cualquier cosa contra estas APIs: hay que espaciar las corridas.** Sostener pedidos

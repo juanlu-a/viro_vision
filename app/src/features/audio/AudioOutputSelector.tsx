@@ -72,7 +72,7 @@ export function AudioOutputSelector() {
     // cannot reach the board in this build, and there is no clip for it — the board saying "en el
     // dispositivo" and then being unable to read anything is worse than saying it from the phone.
     if (value === 'device' && !isSynthesisEnabled) {
-      announce(`${strings.settings.audioOutputSetToDevice} ${strings.settings.audioOutputNotConfigured}`);
+      void announce(`${strings.settings.audioOutputSetToDevice} ${strings.settings.audioOutputNotConfigured}`);
       return;
     }
     void notify(value === 'device' ? 'outputSetToDevice' : 'outputSetToPhone');

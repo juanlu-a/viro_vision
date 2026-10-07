@@ -403,7 +403,7 @@ def test_a_silent_camera_is_reopened_by_the_watchdog():
     camera = SilentCamera()
     watcher = BusWatcher(camera, lambda files: None, lambda event: None)
     watcher._last_frame_at = time.monotonic()
-    threading.Thread(target=watcher._watchdog, daemon=True).start()
+    threading.Thread(target=watcher._watchdog, args=(watcher._stop,), daemon=True).start()
     try:
         watcher._last_frame_at -= FRAME_SILENCE_S + 1  # as if the camera had been quiet that long
         deadline = time.monotonic() + 5
@@ -475,9 +475,9 @@ def test_asked_to_watch_too_early_the_device_says_so(tmp_path):
 
     watcher = BusWatcher(Camera(), lambda files: order.append(("said", list(files))), lambda e: order.append(("event", e)), announcements=tmp_path)
     watcher._build = lambda: order.append(("built", None))
-    watcher._frame_loop = lambda: None
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: None
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     with patch("virovision.bus.is_available", return_value=True):
         assert watcher.start()
     watcher.stop()
@@ -514,9 +514,9 @@ def test_a_board_without_the_warming_clip_still_starts(tmp_path):
 
     watcher = BusWatcher(Camera(), lambda files: said.append(list(files)), lambda e: None, announcements=tmp_path)
     watcher._build = lambda: None
-    watcher._frame_loop = lambda: None
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: None
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     with patch("virovision.bus.is_available", return_value=True):
         assert watcher.start()
     watcher.stop()
@@ -532,9 +532,9 @@ def test_once_warm_the_notice_is_not_said_again(tmp_path):
     said = []
     watcher = BusWatcher(Camera(), lambda files: said.append(list(files)), lambda e: None, announcements=tmp_path)
     watcher._build = lambda: None
-    watcher._frame_loop = lambda: None
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: None
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     watcher._pipeline = object()  # as `warm_up` leaves it
     assert watcher.ready
     with patch("virovision.bus.is_available", return_value=True):
@@ -682,9 +682,9 @@ def test_two_overlapping_starts_launch_one_set_of_threads(tmp_path):
         watcher._pipeline = object()
 
     watcher._build = slow_build
-    watcher._frame_loop = lambda: launched.append("frames")
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: launched.append("frames")
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     with patch("virovision.bus.is_available", return_value=True):
         first = threading.Thread(target=watcher.start)
         first.start()
@@ -712,9 +712,9 @@ def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path)
         watcher._pipeline = object()
 
     watcher._build = slow_build
-    watcher._frame_loop = lambda: launched.append("frames")
-    watcher._read_loop = lambda: None
-    watcher._watchdog = lambda: None
+    watcher._frame_loop = lambda *_: launched.append("frames")
+    watcher._read_loop = lambda *_: None
+    watcher._watchdog = lambda *_: None
     result = []
     with patch("virovision.bus.is_available", return_value=True):
         first = threading.Thread(target=lambda: result.append(watcher.start()))
@@ -726,3 +726,126 @@ def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path)
     assert launched == []
     assert not watcher.running
 
+
+
+def test_the_frame_loop_survives_a_camera_restart_and_a_bad_frame(monkeypatch):
+    """2026-10-06. A restart —the watchdog's, or a phone photo that timed out— closes the camera
+    under the frame loop, and that is what unblocks `capture_request`: with an error. The loop used
+    to return there, with `running` still True, so nothing drained the camera again and the watchdog
+    reopened it every 12 s for good. It also kept the sensor handle from before the restart. And one
+    frame whose processing raised ended the mode the same silent way."""
+    import virovision.bus as bus_module
+
+    monkeypatch.setattr(bus_module, "CAMERA_RETRY_S", 0.01)
+    released, sensors_used, processed = [], [], []
+
+    class Request:
+        def __init__(self, n):
+            self.n = n
+
+        def get_metadata(self):
+            return {"n": self.n}
+
+        def make_array(self, name):
+            return f"frame {self.n}"
+
+        def release(self):
+            released.append(self.n)
+
+    class Sensor:
+        def __init__(self, name):
+            self.name = name
+
+        def get_outputs(self, metadata):
+            sensors_used.append(self.name)
+            return metadata
+
+        def get_input_size(self):
+            return (640, 640)
+
+    class RestartingCamera:
+        def __init__(self):
+            self.sensor = Sensor("before")
+            self.calls = 0
+
+        def capture_request(self):
+            self.calls += 1
+            if self.calls == 2:
+                self.sensor = Sensor("after")  # what a restart leaves behind
+                raise RuntimeError("Camera frontend has timed out")
+            if self.calls == 3:
+                raise RuntimeError("camera not started")  # still reopening
+            if self.calls > 7:
+                watcher._stop.set()  # the user left bus mode
+                raise RuntimeError("closed by stop")
+            return Request(self.calls)
+
+        def to_stream(self, coords, metadata):
+            return (0, 0, 1, 1)
+
+    def detections_from_tensors(outputs, labels, **kwargs):
+        if outputs["n"] == 5:
+            raise ValueError("a tensor of the wrong shape")
+        return []
+
+    class FakeWatcher:
+        tracker = types.SimpleNamespace(tracks=[])
+
+        def process(self, frame, detections, frame_number):
+            processed.append(frame_number)
+            return []
+
+    imx500 = types.ModuleType("bus_banner.imx500")
+    imx500.detections_from_tensors = detections_from_tensors
+    monkeypatch.setitem(sys.modules, "bus_banner", types.ModuleType("bus_banner"))
+    monkeypatch.setitem(sys.modules, "bus_banner.imx500", imx500)
+
+    watcher = BusWatcher(RestartingCamera(), lambda files: None, lambda event: None)
+    watcher._watcher = FakeWatcher()
+    watcher._settings = {"labels": ["bus_sign"], "normalize": False, "order": None}
+    thread = threading.Thread(
+        target=watcher._frame_loop,
+        args=(watcher._stop, watcher._jobs, watcher._results, watcher._watcher),
+        daemon=True,
+    )
+    thread.start()
+    thread.join(5)
+
+    assert not thread.is_alive(), "the loop ends when the mode is left, and only then"
+    assert released == [1, 4, 5, 6, 7], "every request is released, the bad frame's included"
+    assert sensors_used[0] == "before" and set(sensors_used[1:]) == {"after"}, "the handle after the restart"
+    assert len(processed) == 4, "the bad frame is skipped, the rest are watched"
+
+
+
+def test_a_frame_released_after_stop_is_not_processed(monkeypatch):
+    """A frame loop blocked in the camera past `stop`'s 3 s join used to process the frame it finally
+    got — and could announce a bus after the user had left bus mode (2026-10-06)."""
+    released, processed = [], []
+
+    class Request:
+        def release(self):
+            released.append(1)
+
+    class LateCamera:
+        sensor = object()
+
+        def capture_request(self):
+            watcher._stop.set()  # the user left while this call was blocked
+            return Request()
+
+    class FakeWatcher:
+        tracker = types.SimpleNamespace(tracks=[])
+
+        def process(self, *args):
+            processed.append(args)
+            return []
+
+    imx500 = types.ModuleType("bus_banner.imx500")
+    imx500.detections_from_tensors = lambda *a, **kw: []
+    monkeypatch.setitem(sys.modules, "bus_banner", types.ModuleType("bus_banner"))
+    monkeypatch.setitem(sys.modules, "bus_banner.imx500", imx500)
+    watcher = BusWatcher(LateCamera(), lambda files: None, lambda event: None)
+    watcher._watcher = FakeWatcher()
+    watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
+    assert released == [1] and processed == []

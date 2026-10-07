@@ -9,13 +9,13 @@
  * only moves bytes between ble-plx and that module.
  */
 import { Platform } from 'react-native';
-import { BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
+import { BleErrorCode, BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 
 import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, hushCommand, noticeCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 import { loadLastDeviceId, saveLastDeviceId } from '@/services/storage/lastDevice';
-import { record } from '@/services/telemetry';
+import { errorDetail, record } from '@/services/telemetry';
 
 import {
   encodeBase64,
@@ -23,7 +23,7 @@ import {
   decodeTextBase64,
 } from './base64';
 import { createSerializer } from './serialize';
-import { BleDeviceNotFoundError, BleNotConnectedError, type BleClient } from './bleClient';
+import { BleDeviceNotFoundError, BleNotConnectedError, BleRadioOffError, type BleClient } from './bleClient';
 
 const SCAN_TIMEOUT_MS = 15_000;
 /**
@@ -53,6 +53,8 @@ type DeviceEvent =
   | { t: 'read'; mode: number }
   | { t: 'ap'; on: boolean; minutes: number }
   | { t: 'error'; msg: string }
+  /** A daemon log line at WARNING or above, forwarded for telemetry only (2026-10-06). */
+  | { t: 'log'; lvl?: string; src?: string; msg?: string; drop?: number; ago?: number }
   | { t: 'warming' }
   | { t: 'bus' }
   | { t: 'result'; event: RecognitionEvent };
@@ -84,7 +86,10 @@ export function createBleClientPlx(): BleClient | null {
   let manager: BleManager;
   try {
     manager = new BleManager();
-  } catch {
+  } catch (err) {
+    // The app falls back to the stub and runs without the device: worth a row, or "Bluetooth never
+    // worked on this phone" has no explanation.
+    record('ble.failed', { detail: { stage: 'manager', message: errorDetail(err) } });
     return null;
   }
   return new BleClientPlx(manager);
@@ -93,14 +98,16 @@ export function createBleClientPlx(): BleClient | null {
 class BleClientPlx implements BleClient {
   private device: Device | null = null;
   /**
-   * Toda operación de característica pasa por acá, en el orden en que se pidió.
+   * Every characteristic operation goes through here, in the order it was requested.
    *
-   * El motivo completo está en `serialize.ts`: un aviso escrito sin `await` mientras la app leía la
-   * característica `wifi` dejaba al teléfono sin credenciales para unirse al AP. No cubre las
-   * notificaciones, que no son operaciones.
+   * The full reason is in `serialize.ts`: a notice written without `await` while the app read the
+   * `wifi` characteristic left the phone without credentials to join the AP. It does not cover
+   * notifications, which are not operations.
    */
   private readonly gatt = createSerializer();
   private subscriptions: Subscription[] = [];
+  /** Bumped every time the monitors are dropped; a callback from an older value is ignored. */
+  private link = 0;
   private readonly recognitionListeners = new Set<(event: RecognitionEvent) => void>();
   private readonly disconnectListeners = new Set<() => void>();
   private readonly statusListeners = new Set<(status: DeviceStatus) => void>();
@@ -114,9 +121,20 @@ class BleClientPlx implements BleClient {
   constructor(private readonly manager: BleManager) {}
 
   async connect(): Promise<DeviceInfo> {
+    // A second connect while linked (pull-to-refresh on the Device tab) used to stack a second set
+    // of monitors on top of the first: every event, mode and status then fired twice, and "connection
+    // lost" was said twice. The old subscriptions are dropped only once the new link is in hand: a
+    // reconnect that fails (radio off, scan timeout) must not make the client forget a link that is
+    // still alive and stop hearing about its drop.
     await this.waitForRadio();
     const device = await this.reach();
+    this.dropSubscriptions();
     this.device = device;
+    const link = this.link;
+    // In ble-plx `Subscription.remove()` does not cancel the native monitor: a superseded one can
+    // still call back — with a value, or with the error of its teardown. Only the current link's
+    // callbacks count.
+    const current = () => link === this.link;
     // Remembered so the next connection can skip the scan (see `services/storage/lastDevice`).
     void saveLastDeviceId(device.id);
 
@@ -130,20 +148,28 @@ class BleClientPlx implements BleClient {
         for (const listener of this.disconnectListeners) listener();
       }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.event, (error, c) => {
-        if (error || !c?.value) return;
+        if (!current()) return;
+        if (error) return this.monitorFailed('event', error);
+        if (!c?.value) return;
         this.receiveEvent(c.value);
       }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.status, (error, c) => {
-        if (error || !c?.value) return;
+        if (!current()) return;
+        if (error) return this.monitorFailed('status', error);
+        if (!c?.value) return;
         try {
           const status = JSON.parse(decodeTextBase64(c.value)) as DeviceStatus;
           for (const listener of this.statusListeners) listener(status);
-        } catch {
-          /* an unreadable status takes nothing down */
+        } catch (err) {
+          // An unreadable status takes nothing down, but it is recorded: a board whose status never
+          // parses looks, from here, exactly like a board that stopped sending it.
+          record('ble.event', { detail: { char: 'status', parsed: false, message: errorDetail(err) } });
         }
       }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.mode, (error, c) => {
-        if (error || !c?.value) return;
+        if (!current()) return;
+        if (error) return this.monitorFailed('mode', error);
+        if (!c?.value) return;
         const bytes = decodeBase64(c.value);
         if (bytes.length > 0) for (const listener of this.modeListeners) listener(bytes[0]);
       })
@@ -274,9 +300,9 @@ class BleClientPlx implements BleClient {
   }
 
   /**
-   * Calla el parlante de la placa. Sin respuesta y sin esperar: se manda justo antes de que el
-   * teléfono empiece a hablar, y un ack tardío no cambiaría nada — lo que importa es que el `aplay`
-   * de la placa reciba su `terminate` cuanto antes.
+   * Silences the board's speaker. Without a response and without waiting: it is sent right before
+   * the phone starts speaking, and a late ack would change nothing — what matters is that the
+   * board's `aplay` gets its `terminate` as soon as possible.
    */
   async hushDevice(): Promise<void> {
     const device = this.device;
@@ -309,9 +335,11 @@ class BleClientPlx implements BleClient {
       if (!c.value) return null;
       const data = JSON.parse(decodeTextBase64(c.value)) as Partial<WifiCredentials>;
       return data.ssid && data.password && data.ip ? { ssid: data.ssid, password: data.password, ip: data.ip, port: data.port ?? null } : null;
-    } catch {
+    } catch (err) {
       // Old firmware without the characteristic: the device offers no AP and the "same network" mode
-      // still works.
+      // still works. Recorded, because the same `null` also hides a read that failed on a board that
+      // HAS the characteristic — and then the user hears that the network failed with no reason.
+      record('ble.readFailed', { detail: { char: 'wifi', message: errorDetail(err) } });
       return null;
     }
   }
@@ -319,12 +347,14 @@ class BleClientPlx implements BleClient {
   // --- private ----------------------------------------------------------------------------------
 
   private async waitForRadio(): Promise<void> {
-    if ((await this.manager.state()) === State.PoweredOn) return;
+    let last: string = await this.manager.state();
+    if (last === State.PoweredOn) return;
     await withDeadline<void>(
       SCAN_TIMEOUT_MS,
-      () => new BleDeviceNotFoundError(),
+      () => new BleRadioOffError(last),
       (resolve) => {
         const sub = this.manager.onStateChange((s) => {
+          last = s;
           if (s === State.PoweredOn) resolve();
         }, true);
         return () => sub.remove();
@@ -359,8 +389,8 @@ class BleClientPlx implements BleClient {
         const device = await this.open(shortcut.id);
         record('ble.found', { detail: { via: shortcut.via } });
         return device;
-      } catch {
-        record('ble.found', { detail: { via: shortcut.via, failed: true } });
+      } catch (err) {
+        record('ble.found', { detail: { via: shortcut.via, failed: true, message: errorDetail(err) } });
       }
     }
     const found = await this.scan();
@@ -446,8 +476,9 @@ class BleClientPlx implements BleClient {
         this.manager.readCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.status)
       );
       return c.value ? (JSON.parse(decodeTextBase64(c.value)) as DeviceStatus) : null;
-    } catch {
+    } catch (err) {
       // Without a status there is still a connection: the screen shows "not reported", not an error.
+      record('ble.readFailed', { detail: { char: 'status', message: errorDetail(err) } });
       return null;
     }
   }
@@ -470,6 +501,22 @@ class BleClientPlx implements BleClient {
     switch (event.t) {
       case 'error':
         for (const listener of this.errorListeners) listener(event.msg);
+        break;
+      case 'log':
+        // The daemon's own warnings and errors, which otherwise live only in its journal. Straight
+        // to the table, never to a listener: nothing about them is for the user (2026-10-06).
+        record('device.log', {
+          detail: {
+            level: typeof event.lvl === 'string' ? event.lvl.slice(0, 16) : null,
+            source: typeof event.src === 'string' ? event.src.slice(0, 64) : null,
+            message: event.msg == null ? null : errorDetail(event.msg),
+            // How many lines the daemon's rate limit discarded before this one: a hole, made visible.
+            dropped: typeof event.drop === 'number' ? event.drop : 0,
+            // Set on lines buffered while no phone listened (boot, a reconnect): how old they are, so
+            // a boot failure is not read as a current one.
+            agoS: typeof event.ago === 'number' ? event.ago : null,
+          },
+        });
         break;
       case 'warming':
         for (const listener of this.warmingListeners) listener();
@@ -495,9 +542,27 @@ class BleClientPlx implements BleClient {
     }
   }
 
-  private cleanup(): void {
+  /**
+   * A notification stream that errored is dead: the board can keep notifying and nothing arrives.
+   * That is the "the button does nothing" case, and until 2026-10-06 the error was dropped. A stream
+   * torn down by our own `cleanup()` also errors, and that one is not news.
+   */
+  private monitorFailed(char: string, error: { message?: string; errorCode?: number }): void {
+    // A plain link drop errors every monitor before `onDeviceDisconnected` runs; that is `ble.lost`,
+    // already recorded, and three more rows per drop would bury the streams that really died.
+    if (!this.device || error.errorCode === BleErrorCode.DeviceDisconnected) return;
+    record('ble.monitorError', { detail: { char, message: errorDetail(error.message ?? error) } });
+  }
+
+  /** Removes the monitors and invalidates their callbacks (see `link`). */
+  private dropSubscriptions(): void {
     for (const s of this.subscriptions) s.remove();
     this.subscriptions = [];
+    this.link += 1;
+  }
+
+  private cleanup(): void {
+    this.dropSubscriptions();
     this.device = null;
   }
 }

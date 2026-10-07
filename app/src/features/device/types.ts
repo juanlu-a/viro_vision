@@ -28,6 +28,21 @@ export interface DeviceInfo {
 export interface ConnectionState {
   status: ConnectionStatus;
   device: DeviceInfo | null;
-  /** Human-readable message for the current status (Spanish, screen-reader friendly). */
+  /**
+   * Human-readable message for the current status (Spanish, screen-reader friendly). Plain language
+   * only: never an error string, which goes to telemetry instead.
+   */
   message: string;
+}
+
+/**
+ * A photo was asked for while the device has no network address. Typed, not a Spanish sentence
+ * thrown as a message: the user never hears an error's text (2026-10-06), so its only reader is the
+ * telemetry table, and the type is what a query filters on.
+ */
+export class DeviceNoAddressError extends Error {
+  constructor() {
+    super('DEVICE_NO_ADDRESS');
+    this.name = 'DeviceNoAddressError';
+  }
 }

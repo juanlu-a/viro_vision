@@ -45,16 +45,23 @@ ApControl = Callable[[bool], None]
 # the SD is the one failure of this path that is otherwise completely silent — `aplay` exits with an
 # error into /dev/null and the board looks like it spoke.
 Say = Callable[[str], bool]
-# Corta lo que esté sonando en el parlante. None cuando la placa no tiene con qué reproducir.
+# Cuts off whatever the speaker is playing. None when the board has nothing to play with.
 Hush = Callable[[], None]
 DEFAULT_AUDIO_TARGET = "device"
 AUDIO_TARGETS = ("device", "phone")
 AP_MINUTES_DEFAULT = 10
 AP_MINUTES_MAX = 60
-# With a mode active the AP turns itself on (the app is going to ask for the photo over WiFi) and
-# turns off in idle. The cap exists because the device has one radio: with the AP up it is on no
-# other network, and a forgotten mode cannot leave it unreachable forever.
-AP_MINUTES_WITH_MODE = 20
+MEASURE_MAX_BYTES = 5_000_000
+"""The most `measure` will generate, over BLE or HTTP. The byte count arrives over the air and went
+straight into `os.urandom`: one write asking for a few gigabytes was an out-of-memory kill of the
+daemon on a 512 MB board (review of 2026-10-06). 5 MB is ~100 photos, far past any useful measure."""
+INTERVAL_MAX_MS = 1_000
+"""Pause between chunks a `measure` may ask for. Unbounded, one write could hold the single transfer
+slot for hours, and every photo after it would answer "a transfer is already in progress"."""
+MEASURE_MAX_PAUSED_MS = 60_000
+"""And the pauses of one `measure` added up: 5 MB in 182-byte chunks at 1 s each is still eight hours
+of a held transfer slot. Refused with an error rather than shortened, so a measurement is never
+silently a different one from the one asked for."""
 
 
 def _json(obj: dict) -> bytes:
@@ -62,6 +69,43 @@ def _json(obj: dict) -> bytes:
     if len(data) > EVENT_MAX_BYTES:
         raise ValueError(f"a {len(data)}-byte event does not fit in one notification")
     return data
+
+
+def fit(obj: dict, key: str, max_bytes: int = EVENT_MAX_BYTES) -> bytes:
+    """`_json`, trimming the string at `key` until the whole object fits in one notification.
+
+    Since 2026-10-06. The sizes that overflowed were never the fixed fields but the one free-text
+    field of each payload — an exception's message, a NetworkManager connection name the user typed —
+    and `_json` raised on them. In the heartbeat that ValueError escaped `notify_status` and the
+    daemon crash-looped under systemd for as long as the board stayed on that network.
+
+    Trimmed by UTF-8 bytes, not characters: `[:150]` of a Spanish message (or of an SSID with an
+    emoji) is up to 600 bytes. Escaping (quotes, control characters) only makes the serialized form
+    longer than the raw text, so cutting the raw text by the overflow always makes progress.
+    Raises ValueError only when the object does not fit even with the field empty."""
+    obj = dict(obj)
+    while True:
+        data = json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode()
+        overflow = len(data) - max_bytes
+        if overflow <= 0:
+            return data
+        text = obj.get(key)
+        if not isinstance(text, str) or not text:
+            raise ValueError(f"a {len(data)}-byte payload does not fit in one notification")
+        raw = text.encode()
+        # `errors="ignore"` drops a multi-byte character cut in half instead of leaving a broken one.
+        obj[key] = raw[: max(0, len(raw) - overflow)].decode(errors="ignore")
+
+
+def event_bytes(obj: dict) -> bytes:
+    """An event ready for the `event` characteristic, never an exception: its free text (`msg`) is
+    trimmed to fit (`fit`). It is called on the loop thread from callbacks, where a raise is logged by
+    asyncio and the event —usually an error the app is waiting to hear— is simply lost."""
+    try:
+        return fit(obj, "msg")
+    except ValueError:
+        log.error("event %s does not fit in one notification; sent as a bare error", obj.get("t"))
+        return _json({"t": "error", "msg": f"oversized {obj.get('t')} event"[:60]})
 
 
 class Core:
@@ -77,6 +121,7 @@ class Core:
         bus=None,
         say: Optional[Say] = None,
         hush: Optional[Hush] = None,
+        restart_camera: Optional[Callable[[], None]] = None,
     ) -> None:
         self._loop = loop
         self._read_status = read_status
@@ -88,6 +133,7 @@ class Core:
         self._bus = bus
         self._say = say
         self._hush = hush
+        self._restart_camera = restart_camera
         self.audio_target = DEFAULT_AUDIO_TARGET
         """Where the user wants to hear ViroVision, as last written by the app (`cmd: 'audio'`).
 
@@ -127,7 +173,15 @@ class Core:
         return bytes([int(self.modes.current)])
 
     def read_status(self) -> bytes:
-        return _json(self._read_status())
+        """Never raises (2026-10-06): it runs in the GATT read, `notify_status` and the 15 s heartbeat,
+        and an exception from it took the daemon down. `network` is the one field whose length nobody
+        on this side controls — it is the name of whatever WiFi profile the board is on."""
+        status = self._read_status()
+        try:
+            return fit(status, "network")
+        except ValueError:
+            log.error("status does not fit in one notification even without the network name")
+            return _json({"version": status.get("version")})
 
     def read_wifi(self) -> bytes:
         """The AP's credentials so the app can join on its own. Empty when this device has no AP."""
@@ -161,7 +215,7 @@ class Core:
         elif self.modes.current is Mode.BUS and self._bus is not None:
             # Already watching: the user did not catch the last announcement. There is nothing new to
             # read —bus mode watches on its own— so the click repeats what it said.
-            self._loop.run_in_executor(None, self._bus.repeat_last)
+            self._in_executor(self._bus.repeat_last)
         else:
             log.debug("button: already in %s", self.modes.current.name)
         if self.modes.requests_reading(clicks):
@@ -178,27 +232,39 @@ class Core:
         try:
             cmd = json.loads(bytes(value).decode())
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            self._event({"t": "error", "msg": f"unreadable command: {exc}"[:150]})
+            self._event({"t": "error", "msg": f"unreadable command: {exc}"})
+            return
+        if not isinstance(cmd, dict):
+            # `[]`, `"photo"` or `3` are valid JSON: `.get` on them raised inside BlueZ's D-Bus setter.
+            self._event({"t": "error", "msg": "a command is a JSON object"})
             return
         log.info("control ← %s (mtu %s)", cmd, mtu or "?")
+        # Every field below arrives over the air and goes through `int()`: `{"bytes": "lots"}` or
+        # `{"value": null}` raised out of the D-Bus setter, the app got no answer at all and the
+        # journal a traceback (review of 2026-10-06). The app hears why instead.
+        try:
+            self._dispatch(cmd, mtu)
+        except (TypeError, ValueError, KeyError, OverflowError) as exc:
+            log.warning("control: bad %s command: %s", cmd.get("cmd"), exc)
+            self._event({"t": "error", "msg": f"bad {cmd.get('cmd')} command: {exc}"})
+
+    def _dispatch(self, cmd: dict, mtu: int) -> None:
         name = cmd.get("cmd")
         if name == "measure":
-            self._start_transfer(
-                source=self._synthetic_source(int(cmd.get("bytes", DEFAULT_BYTES))),
-                chunk=self._chunk(cmd, mtu),
-                interval_ms=int(cmd.get("interval_ms", 0)),
-                kind="measurement",
-            )
+            amount = max(0, min(int(cmd.get("bytes", DEFAULT_BYTES)), MEASURE_MAX_BYTES))
+            # Parsed before the source exists: a bad `chunk` raising after it would leave an
+            # un-awaited coroutine (or, for a photo, a capture already running for nobody).
+            chunk, interval_ms = self._chunk(cmd, mtu), self._interval(cmd)
+            if chunk > 0 and -(-amount // chunk) * interval_ms > MEASURE_MAX_PAUSED_MS:
+                self._event({"t": "error", "msg": f"measure: chunks x interval_ms over {MEASURE_MAX_PAUSED_MS // 1000} s"})
+                return
+            self._start_transfer(source=self._synthetic_source(amount), chunk=chunk, interval_ms=interval_ms, kind="measurement")
         elif name == "photo":
             if self._capture is None:
                 self._event({"t": "error", "msg": "no camera: use measure"})
                 return
-            self._start_transfer(
-                source=self._capture(),
-                chunk=self._chunk(cmd, mtu),
-                interval_ms=int(cmd.get("interval_ms", 0)),
-                kind="photo",
-            )
+            chunk, interval_ms = self._chunk(cmd, mtu), self._interval(cmd)
+            self._start_transfer(source=self._capture(), chunk=chunk, interval_ms=interval_ms, kind="photo")
         elif name == "mode":
             self._change_mode(int(cmd.get("value", 0)))
         elif name == "audio":
@@ -206,7 +272,7 @@ class Core:
             # its announcements are pre-recorded and work with no phone and no internet.
             target = str(cmd.get("target", DEFAULT_AUDIO_TARGET))
             if target not in AUDIO_TARGETS:
-                self._event({"t": "error", "msg": f"unknown audio target: {target}"[:150]})
+                self._event({"t": "error", "msg": f"unknown audio target: {target}"})
             else:
                 self.audio_target = target
                 if self._bus is not None:
@@ -215,18 +281,29 @@ class Core:
         elif name == "say":
             self._say_notice(str(cmd.get("clip", "")))
         elif name == "hush":
-            # El teléfono va a hablar: la placa se calla. Una voz por vez, sin importar de qué lado
-            # salga (ADR 0003, act. 2026-09-18). Sin respuesta y sin evento: es lo más urgente que
-            # puede pedir la app y no hay nada que contestar.
+            # The phone is about to speak: the board goes quiet. One voice at a time, whichever side
+            # it comes from (ADR 0003, 2026-09-18 update). No reply and no event: it is the most
+            # urgent thing the app can ask for and there is nothing to answer.
             if self._hush is not None:
                 self._hush()
-                log.info("hush: parlante cortado")
+                log.info("hush: speaker cut off")
         elif name == "status":
             self._schedule(self._notify(STATUS, self.read_status()))
         elif name == "ap":
             self._ap(bool(cmd.get("value", True)), int(cmd.get("minutes", AP_MINUTES_DEFAULT)))
+        elif name == "restart_camera":
+            # A test hook, not a product feature (2026-10-06): the only other ways to restart the
+            # camera are the ones that need it to fail — 12 s without frames, or a photo that hangs —
+            # and neither can be provoked on purpose without touching the hardware. It is the same
+            # `Camera.restart()` the watchdog calls, so it proves the real recovery path. In an
+            # executor: closing and reopening the sensor takes seconds and holds the capture lock.
+            if self._restart_camera is None:
+                self._event({"t": "error", "msg": "no camera to restart"})
+                return
+            log.info("camera: restart requested over BLE")
+            self._in_executor(self._restart_camera)
         else:
-            self._event({"t": "error", "msg": f"unknown command: {name}"[:150]})
+            self._event({"t": "error", "msg": f"unknown command: {name}"})
 
     def _say_notice(self, clip: str) -> None:
         """Play one of the pre-recorded system notices (`notices.py`).
@@ -240,14 +317,14 @@ class Core:
         over the air, and the one thing it must not be able to do is name a file we did not record.
         """
         if not is_known(clip):
-            self._event({"t": "error", "msg": f"unknown notice: {clip}"[:150]})
+            self._event({"t": "error", "msg": f"unknown notice: {clip}"})
             return
         if self._say is None:
             log.debug("say %s: this device has no speaker", clip)
             return
         # In an executor: playing spawns a process, and that does not belong on the event loop that
         # BLE is answering from.
-        self._loop.run_in_executor(None, self._play_notice, clip)
+        self._in_executor(self._play_notice, clip)
 
     def _play_notice(self, clip: str) -> None:
         """Runs on a worker thread. Reports a clip the SD does not have.
@@ -264,7 +341,7 @@ class Core:
         if self._say(clip):
             return
         log.warning("notice %s is not on this board", clip)
-        self.emit_event({"t": "error", "msg": f"missing notice: {clip}"[:150]})
+        self.emit_event({"t": "error", "msg": f"missing notice: {clip}"})
 
     def _ap(self, on: bool, minutes: int) -> None:
         """ADR 0003's plan B. The AP is always turned on for a bounded time: the device has a single
@@ -284,7 +361,7 @@ class Core:
         try:
             await self._loop.run_in_executor(None, self._ap_control, on)
         except Exception as exc:
-            await self._notify(EVENT, _json({"t": "error", "msg": f"ap: {exc}"[:150]}))
+            await self._notify(EVENT, event_bytes({"t": "error", "msg": f"ap: {exc}"}))
             return
         if on:
             self._ap_off_timer = self._loop.call_later(minutes * 60, self._ap, False, 0)
@@ -301,8 +378,17 @@ class Core:
     def _schedule(self, coroutine: Awaitable[None]) -> asyncio.Task:
         return self._loop.create_task(coroutine)
 
+    def _in_executor(self, fn: Callable, *args) -> asyncio.Future:
+        """`run_in_executor` for work nobody awaits. Until 2026-10-06 those futures were dropped, so
+        an exception in `bus.start`, `bus.stop` or a notice was stored in a future no one looked at
+        and vanished — not even a journal line. Now it is logged, which also sends it to the app
+        (`log_relay.py`)."""
+        future = self._loop.run_in_executor(None, fn, *args)
+        future.add_done_callback(_log_failure(getattr(fn, "__name__", repr(fn))))
+        return future
+
     def _event(self, obj: dict) -> None:
-        self._schedule(self._notify(EVENT, _json(obj)))
+        self._schedule(self._notify(EVENT, event_bytes(obj)))
 
     def _change_mode(self, value: int) -> None:
         try:
@@ -351,11 +437,28 @@ class Core:
         if self._bus is None:
             return
         if current is Mode.BUS:
-            self._loop.run_in_executor(None, self._bus.start)
+            self._in_executor(self._start_bus)
         else:
             # Always, not only when it is running: a start still building (a cold OCR, up to minutes)
             # is not running yet, and only `stop` tells it the user already left (2026-10-06).
-            self._loop.run_in_executor(None, self._bus.stop)
+            self._in_executor(self._bus.stop)
+
+    def _start_bus(self) -> None:
+        """Runs on a worker thread. A start that cannot watch says why (2026-10-06).
+
+        Its False used to die in the executor's future: the user pressed the button, heard "modo
+        ómnibus activado" from the app and then nothing, ever — no detector, no OCR, and no way to
+        tell from the phone. Only the failures the watcher names are reported: "the camera is still
+        starting" is already said out loud (`warming`), and "the user left meanwhile" is no failure."""
+        if self._bus.start():
+            return
+        reason = getattr(self._bus, "unavailable_reason", None)
+        if reason:
+            self.emit_event({"t": "error", "msg": f"bus unavailable: {reason}"})
+
+    @staticmethod
+    def _interval(cmd: dict) -> int:
+        return max(0, min(int(cmd.get("interval_ms", 0)), INTERVAL_MAX_MS))
 
     @staticmethod
     def _chunk(cmd: dict, mtu: int) -> int:
@@ -383,11 +486,11 @@ class Core:
             payload = await source
             chunks = split(payload, chunk)
         except InvalidChunkError as exc:
-            self._event({"t": "error", "msg": str(exc)[:150]})
+            self._event({"t": "error", "msg": str(exc)})
             return
         except Exception as exc:
             log.exception("could not prepare the transfer")
-            self._event({"t": "error", "msg": f"{kind}: {exc}"[:150]})
+            self._event({"t": "error", "msg": f"{kind}: {exc}"})
             return
 
         await self._notify(EVENT, _json({"t": "start", "id": id_, "kind": kind, "bytes": len(payload), "chunks": len(chunks), "chunk": chunk}))
@@ -402,3 +505,14 @@ class Core:
         # they differ a lot, the bottleneck is the path towards the stack (on BlueZ, D-Bus; see README).
         await self._notify(EVENT, _json({"t": "end", "id": id_, "bytes": len(payload), "chunks": len(chunks), "device_ms": ms}))
         log.info("transfer %d (%s): %d bytes in %d chunks, %d ms on this side", id_, kind, len(payload), len(chunks), ms)
+
+
+def _log_failure(what: str) -> Callable[[asyncio.Future], None]:
+    def done(future: asyncio.Future) -> None:
+        if future.cancelled():
+            return
+        exc = future.exception()
+        if exc is not None:
+            log.error("%s failed in the background: %s", what, exc, exc_info=exc)
+
+    return done

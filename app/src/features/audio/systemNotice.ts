@@ -62,23 +62,22 @@ export function resetNoticesForTests(): void {
 /**
  * Says `id`, and resolves with where it was actually heard.
  *
- * `detail` is the variable part some notices carry — which network failed, what the board
- * complained about. **The phone appends it; the board does not get it**, because the board speaks
- * with clips recorded ahead of time and nobody can record one per error message. That is a
- * deliberate loss and a bounded one: the detail is already on screen and in telemetry, which is
- * where a technical string belongs, and the fixed sentence still names the thing that failed.
+ * There is no variable part. Until 2026-10-06 some notices carried a `detail` — which network step
+ * failed, what the board complained about — that the phone appended; now the user never hears an
+ * error's text, which lives only in telemetry, so every notice is the same fixed sentence on both
+ * outputs.
  *
  * It **never rejects**. Same rule as `announce()` and for the same reason (ADR 0001): nothing on the
  * announcement path may throw at a caller that is often a BLE callback with no one to catch it.
  */
-export async function notify(id: SystemNotice, detail?: string): Promise<AudioOutput> {
+export async function notify(id: SystemNotice): Promise<AudioOutput> {
   const notice = NOTICES[id];
   // The whole device path is inside the try, the decision included: `isLinked` is the BLE client
   // reaching into a native module, and a notice that throws instead of falling back to the phone
   // would take down whatever BLE callback called it.
-  // Consultado una sola vez y guardado: lo necesitan la decisión y, más abajo, el silenciado de la
-  // placa. Si `isLinked` explota queda en `false`, que es la respuesta segura — no se le habla a un
-  // enlace que no sabemos si existe.
+  // Queried once and kept: the decision needs it and, further down, so does hushing the board. If
+  // `isLinked` blows up it stays `false`, the safe answer — we do not talk to a link we do not know
+  // exists.
   let linked = false;
   try {
     linked = deps.isLinked();
@@ -90,10 +89,10 @@ export async function notify(id: SystemNotice, detail?: string): Promise<AudioOu
       hasClip: notice.clip !== null,
     });
     if (delivery.target === 'device' && notice.clip) {
-      // Una voz por vez, venga de donde venga. Cada salida ya se interrumpía a sí misma —el teléfono
-      // con `Speech.stop()`, la placa cortando el `aplay` anterior— y ninguna interrumpía a la otra,
-      // así que cambiar el ajuste a mitad de un anuncio dejaba las dos hablando encimadas. Para quien
-      // no ve la pantalla, dos voces simultáneas no son información: son ruido.
+      // One voice at a time, wherever it comes from. Each output already interrupted itself —the
+      // phone with `Speech.stop()`, the board cutting the previous `aplay`— and neither interrupted
+      // the other, so changing the setting mid-announcement left both talking over each other. For
+      // someone who cannot see the screen, two simultaneous voices are not information: they are noise.
       stopSpeaking();
       await deps.playNotice(notice.clip);
       return 'device';
@@ -104,22 +103,22 @@ export async function notify(id: SystemNotice, detail?: string): Promise<AudioOu
     // and for the same reason: paying twice is much better than leaving the user with nothing.
   }
 
-  // La otra mitad de la misma regla: si habla el teléfono, la placa se calla. Sin `await` y tragando
-  // su error — es mejor arriesgar un solapamiento que demorar el aviso detrás de una escritura BLE.
+  // The other half of the same rule: if the phone speaks, the board goes quiet. No `await`, and
+  // swallowing its error — better to risk an overlap than to delay the notice behind a BLE write.
   if (linked) void deps.hushDevice().catch(() => {});
 
   // Not wrapped: both halves of this are non-throwing by contract (`announce` resolves on failure,
   // `playStartEarcon` swallows its own errors). Wrapping it too would hide a broken one of those.
-  await sayOnPhone(id, detail);
+  await sayOnPhone(id);
   return 'phone';
 }
 
-async function sayOnPhone(id: SystemNotice, detail?: string): Promise<void> {
+async function sayOnPhone(id: SystemNotice): Promise<void> {
   const { say } = NOTICES[id];
   // The one notice that is not a sentence: the reading chirp is a sound file, not speech.
   if (say === null) {
     playStartEarcon();
     return;
   }
-  await announce(detail ? `${say} ${detail}` : say);
+  await announce(say);
 }

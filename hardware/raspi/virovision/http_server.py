@@ -30,15 +30,47 @@ from socketserver import ThreadingMixIn
 from typing import Callable, Optional
 
 from .camera import CameraNotReady
+from .core import MEASURE_MAX_BYTES
 
 log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8080
-MEASURE_MAX_BYTES = 5_000_000
 AUDIO_MAX_BYTES = 5_000_000
 AUDIO_DIRECTORY = "/tmp/virovision-audio"
+AUDIO_FILES_KEPT = 3
+"""How many received readings stay in AUDIO_DIRECTORY. On Trixie /tmp is a tmpfs, so every MP3 the
+phone sent was RAM the board never got back: a shopping trip of readings, kept forever, on 512 MB
+(review of 2026-10-06). Three and not one so the file a player was just handed —`Popen` returns before
+`mpg123` opens it— is never the one deleted; an older one still playing is safe anyway, because Linux
+keeps a deleted file's data until its last reader closes it."""
+REQUEST_TIMEOUT_S = 15.0
+"""Per socket operation. Without it a phone that walked out of WiFi range mid-request left a handler
+thread blocked on `recv` for good, and keep-alive connections the app never closed piled up the same
+way."""
+
+
+def _prune_audio(directory: str, keep: int = AUDIO_FILES_KEPT) -> None:
+    """Deletes all but the newest `keep` readings. Best-effort: a file that will not go is a log
+    line, never a failed `/audio` — the reading itself already arrived and is playing."""
+    try:
+        names = [n for n in os.listdir(directory) if n.startswith("audio-")]
+    except OSError:
+        return
+    # The names carry the millisecond they arrived (`audio-<ms>.<ext>`), so sorting by that number is
+    # sorting by age without a `stat` per file.
+    names.sort(key=_arrival)
+    for name in names[:-keep] if keep > 0 else names:
+        try:
+            os.remove(os.path.join(directory, name))
+        except OSError as exc:
+            log.debug("could not remove old audio %s: %s", name, exc)
 
 SyncCapture = Callable[[], bytes]
+
+
+def _arrival(name: str) -> int:
+    stamp = name[len("audio-") :].split(".", 1)[0]
+    return int(stamp) if stamp.isdigit() else 0
 
 
 class _QuietServer(ThreadingHTTPServer):
@@ -76,6 +108,7 @@ class HttpServer:
         class Handler(BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
             server_version = "ViroVision/0.1"
+            timeout = REQUEST_TIMEOUT_S
 
             def log_message(self, fmt, *args):  # noqa: N802 — logging goes through logging, not stderr
                 log.info("%s %s", self.address_string(), fmt % args)
@@ -135,7 +168,12 @@ class HttpServer:
                 if path != "/audio":
                     self._json(404, {"error": "not found"})
                     return
-                length = int(self.headers.get("Content-Length") or 0)
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                except ValueError:
+                    # Was a traceback in the journal and a socket cut with no answer (2026-10-06).
+                    self._json(400, {"error": "invalid Content-Length"})
+                    return
                 if not 0 < length <= AUDIO_MAX_BYTES:
                     self._json(400, {"error": f"Content-Length out of range (1-{AUDIO_MAX_BYTES})"})
                     return
@@ -154,6 +192,7 @@ class HttpServer:
                 file_path = os.path.join(AUDIO_DIRECTORY, f"audio-{int(time.time() * 1000)}.{extension}")
                 with open(file_path, "wb") as f:
                     f.write(body)
+                _prune_audio(AUDIO_DIRECTORY)
                 log.info("audio received: %d bytes (%s) → %s", length, content_type, file_path)
                 if server._play is not None:
                     try:

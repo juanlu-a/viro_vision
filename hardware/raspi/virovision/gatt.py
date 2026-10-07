@@ -45,12 +45,18 @@ class ViroVisionService(Service):
         read_wifi: Optional[Callable[[], dict]] = None,
         say: Optional[Say] = None,
         hush: Optional[Hush] = None,
+        restart_camera: Optional[Callable[[], None]] = None,
     ) -> None:
         super().__init__(SERVICE_UUID, True)
         self.core = Core(
             loop, read_status, capture, synthetic_payload, self._notify,
             ap_control=ap_control, read_wifi=read_wifi, say=say, hush=hush,
+            restart_camera=restart_camera,
         )
+        self.on_status_read: Optional[Callable[[], None]] = None
+        """Called on every GATT read of `status`. The app reads it right after subscribing to the
+        notifications, so it is the one moment this side knows a phone is listening: `log_relay`
+        replays what it buffered then (2026-10-06)."""
 
     async def _notify(self, name: str, value: bytes) -> None:
         char = {MODE: self.mode, EVENT: self.event, TRANSFER: self.transfer, STATUS: self.status}[name]
@@ -91,6 +97,11 @@ class ViroVisionService(Service):
 
     @characteristic(CH_STATUS, Flags.READ | Flags.NOTIFY)
     def status(self, options):
+        if self.on_status_read is not None:
+            try:
+                self.on_status_read()
+            except Exception:  # noqa: BLE001 — diagnostics must not cost the app its status read
+                pass
         return self.core.read_status()
 
     @characteristic(CH_WIFI, Flags.READ)

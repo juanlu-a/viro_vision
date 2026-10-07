@@ -35,13 +35,14 @@ import { MODE_NOTICE } from '@/features/audio/notices';
 import { notify } from '@/features/audio/systemNotice';
 import { guessBusReading, phraseBusReading, phraseProduct } from '@/features/reader/reading';
 import type { BusReading } from '@/features/reader/reading';
+import { DeviceNoAddressError } from '@/features/device/types';
 import { requestsReading, transition } from '@/features/reader/modes';
 import type { Gesture, Mode } from '@/features/reader/modes';
 import { strings } from '@/i18n';
 import { beginReadingAudio, endReadingAudio } from '@/services/audio/session';
 import { stopSpeaking } from '@/services/audio/tts';
 import { isSynthesisEnabled, synthesizeToFile } from '@/services/audio/synthesis';
-import { flush, record } from '@/services/telemetry';
+import { errorDetail, errorType, flush, record } from '@/services/telemetry';
 import { HttpDownloadError } from '@/services/wifi/deviceHttp';
 import type { CloudImage, DevicePhoto } from '@/services/camera';
 import { loadOcr, readImage, isOcrLoaded } from '@/services/ondevice';
@@ -68,6 +69,17 @@ export const READING_DEADLINE_MS = 12_000;
 
 /** The photo cannot have the whole budget: 4 s is ~80× the measured 46 ms over the device's AP. */
 const PHOTO_TIMEOUT_MS = 4_000;
+
+/**
+ * What a quota wait must leave of the reading deadline for the cloud call that follows it. The
+ * measured medians are 0.8-1.7 s and the worst non-Gemini call 2.5 s
+ * (`docs/mediciones/2026-09-02-modelos-supermercado.md`); a wait that eats this reserve is announced
+ * and then cut short by the deadline, which is the two-sentence failure the cap exists to prevent.
+ */
+const CLOUD_CALL_RESERVE_MS = 5_000;
+
+/** Synthesis + POST to the device's speaker. Past it the phone says the reading instead. */
+const DEVICE_DELIVERY_TIMEOUT_MS = 8_000;
 
 export interface ReaderState {
   mode: Mode;
@@ -106,7 +118,7 @@ const initialState: ReaderState = {
 export interface ReaderDeps {
   getModel(): ModelProfile | null;
   downloadPhoto(options?: { timeoutMs?: number }): Promise<DevicePhoto>;
-  sendAudio(uri: string): Promise<boolean>;
+  sendAudio(uri: string, signal?: AbortSignal): Promise<boolean>;
   writeMode(mode: Mode): Promise<void>;
   /**
    * Whether the device can receive audio right now (connected, on its network, answering). Asked
@@ -123,7 +135,7 @@ export interface ReaderDeps {
 
 const noDeps: ReaderDeps = {
   getModel: () => null,
-  downloadPhoto: () => Promise.reject(new Error(strings.connect.noAddress)),
+  downloadPhoto: () => Promise.reject(new DeviceNoAddressError()),
   sendAudio: () => Promise.resolve(false),
   writeMode: () => Promise.resolve(),
   isDeviceReady: () => false,
@@ -160,12 +172,18 @@ function update(patch: Partial<ReaderState>): void {
  * What we tell the user when something fails. **By error type, never by parsing strings** — and when
  * the error carries an actionable datum (how long to wait), it is used: that is why it travels as a
  * field of the class.
+ *
+ * **Never the error's own text** (2026-10-06): the user hears what to do, in plain language, and the
+ * technical detail goes only to the telemetry row recorded next to every call of this.
  */
 function errorMessage(err: unknown): string {
   if (err instanceof VisionNotConfiguredError) return t.cloudNotConfigured;
   if (err instanceof VisionNetworkError) return t.cloudUnavailable;
-  if (err instanceof VisionQuotaError) return `${t.quotaExhausted} ${err.retryAfterSeconds} s.`;
-  return `${t.cloudFailed} (${err instanceof Error ? err.message : String(err)})`;
+  if (err instanceof VisionQuotaError) {
+    const s = Math.max(1, Math.ceil(err.retryAfterSeconds));
+    return `${t.quotaExhausted} ${s} ${s === 1 ? t.second : t.seconds}`;
+  }
+  return t.cloudFailed;
 }
 
 /**
@@ -184,22 +202,30 @@ function errorMessage(err: unknown): string {
  */
 async function sendReadingToDevice(text: string): Promise<boolean> {
   const t0 = Date.now();
+  // Bounded, because nothing else bounds it: this leg runs after the reading deadline was already
+  // cleared, and a POST to a phone that just left the device's AP hangs until the OS gives up. Until
+  // 2026-10-06 that kept `reading` true and the session open, and every press meanwhile was dropped
+  // as "already reading". On abort the phone speaks instead.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEVICE_DELIVERY_TIMEOUT_MS);
   try {
-    const uri = await synthesizeToFile(text);
+    const uri = await synthesizeToFile(text, new Date(), controller.signal);
     // The call to the cloud TTS, measured separately from the send: they are two things that fail
     // for different reasons and take time for different reasons, and together they look like a
     // single "it was slow". Same criterion as separating the photo's ms from the pipeline's.
     record('audio.synthesis', { ms: Date.now() - t0, detail: { characters: text.length } });
     const t1 = Date.now();
-    const sent = await deps.sendAudio(uri);
+    const sent = await deps.sendAudio(uri, controller.signal);
     record('audio.send', { ms: Date.now() - t1, detail: { sent } });
     return sent;
   } catch (err) {
     record('audio.send', {
       ms: Date.now() - t0,
-      detail: { sent: false, message: err instanceof Error ? err.message : String(err) },
+      detail: { sent: false, timedOut: controller.signal.aborted, message: errorDetail(err) },
     });
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -218,9 +244,9 @@ async function deliverReading(text: string): Promise<void> {
     synthesisEnabled: isSynthesisEnabled,
   });
   if (delivery.target === 'device') {
-    // Una voz por vez: el teléfono se calla antes de que hable la placa. Cada salida ya se
-    // interrumpía a sí misma y ninguna a la otra, y dos voces encimadas no son información para
-    // quien no ve la pantalla.
+    // One voice at a time: the phone goes quiet before the board speaks. Each output already
+    // interrupted itself and neither the other, and overlapping voices are not information for
+    // someone who cannot see the screen.
     stopSpeaking();
     if (await sendReadingToDevice(text)) {
       record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'device' } });
@@ -230,8 +256,8 @@ async function deliverReading(text: string): Promise<void> {
   } else if (delivery.fallback) {
     record('audio.fallback', { detail: { reason: delivery.fallback } });
   }
-  // Y al revés: si habla el teléfono, la placa se calla. Sin `await`, para no demorar la lectura
-  // detrás de una escritura BLE.
+  // And the other way round: if the phone speaks, the board goes quiet. No `await`, so the reading
+  // is not delayed behind a BLE write.
   void deps.hushDevice().catch(() => {});
   await announce(text);
   record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'phone' } });
@@ -330,7 +356,10 @@ async function readBus(uri: string): Promise<void> {
   // bus mode has to work with no internet (ADR 0001, ADR 0006) and sending it to the device needs a
   // cloud synthesis, so it can never be the only output here. The phone has already spoken; this is
   // unawaited and swallows its own errors. ADR 0003's real answer for the bus is **prerecorded clips
-  // on the board's SD**, which do not exist yet.
+  // on the board's SD**: the board has them now (`bus_banner.announcements`, a `.wav` per line and
+  // destination, plus the notices in `hardware/raspi/virovision/notices.py`), but this reading is
+  // OCR'd on the phone and nothing here asks the board to play a clip for it, so this copy still
+  // goes through synthesis.
   if (isSynthesisEnabled) void sendReadingToDevice(spoken);
 }
 
@@ -339,7 +368,7 @@ async function readBus(uri: string): Promise<void> {
  * error type) and does not read; an exhausted quota says how long to wait — that field exists to be
  * read.
  */
-async function readSupermarket(image: CloudImage, signal: AbortSignal): Promise<void> {
+async function readSupermarket(image: CloudImage, signal: AbortSignal, deadlineAt: number): Promise<void> {
   const chosen = deps.getModel();
   if (!chosen) {
     record('reading.failed', { detail: { mode: 'supermarket', stage: 'model', reason: 'no model configured' } });
@@ -356,6 +385,10 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal): Promise<
       model: chosen,
       ...image,
       signal,
+      // A quota wait longer than what is left of the deadline is not announced: it could never
+      // finish. It fails at once as an exhausted quota, which says how long to wait instead.
+      // The cloud call itself needs time after the wait, so that time is kept back too.
+      maxWaitMs: Math.max(0, deadlineAt - Date.now() - CLOUD_CALL_RESERVE_MS),
       // The quota wait is announced. The limiter already handled it, but silently: for someone who
       // cannot see the screen, an app that sleeps for up to a minute is indistinguishable from a
       // frozen one.
@@ -398,8 +431,8 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal): Promise<
         mode: 'supermarket',
         stage: timedOut ? 'deadline' : 'cloud',
         requestedModel: chosen.id,
-        type: err instanceof Error ? err.name : typeof err,
-        message: err instanceof Error ? err.message : String(err),
+        type: errorType(err),
+        message: errorDetail(err),
         ...(err instanceof VisionQuotaError ? { waitS: err.retryAfterSeconds } : null),
       },
     });
@@ -430,9 +463,10 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   }
   reading = true;
 
-  // Both of these happen BEFORE the first await, and that order is the point. The session has to be
-  // taken while iOS is still giving us the execution slot the BLE notification bought, and the chirp
-  // is the user's only sign —and ours— that the button did something at all.
+  // Both of these happen right at the start, before any of the slow work (photo, OCR, cloud), and
+  // that order is the point. The session is the first thing awaited, while iOS is still giving us
+  // the execution slot the BLE notification bought, and the chirp follows immediately: it is the
+  // user's only sign —and ours— that the button did something at all.
   const audio = await beginReadingAudio();
   record('audio.session', { detail: { ok: audio, source } });
   // Through the notice router since 2026-09-16, so the chirp comes out of the same place as the
@@ -464,19 +498,18 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
       record('photo.failed', {
         ms: Date.now() - t0,
         // The 503 is "the device has no camera" and it says so itself; the rest is the network.
-        detail: { mode, status, message: err instanceof Error ? err.message : String(err) },
+        detail: { mode, status, message: errorDetail(err) },
       });
-      // The reason is spoken: someone who cannot see the screen has no other way of knowing why the
-      // button did nothing.
-      const message = `${t.deviceCaptureFailed} ${err instanceof Error ? err.message : String(err)}`;
-      update({ status: 'idle', progress: null, message });
-      await announce(message);
+      // Something is spoken: someone who cannot see the screen has no other way of knowing why the
+      // button did nothing. The reason itself is not — it is in the row above.
+      update({ status: 'idle', progress: null, message: t.deviceCaptureFailed });
+      await announce(t.deviceCaptureFailed);
       return;
     }
 
     try {
       if (mode === 'bus') await readBus(photo.uri);
-      else await readSupermarket(photo.image, controller.signal);
+      else await readSupermarket(photo.image, controller.signal, t0 + READING_DEADLINE_MS);
     } catch (err) {
       const timedOut = controller.signal.aborted;
       record('reading.failed', {
@@ -484,13 +517,13 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
         detail: {
           mode,
           stage: timedOut ? 'deadline' : mode === 'bus' ? 'ocr' : 'cloud',
-          type: err instanceof Error ? err.name : typeof err,
-          message: err instanceof Error ? err.message : String(err),
+          type: errorType(err),
+          message: errorDetail(err),
         },
       });
-      const message = timedOut ? t.readTimedOut : `${t.error}: ${err instanceof Error ? err.message : String(err)}`;
+      const message = timedOut ? t.readTimedOut : t.error;
       update({ status: 'idle', progress: null, message });
-      await announce(timedOut ? t.readTimedOut : t.error);
+      await announce(message);
     }
   } finally {
     clearTimeout(deadline);

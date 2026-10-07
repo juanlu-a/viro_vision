@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import socket
 import subprocess
+import threading
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional, Tuple
 
 from . import VERSION
 from .battery import Battery
@@ -51,9 +52,55 @@ def local_ip(interface: str = "wlan0") -> Optional[str]:
         return None
 
 
-def read_status(camera: bool, http_port: Optional[int] = None, ap: bool = False, network: Optional[str] = None) -> dict:
+class NetworkSnapshot:
+    """The network name and IP, looked up off the event loop and read from memory.
+
+    Since 2026-10-06. Both used to be looked up inside `read_status`, which runs on the asyncio loop
+    that answers BLE — the GATT read, `notify_status`, the 15 s heartbeat — and spawns `nmcli` (30 s
+    timeout) and `ip` (5 s). With NetworkManager slow or restarting, one status read froze the BLE
+    link for up to 35 s, which from the phone is a board that died. Now `refresh` runs in an executor
+    (on the heartbeat, after every AP change) and a status read costs nothing.
+    """
+
+    def __init__(self, active_connection: Callable[[], Optional[str]], ip: Callable[[], Optional[str]] = local_ip) -> None:
+        self._active_connection = active_connection
+        self._ip = ip
+        self._lock = threading.Lock()
+        self.current: Tuple[Optional[str], Optional[str]] = (None, None)
+        """(network name, IPv4), replaced whole so a reader never sees one from each refresh."""
+
+    def refresh(self, wait_s: float = 0.0) -> None:
+        """Blocking: call it from an executor. Skipped when another refresh is already running:
+        `nmcli` stuck on its 30 s timeout would otherwise pile up one thread per heartbeat in a pool of
+        eight. `wait_s` is for right after an AP change, when the next status has to show it — bounded,
+        so a refresh hung on `nmcli` does not hold the AP's answer for another 30 s."""
+        acquired = self._lock.acquire(timeout=wait_s) if wait_s > 0 else self._lock.acquire(blocking=False)
+        if not acquired:
+            return
+        try:
+            network = self._active_connection()
+            ip = self._ip() if _read(_WLAN) == "up" else None
+            self.current = (network, ip)
+        finally:
+            self._lock.release()
+
+
+_LOOK_UP = object()
+
+
+def read_status(
+    camera: bool,
+    http_port: Optional[int] = None,
+    ap: bool = False,
+    network: Optional[str] = None,
+    ip=_LOOK_UP,
+) -> dict:
+    """`ip` comes from a `NetworkSnapshot` on the device; left out, it is looked up here (blocking),
+    which is fine for the Mac emulator and nowhere near the BLE loop."""
     temp = _read(_THERMAL)
     wifi = _read(_WLAN) == "up"
+    if ip is _LOOK_UP:
+        ip = local_ip() if wifi else None
     return {
         "version": VERSION,
         "temp": round(int(temp) / 1000, 1) if temp and temp.isdigit() else None,
@@ -63,7 +110,7 @@ def read_status(camera: bool, http_port: Optional[int] = None, ap: bool = False,
         "wifi": wifi,
         # ADR 0003's plan B: the app downloads the photo over HTTP from here. `ip` null = no network;
         # `port` null = the HTTP server is not running.
-        "ip": local_ip() if wifi else None,
+        "ip": ip if wifi else None,
         "port": http_port,
         # True while the device is an access point (plan B): then `ip` is the AP's, 10.42.0.1.
         "ap": ap,

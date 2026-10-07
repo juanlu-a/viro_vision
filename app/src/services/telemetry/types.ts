@@ -8,7 +8,8 @@
  *   - an event **with no `type` or no `at` is dropped without an error**: the response says
  *     `{stored: 0}` with status 200, so a misplaced field is never noticed. That is why the type
  *     makes them mandatory and `record()` fills `at` in itself;
- *   - `detail` is serialized and if it goes past 8 KB it is replaced entirely by `{trimmed: true}` —
+ *   - `detail` is serialized and if it goes past 6000 UTF-8 bytes (the function keeps a margin under
+ *     the column's 8 KB jsonb check) it is replaced entirely by `{trimmed: true}` —
  *     ALL of the detail is lost, not just the excess. Never put an image or a long text in here.
  */
 
@@ -25,6 +26,11 @@ export type EventType =
   | 'app.background'
   | 'app.foreground'
   | 'app.error'
+  // `console.*` from the app or a library, captured (`capture.ts`). `detail.level` says which.
+  | 'app.log'
+  // A screen that threw while rendering, caught by the root error boundary: the user saw a neutral
+  // screen and a button to start again, never the error.
+  | 'app.renderError'
   // BLE link (control plane, ADR 0003)
   | 'ble.scanning'
   // How the peripheral was reached: already connected to the system, remembered from last time, or
@@ -40,6 +46,10 @@ export type EventType =
   | 'ble.retry'
   | 'ble.disconnected'
   | 'ble.event'
+  // A notification stream that errored while linked: the board may be notifying into the void.
+  | 'ble.monitorError'
+  // A characteristic read that failed (`detail.char`); the caller carried on with null.
+  | 'ble.readFailed'
   // WiFi network with the device (where the photo travels)
   | 'wifi.joining'
   | 'wifi.ready'
@@ -47,6 +57,8 @@ export type EventType =
   // What the device reports about itself
   | 'device.status'
   | 'device.warning'
+  // The daemon's own log lines at WARNING and above, forwarded over BLE (`{t:'log'}`).
+  | 'device.log'
   | 'device.mode'
   | 'device.modeFailed'
   | 'device.audioTargetFailed'
@@ -66,6 +78,8 @@ export type EventType =
   | 'cloud.wait'
   | 'audio.synthesis'
   | 'audio.send'
+  // Why the POST of a reading to the device failed (status or network error).
+  | 'audio.sendFailed'
   | 'audio.session'
   // `audio.spoken` carries `target`: 'phone' or 'device'. `audio.fallback` is the row that matters
   // when comparing the two paths — it says the user asked for the device and heard the phone, and
@@ -80,7 +94,7 @@ export interface TelemetryEvent {
   at: string;
   /** Duration of what the event measures, when it measures something. The function rounds it to an integer. */
   ms?: number;
-  /** The event's context. Serialized it has to stay under 8 KB (see above). */
+  /** The event's context. Serialized it has to stay under 6000 bytes (see above). */
   detail?: Record<string, unknown>;
 }
 

@@ -23,6 +23,7 @@
 import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+import { captureConsole, captureRejections, describeError } from './capture';
 import { EventQueue, MAX_PER_BATCH } from './queue';
 import { resolveTelemetryUrl } from './config';
 import { getPhoneId, generateId } from './identity';
@@ -158,19 +159,24 @@ export function record(type: EventType, extra?: { ms?: number; detail?: Record<s
 export async function flush(): Promise<void> {
   if (!state.enabled || state.uploading || state.queue.length === 0) return;
   state.uploading = true;
-  const batch = state.queue.takeBatch(MAX_PER_BATCH);
   const dropped = state.queue.droppedCount;
+  // One slot is kept for the drop marker: the function trims a batch past 100 from the tail, and
+  // the marker, being last, would be the one row lost.
+  const batch = state.queue.takeBatch(dropped > 0 ? MAX_PER_BATCH - 1 : MAX_PER_BATCH);
   try {
     // Drops travel with the batch: a silent hole leads to concluding that something did not happen
-    // when in fact it could not be recorded.
-    if (dropped > 0) {
-      batch.push({ type: 'app.error', at: state.now().toISOString(), detail: { droppedEvents: dropped } });
-    }
+    // when in fact it could not be recorded. The marker is added to the BODY, not to `batch`: a
+    // failed send returns `batch` to the queue, and a marker returned with it would be sent again
+    // next to a fresh one, counting the same hole twice.
+    const events =
+      dropped > 0
+        ? [...batch, { type: 'app.error' as const, at: state.now().toISOString(), detail: { droppedEvents: dropped } }]
+        : batch;
     const body: TelemetryBatch = {
       phone: state.phone,
       session: state.session,
       app: state.app,
-      events: batch,
+      events,
     };
     const controller = new AbortController();
     const timer = state.schedule(() => controller.abort(), TIMEOUT_MS);
@@ -221,6 +227,9 @@ function scheduleNextUpload(): void {
 export function startTelemetry(options: TelemetryOptions = {}): () => void {
   const url = options.url ?? defaultUrl;
   if (url.length === 0) return () => {};
+  // Once per process: a second call (a fast refresh re-running the root layout's module) would
+  // chain the global handler to itself and wrap the console twice, recording every line double.
+  if (state.enabled) return () => {};
 
   state.url = url;
   state.fetchImpl = options.fetchImpl ?? fetch;
@@ -238,19 +247,24 @@ export function startTelemetry(options: TelemetryOptions = {}): () => void {
 
   const previous = ErrorUtils.getGlobalHandler?.();
   ErrorUtils.setGlobalHandler?.((error, fatal) => {
-    record('app.error', {
-      detail: {
-        fatal: Boolean(fatal),
-        name: error?.name ?? null,
-        message: String(error?.message ?? error).slice(0, 500),
-        // The stack trimmed: with an 8 KB cap for ALL of the detail, a whole one takes the event with it.
-        stack: String(error?.stack ?? '').slice(0, 2_000),
-      },
-    });
+    record('app.error', { detail: { kind: 'uncaught', fatal: Boolean(fatal), ...describeError(error) } });
     // Fatal = the app is going away. It is the last chance for the crash to reach the table.
     void flush();
-    previous?.(error, fatal);
+    // The user never learns about an error (2026-10-06), so a non-fatal one stops here in a release
+    // build: React Native's default handler would only `console.error` it, which the capture below
+    // would record a second time. Development keeps the red screen, and a fatal one keeps the
+    // default path — there is no app left to protect.
+    if (fatal || __DEV__) previous?.(error, fatal);
   });
+
+  // Everything else that would otherwise only reach a console nobody reads: `console.*` from the app
+  // or a library, and promise rejections nobody caught (`void foo()` is all over the BLE callbacks).
+  const uninstallCapture = [
+    captureConsole(console, (level, message) => record('app.log', { detail: { level, message } })),
+    captureRejections((error) => {
+      record('app.error', { detail: { kind: 'unhandledRejection', ...describeError(error) } });
+    }),
+  ];
 
   // The two edges of the pocket. Going away is the obvious one: the user put the phone down and the
   // app may stay suspended for a good while, so whatever is queued has to leave now. Coming back is
@@ -275,6 +289,7 @@ export function startTelemetry(options: TelemetryOptions = {}): () => void {
     if (state.timer) state.cancel(state.timer);
     state.timer = null;
     subscription.remove();
+    for (const uninstall of uninstallCapture) uninstall();
     if (previous) ErrorUtils.setGlobalHandler?.(previous);
   };
 }

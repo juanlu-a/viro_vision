@@ -45,3 +45,40 @@ def test_a_paired_device_is_reported_as_bonded():
 
 def test_a_device_that_never_reported_paired_is_not_bonded():
     assert _is_bonded({}) is False
+
+
+def test_links_from_before_the_restart_are_dropped_once():
+    """Board 2026-10-07: after the watchdog restarted the daemon, the phone stayed on the old link
+    and heard nothing for a minute and a half. The new process must drop that link so the app
+    reconnects to it, and only once: a later connection is a live one."""
+    import asyncio
+
+    from virovision.link import CentralWatcher
+
+    class _Bus:
+        def __init__(self):
+            self.calls = []
+
+        async def call(self, message):
+            self.calls.append((message.path, message.interface, message.member))
+
+    watcher = CentralWatcher()
+    watcher._at_startup = ["/org/bluez/hci0/dev_4A_BF_11_22_33_44"]
+    bus = _Bus()
+    asyncio.run(watcher.drop_links_from_before(bus))
+    asyncio.run(watcher.drop_links_from_before(bus))
+    assert bus.calls == [("/org/bluez/hci0/dev_4A_BF_11_22_33_44", "org.bluez.Device1", "Disconnect")]
+
+
+def test_a_link_that_is_already_gone_does_not_stop_the_startup():
+    import asyncio
+
+    from virovision.link import CentralWatcher
+
+    class _Bus:
+        async def call(self, message):
+            raise RuntimeError("org.bluez.Error.NotConnected")
+
+    watcher = CentralWatcher()
+    watcher._at_startup = ["/org/bluez/hci0/dev_4A_BF_11_22_33_44"]
+    asyncio.run(watcher.drop_links_from_before(_Bus()))  # no exception

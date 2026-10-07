@@ -5,8 +5,8 @@
  * (the ADR 0003 spike, already decided in favour of WiFi) and the raw dump of what the device
  * reports about itself. With the logs in Supabase that is read where a log is read, not on the
  * screen of someone who does not see it. What stays is what the user can use or needs to know:
- * whether the device is there, how its network is doing, its battery, and the notices when
- * something fails on it.
+ * whether the device is there, how its network is doing and its battery. Since 2026-10-06 not even
+ * the device's error notices: every error goes to telemetry and none to the user.
  */
 import { View } from 'react-native';
 
@@ -18,6 +18,7 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import type { ThemeColor } from '@/constants/theme';
+import { notify } from '@/features/audio/systemNotice';
 import { useDevice } from '@/features/device/DeviceProvider';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -32,12 +33,9 @@ const TONE_COLOR: Record<ConnectionTone, ThemeColor> = {
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { connection, wifi, wifiDetail, lastNotice, connect, disconnect } = useDevice();
-  // The Wi-Fi status line (off / joining / ready) is gone since 2026-09-09: it was device console,
-  // and the app stopped being its own console. What stays is the REASON something did not work,
-  // because for someone who does not see the screen that is the only explanation of why the button
-  // did nothing. `wifiDetail` only appears when the network failed and it says what to do.
-  const problem = wifiDetail ?? lastNotice;
+  // No error panel since 2026-10-06: the device's own notices and the reason the network failed
+  // go to telemetry only. The status line below already says what is missing, in plain language.
+  const { connection, wifi, connect, disconnect } = useDevice();
 
   const isConnected = connection.status === 'connected';
   const isBusy = connection.status === 'scanning' || connection.status === 'connecting';
@@ -54,7 +52,10 @@ export default function ConnectScreen() {
       // gesture, applied to the only thing this screen reports. If an operation is already in
       // flight, the gesture does not step on it.
       onRefresh={async () => {
-        if (!isBusy) await connect();
+        // Connected already means fresh: the status arrives on its own every 15 s, so the gesture
+        // only confirms out loud — a silent gesture is indistinguishable from a broken one.
+        if (isConnected) await notify('connected');
+        else if (!isBusy) await connect();
       }}>
       <ScreenHeader title={t.title} subtitle={t.intro} />
 
@@ -80,14 +81,6 @@ export default function ConnectScreen() {
       {isConnected && connection.device && (
         <Card>
           <DeviceSummary device={connection.device} />
-          {problem && (
-            <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${t.deviceErrorLabel}: ${problem}`}>
-              <ThemedText type="small" themeColor="danger">
-                {t.deviceErrorLabel}
-              </ThemedText>
-              <ThemedText type="small">{problem}</ThemedText>
-            </View>
-          )}
         </Card>
       )}
 

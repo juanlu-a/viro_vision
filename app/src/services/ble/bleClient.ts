@@ -86,11 +86,11 @@ export interface BleClient {
    */
   playNotice(clip: string): Promise<void>;
   /**
-   * Corta lo que esté sonando en el parlante de la placa.
+   * Cuts whatever is playing on the board's speaker.
    *
-   * Se manda **antes de que hable el teléfono**. Cada salida sabía interrumpirse a sí misma y
-   * ninguna a la otra, así que dos voces podían quedar encimadas — y para quien no ve la pantalla,
-   * dos voces simultáneas no son información.
+   * Sent **before the phone speaks**. Each output knew how to interrupt itself and neither the
+   * other, so two voices could end up overlapping — and for someone who cannot see the screen, two
+   * simultaneous voices are not information.
    */
   hushDevice(): Promise<void>;
   /**
@@ -118,6 +118,18 @@ export class BleDeviceNotFoundError extends Error {
   constructor() {
     super('BLE_DEVICE_NOT_FOUND');
     this.name = 'BleDeviceNotFoundError';
+  }
+}
+
+/**
+ * The phone's Bluetooth is off or the app is not allowed to use it. Its own type because the remedy
+ * is the user's and different: until 2026-10-06 this surfaced as "device not found — check it is on
+ * and near", sending someone who cannot see the screen to fiddle with a device that was fine.
+ */
+export class BleRadioOffError extends Error {
+  constructor(readonly state: string) {
+    super('BLE_RADIO_OFF');
+    this.name = 'BleRadioOffError';
   }
 }
 
@@ -191,7 +203,7 @@ const stubClient: BleClient = {
     if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
   },
   async hushDevice() {
-    /* no hay placa que callar */
+    /* there is no board to hush */
   },
   isLinked() {
     // False in a build with no BLE, and false in the simulated one too: the simulated device has no

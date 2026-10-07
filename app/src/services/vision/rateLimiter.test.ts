@@ -2,6 +2,7 @@
  * The clock and the wait are injected in every case: a test relying on the real `Date.now()` and
  * `setTimeout` would have to wait an actual minute to exercise the sliding window.
  */
+import { VisionQuotaError } from './errors';
 import { acquireSlot, remainingSlots, resetRateLimiter } from './rateLimiter';
 
 afterEach(resetRateLimiter);
@@ -103,5 +104,46 @@ describe('acquireSlot', () => {
 describe('remainingSlots', () => {
   it('starts with the whole window available', () => {
     expect(remainingSlots('model', 1_000_000)).toBe(17);
+  });
+});
+
+describe('acquireSlot with a wait cap', () => {
+  // The bug of 2026-10-06: a 45 s wait announced inside a 12 s reading deadline could never finish.
+  it('throws an exhausted quota instead of starting a wait longer than the cap', async () => {
+    resetRateLimiter();
+    const now = () => 0;
+    await acquireSlot('capped', { now, maxPerWindow: 1 });
+    let waits = 0;
+    await expect(
+      acquireSlot('capped', { now, maxPerWindow: 1, maxWaitMs: 5_000, onWait: () => (waits += 1) })
+    ).rejects.toBeInstanceOf(VisionQuotaError);
+    expect(waits).toBe(0);
+  });
+});
+
+describe('acquireSlot under the wait cap', () => {
+  it('still waits and announces when the wait fits, and reports the seconds when it does not', async () => {
+    resetRateLimiter();
+    let t = 0;
+    const now = () => t;
+    await acquireSlot('fits', { now, maxPerWindow: 1 });
+    const waits: number[] = [];
+    await acquireSlot('fits', {
+      now,
+      maxPerWindow: 1,
+      maxWaitMs: 120_000,
+      onWait: (ms) => waits.push(ms),
+      sleep: async (ms) => {
+        t += ms;
+      },
+    });
+    expect(waits).toHaveLength(1);
+
+    resetRateLimiter();
+    t = 0;
+    await acquireSlot('tight', { now, maxPerWindow: 1 });
+    const err = await acquireSlot('tight', { now, maxPerWindow: 1, maxWaitMs: 1_000 }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(VisionQuotaError);
+    expect((err as VisionQuotaError).retryAfterSeconds).toBeGreaterThan(1);
   });
 });

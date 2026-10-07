@@ -76,8 +76,23 @@ const MAX_PER_WINDOW = 30;
  * the spending cap at each provider, plus being able to switch this function off.
  */
 const hits = new Map<string, number[]>();
+let sweptAt = 0;
+
+/**
+ * Drops the IPs whose window is empty, at most once per window (2026-10-06). Without it every
+ * address ever seen kept its entry for the isolate's lifetime — and with the IP taken from a header
+ * the client writes, minting a new "address" per request grew the map without bound.
+ */
+function sweep(now: number): void {
+  if (now - sweptAt < WINDOW_MS) return;
+  sweptAt = now;
+  for (const [ip, times] of hits) {
+    if (times.every((t) => now - t >= WINDOW_MS)) hits.delete(ip);
+  }
+}
 
 function overTheBrake(ip: string, now: number): boolean {
+  sweep(now);
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   if (recent.length >= MAX_PER_WINDOW) {
     hits.set(ip, recent);
@@ -86,6 +101,32 @@ function overTheBrake(ip: string, now: number): boolean {
   recent.push(now);
   hits.set(ip, recent);
   return false;
+}
+
+/**
+ * Who is asking, as far as the brake can tell.
+ *
+ * ⚠️ UNVERIFIED (2026-10-06): which of these headers the Supabase edge runtime actually forwards,
+ * and which of them it overwrites rather than passes through from the client, has not been checked
+ * against a deployed function. Check it after deploying (log the three headers from a phone and
+ * from a curl that sets them by hand) and drop whatever turns out to be forgeable.
+ *
+ * The order is what is safest without that check:
+ *   - `cf-connecting-ip`: if Supabase's edge sits behind Cloudflare, Cloudflare sets it itself and
+ *     overwrites whatever the client sent.
+ *   - `x-real-ip`: set by the usual reverse proxies (nginx, Kong) to the address they saw.
+ *   - the FIRST entry of `x-forwarded-for`: all this used until 2026-10-06, and whatever the client
+ *     wrote there. Last resort only, so no ordering here is worse than before.
+ * Not the LAST `x-forwarded-for` entry: that is the nearest proxy's own address, the same for every
+ * phone, and keying on it would turn a per-phone brake into one shared by all of them.
+ */
+function clientIp(request: Request): string {
+  return (
+    request.headers.get('cf-connecting-ip')?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown'
+  );
 }
 
 function json(status: number, body: unknown): Response {
@@ -98,9 +139,7 @@ function json(status: number, body: unknown): Response {
 Deno.serve(async (request: Request): Promise<Response> => {
   if (request.method !== 'POST') return json(405, { error: { message: 'POST only.' } });
 
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  if (overTheBrake(ip, Date.now())) {
+  if (overTheBrake(clientIp(request), Date.now())) {
     // The same code providers use for quota: the client already knows how to tell it apart and wait
     // instead of aborting the series.
     return json(429, {

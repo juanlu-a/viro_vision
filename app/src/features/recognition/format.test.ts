@@ -56,6 +56,7 @@ describe('a bus reading with a destination', () => {
   it('says the destination alone when the number was not read', () => {
     // Reported 2026-09-23: the board decided "Bus CIUDAD VIEJA" with no number and the phone said
     // "Línea…" then a silence, then the destination.
+    expect(toAnnouncement(event({ kind: 'bus_line', label: '', confidence: 0.9 }))).toBe('Se acerca un ómnibus.');
     expect(toAnnouncement(event({ kind: 'bus_line', label: '', detail: 'CIUDAD VIEJA', confidence: 0.9 }))).toBe(
       'CIUDAD VIEJA'
     );
@@ -65,5 +66,16 @@ describe('a bus reading with a destination', () => {
     expect(toAnnouncement(event({ kind: 'product', label: 'Yerba Canarias', confidence: 0.9 }))).toBe(
       'Yerba Canarias'
     );
+  });
+});
+
+describe('toAnnouncement with an unnamed bus among the others', () => {
+  it('leaves it out instead of saying "También: Se acerca un ómnibus"', () => {
+    const event: RecognitionEvent = {
+      timestamp: 0,
+      primary: { kind: 'bus_line', label: '183', confidence: 0.9 },
+      others: [{ kind: 'bus_line', label: '', confidence: 0.5 }],
+    };
+    expect(toAnnouncement(event, true)).toBe('Línea 183');
   });
 });

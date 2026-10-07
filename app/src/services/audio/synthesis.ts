@@ -7,23 +7,24 @@
  * BLE/WiFi (`docs/architecture/README.md`). `expo-speech` uses the system engine and **does not
  * export to a file**, so the file has to come from a cloud TTS.
  *
- * **Off by default.** Nothing consumes the file today: the hardware does not exist, and when it does
- * there is an open decision (ADR 0003) that may make it unnecessary — if the transport ends up being
- * BLE, it may be better for the Raspberry Pi to do its own TTS and only receive the JSON. A ~3 s MP3
- * at 32 kbps is ~12 KB: over WiFi that is nothing, over GATT it is on the order of seconds. In the
- * meantime, leaving it on would mean paying for an API call on every reading to produce a file
- * nobody opens.
+ * **Off by default** (`EXPO_PUBLIC_AUDIO_FILE_ENABLED=1` turns it on). It is the cost switch: every
+ * synthesis is a paid cloud call, so a build that does not send audio to the device must not make
+ * one. A ~3 s MP3 at 32 kbps is ~12 KB: over WiFi that is nothing, over GATT it is on the order of
+ * seconds, which is why the file travels by HTTP over WiFi (ADR 0003).
  *
- * **It never blocks the announcement.** It is called after `announce()` and without `await` on the
- * critical path: if it fails, the user has already heard the product. That is what it means for
- * accessibility to be the design criterion and not a layer — the file exists for hardware that does
- * not exist yet, and it cannot degrade what works today.
+ * **Who consumes it.** The reading pipeline (`sendReadingToDevice` in
+ * `features/reader/readingService.ts`) synthesizes and **awaits** the send when the user chose the
+ * device's speaker: there the file can be the only output, and it has to finish inside the audio
+ * session that `requestReading` holds open (the phone locked in a pocket). It never throws, and on
+ * any failure the caller falls back to the phone, so the user is never left with silence. Bus mode
+ * still sends a best-effort, unawaited copy that never blocks the announcement.
  */
-import { Directory, File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 
 import { isProxyConfigured, proxyUrl, resolveTransport } from '@/services/cloud';
 import type { CloudRequest } from '@/services/cloud';
+import { cacheFolder } from '@/services/storage/cacheFolder';
 
 import { SpeechNotConfiguredError, SpeechHttpError } from './errors';
 
@@ -124,6 +125,7 @@ export function speechFileName(when: Date): string {
 export async function synthesizeToFile(
   text: string,
   when: Date = new Date(),
+  signal?: AbortSignal,
 ): Promise<string> {
   if (!isSynthesisEnabled) throw new SpeechNotConfiguredError('AUDIO_FILE_DISABLED');
   // With the proxy on, the server supplies the key, so not having it here is not a problem.
@@ -136,6 +138,7 @@ export async function synthesizeToFile(
     method: 'POST',
     headers: request.headers,
     body: JSON.stringify(request.body),
+    signal,
   });
 
   if (!response.ok) {
@@ -145,8 +148,8 @@ export async function synthesizeToFile(
   // The endpoint returns the MP3 as binary, not base64: bytes have to be written, not a string.
   const bytes = new Uint8Array(await response.arrayBuffer());
 
-  const folder = new Directory(Paths.cache, FOLDER);
-  if (!folder.exists) folder.create({ idempotent: true });
+  // The previous one may still be playing on the device; older ones are never read again.
+  const folder = cacheFolder(FOLDER, 1);
 
   const file = new File(folder, speechFileName(when));
   file.create({ overwrite: true });

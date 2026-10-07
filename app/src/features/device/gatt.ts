@@ -101,15 +101,16 @@ export function noticeCommand(clip: string): string {
 }
 
 /**
- * El comando que calla el parlante de la placa.
+ * The command that silences the board's speaker.
  *
- * Existe porque cada salida sabía interrumpirse a sí misma y ninguna sabía interrumpir a la otra: el
- * teléfono llama a `Speech.stop()` antes de hablar, la placa corta el `aplay` anterior antes de
- * reproducir, y con las dos sonando a la vez —cambiando el ajuste a mitad de un anuncio, por
- * ejemplo— quedaban dos voces encimadas. Para quien no ve la pantalla, dos voces simultáneas no son
- * información: son ruido (el mismo motivo que ya está escrito en `hardware/raspi/virovision/audio.py`).
+ * It exists because each output knew how to interrupt itself and neither knew how to interrupt the
+ * other: the phone calls `Speech.stop()` before speaking, the board cuts the previous `aplay`
+ * before playing, and with both sounding at once —changing the setting mid-announcement, for
+ * example— two voices ended up overlapping. For someone who cannot see the screen, two simultaneous
+ * voices are not information: they are noise (the same reason already written in
+ * `hardware/raspi/virovision/audio.py`).
  *
- * Sin datos: no hay nada que configurar, es «callate ahora».
+ * No payload: there is nothing to configure, it is "shut up now".
  */
 export function hushCommand(): string {
   return JSON.stringify({ cmd: 'hush' });

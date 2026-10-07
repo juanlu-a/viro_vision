@@ -3579,3 +3579,177 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   está cargando; calibrar la curva contra una descarga real con el medidor USB; anunciar la batería por
   voz al conectar.
 
+
+## 2026-10-06 (cont. 4) — Revisión del codebase entero, y los errores sólo a la telemetría (ADR 0011)
+
+- **Pedido**: revisar todo el código (app y placa) con el loop de revisión multi-modelo, optimizar y
+  ordenar, todo en un PR; y que **la app no muestre errores**: cualquier error o log va a Supabase,
+  y el usuario no se entera.
+- **Cómo**: rama `chore/codebase-review-silent-telemetry` en un worktree aparte (hay sesiones
+  paralelas sobre el checkout). Revisores en paralelo — Opus sobre la app, Opus sobre la placa y
+  Supabase, Sonnet transversal, Haiku (sin hallazgos) — y después dos rondas más sobre el diff hasta
+  que no quedó ningún crítico ni mayor. Codex no corrió: la cuenta de ChatGPT no soporta el modelo
+  que pide.
+- **La decisión (ADR 0011)**: el texto de un error no llega nunca a la pantalla ni a la voz. Se
+  cortaron `La nube no respondió (VISION_HTTP_500)`, la foto fallida que leía en voz alta `the
+  device did not answer in 4 s`, la IP y el error del sistema al unirse a la red, y los avisos de la
+  placa dichos tal cual (`unknown command: say`). Lo que queda es una frase fija de `es.ts` que dice
+  qué hacer — **callar del todo no es opción**: el silencio después del botón es un dispositivo roto
+  para quien no ve. Los avisos internos (placa, escritura de modo) sí se callan del todo, y la
+  pestaña Dispositivo perdió el panel de «último aviso».
+- **Lo que antes no llegaba a ningún lado y ahora llega a `events`**: `console.*` (`app.log`, con
+  presupuesto), promesas rechazadas sin manejar (tracker de Hermes, sólo en release), errores de
+  dibujo (`ErrorBoundary` raíz con pantalla neutra → `app.renderError`), los `catch` silenciosos del
+  cliente BLE (`ble.monitorError`, `ble.readFailed`) y **los logs de la placa**: `log_relay.py` manda
+  las líneas WARNING+ como `{t:'log'}` por BLE (10/min, las últimas 20 guardadas mientras no hay
+  teléfono, con `ago` al reenviarlas) y la app las guarda como `device.log`. La telemetría arranca a
+  nivel de módulo: desde el efecto del layout se encendía después de que montaban los providers.
+- **Bugs reales encontrados y arreglados en la app**:
+  - `withTimeout` de `join.ts` lanzaba dentro del timer: **el tope de 25 s de la unión al WiFi nunca
+    cortaba nada** y la red podía quedar «uniéndose» para siempre.
+  - Refrescar la pestaña Dispositivo estando conectado **apilaba otra tanda de monitores BLE**: todo
+    evento, modo y estado llegaba dos veces. Además ble-plx no cancela el monitor nativo al
+    `remove()`, así que los callbacks llevan ahora una generación de enlace.
+  - Una espera de cuota de 45 s se anunciaba («Sigo en 45 s») dentro de un plazo de 12 s y el plazo
+    la cortaba con «Tardó demasiado». Ahora, si no entra (con 5 s de reserva para la llamada), falla
+    al instante como cuota agotada.
+  - La entrega de la lectura al parlante de la placa no tenía tope: un POST colgado dejaba la
+    lectura «en curso» y cada botón se ignoraba. Tope de 8 s; si vence, habla el teléfono.
+  - El caché de fotos y de MP3 crecía sin límite; ahora queda el último.
+  - Bluetooth apagado decía «no encontré el dispositivo»; ahora tiene su error y su frase.
+  - Desconectar mientras conectaba anunciaba igual la conexión.
+- **Bugs reales en la placa**: el **modo ómnibus moría para siempre después de un reinicio de la
+  cámara** (el loop de frames quedaba con el handle viejo y el watchdog reiniciaba en bucle,
+  recargando el `.rpk`); un nombre de red largo pasaba el `status` de 180 bytes y **el daemon
+  entraba en crash-loop**; `measure` por BLE aceptaba cualquier tamaño (OOM); `/audio` llenaba
+  `/tmp` (tmpfs = RAM); `ip`/`nmcli` corrían sobre el loop que atiende BLE; carreras en la cola de
+  audio y en el arranque/parada del modo ómnibus. La función de telemetría valida evento por evento y
+  reintenta fila por fila: un evento malo ya no tira un lote de 100.
+- **Ordenado**: comentarios en español traducidos (ADR 0009), docblocks que contradecían el código,
+  código muerto (`storage/settings.ts`, `text-field.tsx`, el `reset-project` de la plantilla de Expo,
+  cadenas sin uso).
+
+- **Probado en la placa (Zero 2 W, 21:17)**: daemon de la rama desplegado (respaldo en
+  `~/virovision/virovision.old-20261006-211301`). Nuevo comando BLE `restart_camera` +
+  `tools/restart_camera.py` para forzar el reinicio, que hasta ahora sólo pasaba si la cámara fallaba.
+  En modo ómnibus: 76 frames cada 5 s → `restart_camera` → **frames otra vez a los 1,5 s**, 75-77 cada
+  5 s durante el minuto siguiente, **sin recargar el `.rpk`** (no aparece `detector loaded into the
+  sensor`). Y el relay de logs anduvo de punta a punta: los dos avisos del reinicio llegaron por BLE
+  como `{t:'log', lvl:'error'|'warning', src:'bus'}`.
+
+- **Funciones desplegadas desde la rama, antes del merge** (`telemetry` y `vision`, `--use-api`).
+  `telemetry` probada con un lote de tres eventos, uno con `at` inválido: `{"stored":2,"dropped":1}`
+  (antes el malo tiraba el lote entero); JSON roto → 400. Las filas de prueba (`phone =
+  'deploy-check'`) se borraron. `vision` responde 405/400 como antes.
+
+### Pendientes de esta sesión
+- **La cabecera de IP de `vision`** sigue sin verificar (`cf-connecting-ip` / `x-real-ip`): hace
+  falta loguearlas un momento y pegarle desde el teléfono y con un `curl` que las falsifique.
+- **Detecciones después del reinicio**: en la prueba no había nada delante de la cámara (0
+  detecciones antes y después), así que falta confirmar que el detector del sensor sigue detectando
+  con el handle del IMX500 reutilizado: repetir con un cartel o un ómnibus en pantalla delante de la
+  cámara. Si vuelven frames sin detecciones, el fallback es `self._imx500 = None` en `_restart`.
+- Reiniciar el daemon con el teléfono conectado y ver `device.log` en la tabla; `systemctl stop` con
+  NetworkManager lento.
+- **Sin tocar, a decidir**: `features/auth` y `services/supabase` no se montan en ningún lado
+  (login planeado); dependencias que nadie importa (`@expo/ui`, `expo-device`, `expo-web-browser`,
+  `expo-glass-effect`) — sacarlas cambia el build nativo; el botón de leer en modo ómnibus corre OCR
+  en el teléfono y descarga ~250 MB la primera vez; anunciar la batería baja por voz; selector de
+  modelo y de salida duplicados (`RadioSheet`); la AP con contraseña fija en el repo.
+
+## 2026-10-06 (cont. 5) — El ómnibus se detecta bien; la línea y el destino, no: sólo se dice lo que el catálogo conoce
+
+- **Prueba de campo** (fotos de ómnibus en el celular delante de la cámara): la detección del
+  ómnibus anduvo siempre, pero la línea y el destino salían mal o **deletreados**. Sólo la foto
+  nítida de la 330 Mendoza se leyó bien.
+- **El journal lo explica, y no es la cámara**: los carteles llegan al OCR con unos 30 px de alto de
+  texto y con moiré de pantalla, así que muchas lecturas son basura (`1M12 MITEUE`, `U2 NOEVR`). Lo
+  que fallaba era la decisión: (1) un número que no existe se votaba a medio voto y cuatro lecturas
+  de `1M12` sumaban «Bus 1»; (2) un destino que el catálogo no reconocía se anunciaba **tal cual**, y
+  el TTS no puede hacer otra cosa con `U2 NOEVR` que deletrearlo; (3) la regla del ícono pegado
+  recortaba dígitos hasta encontrar una línea (`92` → línea 2).
+- **Arreglo en `bus-banner-recognizer`, PR #5** (apilado sobre el #4): sólo se dice lo que el
+  catálogo conoce. Destino sin coincidencia → no se dice (queda en `raw`); línea inexistente → no se
+  dice; la regla del ícono saca un solo dígito. La coincidencia aproximada mejoró (dígitos por letras
+  en palabras, sin espacios: `MEMID0ZAE` y `ME MDOZA E` son MENDOZA) con resguardos contra elegir un
+  destino real pero equivocado (mínimo 4 letras, margen de 0,05 sobre el mejor lugar *distinto*, las
+  variantes ortográficas del mismo lugar no compiten). `FUERA DE SERVICIO` se sumó al catálogo.
+- **Medido** (`bus-banner evaluate`, 117 imágenes): destino **76,8 % → 89,3 %**, lectura completa
+  87,5 % → 89,6 %, número igual (89,6 %). Revisión multi-modelo en tres rondas hasta no dejar críticos
+  ni mayores; dos de las rondas encontraron fallas reales de la primera versión (las variantes del
+  mismo lugar se anulaban entre sí: 41 de 257 destinos dejaban de reconocerse).
+- **Desplegado en la placa** (`b08a8c4`), con el catálogo nuevo en `~/models/catalog_stm.csv`
+  (respaldo `.bak-20261006`).
+
+### Pendientes
+- **Volver a probar** con las mismas fotos: lo esperable es menos anuncios con destino, pero ninguno
+  inventado ni deletreado.
+- El techo real es la **resolución del cartel**: ~30 px de alto en un cuadro de 1024 px. Probar un
+  stream principal más grande o un recorte del cartel a resolución completa del sensor, midiendo el
+  costo en la Zero 2 W.
+- Probar con un ómnibus de verdad: el moiré de una pantalla fotografiada no es el de un LED.
+
+## 2026-10-07 — El catálogo completa la mitad del cartel que el OCR no leyó
+
+- **Pedido**: usar el catálogo de líneas como pares (línea, destino) de respaldo. Si el OCR capta
+  sólo la línea o sólo el destino, el catálogo completa la otra mitad, siempre que la confianza del
+  OCR sea **menor a 0,8**.
+- **Arreglo en `bus-banner-recognizer`, PR #6** (apilado sobre el #5):
+  - Se completa sólo lo que no es ambiguo:
+    - Un destino que sirve **una sola línea** da esa línea. Contando las variantes ortográficas como
+      un solo lugar, eso cubre 116 de los 257 destinos.
+    - Una línea que va a **un solo lugar** da ese destino (`270` → PORTONES).
+    - Casi todas las líneas tienen dos terminales, así que «sólo la línea» rara vez se completa.
+  - Lo inferido queda marcado en `Reading.inferred`.
+- **Resguardos**, que salieron de la revisión multi-modelo (tres rondas, dos con fallas reales):
+  - Nunca se infiere una línea encima de dígitos que el OCR sí leyó (`999` o `1` + LUIS BRAILLE).
+  - Lo inferido **no vota**: la misma lectura dudosa vuelve cuadro a cuadro y se daría la razón a sí
+    misma. Sólo llena una mitad que los votos dejaron vacía:
+    - La línea deducida del destino se dice después de la misma paciencia que antes esperaba el
+      destino solo.
+    - El terminal único de una línea leída se dice sin esperar.
+  - Un número leído no se anuncia con el destino de otra línea («330, Luis Braille»).
+- **Medido**: `bus-banner evaluate` no cambia (89,6 / 89,3 / 89,6 %), porque el set tiene casi todo
+  confianza alta. Las lecturas basura de la prueba del 2026-10-06, repetidas a confianza 0,6, no
+  completan nada.
+- **Desplegado en la placa** (`8d9b33f`). El despliegue corta el SSH al reiniciar el daemon; se bajó
+  el AP con `tools/ap.py`, se verificó y se volvió a prender.
+
+### Pendientes
+- Probar en la placa con fotos donde sólo se vea una mitad del cartel.
+- Límite conocido: el Watcher no tiene catálogo. Un número y un destino de varias líneas, leídos en
+  cuadros distintos, se emparejan sin verificar que el par exista. Pasa desde antes; está documentado
+  en `_decide_reading`.
+- Los PRs #4 → #5 → #6 de Magui siguen apilados sin mergear.
+
+## 2026-10-07 (cont.) — El botón «se congelaba»: la app quedaba en un enlace a un daemon que ya no existía
+
+- **Reporte**: después de prender la placa, el botón puso el modo ómnibus y después la app dejó de
+  responder a la placa. Cerrar y abrir la app reconectó, pero el botón seguía sin hacer nada, aunque
+  los modos andaban desde el celular. Un rato después el botón volvió a funcionar.
+- **Lo que dicen el journal y la telemetría** (el reloj de la placa iba 2:28 atrás del teléfono):
+  1. A los 33 s del arranque, libcamera dio `Camera frontend has timed out!`: la cámara se trabó al
+     arrancar. Sin baja tensión (`get_throttled=0x0`).
+  2. El botón puso el modo ómnibus, no llegó ningún cuadro, y el watchdog reinició el daemon para
+     liberar la cámara. Esa recuperación anduvo, unos 25 s.
+  3. **El teléfono siguió conectado al daemon viejo**: BlueZ conserva el enlace, pero el proceso
+     nuevo registra otra aplicación GATT y las suscripciones del teléfono ya no llevan a ningún
+     lado. Durante un minuto y medio el botón cambió modos (ocioso, supermercado con lectura,
+     ómnibus) y la app no se enteró de nada.
+  4. Al reabrir la app, la placa estaba en ómnibus, donde **un clic quiere decir «repetir»**. Sin
+     nada para repetir, se queda en silencio (`bus: nothing to repeat yet`, cuatro veces). Para quien
+     lo usa, eso es «el botón no anda».
+- **Arreglo** (en el PR #112, que ya tocaba ese código): al arrancar, el daemon **corta los enlaces
+  que venían de antes** (`CentralWatcher.drop_links_from_before`, `Device1.Disconnect`). La app
+  reconecta sola, como después de cualquier corte, y se suscribe al proceso que está corriendo.
+  - Se hace después de empezar a anunciarse y sin esperarlo: cada corte tarda ~2 s y la primera
+    versión retrasaba el anuncio 4,5 s con dos enlaces viejos.
+  - **Probado en la placa**: con la Mac conectada por BLE, reinicio del daemon → «dropped the link
+    from before this process» a los 3 s; la placa se anuncia sin demora.
+
+### Pendientes
+- El clic en modo ómnibus sin nada para repetir no dice nada. Falta decidir qué tiene que decir,
+  por ejemplo el modo actual.
+- La cámara trabándose al arrancar (`frontend timed out`) ya pasó más de una vez. La recuperación
+  funciona, pero cuesta ~25 s. Habría que mirar si arrancar la cámara después de que el IMX500
+  termine de cargar su firmware (≈22 s del arranque) lo evita.

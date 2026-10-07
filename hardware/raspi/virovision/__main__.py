@@ -24,8 +24,9 @@ from .bus import DEFAULT_CATALOG as BUS_DEFAULT_CATALOG
 from .bus import DEFAULT_MODEL as BUS_DEFAULT_MODEL
 from .bus import BusWatcher
 from .camera import Camera, synthetic_payload
+from .log_relay import LogRelay
 from .notices import SYSTEM_DIR
-from .state import local_ip, read_status
+from .state import NetworkSnapshot, local_ip, read_status
 from .http_server import DEFAULT_PORT, HttpServer
 from .gatt import ADVERTISED_NAME, SERVICE_UUID, ViroVisionService
 from .modes import Mode
@@ -34,6 +35,8 @@ from .link import CentralWatcher, log_existing_bonds, report_visibility, set_bon
 log = logging.getLogger("virovision")
 
 STATUS_EVERY_SECONDS = 15
+AP_REFRESH_WAIT_S = 10.0
+"""How long an AP change waits for a network refresh already in flight before giving up on its own."""
 
 
 def _arguments() -> argparse.Namespace:
@@ -89,8 +92,26 @@ async def _get_adapter(bus, hci: str) -> Adapter:
     return Adapter(bus.get_proxy_object("org.bluez", path, introspection))
 
 
+def _log_task_failure(task: asyncio.Task) -> None:
+    """A background task's exception otherwise surfaces only as "Task exception was never retrieved",
+    whenever the garbage collector gets to it — or never, for a task held in a variable (2026-10-06)."""
+    if not task.cancelled() and task.exception() is not None:
+        log.error("%s failed", task.get_name(), exc_info=task.exception())
+
+
 async def _main(args: argparse.Namespace) -> None:
     loop = asyncio.get_running_loop()
+    # Right away, not after startup (2026-10-06): startup takes from seconds to minutes (BlueZ, the
+    # AP's retries), and a SIGTERM in that window killed the process on Python's default handler
+    # without the shutdown below — a reading left playing with no daemon behind it.
+    stop = asyncio.Event()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop.set)
+
+    # The journal's warnings and errors, to the phone (`log_relay.py`). Installed first so the boot —
+    # where the camera and the AP fail if they are going to — is buffered for the first phone.
+    relay = LogRelay()
+    logging.getLogger().addHandler(relay)
 
     camera = Camera(model=None if args.no_bus else args.bus_model)
     # The camera is NOT started here: it starts in the background once the board is advertising
@@ -104,9 +125,27 @@ async def _main(args: argparse.Namespace) -> None:
     # the app knows where to download the photo from. The capture is the same blocking function BLE
     # uses.
     ap = AccessPoint()
+    network = NetworkSnapshot(ap.active_connection)
 
     def ap_control(on: bool) -> None:
-        ap.turn_on() if on else ap.turn_off()
+        """Runs in an executor (`Core._toggle_ap`), so the snapshot is refreshed right here: the
+        status the core pushes next must already carry the AP's address, or the phone learns where to
+        download the photo from only on the next heartbeat."""
+        try:
+            if on:
+                ap.turn_on()
+            else:
+                ap.turn_off()
+        finally:
+            network.refresh(wait_s=AP_REFRESH_WAIT_S)
+
+    def status() -> dict:
+        """The one status, for BLE and HTTP alike. It reads only memory: the network lookups are
+        refreshed off the loop (`NetworkSnapshot`). `camera.available` and not a flag taken at
+        startup: if a capture hangs the camera restarts, and if it does not come back, the status has
+        to say so."""
+        name, ip = network.current
+        return read_status(camera=camera.available, http_port=None if args.no_http else args.port, ap=ap.on, network=name, ip=ip)
 
     # The device's speaker. It is built even with `--no-http`, so the log says at startup whether
     # there is anything on this board able to play a reading. The level is set here and not left to
@@ -140,9 +179,7 @@ async def _main(args: argparse.Namespace) -> None:
     http = None
     if not args.no_http:
         http = HttpServer(
-            # `camera.available` and not a flag taken at startup: if a capture hangs the camera restarts, and if
-            # it does not come back, the status has to say so.
-            read_status=lambda: read_status(camera=camera.available, http_port=args.port, ap=ap.on, network=ap.active_connection()),
+            read_status=status,
             synthetic_payload=synthetic_payload,
             capture=camera.capture_jpeg if wants_camera else None,
             port=args.port,
@@ -161,7 +198,7 @@ async def _main(args: argparse.Namespace) -> None:
 
     service = ViroVisionService(
         loop=loop,
-        read_status=lambda: read_status(camera=camera.available, http_port=args.port if http else None, ap=ap.on, network=ap.active_connection()),
+        read_status=status,
         capture=capture,
         synthetic_payload=synthetic_payload,
         ap_control=ap_control,
@@ -170,8 +207,25 @@ async def _main(args: argparse.Namespace) -> None:
         # debug the pipeline without the board talking over you.
         say=None if args.no_audio else say,
         hush=None if args.no_audio else player.stop,
+        restart_camera=camera.restart if wants_camera else None,
     )
     await service.register(bus, adapter=adapter)
+    relay.attach(service.core.emit_event)
+    service.on_status_read = relay.subscriber_ready
+
+    def _push_status(refresh: asyncio.Future) -> None:
+        if not refresh.cancelled() and refresh.exception() is not None:
+            log.error("network refresh failed", exc_info=refresh.exception())
+        service.notify_status()
+
+    async def _refresh_network() -> None:
+        await loop.run_in_executor(None, network.refresh)
+        service.notify_status()
+
+    # The first lookup, off the loop and without waiting for it: with NetworkManager still coming up
+    # it can take the whole `nmcli` timeout, and advertising does not wait for that.
+    network_task = asyncio.create_task(_refresh_network(), name="network-refresh")
+    network_task.add_done_callback(_log_task_failure)
 
     # Bus mode (ADR 0006, amended 2026-09-07): the detector already lives in the sensor, so what is
     # wired here is who speaks and where the reading goes. Built after the service because it emits
@@ -231,13 +285,22 @@ async def _main(args: argparse.Namespace) -> None:
     await log_existing_bonds(bus, f"/org/bluez/{args.hci}")
     # Who connects and who leaves, in the journal. Until 2026-09-13 the board said nothing about the
     # link at all, and "the app finds nothing" had two indistinguishable causes.
-    centrals = CentralWatcher()
+    centrals = CentralWatcher(on_change=lambda anyone: None if anyone else relay.central_gone())
     await centrals.start(bus)
+    # A phone already connected at startup (the daemon restarted under a live link) is NOT taken as
+    # subscribed: the GATT application was registered again with fresh notify state, and replaying
+    # the boot buffer then would send the boot errors to nobody. The buffer waits for the first
+    # `status` read — the next connection's, at worst (2026-10-06). That link is dropped right after
+    # advertising starts (below), so the phone reconnects to this process.
 
     # timeout 0 = advertise until the process dies; the device has to be discoverable always, because
     # the app reconnects on its own when it comes back into range.
     advert = Advertisement(args.name, [SERVICE_UUID], 0x0000, 0)
     await advert.register(bus, adapter)
+    # After advertising, and not awaited: each Disconnect waits ~2 s for BlueZ (measured on the board
+    # 2026-10-07: two stale links held advertising back 4.5 s), the phone can only reconnect to a
+    # board that is advertising, and the camera should not wait for it either.
+    old_links_task = asyncio.create_task(centrals.drop_links_from_before(bus), name="drop-old-links")  # noqa: F841 — a referenced task is not garbage-collected mid-run
     log.info("advertising \"%s\" with service %s (camera: %s)", args.name, SERVICE_UUID, "starting" if wants_camera else "no")
 
     # Discoverable first, everything slow after (2026-10-05). The camera and the AP each take from
@@ -265,7 +328,11 @@ async def _main(args: argparse.Namespace) -> None:
 
     # Held in a variable because asyncio keeps only a weak reference to a task: an unreferenced one
     # can be garbage-collected halfway.
-    camera_task = asyncio.create_task(_bring_camera_up()) if wants_camera else None
+    camera_task = asyncio.create_task(_bring_camera_up(), name="camera-start") if wants_camera else None
+    if camera_task is not None:
+        # An exception here used to stay inside the task: the board advertised and served forever
+        # with a camera that never came up, and not one line in the journal said why (2026-10-06).
+        camera_task.add_done_callback(_log_task_failure)
 
     # The AP stays on while the device is powered (ADR 0003, 2026-09-07 update): the phone joins when
     # it connects over BLE and the photo is available the instant a mode is activated. With no time
@@ -282,10 +349,18 @@ async def _main(args: argparse.Namespace) -> None:
             log.warning("NetworkManager did not answer in 30 s; trying the AP anyway")
         for attempt, wait in enumerate((0, 5, 10, 20, 30), start=1):
             if wait:
-                await asyncio.sleep(wait)
+                # Interruptible: the signal handlers are installed before this, and a stop must not
+                # sit through 65 s of retries until systemd gives up and kills the process.
+                try:
+                    await asyncio.wait_for(stop.wait(), wait)
+                except asyncio.TimeoutError:
+                    pass
+            if stop.is_set():
+                break
             try:
                 await loop.run_in_executor(None, ap.turn_on)
-                if local_ip() == AP_IP:
+                # `ip` is a subprocess: off the loop, like every other network lookup.
+                if await loop.run_in_executor(None, local_ip) == AP_IP:
                     break
                 log.warning("AP up but wlan0 does not have %s (attempt %d)", AP_IP, attempt)
             except Exception as exc:  # noqa: BLE001
@@ -294,11 +369,8 @@ async def _main(args: argparse.Namespace) -> None:
             log.error("the AP did not end up operational after several attempts; carrying on without it")
         # Pushed now and not on the next 15 s heartbeat: a phone that connected before the AP was up
         # learns the address to join the instant there is one.
+        await loop.run_in_executor(None, lambda: network.refresh(wait_s=AP_REFRESH_WAIT_S))
         service.notify_status()
-
-    stop = asyncio.Event()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, stop.set)
 
     no_network_since = None
     heartbeats = 0
@@ -306,7 +378,11 @@ async def _main(args: argparse.Namespace) -> None:
         try:
             await asyncio.wait_for(stop.wait(), STATUS_EVERY_SECONDS)
         except asyncio.TimeoutError:
-            service.notify_status()
+            # Not awaited (2026-10-06): `nmcli` can take its whole 30 s timeout, and awaiting it held
+            # the status push and the SIGTERM check that long. The status goes out when the refresh
+            # ends; a refresh still running from the last beat makes this one return at once.
+            refresh = loop.run_in_executor(None, network.refresh)
+            refresh.add_done_callback(_push_status)
             # Once a minute: could a phone find this board at all right now (see `link.py`)? It is
             # the one hypothesis for "the app finds nothing" that could not be tested from the app.
             heartbeats += 1
@@ -314,15 +390,21 @@ async def _main(args: argparse.Namespace) -> None:
                 await report_visibility(adapter, centrals)
             # Network watchdog: if it is not an AP and it has gone more than a minute with no network,
             # ask NM to connect. A device on no network at all is useless and cannot be fixed remotely.
-            if not ap.on and ap.active_connection() is None:
+            if not ap.on and network.current[0] is None:
                 no_network_since = no_network_since or loop.time()
                 if loop.time() - no_network_since > 60:
                     log.warning("no network for %d s: reconnecting", int(loop.time() - no_network_since))
-                    await loop.run_in_executor(None, ap.reconnect)
+                    # Guarded: `nmcli` failing to even run (a timeout, NM restarting) raised out of
+                    # the heartbeat and ended the daemon (2026-10-06). It is retried next minute.
+                    try:
+                        await loop.run_in_executor(None, ap.reconnect)
+                    except Exception as exc:  # noqa: BLE001
+                        log.error("reconnecting failed: %s", exc)
                     no_network_since = None
             else:
                 no_network_since = None
     log.info("shutting down")
+    logging.getLogger().removeHandler(relay)
     if button:
         button.close()
     # Silence a reading still playing: otherwise a restart of the service leaves a voice talking

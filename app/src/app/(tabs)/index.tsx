@@ -141,14 +141,14 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* La foto que sacó el dispositivo, debajo del resultado. No es diagnóstico —de eso se
-            encarga la telemetría— sino el contenido del producto: quien tiene algo de visión la usa
-            para ver qué encuadró la cámara, que es lo único que distingue «el modelo se equivocó» de
-            «la foto era del techo». Va DESPUÉS de los campos a propósito: la voz ya dijo el
-            resultado y el lector de pantalla llega primero a lo que se puede leer.
+        {/* The photo the device took, below the result. It is not a diagnostic —telemetry handles
+            that— but product content: someone with some vision uses it to see what the camera
+            framed, which is the only thing that tells "the model got it wrong" from "the photo was
+            of the ceiling". It goes AFTER the fields on purpose: the voice already said the result
+            and the screen reader reaches what can be read first.
 
-            `aspect-ratio` fijo en 4:3, que es lo que entrega la placa (1024x766): sin él la altura la
-            decidiría la imagen al cargar y la tarjeta saltaría. */}
+            Fixed 4:3 `aspect-ratio`, which is what the board delivers (1024x766): without it the
+            height would be decided by the image on load and the card would jump. */}
         {state.photoUri && (
           <View className="gap-two">
             <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">

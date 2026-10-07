@@ -36,11 +36,16 @@ chown -R virovision:virovision /home/virovision/virovision
 # El daemon levanta el AP WiFi al arrancar (ADR 0003) y con el AP arriba la placa DEJA la red de
 # casa: se pierde el SSH. Mientras se desarrolla queremos lo contrario. Para volver al
 # comportamiento de producción: borrar este drop-in y reiniciar el servicio.
+# Byte for byte the drop-in `modo-red.sh` writes for SIN-AP (2026-10-06): this one dropped
+# /etc/default/virovision and $VIROVISION_ARGS, so the first run after an install ignored the board's
+# flags (detector, labels), and a SIN-AP board then paid a needless `daemon-reload` on the next boot.
+# It still forces --no-ap whatever SIN-AP says: the install needs the board on the home network.
 mkdir -p /etc/systemd/system/virovision.service.d
 cat > /etc/systemd/system/virovision.service.d/10-sin-ap.conf <<'EOF'
 [Service]
 ExecStart=
-ExecStart=/home/virovision/virovision/.venv/bin/python -m virovision --no-ap
+EnvironmentFile=-/etc/default/virovision
+ExecStart=/home/virovision/virovision/.venv/bin/python -m virovision --no-ap $VIROVISION_ARGS
 EOF
 
 if sh /home/virovision/virovision/setup.sh; then

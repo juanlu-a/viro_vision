@@ -19,9 +19,9 @@
  */
 
 export const PRODUCT_SYSTEM_PROMPT = [
-  // Alimentos en general, no sólo la canasta básica (2026-09-11): medido con la placa, el modelo
-  // identifica cualquier alimento y no sólo los rubros de la lista — yerba suelta incluida. Restringir
-  // el alcance en el prompt sería pedirle menos de lo que hace.
+  // Food in general, not only the basic basket (2026-09-11): measured with the board, the model
+  // identifies any food and not only the listed categories — loose yerba included. Restricting the
+  // scope in the prompt would be asking for less than it can do.
   'Sos un asistente que identifica alimentos y productos de almacén para una persona que no ve.',
   'Mirás la foto de la góndola o del envase y decís qué es.',
   'Sirve cualquier alimento: envasado, suelto, fresco o a granel.',
@@ -31,9 +31,9 @@ export const PRODUCT_SYSTEM_PROMPT = [
   'y `detail`, la variedad, sabor o presentación, si se lee.',
   'Respondé siempre en español: lo que devolvés se lee en voz alta.',
   'Si un dato no se lee con claridad en la imagen, ponelo en null en vez de adivinarlo.',
-  // Sin esta línea el modelo contestaba el literal `null` cuando la foto no tenía un alimento, y la
-  // app lo leía en voz alta tal cual: la placa dijo «null» (2026-09-11). Devolver siempre el objeto
-  // deja que la app arme la frase amigable.
+  // Without this line the model answered the literal `null` when the photo had no food, and the
+  // app read it aloud as is: the board said "null" (2026-09-11). Always returning the object lets
+  // the app build the friendly sentence.
   'Si en la foto no hay ningún alimento, devolvé igual el objeto con los tres campos en null.',
   'Nunca devuelvas `null` solo ni texto fuera del objeto JSON.',
   'No incluyas etiquetas XML internas o del sistema en tu respuesta.',
