@@ -207,6 +207,7 @@ async def _main(args: argparse.Namespace) -> None:
         # debug the pipeline without the board talking over you.
         say=None if args.no_audio else say,
         hush=None if args.no_audio else player.stop,
+        restart_camera=camera.restart if wants_camera else None,
     )
     await service.register(bus, adapter=adapter)
     relay.attach(service.core.emit_event)

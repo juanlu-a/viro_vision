@@ -121,6 +121,7 @@ class Core:
         bus=None,
         say: Optional[Say] = None,
         hush: Optional[Hush] = None,
+        restart_camera: Optional[Callable[[], None]] = None,
     ) -> None:
         self._loop = loop
         self._read_status = read_status
@@ -132,6 +133,7 @@ class Core:
         self._bus = bus
         self._say = say
         self._hush = hush
+        self._restart_camera = restart_camera
         self.audio_target = DEFAULT_AUDIO_TARGET
         """Where the user wants to hear ViroVision, as last written by the app (`cmd: 'audio'`).
 
@@ -289,6 +291,17 @@ class Core:
             self._schedule(self._notify(STATUS, self.read_status()))
         elif name == "ap":
             self._ap(bool(cmd.get("value", True)), int(cmd.get("minutes", AP_MINUTES_DEFAULT)))
+        elif name == "restart_camera":
+            # A test hook, not a product feature (2026-10-06): the only other ways to restart the
+            # camera are the ones that need it to fail — 12 s without frames, or a photo that hangs —
+            # and neither can be provoked on purpose without touching the hardware. It is the same
+            # `Camera.restart()` the watchdog calls, so it proves the real recovery path. In an
+            # executor: closing and reopening the sensor takes seconds and holds the capture lock.
+            if self._restart_camera is None:
+                self._event({"t": "error", "msg": "no camera to restart"})
+                return
+            log.info("camera: restart requested over BLE")
+            self._in_executor(self._restart_camera)
         else:
             self._event({"t": "error", "msg": f"unknown command: {name}"})
 

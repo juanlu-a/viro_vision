@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import sys
+import threading
 
 import pytest
 
@@ -309,3 +310,22 @@ def test_a_measure_whose_pauses_add_up_past_a_minute_is_refused(loop):
     core.write_control(b'{"cmd":"measure","bytes":53000,"interval_ms":1000}', mtu=185)
     loop.run_until_complete(_drain(loop))
     assert asked == [] and [e["t"] for e in n.events()] == ["error"]
+
+
+def test_restart_camera_runs_the_same_restart_the_watchdog_uses(loop):
+    """The test hook for the recovery path: without it, checking that bus mode survives a camera
+    restart needed the camera to fail on its own (2026-10-06)."""
+    restarted = threading.Event()
+    n = Notifications()
+    core = Core(loop, lambda: {}, None, bytes, n, restart_camera=restarted.set)
+    core.write_control(b'{"cmd":"restart_camera"}')
+    loop.run_until_complete(_drain(loop))
+    assert restarted.wait(2)
+    assert n.events() == []
+
+
+def test_restart_camera_without_a_camera_says_so(loop):
+    core, n = build(loop)
+    core.write_control(b'{"cmd":"restart_camera"}')
+    loop.run_until_complete(_drain(loop))
+    assert [e["msg"] for e in n.events()] == ["no camera to restart"]
