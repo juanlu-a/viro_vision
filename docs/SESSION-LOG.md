@@ -3721,3 +3721,35 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   cuadros distintos, se emparejan sin verificar que el par exista. Pasa desde antes; está documentado
   en `_decide_reading`.
 - Los PRs #4 → #5 → #6 de Magui siguen apilados sin mergear.
+
+## 2026-10-07 (cont.) — El botón «se congelaba»: la app quedaba en un enlace a un daemon que ya no existía
+
+- **Reporte**: después de prender la placa, el botón puso el modo ómnibus y después la app dejó de
+  responder a la placa. Cerrar y abrir la app reconectó, pero el botón seguía sin hacer nada, aunque
+  los modos andaban desde el celular. Un rato después el botón volvió a funcionar.
+- **Lo que dicen el journal y la telemetría** (el reloj de la placa iba 2:28 atrás del teléfono):
+  1. A los 33 s del arranque, libcamera dio `Camera frontend has timed out!`: la cámara se trabó al
+     arrancar. Sin baja tensión (`get_throttled=0x0`).
+  2. El botón puso el modo ómnibus, no llegó ningún cuadro, y el watchdog reinició el daemon para
+     liberar la cámara. Esa recuperación anduvo, unos 25 s.
+  3. **El teléfono siguió conectado al daemon viejo**: BlueZ conserva el enlace, pero el proceso
+     nuevo registra otra aplicación GATT y las suscripciones del teléfono ya no llevan a ningún
+     lado. Durante un minuto y medio el botón cambió modos (ocioso, supermercado con lectura,
+     ómnibus) y la app no se enteró de nada.
+  4. Al reabrir la app, la placa estaba en ómnibus, donde **un clic quiere decir «repetir»**. Sin
+     nada para repetir, se queda en silencio (`bus: nothing to repeat yet`, cuatro veces). Para quien
+     lo usa, eso es «el botón no anda».
+- **Arreglo** (en el PR #112, que ya tocaba ese código): al arrancar, el daemon **corta los enlaces
+  que venían de antes** (`CentralWatcher.drop_links_from_before`, `Device1.Disconnect`). La app
+  reconecta sola, como después de cualquier corte, y se suscribe al proceso que está corriendo.
+  - Se hace después de empezar a anunciarse y sin esperarlo: cada corte tarda ~2 s y la primera
+    versión retrasaba el anuncio 4,5 s con dos enlaces viejos.
+  - **Probado en la placa**: con la Mac conectada por BLE, reinicio del daemon → «dropped the link
+    from before this process» a los 3 s; la placa se anuncia sin demora.
+
+### Pendientes
+- El clic en modo ómnibus sin nada para repetir no dice nada. Falta decidir qué tiene que decir,
+  por ejemplo el modo actual.
+- La cámara trabándose al arrancar (`frontend timed out`) ya pasó más de una vez. La recuperación
+  funciona, pero cuesta ~25 s. Habría que mirar si arrancar la cámara después de que el IMX500
+  termine de cargar su firmware (≈22 s del arranque) lo evita.

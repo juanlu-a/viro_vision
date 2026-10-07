@@ -128,6 +128,8 @@ class CentralWatcher:
 
     def __init__(self, on_change: Optional[Callable[[bool], None]] = None) -> None:
         self.connected: set[str] = set()
+        # D-Bus paths of the centrals that were already connected when this process started.
+        self._at_startup: list[str] = []
         # Told whether ANY central is connected after every change. `log_relay` uses it to stop
         # sending into a link nobody is on and buffer instead (2026-10-06).
         self._on_change = on_change
@@ -164,11 +166,30 @@ class CentralWatcher:
             for path, interfaces in (await _managed_objects(bus)).items():
                 if _is_connected(interfaces.get(_DEVICE_INTERFACE, {})):
                     self.connected.add(_address(path))
+                    self._at_startup.append(path)
         except Exception as exc:  # noqa: BLE001
             log.debug("could not seed the connected centrals: %s", exc)
         if self.connected:
             log.info("central already connected at startup: %s", ", ".join(sorted(self.connected)))
         self._changed()
+
+    async def drop_links_from_before(self, bus: MessageBus) -> None:
+        """Disconnects the centrals that were connected before this process started.
+
+        A daemon that restarts under a live link (the camera watchdog does it on purpose) registers
+        a NEW GATT application, but the phone keeps the old link and its old subscriptions, which
+        now lead nowhere: the board kept working and the app heard none of it. Board, 2026-10-07:
+        the camera jammed at boot, the watchdog restarted the daemon, and for a minute and a half the
+        button changed modes that the app never learnt of, until the user closed the app. Dropping
+        the link makes the app do what it does after any drop: reconnect in a couple of seconds and
+        subscribe to the GATT application that is actually running."""
+        for path in self._at_startup:
+            try:
+                await bus.call(Message(destination="org.bluez", path=path, interface=_DEVICE_INTERFACE, member="Disconnect"))
+                log.info("dropped the link from before this process: %s (the app reconnects on its own)", _address(path))
+            except Exception as exc:  # noqa: BLE001 — the link may already be gone; nothing to do then
+                log.debug("could not drop %s: %s", _address(path), exc)
+        self._at_startup.clear()
 
     def _handle(self, message: Message) -> None:
         if message.message_type is not MessageType.SIGNAL:

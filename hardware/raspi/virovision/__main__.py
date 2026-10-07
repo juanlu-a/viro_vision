@@ -290,12 +290,17 @@ async def _main(args: argparse.Namespace) -> None:
     # A phone already connected at startup (the daemon restarted under a live link) is NOT taken as
     # subscribed: the GATT application was registered again with fresh notify state, and replaying
     # the boot buffer then would send the boot errors to nobody. The buffer waits for the first
-    # `status` read — the next connection's, at worst (2026-10-06).
+    # `status` read — the next connection's, at worst (2026-10-06). That link is dropped right after
+    # advertising starts (below), so the phone reconnects to this process.
 
     # timeout 0 = advertise until the process dies; the device has to be discoverable always, because
     # the app reconnects on its own when it comes back into range.
     advert = Advertisement(args.name, [SERVICE_UUID], 0x0000, 0)
     await advert.register(bus, adapter)
+    # After advertising, and not awaited: each Disconnect waits ~2 s for BlueZ (measured on the board
+    # 2026-10-07: two stale links held advertising back 4.5 s), the phone can only reconnect to a
+    # board that is advertising, and the camera should not wait for it either.
+    old_links_task = asyncio.create_task(centrals.drop_links_from_before(bus), name="drop-old-links")  # noqa: F841 — a referenced task is not garbage-collected mid-run
     log.info("advertising \"%s\" with service %s (camera: %s)", args.name, SERVICE_UUID, "starting" if wants_camera else "no")
 
     # Discoverable first, everything slow after (2026-10-05). The camera and the AP each take from
