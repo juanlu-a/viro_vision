@@ -3688,3 +3688,36 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   stream principal más grande o un recorte del cartel a resolución completa del sensor, midiendo el
   costo en la Zero 2 W.
 - Probar con un ómnibus de verdad: el moiré de una pantalla fotografiada no es el de un LED.
+
+## 2026-10-07 — El catálogo completa la mitad del cartel que el OCR no leyó
+
+- **Pedido**: usar el catálogo de líneas como pares (línea, destino) de respaldo. Si el OCR capta
+  sólo la línea o sólo el destino, el catálogo completa la otra mitad, siempre que la confianza del
+  OCR sea **menor a 0,8**.
+- **Arreglo en `bus-banner-recognizer`, PR #6** (apilado sobre el #5):
+  - Se completa sólo lo que no es ambiguo:
+    - Un destino que sirve **una sola línea** da esa línea. Contando las variantes ortográficas como
+      un solo lugar, eso cubre 116 de los 257 destinos.
+    - Una línea que va a **un solo lugar** da ese destino (`270` → PORTONES).
+    - Casi todas las líneas tienen dos terminales, así que «sólo la línea» rara vez se completa.
+  - Lo inferido queda marcado en `Reading.inferred`.
+- **Resguardos**, que salieron de la revisión multi-modelo (tres rondas, dos con fallas reales):
+  - Nunca se infiere una línea encima de dígitos que el OCR sí leyó (`999` o `1` + LUIS BRAILLE).
+  - Lo inferido **no vota**: la misma lectura dudosa vuelve cuadro a cuadro y se daría la razón a sí
+    misma. Sólo llena una mitad que los votos dejaron vacía:
+    - La línea deducida del destino se dice después de la misma paciencia que antes esperaba el
+      destino solo.
+    - El terminal único de una línea leída se dice sin esperar.
+  - Un número leído no se anuncia con el destino de otra línea («330, Luis Braille»).
+- **Medido**: `bus-banner evaluate` no cambia (89,6 / 89,3 / 89,6 %), porque el set tiene casi todo
+  confianza alta. Las lecturas basura de la prueba del 2026-10-06, repetidas a confianza 0,6, no
+  completan nada.
+- **Desplegado en la placa** (`8d9b33f`). El despliegue corta el SSH al reiniciar el daemon; se bajó
+  el AP con `tools/ap.py`, se verificó y se volvió a prender.
+
+### Pendientes
+- Probar en la placa con fotos donde sólo se vea una mitad del cartel.
+- Límite conocido: el Watcher no tiene catálogo. Un número y un destino de varias líneas, leídos en
+  cuadros distintos, se emparejan sin verificar que el par exista. Pasa desde antes; está documentado
+  en `_decide_reading`.
+- Los PRs #4 → #5 → #6 de Magui siguen apilados sin mergear.
