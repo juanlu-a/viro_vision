@@ -3753,3 +3753,39 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - La cámara trabándose al arrancar (`frontend timed out`) ya pasó más de una vez. La recuperación
   funciona, pero cuesta ~25 s. Habría que mirar si arrancar la cámara después de que el IMX500
   termine de cargar su firmware (≈22 s del arranque) lo evita.
+
+## 2026-10-12 — El pipeline de ómnibus pasa a un solo PR (bus-banner-recognizer #7)
+
+- **Por qué**: los PRs del repo de Magalí eran cinco apilados (#2 → #6), cada uno sobre la rama del
+  anterior, con 32 commits que iban y venían (nombres en español que después se pasaron a inglés,
+  reglas del catálogo ajustadas en tres rondas de revisión) y varios ya obsoletos. Magalí se estaba
+  confundiendo al revisarlos: leerlos en orden era leer código que ya no existe.
+- **Qué se hizo**: rama `feat/bus-line-reader` desde `main`, con **el mismo código que corre la placa**
+  (la punta del #6), reorganizado en **11 commits, uno por pieza** y en el orden en que corre el
+  pipeline: estructura del paquete, detección, recorte, OCR, lectura + catálogo, pipeline, seguimiento,
+  CLI + evaluación, placa, modelo de dos clases y README. Cada mensaje de commit explica qué hace la
+  pieza, por qué es así y la medición detrás de cada decisión. **Cada commit pasa lint y tests por
+  separado** (95 tests al final). PR #7 abierto; #2 a #6 cerrados con un comentario que apunta al #7.
+  Las ramas viejas quedan.
+- **Diferencias con la punta del #6** (`git diff` lo confirma, nada más cambia):
+  - El smoke test se salteaba siempre: buscaba `rapidocr_onnxruntime`, el paquete viejo de PP-OCRv4.
+    Ahora importa `rapidocr` y pasa con los modelos reales.
+  - El tiempo de `parse` se medía con dos lecturas de reloj seguidas después de parsear: daba siempre
+    ~0 ms y el parseo se contaba como OCR. Se fue también un `Pipeline._complete` que nadie llamaba.
+  - `data/data_bus_sign.yaml` tiene `path:` explícito: al moverlo a `data/`, ultralytics buscaba las
+    imágenes en `data/train/images`.
+  - `resultados/` no entra: eran salidas de una versión vieja de `evaluate`, anterior al reconocedor
+    `latin` y al catálogo.
+  - Versión 0.3.0 en `pyproject.toml`, comentarios en inglés, `uv.lock` regenerado e instrucciones de
+    instalación que apuntan a `scripts/deploy_pi.sh`. El README se reescribió: seguía describiendo la
+    Pi 3 B+, un evento BLE viejo y 43 tests.
+- **Medido hoy sobre las 117 imágenes** (Mac): dos modelos → número 91,7 % / destino 89,3 % / lectura
+  completa 91,7 %; modelo de dos clases (el del sensor) → 91,7 % / 85,7 % / 87,5 %. La punta del #6 en el
+  venv viejo da 89,6 % en número: la diferencia es **una sola imagen**, el 109 de noche, que lee `109` o
+  `10` según la versión de onnxruntime/OpenCV. No es un cambio de código.
+
+### Pendientes
+- Que Magalí revise el #7 commit por commit y lo mergee.
+- Rotar la API key de Roboflow, que sigue en la historia del repo de Magalí.
+- El modelo de dos clases lee peor el destino (85,7 % contra 89,3 %): la palanca siguiente es reentrenar
+  el reconocedor, no el recorte.

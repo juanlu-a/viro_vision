@@ -165,8 +165,9 @@ la Pi sólo recorta, lee y anuncia; el Coral, la restricción "USB ocupado" de 0
 (3) **El modo ómnibus vigila, no saca una foto**: cámara abierta, detector en cada frame en el sensor,
 capa de seguimiento (`tracking.py`) que confirma la pista, anuncia presencia, lee el banner del ómnibus
 principal y anuncia la línea una vez por ómnibus; compatible con 0007 (el modo es explícito). El código
-vive en el repo de Magalí (`bus-banner-recognizer`, rama `feat/bus-banner-pipeline`, PR #2; fork
-`juanlu-a/bus-banner-recognizer` para instalar en la placa).
+vive en el repo de Magalí (`bus-banner-recognizer`). Desde el 2026-10-12 está entero en **un solo PR, el
+#7** (rama `feat/bus-line-reader`, 11 commits desde `main`); los PRs apilados #2 a #6 se cerraron. La placa
+se instala con `scripts/deploy_pi.sh` desde un checkout, no desde el fork.
 
 **Qué cambió el 2026-09-14**: probado en la placa (Pi 3 B+ prestada + AI Camera). Hasta tener el modelo
 de dos clases, el sensor corre el **COCO YOLO11n que trae la cámara** (`imx500_network_yolo11n_pp.rpk`,
