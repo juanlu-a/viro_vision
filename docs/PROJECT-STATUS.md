@@ -34,7 +34,7 @@ auditory feedback**, via a glasses-mounted camera device paired with a mobile ap
 ```
 app/        React Native (Expo) app        ← main work so far
 hardware/   Raspberry Pi Zero 2 W (de nuevo la placa en uso desde 2026-09-19; sin Ethernet) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
-ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer; PRs en cascada #2 → #3 → #4)
+ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer; todo en el PR #7 desde 2026-10-12)
 docs/       thesis deliverables, ADRs, this file
 docs/tesis/ capítulos del informe formal (3 a 8, 11 y 12); el documento armado vive en el Drive
             del proyecto como «ViroVision PFC v2 (completo)»
