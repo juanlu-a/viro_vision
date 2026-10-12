@@ -3778,11 +3778,13 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - **Es temporal**: decisión del equipo de sacarlo para la versión final. La lista de qué sacar
   está en `docs/ROADMAP.md` («Antes de la versión final»), y cada archivo lo dice en su cabecera.
 - **Verificado**: tests nuevos en la placa (`tests/test_evidence.py`, 174 en verde) y en la app
-  (`services/evidence/*.test.ts`, 328 en verde); lint y typecheck limpios. **No verificado**: la
-  función `evidence` (no hay Deno en la Mac), y nada en la placa ni en el teléfono todavía.
+  (`services/evidence/*.test.ts`, 328 en verde); lint y typecheck limpios.
+- **Desplegado en Supabase**: migración del bucket aplicada con `supabase db push` (bucket `evidence`
+  privado, sólo JPEG, 2 MB) y función `evidence` desplegada. Probada con `curl`: rechaza una ref
+  inválida y un archivo que no es JPEG, y guarda uno válido en `<phone>/<corrida>/<archivo>`; la
+  prueba se borró y el bucket quedó vacío. **No verificado todavía** en la placa ni en el teléfono.
 
 ### Pendientes
-- Aplicar la migración del bucket y desplegar la función `evidence` (pide confirmación: es producción).
 - Desplegar en la placa, build de la app, y una corrida en la parada: mirar los recortes de las
   lecturas fallidas.
 - Antes de la versión final: sacar la evidencia entera (lista en el ROADMAP).
