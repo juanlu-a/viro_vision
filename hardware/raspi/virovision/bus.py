@@ -145,10 +145,11 @@ class Timeline:
         what = f"sign {_box(banner_box)}" if banner_box is not None else f"top strip of the bus {_box(bus_box)}"
         log.info("bus: track %d read #%d queued at %.1f s: %s", track_id, attempt, self.age(track_id), what)
 
-    def read_done(self, track_id: int, reading, ocr_ms: int) -> None:
+    def read_done(self, track_id: int, reading, ocr_ms: int, evidence: Optional[str] = None) -> None:
         log.info(
-            "bus: track %d read in %d ms at %.1f s: %s",
+            "bus: track %d read in %d ms at %.1f s: %s%s",
             track_id, ocr_ms, self.age(track_id), reading.raw if reading else "nothing",
+            f" (evidence {evidence})" if evidence else "",
         )
 
     def decided(self, event) -> None:
@@ -229,8 +230,12 @@ class BusWatcher:
         signs_only: bool = True,
         min_conf: float = MIN_CONFIDENCE,
         audio_target: str = "device",
+        evidence=None,
     ) -> None:
         self._camera = camera
+        # `evidence.Evidence`, or None: what the camera saw behind each announcement and each read,
+        # kept on the card. Diagnostics only — bus mode never waits on it nor depends on it.
+        self._evidence = evidence
         self._announce = announce
         self._emit = emit
         self._announcements = Path(announcements)
@@ -371,6 +376,8 @@ class BusWatcher:
             self._jobs = queue.Queue()
             self._results = queue.Queue()
             self._last_frame_at = time.monotonic()
+            if self._evidence is not None:
+                self._evidence.begin_run()
             self._threads = [
                 # The run's state goes in as arguments, bound HERE: `Thread.start()` returns before the
                 # target's first line, and a thread that read `self._stop` itself could pick up the
@@ -461,6 +468,8 @@ class BusWatcher:
         """Ends the OCR process, if there is one. Called on daemon shutdown only: leaving bus mode
         keeps it on purpose, so entering again answers in a second instead of rebuilding."""
         self._closed = True  # a build still running when we shut down stops its own worker (`_build`)
+        if self._evidence is not None:
+            self._evidence.close()
         stop = getattr(self._ocr, "stop", None)
         if stop is not None:
             stop()
@@ -520,7 +529,7 @@ class BusWatcher:
         track_id = watcher.reading_track
         attempts = next((t.read_attempts for t in watcher.tracker.tracks if t.id == track_id), 0)
         self._timeline.read_queued(track_id, attempts, banner_box, bus_box)
-        jobs.put((frame, banner_box, bus_box, track_id))
+        jobs.put((frame, banner_box, bus_box, track_id, attempts))
         return None
 
     def _read_loop(self, jobs: queue.Queue, results: queue.Queue) -> None:
@@ -528,14 +537,16 @@ class BusWatcher:
             job = jobs.get()
             if job is None:
                 return
-            frame, banner_box, bus_box, track_id = job
+            frame, banner_box, bus_box, track_id, attempt = job
             started = time.monotonic()
             try:
-                reading = self._pipeline.process_with_boxes(frame, banner_box, bus_box).reading
+                result = self._pipeline.process_with_boxes(frame, banner_box, bus_box)
             except Exception as exc:  # noqa: BLE001 — one bad frame must not end the mode
                 log.warning("bus: the reading failed: %s", exc)
-                reading = None
-            results.put((track_id, reading, round((time.monotonic() - started) * 1000)))
+                result = None
+            ocr_ms = round((time.monotonic() - started) * 1000)
+            evidence = self._evidence.read(track_id, attempt, frame, result, ocr_ms) if self._evidence else None
+            results.put((track_id, result.reading if result else None, ocr_ms, evidence))
 
     def _watchdog(self, stop: threading.Event) -> None:
         """Reopens the camera when no frame has arrived for FRAME_SILENCE_S.
@@ -630,7 +641,7 @@ class BusWatcher:
                 for event in events:
                     if stop.is_set():
                         break  # left mid-frame: nothing more is said
-                    self._handle(event)
+                    self._handle(event, frame, detections)
             except Exception:  # noqa: BLE001
                 errors_unlogged += 1
                 if time.monotonic() - last_error_logged >= FRAME_ERROR_LOG_S:
@@ -665,10 +676,10 @@ class BusWatcher:
     def _drain_results(self, frame_number: int, results: queue.Queue, watcher) -> None:
         while True:
             try:
-                track_id, reading, ocr_ms = results.get_nowait()
+                track_id, reading, ocr_ms, evidence = results.get_nowait()
             except queue.Empty:
                 return
-            self._timeline.read_done(track_id, reading, ocr_ms)
+            self._timeline.read_done(track_id, reading, ocr_ms, evidence)
             watcher.submit_reading(track_id, reading, frame_number)
 
     def _is_an_echo(self, number: str, destination: str) -> bool:
@@ -694,15 +705,22 @@ class BusWatcher:
         self._last_voice_at = now
         return True
 
-    def _handle(self, event) -> None:
+    def _handle(self, event, frame=None, detections: Optional[list] = None) -> None:
         if event.kind == "bus":
+            if self._evidence is not None:
+                # Kept even when the phrase is silenced below: the picture is of what the sensor
+                # took for a bus, which is the question whether or not it was said.
+                self._evidence.bus_seen(event.track, frame, detections or [])
             if not self._presence_is_worth_saying():
                 log.info("bus: there is a bus, said %.1f s ago", time.monotonic() - (self._last_voice_at or 0.0))
                 return
             self._announce_presence()
         elif event.kind == "reading":
             self._timeline.decided(event)
-            if self._is_an_echo(event.number, event.destination):
+            echo = self._is_an_echo(event.number, event.destination)
+            if self._evidence is not None:
+                self._evidence.decided(event, announced=not echo)
+            if echo:
                 log.info("bus: %s again, still the same bus", event.phrase())
                 return
             log.info("bus: %s", event.phrase())

@@ -395,6 +395,36 @@ están espejados en `virovision/notices.py`, y `notices.test.ts` del lado de la 
 catálogos se desincronizan — un nombre que no existe no rompe nada, simplemente no suena, y eso no se
 ve en ningún log que el usuario alcance.
 
+### Qué vio la cámara: los cuadros y recortes de cada corrida
+
+Cada vez que arranca el modo ómnibus, la placa guarda en la microSD lo que hubo detrás de cada
+anuncio (`virovision/evidence.py`), para poder separar después un cartel muy chico, un recorte que
+cortó medio destino, un reflejo en los LED o un error del OCR — en el journal los cuatro se ven igual:
+
+```
+/home/virovision/evidence/<AAAAMMDD-HHMMSS>/
+    t003-bus.jpg          el cuadro de «se acerca un ómnibus», con todas las cajas del sensor
+    t003-r02-crop.jpg     el recorte exacto que leyó el OCR (lectura 2 del track 3), sin agrandar
+    t003-r02-frame.jpg    el cuadro entero con el ómnibus y el recorte marcados (sólo si el OCR leyó algo)
+    events.jsonl          una línea por imagen y por decisión: textos y scores del OCR, ms, qué se dijo
+```
+
+La línea del journal apunta a la imagen: `bus: track 3 read in 512 ms at 1.4 s: 115 LUIS BRAILLE
+(evidence 20261012-101500/t003-r02)`. Para bajarlas a la Mac:
+
+```sh
+rsync -av virovision@<ip>:evidence/ ./evidence/     # y borrarlas en la placa cuando ya no sirvan
+```
+
+- Se escribe en un hilo propio con una cola corta: si la tarjeta no da abasto se descartan imágenes,
+  nunca se frena la cámara. La línea siguiente de `events.jsonl` dice cuántas se perdieron.
+- Tope de **500 MB** entre todas las corridas, y nada si quedan menos de 1 GB libres: al empezar
+  una corrida se borran las más viejas.
+- El nombre de la carpeta es la hora de la placa, que no tiene RTC: antes de NTP puede estar
+  corrida horas.
+- **Son fotos de la calle, con gente.** Quedan en la placa y no viajan solas a ningún lado. Para
+  apagarlo: `--no-evidence` en `/etc/default/virovision`; `--evidence-dir` cambia la carpeta.
+
 ### Cambiar el detector sin editar dos archivos
 
 Las banderas del daemon viven en **`/etc/default/virovision`**, en la placa, y las leen tanto la

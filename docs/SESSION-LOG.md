@@ -3753,3 +3753,31 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - La cámara trabándose al arrancar (`frontend timed out`) ya pasó más de una vez. La recuperación
   funciona, pero cuesta ~25 s. Habría que mirar si arrancar la cámara después de que el IMX500
   termine de cargar su firmware (≈22 s del arranque) lo evita.
+
+## 2026-10-12 — El modo ómnibus guarda lo que vio: el cuadro de cada ómnibus y el recorte de cada lectura
+
+- **Pedido**: saber qué ve efectivamente la placa cuando reconoce un ómnibus y cuando el OCR devuelve
+  una línea. El journal decía «track 3 read: 115 LUIS BRAILLE» y nada de la imagen: un cartel chico,
+  un recorte que corta medio destino, un reflejo o un error del OCR se veían igual.
+- **Qué se hizo** (`hardware/raspi/virovision/evidence.py`, enganchado en `bus.py`): cada corrida del
+  modo deja una carpeta en `/home/virovision/evidence/<hora>/` con
+  - el cuadro del aviso «se acerca un ómnibus», con las cajas del sensor (se guarda aunque la frase
+    se silencie por la ventana de 15 s: la pregunta es qué tomó el sensor por un ómnibus);
+  - el recorte exacto de cada lectura del OCR, y el cuadro entero marcado cuando leyó algo;
+  - `events.jsonl` con los textos y scores del OCR, el tiempo, y la decisión final (dicha o
+    silenciada como eco).
+  - La línea de lectura del journal lleva `(evidence <corrida>/t003-r02)` para encontrar la imagen.
+- **Por qué así**:
+  - En la placa y no por BLE/telemetría: un cuadro son ~100 KB y BLE mueve 53 KB en 4,5 s (ADR 0003).
+    Se baja con `rsync` después de la prueba.
+  - Hilo propio con cola de 4 y descarte: codificar un JPEG de 1024 px cuesta decenas de ms en la
+    Zero 2 W y el hilo de cámara no puede esperar (libcamera da el sensor por muerto a ~1 s).
+  - Tope de 500 MB y piso de 1 GB libre: la microSD es de la que arranca la placa.
+  - Bandera `--no-evidence`: son fotos de la calle, con gente; quedan en la placa.
+- **Verificado**: tests nuevos (`tests/test_evidence.py`) y la suite del daemon en verde; el camino
+  real con OpenCV probado en la Mac. **Falta probarlo en la placa.**
+
+### Pendientes
+- Desplegar en la placa y hacer una corrida en la parada: mirar los recortes de las lecturas fallidas.
+- Si sirve, ver la evidencia desde la app (un endpoint HTTP que liste y sirva las imágenes, como
+  `/photos/latest`) en vez de `rsync`.
