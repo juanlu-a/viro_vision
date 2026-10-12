@@ -191,6 +191,9 @@ async def _main(args: argparse.Namespace) -> None:
             # /tmp, answered 202 and nobody ever heard it. `--no-audio` keeps that old behaviour for
             # debugging a reading without the sound.
             play=None if args.no_audio else player.play,
+            # Served even with no camera or no bus mode on this run: what earlier runs saw is still
+            # on the card, and looking at it is the point.
+            evidence_dir=None if args.no_evidence else args.evidence_dir,
         )
         http.start()
 

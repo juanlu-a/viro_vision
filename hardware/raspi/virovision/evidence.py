@@ -1,5 +1,9 @@
 """What bus mode saw: the frame each bus was announced from, and the crop each OCR read was made on.
 
+TEMPORARY — DEVELOPMENT ONLY. This module, its HTTP routes and its flags are removed before the final
+version (team decision, 2026-10-12; tracked in `docs/ROADMAP.md`, "Antes de la versión final"): they
+keep pictures of the street, people included, and serve them without authentication.
+
 The journal says "track 3 read in 512 ms: 115 LUIS BRAILLE" and nothing about the picture behind it.
 After a field run nobody could say whether a bad reading came from a sign that was too small, a crop
 that cut half the destination, glare on the LEDs or the OCR itself — the four look the same in text.
@@ -34,10 +38,12 @@ travels nowhere on its own, and can be turned off with `--no-evidence`.
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import os
 import queue
+import re
 import shutil
 import threading
 import time
@@ -122,15 +128,25 @@ class Evidence:
         self._ensure_writer()
         log.info("evidence: recording this run in %s", run)
 
-    def bus_seen(self, track_id: int, frame, detections: list) -> None:
-        """The frame «se acerca un ómnibus» was said from, every detection on it drawn."""
-        if frame is None:
-            return
+    def bus_seen(self, track_id: int, frame, detections: list) -> Optional[str]:
+        """The frame «se acerca un ómnibus» was said from, every detection on it drawn. Returns the
+        name it will be saved under, for the journal's line, like `read`."""
+        run = self._run
+        if run is None or frame is None:
+            return None
+        stem = f"t{track_id:03d}-bus"
         boxes = [(d.label, d.box, d.conf) for d in detections]
-        self._put(
+        queued = self._put(
             {"what": "bus", "track": track_id, "detections": [{"label": l, "box": _box(b), "conf": round(c, 2)} for l, b, c in boxes]},
-            pictures=[(f"t{track_id:03d}-bus", lambda: self._drawn(frame, boxes))],
+            pictures=[(stem, lambda: self._drawn(frame, boxes))],
         )
+        return f"{run.name}/{stem}" if queued else None
+
+    def track_ref(self, track_id: int) -> Optional[str]:
+        """`<run>/t003`: every picture of that bus starts with it. For the journal's lines about a
+        track as a whole — the decision, above all, which is made from several reads."""
+        run = self._run
+        return f"{run.name}/t{track_id:03d}" if run is not None else None
 
     def read(self, track_id: int, attempt: int, frame, result, ocr_ms: int) -> Optional[str]:
         """One OCR read. Returns the name it will be saved under, for the journal's line, or None when
@@ -167,7 +183,10 @@ class Evidence:
                 marks = [("bus", result.bus_box, None)] if result.bus_box is not None else []
                 marks.append((label, crop_box, None))
                 pictures.append((f"{stem}-frame", lambda: self._drawn(frame, marks)))
-        self._put(record, pictures)
+        if not self._put(record, pictures):
+            # Never name a picture that will not exist: the journal line is how it is found later, and
+            # a name that leads nowhere is worse than none.
+            return None
         return f"{run.name}/{stem}"
 
     def decided(self, event, announced: bool) -> None:
@@ -196,16 +215,22 @@ class Evidence:
 
     # --- the writer -----------------------------------------------------------------------------
 
-    def _put(self, record: dict, pictures: list) -> None:
+    def _put(self, record: dict, pictures: list) -> bool:
         run = self._run
         if run is None or self._full:
-            return
-        record = {"wall": time.strftime("%H:%M:%S", time.localtime(self._clock())), **record}
+            return False
+        # The same clock, and the same precision, as the journal's own timestamps
+        # (`journalctl -o short-precise`): a line of one and a line of the other match by time too.
+        now = self._clock()
+        wall = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)) + f".{int(now % 1 * 1000):03d}"
+        record = {"wall": wall, **record}
         try:
             self._queue.put_nowait((run, record, pictures))
         except queue.Full:
             with self._lock:
                 self._dropped += 1
+            return False
+        return True
 
     def _ensure_writer(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -325,3 +350,168 @@ class Evidence:
                 os.chown(path, owner.st_uid, owner.st_gid)
         except (OSError, AttributeError):
             pass
+
+
+# --- reading it back over WiFi (`http_server.py`) -----------------------------------------------
+#
+# The board already serves the phone's photo over HTTP (ADR 0003's plan B), so the pictures go out
+# the same way: a page any browser on the same network can open — the phone joined to the board's
+# AP included — and a JSON listing for the app. Read-only on purpose: deleting stays an SSH job, so
+# nobody on the AP can wipe the evidence of a run by following a link.
+
+RUN_NAME = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
+FILE_NAME = re.compile(r"^[a-z0-9-]+\.(jpg|jsonl)$")
+"""Only names this module writes. A request path is never joined to the root without matching one:
+that is what keeps `/evidence/../../etc/shadow` out — the daemon runs as root."""
+
+
+def find_file(root: Path, run: str, name: str) -> Optional[Path]:
+    """The file a request names, or None if the name is not one this module could have written."""
+    if not RUN_NAME.match(run) or not FILE_NAME.match(name):
+        return None
+    path = Path(root) / run / name
+    return path if path.is_file() else None
+
+
+def _read_events(run: Path) -> list:
+    try:
+        lines = (run / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    events = []
+    for line in lines:
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            continue  # the writer was killed mid-line; the rest of the run is still worth showing
+    return events
+
+
+def list_runs(root: Path) -> list:
+    """Newest first: after a field run, the run you want is the last one."""
+    try:
+        runs = [p for p in Path(root).iterdir() if p.is_dir() and RUN_NAME.match(p.name)]
+    except OSError:
+        return []
+    out = []
+    for run in sorted(runs, key=lambda p: p.name, reverse=True):
+        events = _read_events(run)
+        files = [f for f in run.iterdir() if f.is_file()]
+        out.append(
+            {
+                "run": run.name,
+                "buses": sum(e.get("what") == "bus" for e in events),
+                "reads": sum(e.get("what") == "read" for e in events),
+                "said": [_said(e) for e in events if e.get("what") == "decided" and e.get("announced")],
+                "files": len(files),
+                "bytes": sum(f.stat().st_size for f in files),
+            }
+        )
+    return out
+
+
+def _ref(track, what: str) -> str:
+    """`t003-r02`: what the journal prints after `evidence <run>/`, and the page's anchor for it, so
+    `/evidence/<run>/#t003-r02` jumps straight to the picture a journal line names."""
+    try:
+        return f"t{int(track):03d}-{what}"
+    except (TypeError, ValueError):
+        return f"t-{what}"
+
+
+def _said(event: dict) -> str:
+    return ", ".join(p for p in (event.get("number"), event.get("destination")) if p) or "?"
+
+
+_STYLE = """
+:root { color-scheme: light dark; --bg: #fff; --fg: #111; --muted: #555; --line: #ccc; --ok: #0a6b2d; }
+@media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #eee; --muted: #aaa; --line: #444; --ok: #6fdc8c; } }
+body { background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, sans-serif; margin: 0 auto; max-width: 960px; padding: 16px; }
+a { color: inherit; }
+img { max-width: 100%; height: auto; border: 1px solid var(--line); display: block; }
+.crop { image-rendering: pixelated; min-height: 48px; }
+section { border-top: 2px solid var(--line); margin-top: 24px; padding-top: 8px; }
+.read { display: grid; gap: 8px; margin: 12px 0; }
+.muted { color: var(--muted); }
+.said { color: var(--ok); font-weight: 600; }
+code { word-break: break-all; }
+"""
+
+
+def _page(title: str, body: str) -> bytes:
+    return (
+        f'<!doctype html><html lang="es"><head><meta charset="utf-8">'
+        f'<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{html.escape(title)}</title><style>{_STYLE}</style></head>"
+        f"<body>{body}</body></html>"
+    ).encode()
+
+
+def index_page(root: Path) -> bytes:
+    runs = list_runs(root)
+    if not runs:
+        items = "<p>Todavía no hay corridas del modo ómnibus guardadas.</p>"
+    else:
+        rows = []
+        for r in runs:
+            said = "; ".join(r["said"]) or "ninguna línea dicha"
+            rows.append(
+                f'<li><a href="/evidence/{r["run"]}/">{r["run"]}</a> — {r["buses"]} ómnibus, '
+                f'{r["reads"]} lecturas, <span class="said">{html.escape(said)}</span> '
+                f'<span class="muted">({r["bytes"] // 1000} KB)</span></li>'
+            )
+        items = f"<ul>{''.join(rows)}</ul>"
+    note = '<p class="muted">La hora del nombre es la de la placa, que no tiene reloj propio: antes de sincronizar puede estar corrida.</p>'
+    return _page("Evidencia del modo ómnibus", f"<h1>Qué vio la cámara</h1>{note}{items}")
+
+
+def run_page(root: Path, run: str) -> Optional[bytes]:
+    """One run, grouped by bus: the frame it was noticed in, then every read with its crop, what the
+    OCR returned and how sure it was, then what was said. None if the run does not exist."""
+    if not RUN_NAME.match(run) or not (Path(root) / run).is_dir():
+        return None
+    events = _read_events(Path(root) / run)
+    tracks: dict = {}
+    for e in events:
+        tracks.setdefault(e.get("track"), []).append(e)
+
+    def img(name: str, alt: str, cls: str = "") -> str:
+        return f'<a href="{name}"><img src="{name}" alt="{html.escape(alt)}" class="{cls}" loading="lazy"></a>'
+
+    sections = []
+    for track, items in tracks.items():
+        parts = [f"<h2>Ómnibus {track}</h2>"]
+        for e in items:
+            files = e.get("files") or []
+            dropped = f' <span class="muted">({e["dropped_before"]} imágenes descartadas antes)</span>' if e.get("dropped_before") else ""
+            if e.get("what") == "bus":
+                labels = ", ".join(f'{d["label"]} {d["conf"]}' for d in e.get("detections", []))
+                ref = _ref(track, "bus")
+                parts.append(f'<p id="{ref}">{e.get("wall", "")} — detectado: {html.escape(labels) or "?"} · <code>evidence {run}/{ref}</code>{dropped}</p>')
+                parts += [img(f, f"Cuadro en que se detectó el ómnibus {track}") for f in files]
+            elif e.get("what") == "read":
+                texts = " · ".join(f'{t["text"]} ({t["score"]:.2f})' for t in e.get("texts", [])) or "el OCR no devolvió nada"
+                parsed = _said(e) if e.get("number") or e.get("destination") else "sin línea ni destino"
+                flags = " ✓ catálogo" if e.get("verified") else ""
+                if e.get("inferred"):
+                    flags += f' · completado: {", ".join(e["inferred"])}'
+                crop = [img(f, f"Recorte leído: {texts}", "crop") for f in files if f.endswith("-crop.jpg")]
+                frame = [img(f, f"Cuadro de la lectura {e.get('attempt')}") for f in files if f.endswith("-frame.jpg")]
+                attempt = e.get("attempt") or 0
+                ref = _ref(track, f"r{attempt:02d}")
+                parts.append(
+                    f'<div class="read" id="{ref}"><div>{e.get("wall", "")} — lectura {attempt}, {e.get("ocr_ms")} ms'
+                    f" · <code>evidence {run}/{ref}</code>{dropped}</div>"
+                    f"{''.join(crop)}<div>OCR: <code>{html.escape(texts)}</code></div>"
+                    f"<div>Interpretado: <b>{html.escape(parsed)}</b>{html.escape(flags)}</div>"
+                    f"{''.join(frame)}</div>"
+                )
+            elif e.get("what") == "decided":
+                how = "dicho" if e.get("announced") else "no dicho (eco del mismo ómnibus)"
+                parts.append(f'<p class="said" id="{_ref(track, "decided")}">Decidido tras {e.get("attempts")} lecturas: {html.escape(_said(e))} — {how}</p>')
+        sections.append(f"<section>{''.join(parts)}</section>")
+    body = (
+        f'<p><a href="/evidence/">← todas las corridas</a> · <a href="events.jsonl">events.jsonl</a></p>'
+        f"<h1>Corrida {run}</h1>{''.join(sections) or '<p>Esta corrida no guardó nada.</p>'}"
+    )
+    return _page(f"Corrida {run}", body)

@@ -100,6 +100,17 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 
 Recognition wiring in the app (**A5**) waits for B1/B2.
 
+## Antes de la versión final (entrega del 30/11) — sacar lo que es sólo de desarrollo
+
+Herramientas que se usan mientras se ajusta el sistema y **no van en la versión que se entrega**:
+
+- [ ] **Evidencia del modo ómnibus** (2026-10-12): la placa guarda en la microSD el cuadro de cada
+  ómnibus y el recorte de cada lectura del OCR, y los sirve por WiFi en `/evidence/`
+  (`hardware/raspi/virovision/evidence.py`, sus rutas en `http_server.py`, las banderas
+  `--evidence-dir`/`--no-evidence` en `__main__.py`, el README de la placa y `tests/test_evidence.py`).
+  Son fotos de la calle, con gente, en un servidor sin autenticación. Decisión del equipo: queda
+  mientras se prueba y se saca para la versión final. Como mínimo, apagado por defecto.
+
 ## Verification per phase
 - **A1–A3:** launch app (dev client), drive each flow with VoiceOver + TalkBack; check focus order,
   labels/roles/hints, Dynamic Type, contrast, reduce-motion; CI green; login persists offline.

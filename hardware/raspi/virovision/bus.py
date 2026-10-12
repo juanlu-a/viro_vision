@@ -152,10 +152,11 @@ class Timeline:
             f" (evidence {evidence})" if evidence else "",
         )
 
-    def decided(self, event) -> None:
+    def decided(self, event, evidence: Optional[str] = None) -> None:
         log.info(
-            "bus: track %d decided at %.1f s after %d reads: %s",
+            "bus: track %d decided at %.1f s after %d reads: %s%s",
             event.track, self.age(event.track), event.attempts, event.phrase(),
+            f" (evidence {evidence}-*)" if evidence else "",
         )
 
     def lost(self, event, announced: bool) -> None:
@@ -707,16 +708,18 @@ class BusWatcher:
 
     def _handle(self, event, frame=None, detections: Optional[list] = None) -> None:
         if event.kind == "bus":
-            if self._evidence is not None:
-                # Kept even when the phrase is silenced below: the picture is of what the sensor
-                # took for a bus, which is the question whether or not it was said.
-                self._evidence.bus_seen(event.track, frame, detections or [])
+            # Kept even when the phrase is silenced below: the picture is of what the sensor took for
+            # a bus, which is the question whether or not it was said. And named in the journal
+            # either way, so the line and the picture can be matched after the run.
+            picture = self._evidence.bus_seen(event.track, frame, detections or []) if self._evidence else None
+            seen = f" (evidence {picture})" if picture else ""
             if not self._presence_is_worth_saying():
-                log.info("bus: there is a bus, said %.1f s ago", time.monotonic() - (self._last_voice_at or 0.0))
+                log.info("bus: track %d is a bus, said %.1f s ago%s", event.track, time.monotonic() - (self._last_voice_at or 0.0), seen)
                 return
+            log.info("bus: track %d is a bus, saying so%s", event.track, seen)
             self._announce_presence()
         elif event.kind == "reading":
-            self._timeline.decided(event)
+            self._timeline.decided(event, self._evidence.track_ref(event.track) if self._evidence else None)
             echo = self._is_an_echo(event.number, event.destination)
             if self._evidence is not None:
                 self._evidence.decided(event, announced=not echo)

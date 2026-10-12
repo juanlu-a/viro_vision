@@ -397,6 +397,9 @@ ve en ningún log que el usuario alcance.
 
 ### Qué vio la cámara: los cuadros y recortes de cada corrida
 
+> ⚠️ **Temporal, sólo para desarrollo.** Se saca antes de la versión final (decisión del equipo,
+> 2026-10-12; anotado en `docs/ROADMAP.md`, «Antes de la versión final»).
+
 Cada vez que arranca el modo ómnibus, la placa guarda en la microSD lo que hubo detrás de cada
 anuncio (`virovision/evidence.py`), para poder separar después un cartel muy chico, un recorte que
 cortó medio destino, un reflejo en los LED o un error del OCR — en el journal los cuatro se ven igual:
@@ -409,8 +412,28 @@ cortó medio destino, un reflejo en los LED o un error del OCR — en el journal
     events.jsonl          una línea por imagen y por decisión: textos y scores del OCR, ms, qué se dijo
 ```
 
-La línea del journal apunta a la imagen: `bus: track 3 read in 512 ms at 1.4 s: 115 LUIS BRAILLE
-(evidence 20261012-101500/t003-r02)`. Para bajarlas a la Mac:
+**Cada línea del journal apunta a su imagen, y cada imagen a su línea.** Las tres líneas que
+importan llevan la referencia:
+
+```
+bus: track 3 is a bus, saying so (evidence 20261012-101500/t003-bus)
+bus: track 3 read in 512 ms at 1.4 s: 115 LUIS BRAILLE (evidence 20261012-101500/t003-r02)
+bus: track 3 decided at 2.1 s after 3 reads: Bus 115, LUIS BRAILLE (evidence 20261012-101500/t003-*)
+```
+
+y `events.jsonl` guarda la hora con milisegundos, la misma que da `journalctl -o short-precise`.
+
+**Verlas por WiFi**, desde cualquier navegador en la misma red que la placa (el celular unido al AP
+de la placa incluido; la Mac nunca, ver `placa-acceso.md`):
+
+| URL | Qué es |
+|---|---|
+| `http://<ip>:8080/evidence/` | todas las corridas, la más nueva primero, con lo que se dijo en cada una |
+| `http://<ip>:8080/evidence/<corrida>/` | la corrida por ómnibus: el cuadro, cada recorte con lo que leyó el OCR y sus scores, y la decisión |
+| `http://<ip>:8080/evidence/<corrida>/#t003-r02` | salta directo a la imagen que nombra una línea del journal |
+| `http://<ip>:8080/evidence.json` | la lista en JSON, para la app |
+
+Es de sólo lectura: borrar sigue siendo por SSH. Para bajarlas todas a la Mac:
 
 ```sh
 rsync -av virovision@<ip>:evidence/ ./evidence/     # y borrarlas en la placa cuando ya no sirvan

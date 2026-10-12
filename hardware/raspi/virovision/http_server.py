@@ -13,6 +13,10 @@ asyncio loop never notices. Capture and status reading are passed in as callable
     GET  /measure/<bytes>  <bytes> random bytes, to measure the download without a camera
     GET  /photos/latest    captures now and returns the JPEG (1024 px, q70); 503 without a camera
     POST /audio            stores the body (MP3/WAV) to play it; 202 with the size
+    GET  /evidence/        [TEMPORARY, removed before the final version: see evidence.py] what bus mode saw, run by run: a page for a browser (`evidence.py`)
+    GET  /evidence.json    the same list, for the app
+    GET  /evidence/<run>/  one run: each bus's frame, each read's crop, what the OCR said
+    GET  /evidence/<run>/<file>   one picture, or that run's events.jsonl
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import ThreadingMixIn
 from typing import Callable, Optional
 
+from . import evidence
 from .camera import CameraNotReady
 from .core import MEASURE_MAX_BYTES
 
@@ -102,6 +107,7 @@ class HttpServer:
         capture: Optional[SyncCapture],
         port: int = DEFAULT_PORT,
         play: Optional[Callable[[str], None]] = None,
+        evidence_dir: Optional[str] = None,
     ) -> None:
         server = self
 
@@ -160,8 +166,44 @@ class HttpServer:
                         return
                     log.info("photo of %d bytes captured in %d ms", len(jpeg), (time.monotonic() - t0) * 1000)
                     self._respond(200, jpeg, "image/jpeg")
+                elif path == "/evidence" or path.startswith("/evidence/") or path == "/evidence.json":
+                    self._evidence(path)
                 else:
                     self._json(404, {"error": "not found"})
+
+            def _evidence(self, path: str) -> None:
+                """Read-only, and only names `evidence.py` could have written (see `find_file`)."""
+                root = server._evidence_dir
+                if root is None:
+                    self._json(404, {"error": "evidence is off (--no-evidence)"})
+                    return
+                if path == "/evidence.json":
+                    self._json(200, {"runs": evidence.list_runs(root)})
+                    return
+                if path in ("/evidence", "/evidence/"):
+                    self._respond(200, evidence.index_page(root), "text/html; charset=utf-8")
+                    return
+                parts = path[len("/evidence/") :].split("/")
+                if len(parts) == 1 or (len(parts) == 2 and parts[1] == ""):
+                    if len(parts) == 1:
+                        # Without the slash, the page's relative links would point one level up.
+                        self.send_response(301)
+                        self.send_header("Location", f"/evidence/{parts[0]}/")
+                        self.send_header("Content-Length", "0")
+                        self.end_headers()
+                        return
+                    page = evidence.run_page(root, parts[0])
+                    if page is None:
+                        self._json(404, {"error": "no such run"})
+                        return
+                    self._respond(200, page, "text/html; charset=utf-8")
+                    return
+                found = evidence.find_file(root, parts[0], parts[1]) if len(parts) == 2 else None
+                if found is None:
+                    self._json(404, {"error": "not found"})
+                    return
+                kind = "image/jpeg" if found.suffix == ".jpg" else "application/x-ndjson; charset=utf-8"
+                self._respond(200, found.read_bytes(), kind)
 
             def do_POST(self):  # noqa: N802
                 path = self.path.split("?", 1)[0]
@@ -205,6 +247,7 @@ class HttpServer:
         self._synthetic_payload = synthetic_payload
         self._capture = capture
         self._play = play
+        self._evidence_dir = evidence_dir
         self._server = _QuietServer(("0.0.0.0", port), Handler)
         self._server.daemon_threads = True
         self._thread: Optional[threading.Thread] = None

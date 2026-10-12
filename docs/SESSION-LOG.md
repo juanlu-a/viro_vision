@@ -3766,10 +3766,17 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   - el recorte exacto de cada lectura del OCR, y el cuadro entero marcado cuando leyó algo;
   - `events.jsonl` con los textos y scores del OCR, el tiempo, y la decisión final (dicha o
     silenciada como eco).
-  - La línea de lectura del journal lleva `(evidence <corrida>/t003-r02)` para encontrar la imagen.
+  - **El log queda conectado con la foto** (lo que más importa para analizar después): la línea del
+    ómnibus detectado, la de cada lectura y la de la decisión llevan `(evidence <corrida>/t003-…)`,
+    y `events.jsonl` guarda la hora con milisegundos, igual que el journal.
+- **Servidas por WiFi** en el servidor HTTP que ya mandaba la foto al celular: `/evidence/` es una
+  galería para el navegador (cada imagen con la referencia del journal al lado y un ancla con ese
+  nombre) y `/evidence.json` la lista para la app. Sólo lectura, y sólo nombres que la placa
+  escribió (el daemon corre como root: una ruta con `..` serviría cualquier archivo).
+- **Es temporal**: decisión del equipo de sacarlo para la versión final. Anotado en
+  `docs/ROADMAP.md` («Antes de la versión final») y al principio de `evidence.py`.
 - **Por qué así**:
   - En la placa y no por BLE/telemetría: un cuadro son ~100 KB y BLE mueve 53 KB en 4,5 s (ADR 0003).
-    Se baja con `rsync` después de la prueba.
   - Hilo propio con cola de 4 y descarte: codificar un JPEG de 1024 px cuesta decenas de ms en la
     Zero 2 W y el hilo de cámara no puede esperar (libcamera da el sensor por muerto a ~1 s).
   - Tope de 500 MB y piso de 1 GB libre: la microSD es de la que arranca la placa.
@@ -3779,5 +3786,4 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 
 ### Pendientes
 - Desplegar en la placa y hacer una corrida en la parada: mirar los recortes de las lecturas fallidas.
-- Si sirve, ver la evidencia desde la app (un endpoint HTTP que liste y sirva las imágenes, como
-  `/photos/latest`) en vez de `rsync`.
+- Antes de la versión final: sacar la evidencia entera (o, como mínimo, apagarla por defecto).

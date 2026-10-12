@@ -191,3 +191,82 @@ def test_the_bus_frame_is_kept_even_when_the_phrase_is_silenced(tmp_path):
     watcher._handle(bus, "frame", [])
     watcher._handle(types.SimpleNamespace(kind="bus", track=2), "frame", [])  # inside PRESENCE_SILENCE_S
     assert seen == [1, 2]
+
+
+def _serve(root):
+    from virovision.http_server import HttpServer
+
+    s = HttpServer(lambda: {}, bytes, capture=None, port=0, evidence_dir=root)
+    s.start()
+    return s
+
+
+def _fetch(server, path):
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{server.port}{path}", timeout=5) as r:
+            return r.status, r.headers.get("Content-Type"), r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers.get("Content-Type"), e.read()
+
+
+def test_the_pictures_are_served_over_wifi_with_the_journal_reference_beside_each(tmp_path):
+    """The point of the pictures is to match them with the journal after a run: the page shows each
+    one next to the `evidence <run>/t003-r02` the journal printed, and anchors it under that name."""
+    evidence = make(tmp_path)
+    evidence.begin_run()
+    sign = types.SimpleNamespace(label="bus_sign", box=Box(10, 20, 300, 60), conf=0.88)
+    evidence.bus_seen(3, "frame", [sign])
+    name = evidence.read(3, 2, "frame", result([text("115", 0.91)], "115", "LUIS BRAILLE"), 512)
+    evidence.close()
+    run, stem = name.split("/")
+
+    server = _serve(tmp_path / "evidence")
+    try:
+        status, _, body = _fetch(server, "/evidence.json")
+        assert status == 200 and json.loads(body)["runs"][0]["run"] == run
+
+        status, kind, body = _fetch(server, f"/evidence/{run}/")
+        page = body.decode()
+        assert status == 200 and kind.startswith("text/html")
+        assert f'id="{stem}"' in page and f"evidence {name}" in page
+        assert "t003-r02-crop.jpg" in page and f"evidence {run}/t003-bus" in page
+
+        status, kind, body = _fetch(server, f"/evidence/{run}/t003-r02-crop.jpg")
+        assert (status, kind, body) == (200, "image/jpeg", b"jpeg of frame cropped at 10,20")
+        assert _fetch(server, "/evidence/")[0] == 200
+    finally:
+        server.stop()
+
+
+def test_only_names_the_board_wrote_are_served(tmp_path):
+    """The daemon runs as root: a path out of the folder would serve anything on the card."""
+    root = tmp_path / "evidence"
+    (root / "20261012-101500").mkdir(parents=True)
+    (tmp_path / "secret.jpg").write_bytes(b"no")
+    server = _serve(root)
+    try:
+        for path in (
+            "/evidence/20261012-101500/../../secret.jpg",
+            "/evidence/..%2F/secret.jpg",
+            "/evidence/20261012-101500/secret.txt",
+            "/evidence/not-a-run/",
+            "/evidence/20261012-101500/missing.jpg",
+        ):
+            assert _fetch(server, path)[0] in (301, 404), path
+    finally:
+        server.stop()
+
+
+def test_with_evidence_off_the_routes_say_so(tmp_path):
+    from virovision.http_server import HttpServer
+
+    server = HttpServer(lambda: {}, bytes, capture=None, port=0)
+    server.start()
+    try:
+        status, _, body = _fetch(server, "/evidence/")
+        assert status == 404 and b"--no-evidence" in body
+    finally:
+        server.stop()
