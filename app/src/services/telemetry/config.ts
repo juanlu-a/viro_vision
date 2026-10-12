@@ -21,6 +21,14 @@
  * endpoint that does not exist. Better off and known than on and broken.
  */
 export function telemetryUrlFrom(proxyUrl: string | undefined | null): string | null {
+  return functionUrlFrom(proxyUrl, 'telemetry');
+}
+
+/**
+ * Any sibling function of the vision proxy, by the same derivation: `…/v1/vision` → `…/v1/<name>`.
+ * `evidence` uses it too (`services/evidence`), for the same reason telemetry does.
+ */
+export function functionUrlFrom(proxyUrl: string | undefined | null, name: string): string | null {
   if (!proxyUrl) return null;
   const withoutTrailingSlash = proxyUrl.replace(/\/+$/, '');
   // The scheme is stripped BEFORE comparing: `https://vision` also "ends in /vision" —because of the
@@ -28,7 +36,7 @@ export function telemetryUrlFrom(proxyUrl: string | undefined | null): string | 
   // every batch.
   const withoutScheme = withoutTrailingSlash.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
   return withoutScheme.endsWith('/vision')
-    ? `${withoutTrailingSlash.slice(0, -'/vision'.length)}/telemetry`
+    ? `${withoutTrailingSlash.slice(0, -'/vision'.length)}/${name}`
     : null;
 }
 

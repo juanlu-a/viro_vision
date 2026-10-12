@@ -62,6 +62,8 @@ def test_a_read_with_text_keeps_the_crop_the_frame_and_what_the_ocr_said(tmp_pat
     assert (run / "t003-r02-crop.jpg").read_bytes() == b"jpeg of frame cropped at 10,20"
     assert "115 LUIS BRAILLE" in (run / "t003-r02-frame.jpg").read_text(), "the frame is labelled with what was read"
     [record] = events(run)
+    assert json.loads((run / "t003-r02.json").read_text()) == record, "the app downloads this one"
+    assert record["ref"] == name
     assert record["files"] == ["t003-r02-crop.jpg", "t003-r02-frame.jpg"]
     assert record["texts"] == [{"text": "115", "score": 0.91}, {"text": "LUIS BRAILLE", "score": 0.77}]
     assert (record["number"], record["destination"], record["ocr_ms"]) == ("115", "LUIS BRAILLE", 512)
@@ -212,61 +214,61 @@ def _fetch(server, path):
         return e.code, e.headers.get("Content-Type"), e.read()
 
 
-def test_the_pictures_are_served_over_wifi_with_the_journal_reference_beside_each(tmp_path):
-    """The point of the pictures is to match them with the journal after a run: the page shows each
-    one next to the `evidence <run>/t003-r02` the journal printed, and anchors it under that name."""
+def test_each_record_is_announced_to_the_app_and_served_with_its_pictures(tmp_path):
+    """The app fetches the pictures the way it fetches the supermarket photo: told over BLE, pulled
+    over WiFi. The announcement must come after the files are whole, and name the record the app then
+    downloads; the record lists the pictures, and carries the same reference the journal printed."""
+    announced = []
     evidence = make(tmp_path)
+    evidence._emit = announced.append
     evidence.begin_run()
-    sign = types.SimpleNamespace(label="bus_sign", box=Box(10, 20, 300, 60), conf=0.88)
-    evidence.bus_seen(3, "frame", [sign])
     name = evidence.read(3, 2, "frame", result([text("115", 0.91)], "115", "LUIS BRAILLE"), 512)
     evidence.close()
     run, stem = name.split("/")
+    assert announced == [{"t": "evidence", "ref": name}]
 
     server = _serve(tmp_path / "evidence")
     try:
-        status, _, body = _fetch(server, "/evidence.json")
-        assert status == 200 and json.loads(body)["runs"][0]["run"] == run
-
-        status, kind, body = _fetch(server, f"/evidence/{run}/")
-        page = body.decode()
-        assert status == 200 and kind.startswith("text/html")
-        assert f'id="{stem}"' in page and f"evidence {name}" in page
-        assert "t003-r02-crop.jpg" in page and f"evidence {run}/t003-bus" in page
-
-        status, kind, body = _fetch(server, f"/evidence/{run}/t003-r02-crop.jpg")
-        assert (status, kind, body) == (200, "image/jpeg", b"jpeg of frame cropped at 10,20")
-        assert _fetch(server, "/evidence/")[0] == 200
+        status, kind, body = _fetch(server, f"/evidence/{run}/{stem}.json")
+        record = json.loads(body)
+        assert status == 200 and kind.startswith("application/json")
+        assert record["ref"] == name and record["number"] == "115"
+        for picture in record["files"]:
+            status, kind, body = _fetch(server, f"/evidence/{run}/{picture}")
+            assert (status, kind) == (200, "image/jpeg") and body.startswith(b"jpeg of")
     finally:
         server.stop()
 
 
 def test_only_names_the_board_wrote_are_served(tmp_path):
-    """The daemon runs as root: a path out of the folder would serve anything on the card."""
+    """The daemon runs as root: a path out of the folder would serve anything on the card. And there
+    is no listing: the app asks only for what it was told about."""
     root = tmp_path / "evidence"
-    (root / "20261012-101500").mkdir(parents=True)
+    run = root / "20261012-101500"
+    run.mkdir(parents=True)
+    (run / "events.jsonl").write_text("{}")
     (tmp_path / "secret.jpg").write_bytes(b"no")
     server = _serve(root)
     try:
         for path in (
             "/evidence/20261012-101500/../../secret.jpg",
             "/evidence/..%2F/secret.jpg",
-            "/evidence/20261012-101500/secret.txt",
-            "/evidence/not-a-run/",
-            "/evidence/20261012-101500/missing.jpg",
+            "/evidence/20261012-101500/events.jsonl",
+            "/evidence/20261012-101500/",
+            "/evidence/",
+            "/evidence/20261012-101500/t001-missing.jpg",
         ):
-            assert _fetch(server, path)[0] in (301, 404), path
+            assert _fetch(server, path)[0] == 404, path
     finally:
         server.stop()
 
 
-def test_with_evidence_off_the_routes_say_so(tmp_path):
+def test_with_evidence_off_nothing_is_served(tmp_path):
     from virovision.http_server import HttpServer
 
     server = HttpServer(lambda: {}, bytes, capture=None, port=0)
     server.start()
     try:
-        status, _, body = _fetch(server, "/evidence/")
-        assert status == 404 and b"--no-evidence" in body
+        assert _fetch(server, "/evidence/20261012-101500/t001-bus.json")[0] == 404
     finally:
         server.stop()

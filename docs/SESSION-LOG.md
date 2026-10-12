@@ -3754,36 +3754,35 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   funciona, pero cuesta ~25 s. Habría que mirar si arrancar la cámara después de que el IMX500
   termine de cargar su firmware (≈22 s del arranque) lo evita.
 
-## 2026-10-12 — El modo ómnibus guarda lo que vio: el cuadro de cada ómnibus y el recorte de cada lectura
+## 2026-10-12 — El modo ómnibus guarda lo que vio, y la foto llega a la telemetría unida a su log
 
 - **Pedido**: saber qué ve efectivamente la placa cuando reconoce un ómnibus y cuando el OCR devuelve
-  una línea. El journal decía «track 3 read: 115 LUIS BRAILLE» y nada de la imagen: un cartel chico,
-  un recorte que corta medio destino, un reflejo o un error del OCR se veían igual.
-- **Qué se hizo** (`hardware/raspi/virovision/evidence.py`, enganchado en `bus.py`): cada corrida del
-  modo deja una carpeta en `/home/virovision/evidence/<hora>/` con
-  - el cuadro del aviso «se acerca un ómnibus», con las cajas del sensor (se guarda aunque la frase
-    se silencie por la ventana de 15 s: la pregunta es qué tomó el sensor por un ómnibus);
-  - el recorte exacto de cada lectura del OCR, y el cuadro entero marcado cuando leyó algo;
-  - `events.jsonl` con los textos y scores del OCR, el tiempo, y la decisión final (dicha o
-    silenciada como eco).
-  - **El log queda conectado con la foto** (lo que más importa para analizar después): la línea del
-    ómnibus detectado, la de cada lectura y la de la decisión llevan `(evidence <corrida>/t003-…)`,
-    y `events.jsonl` guarda la hora con milisegundos, igual que el journal.
-- **Servidas por WiFi** en el servidor HTTP que ya mandaba la foto al celular: `/evidence/` es una
-  galería para el navegador (cada imagen con la referencia del journal al lado y un ancla con ese
-  nombre) y `/evidence.json` la lista para la app. Sólo lectura, y sólo nombres que la placa
-  escribió (el daemon corre como root: una ruta con `..` serviría cualquier archivo).
-- **Es temporal**: decisión del equipo de sacarlo para la versión final. Anotado en
-  `docs/ROADMAP.md` («Antes de la versión final») y al principio de `evidence.py`.
-- **Por qué así**:
-  - En la placa y no por BLE/telemetría: un cuadro son ~100 KB y BLE mueve 53 KB en 4,5 s (ADR 0003).
-  - Hilo propio con cola de 4 y descarte: codificar un JPEG de 1024 px cuesta decenas de ms en la
-    Zero 2 W y el hilo de cámara no puede esperar (libcamera da el sensor por muerto a ~1 s).
+  una línea, con **el log conectado a la foto correspondiente** para analizarlo después. El log decía
+  «115 LUIS BRAILLE» y nada de la imagen: un cartel chico, un recorte que corta medio destino, un
+  reflejo o un error del OCR se veían igual.
+- **Placa** (`hardware/raspi/virovision/evidence.py`, enganchado en `bus.py`): cada corrida del modo
+  deja una carpeta en la microSD con el cuadro del aviso «se acerca un ómnibus» (aunque la frase se
+  silencie), el recorte exacto de cada lectura, el cuadro entero cuando el OCR leyó algo, y un JSON
+  por registro (textos y scores del OCR, ms, decisión). Las líneas del journal llevan
+  `(evidence <corrida>/t003-…)`.
+  - Hilo propio con cola de 4 y descarte: el hilo de cámara no puede esperar un JPEG.
   - Tope de 500 MB y piso de 1 GB libre: la microSD es de la que arranca la placa.
-  - Bandera `--no-evidence`: son fotos de la calle, con gente; quedan en la placa.
-- **Verificado**: tests nuevos (`tests/test_evidence.py`) y la suite del daemon en verde; el camino
-  real con OpenCV probado en la Mac. **Falta probarlo en la placa.**
+- **A la app, como el modo supermercado** (pedido explícito: nada de una galería web en la placa).
+  Un primer intento servía una galería HTML en `/evidence/`; se descartó. Ahora la placa avisa por
+  BLE `{t:"evidence", ref}` y la app baja ese registro y sus fotos por WiFi (`services/evidence/`).
+- **A Supabase, junto a la telemetría** (elegido entre «sólo en el teléfono», «Supabase» y «las
+  dos»): la app graba en el momento una fila `bus.evidence` con lo que leyó el OCR y la ruta de
+  cada foto en Storage, y sube las fotos después a esa misma ruta (función `evidence`, bucket privado
+  `evidence`). Rutas deterministas: la fila es correcta aunque la foto suba una hora más tarde —con
+  el celular en el AP de la placa no hay internet—, y la cola en el teléfono tiene tope.
+- **Es temporal**: decisión del equipo de sacarlo para la versión final. La lista de qué sacar
+  está en `docs/ROADMAP.md` («Antes de la versión final»), y cada archivo lo dice en su cabecera.
+- **Verificado**: tests nuevos en la placa (`tests/test_evidence.py`, 174 en verde) y en la app
+  (`services/evidence/*.test.ts`, 328 en verde); lint y typecheck limpios. **No verificado**: la
+  función `evidence` (no hay Deno en la Mac), y nada en la placa ni en el teléfono todavía.
 
 ### Pendientes
-- Desplegar en la placa y hacer una corrida en la parada: mirar los recortes de las lecturas fallidas.
-- Antes de la versión final: sacar la evidencia entera (o, como mínimo, apagarla por defecto).
+- Aplicar la migración del bucket y desplegar la función `evidence` (pide confirmación: es producción).
+- Desplegar en la placa, build de la app, y una corrida en la parada: mirar los recortes de las
+  lecturas fallidas.
+- Antes de la versión final: sacar la evidencia entera (lista en el ROADMAP).

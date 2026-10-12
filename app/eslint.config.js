@@ -42,6 +42,13 @@ const ADR_0001_BOUNDARY = {
             message:
               'ADR 0001 + ADR 0008: the announcement has to work without internet. Whatever goes out to the cloud is called from features/reader, after announcing.',
           },
+          {
+            // Bus mode's pictures go to Supabase Storage: development instrumentation, network, and
+            // TEMPORARY. Wired from features/device, never from the path that reads and announces.
+            group: ['@/services/evidence', '@/services/evidence/*', '**/services/evidence/*'],
+            message:
+              'ADR 0001: evidence uploads are network instrumentation. Wire them from features/device, never from recognition or the announcement.',
+          },
         ],
       },
     ],

@@ -57,6 +57,8 @@ type DeviceEvent =
   | { t: 'log'; lvl?: string; src?: string; msg?: string; drop?: number; ago?: number }
   | { t: 'warming' }
   | { t: 'bus' }
+  /** Bus mode kept a picture; the app downloads it (`services/evidence`). TEMPORARY. */
+  | { t: 'evidence'; ref?: string }
   | { t: 'result'; event: RecognitionEvent };
 
 function withDeadline<T>(ms: number, error: () => Error, run: (resolve: (v: T) => void, reject: (e: Error) => void) => void | (() => void)): Promise<T> {
@@ -116,6 +118,7 @@ class BleClientPlx implements BleClient {
   private readonly readRequestListeners = new Set<(mode: number | null) => void>();
   private readonly errorListeners = new Set<(message: string) => void>();
   private readonly warmingListeners = new Set<() => void>();
+  private readonly evidenceListeners = new Set<(ref: string) => void>();
   private readonly busListeners = new Set<() => void>();
 
   constructor(private readonly manager: BleManager) {}
@@ -225,6 +228,11 @@ class BleClientPlx implements BleClient {
   onBusApproaching(listener: () => void): () => void {
     this.busListeners.add(listener);
     return () => this.busListeners.delete(listener);
+  }
+
+  onEvidence(listener: (ref: string) => void): () => void {
+    this.evidenceListeners.add(listener);
+    return () => this.evidenceListeners.delete(listener);
   }
 
   onDeviceError(listener: (message: string) => void): () => void {
@@ -523,6 +531,9 @@ class BleClientPlx implements BleClient {
         break;
       case 'bus':
         for (const listener of this.busListeners) listener();
+        break;
+      case 'evidence':
+        if (typeof event.ref === 'string') for (const listener of this.evidenceListeners) listener(event.ref);
         break;
       case 'ap':
         for (const listener of this.apListeners) listener(event.on);

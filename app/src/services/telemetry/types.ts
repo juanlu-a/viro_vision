@@ -65,6 +65,11 @@ export type EventType =
   | 'device.readRequest'
   // Bus mode asked for before its OCR finished loading: how often the user meets that window
   | 'device.warmingUp'
+  // Bus mode's pictures (TEMPORARY, development only: `services/evidence`). `bus.evidence` is the
+  // log line of one picture — what the OCR returned and where the JPEGs are in Storage; the
+  // `…Failed` ones say why a picture never reached the bucket (`detail.stage`).
+  | 'bus.evidence'
+  | 'bus.evidenceFailed'
   // Operating modes (ADR 0007)
   | 'mode.change'
   // One reading, end to end

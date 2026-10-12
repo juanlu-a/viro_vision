@@ -11,4 +11,6 @@
  */
 export { record, flush, startTelemetry, isTelemetryConfigured } from './recorder';
 export { errorDetail, errorType } from './errorDetail';
+export { getPhoneId } from './identity';
+export { functionUrlFrom } from './config';
 export type { TelemetryEvent, TelemetryBatch, EventType } from './types';

@@ -11,7 +11,7 @@
  * measures where it runs and not what the code does (the lesson of the TestFlight failure of
  * 2026-09-02).
  */
-import { resolveTelemetryUrl, telemetryUrlFrom } from './config';
+import { functionUrlFrom, resolveTelemetryUrl, telemetryUrlFrom } from './config';
 
 const PROXY = 'https://oxukvenxiqkjhksgoigq.supabase.co/functions/v1/vision';
 const TELEMETRY = 'https://oxukvenxiqkjhksgoigq.supabase.co/functions/v1/telemetry';
@@ -54,5 +54,12 @@ describe('resolveTelemetryUrl', () => {
   it('with neither of the two it returns empty, which turns telemetry off entirely', () => {
     expect(resolveTelemetryUrl('', '')).toBe('');
     expect(resolveTelemetryUrl(undefined, undefined)).toBe('');
+  });
+});
+
+describe('functionUrlFrom', () => {
+  it('derives any sibling of the proxy: the evidence uploads use it (`services/evidence`)', () => {
+    expect(functionUrlFrom(PROXY, 'evidence')).toBe(PROXY.replace(/vision$/, 'evidence'));
+    expect(functionUrlFrom('https://example.test/functions/v1/other', 'evidence')).toBeNull();
   });
 });

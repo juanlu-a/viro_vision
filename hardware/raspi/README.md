@@ -402,18 +402,26 @@ ve en ningún log que el usuario alcance.
 
 Cada vez que arranca el modo ómnibus, la placa guarda en la microSD lo que hubo detrás de cada
 anuncio (`virovision/evidence.py`), para poder separar después un cartel muy chico, un recorte que
-cortó medio destino, un reflejo en los LED o un error del OCR — en el journal los cuatro se ven igual:
+cortó medio destino, un reflejo en los LED o un error del OCR — en el log los cuatro se ven igual:
 
 ```
 /home/virovision/evidence/<AAAAMMDD-HHMMSS>/
-    t003-bus.jpg          el cuadro de «se acerca un ómnibus», con todas las cajas del sensor
-    t003-r02-crop.jpg     el recorte exacto que leyó el OCR (lectura 2 del track 3), sin agrandar
-    t003-r02-frame.jpg    el cuadro entero con el ómnibus y el recorte marcados (sólo si el OCR leyó algo)
-    events.jsonl          una línea por imagen y por decisión: textos y scores del OCR, ms, qué se dijo
+    t003-bus.jpg / .json      el cuadro de «se acerca un ómnibus», con todas las cajas del sensor
+    t003-r02-crop.jpg         el recorte exacto que leyó el OCR (lectura 2 del track 3), sin agrandar
+    t003-r02-frame.jpg        el cuadro entero con el ómnibus y el recorte marcados (sólo si leyó algo)
+    t003-r02.json             qué devolvió el OCR, sus scores, cuánto tardó
+    t003-decided.json         qué decidieron los votos y si se dijo o se calló como eco
+    events.jsonl              todos esos registros en orden, para quien lea la tarjeta
 ```
 
-**Cada línea del journal apunta a su imagen, y cada imagen a su línea.** Las tres líneas que
-importan llevan la referencia:
+**Llegan a la app igual que la foto del modo supermercado**: la placa avisa por BLE
+(`{"t":"evidence","ref":"<corrida>/t003-r02"}`) y la app baja `GET /evidence/<ref>.json` y las fotos
+que lista. No hay listado ni páginas: sólo se sirve lo que se anunció, y sólo nombres que escribe
+`evidence.py` (el daemon corre como root). Lo que la app hace después está en `docs/supabase.md`
+(«Edge Function `evidence`»): una fila `bus.evidence` en la telemetría con lo que leyó el OCR y la
+ruta de cada foto en Storage, y la foto subida a esa ruta.
+
+**El log queda conectado con la foto** también en el journal de la placa:
 
 ```
 bus: track 3 is a bus, saying so (evidence 20261012-101500/t003-bus)
@@ -421,32 +429,15 @@ bus: track 3 read in 512 ms at 1.4 s: 115 LUIS BRAILLE (evidence 20261012-101500
 bus: track 3 decided at 2.1 s after 3 reads: Bus 115, LUIS BRAILLE (evidence 20261012-101500/t003-*)
 ```
 
-y `events.jsonl` guarda la hora con milisegundos, la misma que da `journalctl -o short-precise`.
-
-**Verlas por WiFi**, desde cualquier navegador en la misma red que la placa (el celular unido al AP
-de la placa incluido; la Mac nunca, ver `placa-acceso.md`):
-
-| URL | Qué es |
-|---|---|
-| `http://<ip>:8080/evidence/` | todas las corridas, la más nueva primero, con lo que se dijo en cada una |
-| `http://<ip>:8080/evidence/<corrida>/` | la corrida por ómnibus: el cuadro, cada recorte con lo que leyó el OCR y sus scores, y la decisión |
-| `http://<ip>:8080/evidence/<corrida>/#t003-r02` | salta directo a la imagen que nombra una línea del journal |
-| `http://<ip>:8080/evidence.json` | la lista en JSON, para la app |
-
-Es de sólo lectura: borrar sigue siendo por SSH. Para bajarlas todas a la Mac:
-
-```sh
-rsync -av virovision@<ip>:evidence/ ./evidence/     # y borrarlas en la placa cuando ya no sirvan
-```
-
 - Se escribe en un hilo propio con una cola corta: si la tarjeta no da abasto se descartan imágenes,
-  nunca se frena la cámara. La línea siguiente de `events.jsonl` dice cuántas se perdieron.
+  nunca se frena la cámara (`dropped_before` en el registro siguiente dice cuántas).
 - Tope de **500 MB** entre todas las corridas, y nada si quedan menos de 1 GB libres: al empezar
-  una corrida se borran las más viejas.
+  una corrida se borran las más viejas. Sin teléfono escuchando, la tarjeta es la única copia
+  (`rsync -av virovision@<ip>:evidence/ ./evidence/`).
 - El nombre de la carpeta es la hora de la placa, que no tiene RTC: antes de NTP puede estar
   corrida horas.
-- **Son fotos de la calle, con gente.** Quedan en la placa y no viajan solas a ningún lado. Para
-  apagarlo: `--no-evidence` en `/etc/default/virovision`; `--evidence-dir` cambia la carpeta.
+- **Son fotos de la calle, con gente.** Para apagarlo: `--no-evidence` en `/etc/default/virovision`;
+  `--evidence-dir` cambia la carpeta.
 
 ### Cambiar el detector sin editar dos archivos
 

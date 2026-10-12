@@ -191,8 +191,7 @@ async def _main(args: argparse.Namespace) -> None:
             # /tmp, answered 202 and nobody ever heard it. `--no-audio` keeps that old behaviour for
             # debugging a reading without the sound.
             play=None if args.no_audio else player.play,
-            # Served even with no camera or no bus mode on this run: what earlier runs saw is still
-            # on the card, and looking at it is the point.
+            # Where the app downloads what bus mode announces over BLE (`evidence.py`).
             evidence_dir=None if args.no_evidence else args.evidence_dir,
         )
         http.start()
@@ -253,7 +252,7 @@ async def _main(args: argparse.Namespace) -> None:
             catalog=args.bus_catalog,
             labels=labels,
             signs_only=signs_only,
-            evidence=None if args.no_evidence else Evidence(args.evidence_dir),
+            evidence=None if args.no_evidence else Evidence(args.evidence_dir, emit=service.core.emit_event),
         )
         service.core.attach_bus(bus_watcher)
 

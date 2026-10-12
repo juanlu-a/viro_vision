@@ -67,6 +67,13 @@ export interface BleClient {
    * what the user already knows (`bus_banner/tracking.py`).
    */
   onBusApproaching(listener: () => void): () => void;
+  /**
+   * Bus mode kept a picture of what it saw — a bus's frame, an OCR read's crop, or a decision —
+   * and it is ready to download over WiFi under `ref` (`<run>/t003-r02`). Development
+   * instrumentation, TEMPORARY: removed before the final version with the rest of the evidence path
+   * (`services/evidence`).
+   */
+  onEvidence(listener: (ref: string) => void): () => void;
   /** Sets the mode on the device (0 idle, 1 bus, 2 supermarket). It turns its AP on or off. */
   writeMode(mode: number): Promise<void>;
 
@@ -191,6 +198,9 @@ const stubClient: BleClient = {
     return () => {};
   },
   onBusApproaching() {
+    return () => {};
+  },
+  onEvidence() {
     return () => {};
   },
   async writeMode() {

@@ -286,3 +286,33 @@ Lo que conviene saber al leerlas:
   mide **caracteres de JSON** (≤ 8000): son medidas distintas. En la práctica la de la función es
   más estricta —se probó con 7900 caracteres incompresibles y entró sin problema—, y ese margen es
   el que evita que un evento gigante haga fallar el insert del lote entero.
+
+---
+
+# Edge Function `evidence` — las fotos del modo ómnibus (2026-10-12)
+
+> ⚠️ **Temporal, sólo para desarrollo.** Se saca antes de la versión final (`docs/ROADMAP.md`,
+> «Antes de la versión final»): son fotos de la calle, con gente.
+
+Une cada línea del log con la foto que la explica. El camino:
+
+1. La placa guarda el cuadro de cada ómnibus y el recorte de cada lectura del OCR y avisa por BLE
+   (`hardware/raspi/virovision/evidence.py`).
+2. La app baja el registro y las fotos por WiFi, como la foto del modo supermercado, y graba **en el
+   momento** una fila `bus.evidence` en `events` con lo que leyó el OCR (textos, scores, línea,
+   destino, ms) y, en `detail.storage`, la ruta de cada foto (`app/src/services/evidence/`).
+3. Las fotos quedan en cola en el teléfono y se suben cuando hay internet a esta función, que las
+   guarda con service role en el bucket **privado** `evidence`, en
+   `<phone>/<corrida>/<archivo>.jpg` — la misma ruta que ya dice la fila. Con el celular unido al AP
+   de la placa no hay internet: se reintenta cada minuto y la cola tiene tope (150).
+
+Las rutas son deterministas a propósito: la fila es correcta aunque la foto suba una hora después, y
+ninguno de los dos lados tiene que avisarle al otro dónde quedó nada.
+
+Para mirar: en la tabla `events`, `type = 'bus.evidence'`, y abrir `detail->'storage'` en el
+dashboard (*Storage → evidence*) o con una URL firmada. `bus.evidenceFailed` dice por qué una foto no
+llegó (`detail.stage`: `pull`, `upload`, `dropped`, `noAddress`).
+
+Sin JWT, igual que `telemetry` (ADR 0008). Topes: 4 archivos por pedido, 2 MB por archivo, sólo
+JPEG (los primeros bytes se verifican), sólo nombres que escribe la placa. El bucket se crea con la
+migración `20261012120000_evidence_bucket.sql`.

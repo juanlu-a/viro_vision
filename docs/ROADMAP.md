@@ -104,12 +104,17 @@ Recognition wiring in the app (**A5**) waits for B1/B2.
 
 Herramientas que se usan mientras se ajusta el sistema y **no van en la versión que se entrega**:
 
-- [ ] **Evidencia del modo ómnibus** (2026-10-12): la placa guarda en la microSD el cuadro de cada
-  ómnibus y el recorte de cada lectura del OCR, y los sirve por WiFi en `/evidence/`
-  (`hardware/raspi/virovision/evidence.py`, sus rutas en `http_server.py`, las banderas
-  `--evidence-dir`/`--no-evidence` en `__main__.py`, el README de la placa y `tests/test_evidence.py`).
-  Son fotos de la calle, con gente, en un servidor sin autenticación. Decisión del equipo: queda
-  mientras se prueba y se saca para la versión final. Como mínimo, apagado por defecto.
+- [ ] **Evidencia del modo ómnibus** (2026-10-12): la placa guarda el cuadro de cada ómnibus y el
+  recorte de cada lectura del OCR, la app los baja y los sube a Supabase junto a la telemetría.
+  Son fotos de la calle, con gente. Decisión del equipo: queda mientras se prueba y se saca para la
+  versión final. Qué sacar:
+  - Placa: `hardware/raspi/virovision/evidence.py`, la ruta `/evidence/` de `http_server.py`, las
+    banderas `--evidence-dir`/`--no-evidence` y el `evidence=` de `__main__.py`, los ganchos en
+    `bus.py`, `tests/test_evidence.py` y la sección del README. Borrar `/home/virovision/evidence`.
+  - App: `src/services/evidence/`, `onEvidence` en `services/ble/`, el `evidenceAddress` de
+    `DeviceProvider.tsx`, los tipos `bus.evidence*` de la telemetría y el grupo en `eslint.config.js`.
+  - Supabase: la función `evidence` (y su bloque en `config.toml`), y vaciar y borrar el bucket
+    `evidence` con una migración nueva.
 
 ## Verification per phase
 - **A1–A3:** launch app (dev client), drive each flow with VoiceOver + TalkBack; check focus order,
