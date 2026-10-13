@@ -1,0 +1,112 @@
+/**
+ * The contract with the `telemetry` function (ADR 0008, same family as the vision proxy).
+ *
+ * **A mirror of `supabase/functions/telemetry/index.ts`**, the way `features/device/gatt.ts` is a
+ * mirror of the device's profile: if the contract changes over there, it changes here in the same PR.
+ *
+ * Two rules of the function that cannot be seen from here and bite silently:
+ *   - an event **with no `type` or no `at` is dropped without an error**: the response says
+ *     `{stored: 0}` with status 200, so a misplaced field is never noticed. That is why the type
+ *     makes them mandatory and `record()` fills `at` in itself;
+ *   - `detail` is serialized and if it goes past 6000 UTF-8 bytes (the function keeps a margin under
+ *     the column's 8 KB jsonb check) it is replaced entirely by `{trimmed: true}` —
+ *     ALL of the detail is lost, not just the excess. Never put an image or a long text in here.
+ */
+
+/**
+ * The event types, deliberately closed.
+ *
+ * It is a table that later has to be queried: with free strings, a `reading.failed` and a
+ * `reading_failed` live happily side by side and no query sees both. Adding a type is adding a line
+ * here.
+ */
+export type EventType =
+  // App lifecycle
+  | 'app.start'
+  | 'app.background'
+  | 'app.foreground'
+  | 'app.error'
+  // `console.*` from the app or a library, captured (`capture.ts`). `detail.level` says which.
+  | 'app.log'
+  // A screen that threw while rendering, caught by the root error boundary: the user saw a neutral
+  // screen and a button to start again, never the error.
+  | 'app.renderError'
+  // BLE link (control plane, ADR 0003)
+  | 'ble.scanning'
+  // How the peripheral was reached: already connected to the system, remembered from last time, or
+  // found by scanning. It is the number that says whether skipping the scan is buying anything, and
+  // a run of `via: 'scan'` after a disconnection is the board failing to advertise again.
+  | 'ble.found'
+  // A scan callback that came back with an error. They are survivable and no longer end the scan, so
+  // without a row here they would be completely invisible.
+  | 'ble.scanError'
+  | 'ble.connected'
+  | 'ble.failed'
+  | 'ble.lost'
+  | 'ble.retry'
+  | 'ble.disconnected'
+  | 'ble.event'
+  // A notification stream that errored while linked: the board may be notifying into the void.
+  | 'ble.monitorError'
+  // A characteristic read that failed (`detail.char`); the caller carried on with null.
+  | 'ble.readFailed'
+  // WiFi network with the device (where the photo travels)
+  | 'wifi.joining'
+  | 'wifi.ready'
+  | 'wifi.failed'
+  // What the device reports about itself
+  | 'device.status'
+  | 'device.warning'
+  // The daemon's own log lines at WARNING and above, forwarded over BLE (`{t:'log'}`).
+  | 'device.log'
+  | 'device.mode'
+  | 'device.modeFailed'
+  | 'device.audioTargetFailed'
+  | 'device.readRequest'
+  // Bus mode asked for before its OCR finished loading: how often the user meets that window
+  | 'device.warmingUp'
+  // Bus mode's pictures (TEMPORARY, development only: `services/evidence`). `bus.evidence` is the
+  // log line of one picture — what the OCR returned and where the JPEGs are in Storage; the
+  // `…Failed` ones say why a picture never reached the bucket (`detail.stage`).
+  | 'bus.evidence'
+  | 'bus.evidenceFailed'
+  // Operating modes (ADR 0007)
+  | 'mode.change'
+  // One reading, end to end
+  | 'reading.requested'
+  | 'reading.start'
+  | 'reading.ok'
+  | 'reading.failed'
+  | 'photo.ok'
+  | 'photo.failed'
+  | 'ocr.load'
+  | 'cloud.wait'
+  | 'audio.synthesis'
+  | 'audio.send'
+  // Why the POST of a reading to the device failed (status or network error).
+  | 'audio.sendFailed'
+  | 'audio.session'
+  // `audio.spoken` carries `target`: 'phone' or 'device'. `audio.fallback` is the row that matters
+  // when comparing the two paths — it says the user asked for the device and heard the phone, and
+  // why. A table full of these means the device path is not actually usable yet, which is a finding
+  // and not a bug report.
+  | 'audio.fallback'
+  | 'audio.spoken';
+
+export interface TelemetryEvent {
+  type: EventType;
+  /** ISO 8601. Mandatory: without it the function drops the event and answers 200 all the same. */
+  at: string;
+  /** Duration of what the event measures, when it measures something. The function rounds it to an integer. */
+  ms?: number;
+  /** The event's context. Serialized it has to stay under 6000 bytes (see above). */
+  detail?: Record<string, unknown>;
+}
+
+/** The body the function expects. `app` identifies the version, so builds are not compared blindly. */
+export interface TelemetryBatch {
+  phone: string;
+  session: string;
+  app: string;
+  events: TelemetryEvent[];
+}

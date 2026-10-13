@@ -1,10 +1,11 @@
 /**
- * Camino local del modo ómnibus (ADR 0006): OCR sobre el banner del ómnibus.
+ * The local path of bus mode (ADR 0006): OCR over the bus's banner.
  *
- * En el producto, la TPU del dispositivo detecta el ómnibus y manda a la app sólo el recorte del
- * banner (número y destino); acá se lee. Hoy, sin hardware, la app recibe la foto entera desde
- * la fototeca — por eso la heurística de `features/reader/lectura.ts` todavía filtra candidatos.
- * Nada de esto toca la red: es el camino que ADR 0001 exige que funcione sin internet.
+ * In the product, the device detects the bus and the app reads the banner here (number and
+ * destination). Today the app downloads the whole photo from the device over WiFi and OCRs all of
+ * it — which is why the heuristic in `features/reader/reading.ts` still filters candidates. None of
+ * this touches the network: it is the path ADR 0001 requires to work without
+ * internet.
  */
-export { cargarOcr, leerImagen, liberarOcr, ocrCargado } from './ocr';
-export type { LecturaOcr } from './ocr';
+export { isOcrLoaded, loadOcr, readImage, releaseOcr } from './ocr';
+export type { OcrReading } from './ocr';

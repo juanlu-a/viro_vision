@@ -71,6 +71,123 @@ referencia y no lo duplica.
   desarrollo de estos modos; cuando el dispositivo exista, el modo lo fija el botón y la app lo
   refleja.
 
+## Actualización 2026-09-09 — un gesto nombra un modo, no un paso
+
+**Probado con el botón soldado, la máquina original no se sostuvo en la mano.** La decisión de
+arriba restringía los clicks a *esperando*: dentro de un modo, el click corto quedaba reservado
+"para disparar una lectura" y cambiar de ómnibus a supermercado exigía un click largo en el medio.
+En la práctica el usuario hace dos clicks esperando supermercado, no pasa nada, y la lectura es que
+**el botón está roto** — no que falta un gesto intermedio. Para alguien que no ve la pantalla, un
+control que a veces responde y a veces no es peor que uno con menos funciones.
+
+| Gesto | Desde | Efecto |
+|---|---|---|
+| 1 click | **cualquier estado** | **Modo detección de ómnibus** |
+| 2 clicks | **cualquier estado** | **Modo supermercado** (saca una foto y la procesa) |
+| Click largo | Cualquier modo | Volver a **esperando** |
+
+Entrar a un modo desactiva el anterior; no hay dos modos activos a la vez, ni estado intermedio.
+
+Se cae con esto la reserva del click corto "para disparar una lectura" dentro de un modo. No se
+perdió nada: **los dos modos disparan su lectura al activarse**, cada uno según su naturaleza —
+ómnibus deja la cámara en **vigilancia continua** y anuncia cada ómnibus que aparece, mientras que
+supermercado es **puntual**, saca una foto en el momento y la procesa, porque el usuario está
+parado frente a la góndola apuntando a un producto.
+
+Queda abierto cómo pedir una **segunda** lectura de supermercado sin salir del modo. Hoy son dos
+gestos (click largo y otra vez dos clicks). La opción natural —que repetir los dos clicks saque
+otra foto— exige que el dispositivo avise cada gesto y no sólo cada cambio de modo, porque el modo
+no cambia; se decide con el usuario antes de agregar superficie al protocolo.
+*(Cerrado el 2026-10, abajo: se decidió la opción natural y sí hubo que agregar el evento.)*
+
+## Actualización 2026-10 — dos clicks piden una lectura, siempre
+
+**La pregunta que la actualización anterior dejó abierta, decidida con el usuario probándolo.** Con
+la máquina de "un gesto nombra un modo", el segundo doble click frente a la góndola no hacía nada:
+el modo ya era supermercado, no había transición, y la captura se disparaba con la transición. Para
+leer el producto siguiente había que salir con un click largo y volver a entrar — dos gestos para
+repetir uno, con el mismo síntoma que ya habíamos arreglado un nivel más arriba: **el botón se
+siente muerto**.
+
+**Decisión: un gesto de dos clicks pide una lectura, cambie o no el modo.** Un click no: ómnibus es
+vigilancia y ya está mirando solo, así que repetirlo no pide nada nuevo — y si lo pidiera, cada
+click costaría una foto y una llamada a la nube.
+
+| Gesto | Desde | Efecto |
+|---|---|---|
+| 2 clicks | esperando u ómnibus | entra a supermercado **y lee** |
+| 2 clicks | **ya en supermercado** | **lee de nuevo** (no anuncia el modo otra vez) |
+| 1 click | ya en ómnibus | nada: el modo ya está vigilando |
+
+**Cómo se implementó, y por qué así.** Tal como anticipaba el párrafo de arriba, hubo que agregar
+superficie al protocolo: un evento nuevo **`{"t":"read","mode":N}`** en la característica `event`.
+Las dos alternativas que se descartaron:
+
+- *Re-anunciar el modo.* La app ignora un `mode` que nombra el modo en el que ya está —como debe,
+  o cada latido hablaría— así que se perdería en silencio. Y si no se perdiera, haría decir «Modo
+  supermercado activado» de nuevo: ruido para quien está leyendo tres productos seguidos.
+- *Que el dispositivo saque la foto por su cuenta.* Rompe ADR 0003: la app tira, el dispositivo
+  nunca empuja. Lo que viaja es la intención, no la imagen.
+
+**Consecuencia en la app**: el pedido de lectura deja de deducirse de la transición de modo y pasa a
+ser una señal explícita, con dos orígenes —el botón físico y la pantalla— que se sirven en un solo
+lugar. Los dos son contadores y lo que dispara es que el total *cambie*, nunca su valor: dos pedidos
+idénticos seguidos tienen que ser distinguibles, porque eso es exactamente leer dos productos
+seguidos. De paso desaparece una fragilidad: el efecto anterior dependía de `read`, cuya identidad
+cambia al cambiar de modelo, y llevaba una guarda para no disparar por un motivo ajeno al usuario.
+
+**Una lectura en curso no se encola**: si llega un pedido mientras hay otro andando, se ignora y se
+registra. Para cuando terminara, la foto extra sería de una escena que el usuario ya dejó atrás — y
+está por escuchar el resultado de la que sí está corriendo.
+
+## Actualización 2026-09-13 — el doble click, probado con un dedo real
+
+Primera sesión de uso seguido con el botón soldado. Los dos gestos fallaban, por motivos
+independientes y en capas distintas.
+
+### El primer doble click de cada sesión encendía ómnibus
+
+No era la máquina de modos: era el **antirrebote**. `bounce_time` de gpiozero no significa «ignorar
+el rebote después de una pulsación», significa *ignorar todo flanco que llegue dentro de esa ventana
+del flanco anterior aceptado* — **el de soltar incluido**. Es decir, es una **cota superior de lo
+corto que puede ser un click**: un click más corto que el antirrebote pierde su flanco de soltar, la
+pulsación siguiente ya no parece un cambio de estado, y **el doble click colapsa en uno solo**. Los
+50 ms elegidos «con margen» eran más largos que la pulsación de alguien apurado apretando un botón
+en su sien.
+
+| Constante | Antes | Ahora | Por qué |
+|---|---|---|---|
+| antirrebote | 50 ms | **15 ms** | cota de lo corto que puede ser un click; 15 ms igual cubre el rebote mecánico (~10 ms) de un tact switch 6x6 |
+| ventana de doble click | 0,4 s | **0,6 s** | 0,4 s es la cifra del mouse; acá no hay mouse ni feedback hasta que el gesto resuelve. Lo paga el click **simple**, que es el barato: cae en ómnibus, que después vigila solo |
+| umbral de click largo | 0,8 s | 0,8 s | sin cambios; sigue siendo el más largo de los tres, y eso es un invariante con test propio |
+
+Los tres pasan a ser **banderas de línea de comando** (`--debounce-ms`, `--double-click-ms`,
+`--long-press-ms`): se calibran contra un dedo real, y editar `button.py` por SSH en cada prueba es
+exactamente por qué estuvieron tres días sin calibrar. Y cada gesto **se registra**: los flancos en
+`debug`, la cuenta de clicks resuelta en `info`. Sin eso, «hice doble click y prendió ómnibus» no
+tiene forma de distinguirse de «el gesto se leyó bien y el modo está mal mapeado».
+
+### El segundo doble click prendía supermercado y no sacaba la foto
+
+Esto sí era de la app, y **no era una carrera: era determinista**. Un doble click hace que la placa
+mande dos cosas —el modo nuevo por la característica `mode` y el evento `read`— y desde el PR #80 las
+dos llegan a velocidades incomparables: `read` se sirve **sincrónicamente** en el callback de BLE,
+mientras que el modo viaja `onMode` → estado del provider → render → efecto. React no commitea
+adentro de un callback nativo, así que **la lectura ganaba siempre** y se juzgaba contra el modo
+*anterior* al click. Desde *esperando* eso caía en la guarda `mode === 'idle'` de `requestReading` y
+**se descartaba en silencio**: el modo se anunciaba, la foto no se sacaba, y recién el doble click
+siguiente leía.
+
+**Decisión: el evento `read` ya traía el modo (`{"t":"read","mode":N}`) y la app tiene que usarlo.**
+Se aplica el modo de la placa **antes** de servir la lectura, en el mismo tick
+(`readFromDevice(mode)`), en vez de correrle la carrera al commit. La app sigue reflejando el evento
+`mode` por el camino de siempre; cuando llega, ya nombra el modo en el que está y no anuncia dos
+veces.
+
+> Corrección a la actualización anterior: «los dos son contadores y lo que dispara es que el total
+> cambie» describe la implementación que el PR #80 reemplazó al sacar el pipeline de React. Hoy hay
+> un solo punto de entrada (`requestReading(source)`) y el origen viaja como parámetro.
+
 ## Ver también
 
 [ADR 0006](0006-pipelines-por-caso-de-uso.md), el diagrama de modos en

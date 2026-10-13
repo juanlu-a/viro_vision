@@ -1,40 +1,40 @@
 /**
- * Lector de Server-Sent Events sobre un ReadableStream web.
+ * A Server-Sent Events reader over a web ReadableStream.
  *
- * Existe en vez de usar `@anthropic-ai/sdk` por dos razones:
- *   1. El SDK declara en su README que React Native no está soportado.
- *   2. Para un benchmark el instrumento tiene que ser más delgado que lo medido: el decoder del
- *      SDK se interpondría entre la red y el timestamp, y no expone el momento en que llegan
- *      los headers ni el primer byte.
+ * It exists instead of using `@anthropic-ai/sdk` for two reasons:
+ *   1. The SDK states in its README that React Native is not supported.
+ *   2. For a benchmark the instrument has to be thinner than what it measures: the SDK's decoder
+ *      would sit between the network and the timestamp, and it exposes neither the moment the
+ *      headers arrive nor the first byte.
  *
- * Módulo puro y agnóstico del transporte: se testea con un stream falso (ver sse.test.ts).
- * `TextDecoder` y `ReadableStream` los instala Expo como globales antes del módulo principal.
+ * Pure, transport-agnostic module: it is tested with a fake stream (see sse.test.ts).
+ * Expo installs `TextDecoder` and `ReadableStream` as globals before the main module.
  */
 
 export interface SseFrame {
-  /** Valor de la línea `event:`, o null si el frame no la trae. */
+  /** Value of the `event:` line, or null when the frame does not carry one. */
   event: string | null;
-  /** Líneas `data:` concatenadas con \n. */
+  /** `data:` lines joined with \n. */
   data: string;
 }
 
 export interface ReadSseOptions {
-  /** Se llama una sola vez, cuando llega el primer chunk con datos. */
+  /** Called exactly once, when the first chunk with data arrives. */
   onFirstByte?: (at: number) => void;
-  /** Reloj inyectable para poder testear. Por defecto `performance.now()`. */
+  /** Injectable clock so it can be tested. Defaults to `performance.now()`. */
   now?: () => number;
-  /** Techo del buffer sin separador. Por defecto {@link MAX_BUFFER_BYTES}. */
+  /** Ceiling for the buffer without a separator. Defaults to {@link MAX_BUFFER_BYTES}. */
   maxBufferBytes?: number;
 }
 
 /**
- * Techo del buffer entre separadores de frame. Un servidor que responde 200 pero nunca manda la
- * línea en blanco (bug, proxy roto) haría crecer el buffer sin límite hasta colgar la app. Un
- * frame legítimo de estas APIs son unos pocos kB; 4 MB es holgadísimo y aun así acota el daño.
+ * Ceiling for the buffer between frame separators. A server that answers 200 but never sends the
+ * blank line (a bug, a broken proxy) would grow the buffer without limit until the app hangs. A
+ * legitimate frame from these APIs is a few kB; 4 MB is very generous and still bounds the damage.
  */
 export const MAX_BUFFER_BYTES = 4 * 1024 * 1024;
 
-/** Se lanza cuando el stream no respeta el formato SSE y el buffer se desborda. */
+/** Thrown when the stream does not respect the SSE format and the buffer overflows. */
 export class SseOverflowError extends Error {
   constructor(bytes: number) {
     super(`SSE_BUFFER_OVERFLOW_${bytes}`);
@@ -43,9 +43,9 @@ export class SseOverflowError extends Error {
 }
 
 /**
- * Consume el stream hasta el final, invocando `onFrame` por cada evento completo.
- * `receivedAt` es el instante en que se leyó el chunk que cerró ese frame — no el instante
- * en que se terminó de parsear.
+ * Consumes the stream to the end, invoking `onFrame` for each complete event.
+ * `receivedAt` is the instant the chunk that closed that frame was read — not the instant parsing
+ * finished.
  */
 export async function readSseStream(
   body: ReadableStream<Uint8Array>,
@@ -59,8 +59,8 @@ export async function readSseStream(
 
   let buffer = '';
   let sawFirstByte = false;
-  /** Llegada del último chunk con datos. El frame de cola se sella con esto y no con `now()`
-   *  después del cierre, que sumaría el round trip de cierre de conexión. */
+  /** Arrival of the last chunk with data. The trailing frame is stamped with this and not with
+   *  `now()` after the close, which would add the connection-close round trip. */
   let lastReceivedAt = 0;
 
   try {
@@ -78,7 +78,7 @@ export async function readSseStream(
 
       buffer += decoder.decode(value, { stream: true });
 
-      // Los frames SSE se separan con una línea en blanco. \r\n\r\n por si hay proxies.
+      // SSE frames are separated by a blank line. \r\n\r\n in case there are proxies.
       let separator = findSeparator(buffer);
       while (separator !== null) {
         const rawFrame = buffer.slice(0, separator.index);
@@ -88,16 +88,16 @@ export async function readSseStream(
         separator = findSeparator(buffer);
       }
 
-      // Si no quedó ningún separador y el buffer siguió creciendo, el stream no es SSE válido.
+      // If no separator was left and the buffer kept growing, the stream is not valid SSE.
       if (buffer.length > maxBuffer) throw new SseOverflowError(buffer.length);
     }
 
-    // Cola sin línea en blanco final (algunos servidores cierran sin ella).
+    // Trailing frame with no final blank line (some servers close without it).
     buffer += decoder.decode();
     const trailing = parseFrame(buffer);
     if (trailing) onFrame(trailing, lastReceivedAt || now());
   } catch (err) {
-    // Sin cancel(), un throw a mitad de stream libera el lock pero deja el socket vivo.
+    // Without cancel(), a throw mid-stream releases the lock but leaves the socket alive.
     await reader.cancel().catch(() => {});
     throw err;
   } finally {
@@ -113,17 +113,17 @@ function findSeparator(buffer: string): { index: number; length: number } | null
   return { index: lf, length: 2 };
 }
 
-/** Parsea un frame crudo. Devuelve null si no tiene ninguna línea `data:`. */
+/** Parses a raw frame. Returns null when it has no `data:` line at all. */
 export function parseFrame(raw: string): SseFrame | null {
   const lines = raw.split(/\r?\n/);
   let event: string | null = null;
   const dataLines: string[] = [];
 
   for (const line of lines) {
-    if (line.length === 0 || line.startsWith(':')) continue; // comentario / keep-alive
+    if (line.length === 0 || line.startsWith(':')) continue; // comment / keep-alive
     const colon = line.indexOf(':');
     const field = colon === -1 ? line : line.slice(0, colon);
-    // La espec. permite un único espacio opcional después de los dos puntos.
+    // The spec allows a single optional space after the colon.
     let value = colon === -1 ? '' : line.slice(colon + 1);
     if (value.startsWith(' ')) value = value.slice(1);
 

@@ -6,15 +6,18 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "virovision",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.virovision.app",
       "supportsTablet": true,
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
         "NSBluetoothPeripheralUsageDescription": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento.",
-        "NSPhotoLibraryUsageDescription": "ViroVision accede a tus fotos para elegir la imagen del cartel de ómnibus o del producto que querés que te lea en voz alta.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocalNetworkUsageDescription": "ViroVision se comunica con el dispositivo de asistencia por la red WiFi local para recibir las fotos y enviarle el audio.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
@@ -41,11 +44,15 @@
         {
           "ios": {
             "deploymentTarget": "17.0"
+          },
+          "android": {
+            "usesCleartextTraffic": true
           }
         }
       ],
       "expo-router",
       "expo-dev-client",
+      "react-native-wifi-reborn",
       [
         "expo-splash-screen",
         {
@@ -64,11 +71,12 @@
           "bluetoothAlwaysPermission": "ViroVision usa Bluetooth para conectarse con el dispositivo de asistencia y recibir los resultados de reconocimiento."
         }
       ],
-      "expo-audio",
       [
-        "expo-image-picker",
+        "expo-audio",
         {
-          "photosPermission": "ViroVision accede a tus fotos para elegir la imagen del cartel de ómnibus o del producto que querés que te lea en voz alta.",
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false,
+          "recordAudioAndroid": false,
           "microphonePermission": false
         }
       ],

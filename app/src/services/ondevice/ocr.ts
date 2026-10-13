@@ -1,73 +1,73 @@
 /**
- * OCR local: detecta regiones de texto en una foto y las lee.
+ * Local OCR: detects text regions in a photo and reads them.
  *
- * Camino de producto del modo ómnibus desde ADR 0006 (2026-08-22): la TPU del dispositivo detecta
- * el ómnibus y recorta el banner; la app lee el recorte con esto. Lo que el spike validó como
- * "lo único de lo local que funciona sin descargar gigabytes" es hoy el camino primario.
+ * The product path of bus mode since ADR 0006 (2026-08-22): the device's TPU detects the bus and
+ * crops the banner; the app reads the crop with this. What the spike validated as "the only local
+ * thing that works without downloading gigabytes" is today the primary path.
  *
- * **Por qué OCR y no un modelo de visión generalista.** Leer "183 · Punta Carretas" de un cartel es
- * literalmente la tarea para la que existe un OCR. Un VLM hace eso *además* de describir la escena
- * y razonar sobre ella — capacidades que este producto no usa y que se pagan en memoria, batería y
- * latencia. Los números del spike lo vuelven concreto: el VLM multimodal más chico que encontramos
- * pide 3 GB y no logra cargar en el teléfono; este pipeline son ~250 MB y corre.
+ * **Why OCR and not a general-purpose vision model.** Reading "183 · Punta Carretas" off a sign is
+ * literally the task an OCR exists for. A VLM does that *in addition to* describing the scene and
+ * reasoning about it — capabilities this product does not use and that are paid for in memory,
+ * battery and latency. The spike's numbers make it concrete: the smallest multimodal VLM we found
+ * asks for 3 GB and fails to load on the phone; this pipeline is ~250 MB and runs.
  *
- * **Esto no es "volver a YOLO + OCR".** Esa era la tarea B1 del roadmap: juntar y etiquetar un
- * dataset uruguayo, entrenar YOLO11, elegir un OCR. Acá los modelos vienen entrenados y listos: se
- * bajan y andan. Es quedarse con el resultado de ese camino sin pagar el entrenamiento.
+ * **This is not "going back to YOLO + OCR".** That was roadmap task B1: gather and label a Uruguayan
+ * dataset, train YOLO11, pick an OCR. Here the models come trained and ready: they download and
+ * work. It is keeping that path's result without paying for the training.
  *
- * El detector devuelve **caja delimitadora** además del texto, y eso no es un detalle: la tesis
- * pide priorizar el ómnibus más relevante cuando hay varios, y la posición es lo que permite
- * hacerlo. Un VLM devolvería una frase, no coordenadas.
+ * The detector returns a **bounding box** as well as the text, and that is not a detail: the thesis
+ * asks for prioritizing the most relevant bus when there are several, and position is what makes
+ * that possible. A VLM would return a sentence, not coordinates.
  */
 import { OCR_SPANISH, OCRModule } from 'react-native-executorch';
 import type { OCRDetection } from 'react-native-executorch';
 
-export interface LecturaOcr {
-  /** Todo lo que se detectó, ordenado de mayor a menor confianza. */
-  detecciones: OCRDetection[];
-  /** Milisegundos de la pasada, medidos acá para ser comparables con el resto del spike. */
+export interface OcrReading {
+  /** Everything detected, sorted from highest to lowest confidence. */
+  detections: OCRDetection[];
+  /** Milliseconds of the pass, measured here so it is comparable with the rest of the spike. */
   ms: number;
 }
 
-let modulo: OCRModule | null = null;
+let ocrModule: OCRModule | null = null;
 
-export function ocrCargado(): boolean {
-  return modulo !== null;
+export function isOcrLoaded(): boolean {
+  return ocrModule !== null;
 }
 
 /**
- * Descarga (la primera vez) y carga el pipeline de OCR en español.
+ * Downloads (the first time) and loads the Spanish OCR pipeline.
  *
- * Español y no inglés porque el alfabeto cambia el reconocedor: los destinos llevan tildes y eñes
- * —"Punta Carretas", "Peñarol", "Estación"— y un reconocedor entrenado sin esos símbolos los
- * lee mal o los descarta.
+ * Spanish and not English because the alphabet changes the recognizer: destinations carry accents
+ * and eñes —"Punta Carretas", "Peñarol", "Estación"— and a recognizer trained without those symbols
+ * reads them wrong or drops them.
  */
-export async function cargarOcr(
-  onProgress: (fraccion: number) => void,
+export async function loadOcr(
+  onProgress: (fraction: number) => void,
 ): Promise<{ ms: number }> {
-  liberarOcr();
+  releaseOcr();
   const t0 = performance.now();
-  modulo = await OCRModule.fromModelName(OCR_SPANISH, onProgress);
+  ocrModule = await OCRModule.fromModelName(OCR_SPANISH, onProgress);
   return { ms: performance.now() - t0 };
 }
 
-/** Lee el texto de una imagen. La ruta puede ser `file://…` o absoluta. */
-export async function leerImagen(rutaImagen: string): Promise<LecturaOcr> {
-  if (!modulo) throw new Error('El OCR no está cargado.');
+/** Reads the text of an image. The path can be `file://…` or absolute. */
+export async function readImage(imagePath: string): Promise<OcrReading> {
+  if (!ocrModule) throw new Error('The OCR is not loaded.');
 
   const t0 = performance.now();
-  const detecciones = await modulo.forward(rutaImagen);
+  const detections = await ocrModule.forward(imagePath);
   const ms = performance.now() - t0;
 
   return {
-    // Mayor confianza primero: es el orden en que un humano miraría los resultados, y el que
-    // conviene para elegir qué anunciar cuando hay varios textos en la escena.
-    detecciones: [...detecciones].sort((a, b) => b.score - a.score),
+    // Highest confidence first: it is the order a human would look at the results in, and the one
+    // that suits picking what to announce when there are several texts in the scene.
+    detections: [...detections].sort((a, b) => b.score - a.score),
     ms,
   };
 }
 
-export function liberarOcr(): void {
-  modulo?.delete();
-  modulo = null;
+export function releaseOcr(): void {
+  ocrModule?.delete();
+  ocrModule = null;
 }

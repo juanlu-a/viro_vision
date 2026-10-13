@@ -529,21 +529,3298 @@ Lo decidido el 21/08 (ADRs 0006 y 0007), implementado en Inicio.
 - ADR 0006 lleva una actualización *bis* con la medición y el cambio de default; el índice de
   decisiones de la skill quedó alineado. 138 tests en 11 suites, lint y typecheck en verde.
 
+## 2026-08-31 → 2026-09-01 — el link público quedó vivo (y el fantasma del build 1)
+
+Sesión de operaciones sobre TestFlight, casi toda desde monitores en background:
+
+- **El link público está VIVO.** El release del PR #44 (build 202608312029) pasó Beta App Review el
+  2026-08-31: lo envió el propio workflow de `main`, como estaba diseñado. Cualquiera con
+  <https://testflight.apple.com/join/jbE7GDqV> instala el release. Con esto el flujo quedó probado
+  punta a punta: merge a `staging` → grupo interno en minutos; PR `staging → main` → revisión →
+  link público.
+- **El fantasma del build 1.** El build 1 (el primero, el del build number roto) fue expirado en
+  App Store Connect con su Beta App Review pendiente. Eso canceló la revisión, pero el slot de "un
+  build por versión en revisión" quedó ocupado por un fantasma durante horas: la API de lectura
+  mostraba **cero** submissions en toda la app mientras `POST /v1/betaAppReviewSubmissions`
+  respondía `ANOTHER_BUILD_IN_REVIEW`; dos reenvíos del release anterior (202608301933) llegaron a
+  verse `WAITING_FOR_REVIEW` y se evaporaron. Moraleja doble, ahora en `dev-build-ios.md`: no
+  expirar un build con revisión pendiente, y consultar el estado **por build**
+  (`GET /v1/builds/{id}/betaAppReviewSubmission`) porque el listado con `include` miente mientras
+  el backend de Apple converge.
+- Quedó una submission `WAITING_FOR_REVIEW` huérfana sobre el build viejo 202608301933: la creó el
+  monitor de reintento cuando el slot se liberó, antes de enterarse de que el release nuevo ya
+  estaba aprobado. Es inocua; si molesta en ASC, se expira ese build (ya superado).
+- **TCC, cuarta vez** (18/07, 10/08, 21/08 y ahora): macOS revocó el acceso a `~/Documents` a mitad
+  de sesión. Mismo fix de siempre: Full Disk Access + reiniciar la sesión. Mientras tanto se
+  trabajó igual: el cierre anterior se escribió vía la API de GitHub y los monitores corrieron
+  desde un tmp con `asc.mjs` bajado del repo (es público y no tiene dependencias).
+- **Ciclo de la knowledgebase, ahora explícito en `CLAUDE.md`** (pedido del usuario para no repetir
+  contexto entre sesiones): al abrir, invocar la skill `virovision`; al cerrar cada sesión o
+  ticket, actualizar SESSION-LOG (siempre), PROJECT-STATUS (si cambió el estado), la skill (si
+  cambió cómo se trabaja) y ADRs (si hubo decisión). También quedó escrito que el grupo interno de
+  TestFlight no tiene link compartible (convenciones + PROJECT-STATUS).
+
+## 2026-09-01 — El modo supermercado, entero: cámara, cinco modelos y un proxy propio
+
+Punto de partida: un diagrama dibujado por el equipo (`documents/logicas-casos-de-uso.pdf`) con
+tres flujos — dos variantes del caso ómnibus según cuánto modelo corre en la Raspi, y el caso
+supermercado contra un modelo en la nube. **El camino de ómnibus queda en stand by** por decisión
+del equipo: elegir entre sus dos variantes exige tener el hardware para medirlas. La sesión fue
+sobre supermercado, que era el que estaba a medio hacer.
+
+Cinco PRs en secuencia, todos con CI verde: **#46** (docs), **#47** (cámara), **#48** (modelos),
+**#49** (proxy), **#50** (audio + QA).
+
+- **El diagrama se versiona dos veces, a propósito.** El PDF en `documents/` —carpeta nueva— es el
+  registro de qué se acordó; la transcripción a mermaid en `docs/architecture/README.md` es la
+  fuente canónica, porque se lee en un diff y GitHub la renderiza. El `documents/README.md` dice
+  cuál manda si difieren, que es el costo de tener dos copias.
+
+- **La app abría la fototeca, no la cámara.** Servía para probar pero no era el flujo: en el
+  diagrama la foto la saca la placa del dispositivo. Sin hardware, la cámara del teléfono ocupa ese
+  lugar y el resto del camino es idéntico. Se usa la cámara del sistema vía `expo-image-picker` y
+  no una vista propia con `expo-camera`: la UI nativa ya está resuelta para VoiceOver, y la
+  convención prefiere componente estándar bien anotado sobre UI dibujada a mano. La fototeca **no
+  se fue**: baja a acción secundaria porque es lo que permite pasarle la MISMA foto a varios
+  modelos —si no, la comparación mide fotos y no modelos— y es la salida cuando el permiso de
+  cámara quedó denegado.
+
+- **El permiso se pide explícitamente**, en vez de dejar que `launchCameraAsync` falle solo. Sin
+  eso el botón no hacía nada visible y quien no ve la pantalla no tenía forma de saber por qué. El
+  error tipado lleva `canAskAgain` porque **cambia el consejo**: decirle "aceptá el permiso" a
+  quien iOS ya no le va a mostrar el diálogo lo deja esperando un cartel que no aparece.
+
+- **La foto se subía entera.** ~4000 px y varios MB de base64 cruzando el puente JS, la red y los
+  tokens de entrada — tres veces latencia para alguien parado frente a la góndola. Ahora se achica
+  a 1024 px de lado mayor. El detalle que importa: se restringe el lado **mayor** y no el ancho,
+  porque un envase en la góndola es vertical y fijar el ancho dejaba el alto en ~1365 px, que era
+  justo lo que se quería evitar. Y el base64 se pide **después** del achique, no antes.
+
+- **Cae la gratuidad como restricción del proyecto** (sigue vigente para el usuario final). El
+  selector pasa a cinco modelos elegidos por latencia: `gemini-3.5-flash-lite` (default),
+  `gpt-5.6-luna`, `claude-haiku-4-5`, `qwen/qwen3.8-27b` sobre Groq, y el modelo hosteado en
+  Arnaldo Castro, **documentado y sin implementar** porque no hay endpoint.
+
+- **Un módulo cubre dos proveedores.** OpenAI, Groq y cualquier vLLM hablan el mismo dialecto, así
+  que `providers/openaiCompatible.ts` se parametriza por URL. Es también por qué sumar el endpoint
+  de Arnaldo Castro va a ser configuración y no código.
+
+- **El razonamiento, de nuevo.** `gpt-5.6-luna` razona en `medium` por defecto: sin
+  `reasoning_effort: 'none'`, tres campos cortos se pagarían como decenas de segundos — la misma
+  trampa que en Gemini con `thinking_level`. Quedó anotado que los valores **no** coinciden entre
+  proveedores (OpenAI acepta `none|low|medium|high|xhigh|max`, Groq sólo `none|default`) para que
+  nadie copie la línea a un modelo que la rechace.
+
+- **De Groq va el Qwen 3.8 y no el 3.6, aun siendo el 3.6 más rápido** (500 contra 450 tok/s). El
+  3.6 sólo admite `json_object`, que garantiza JSON sintáctico pero deja los nombres de campo a
+  criterio del modelo: `parseProductoLeido` rebotaría una lectura correcta por venir como
+  "producto" en vez de "tipo". El 3.8 admite `json_schema` con `strict`. Sobre ~50 tokens de
+  respuesta, 50 tok/s son centésimas; la garantía de forma vale más.
+
+- **Salen `gemini-flash-lite-latest` y `claude-opus-5` del selector.** Con los nuevos serían siete
+  opciones en un radiogroup que se recorre con VoiceOver, y cada opción de más es un swipe más
+  entre la persona y la lectura. Hay un test que **falla** si alguien vuelve a poner dos modelos
+  del mismo proveedor: la decisión hay que rediscutirla, no ajustarla.
+
+- **El limitador de cuota imponía el tier gratuito de Gemini a todos.** Pasa a ser por proveedor;
+  en los pagos el número alto es deliberado, porque ahí deja de ser la pared del tier gratuito y
+  pasa a ser un freno contra un bucle que queme crédito. De paso apareció un bug latente: el
+  callback `onWait` existía desde el principio y **no lo llamaba nadie**, así que la app podía
+  dormir hasta un minuto en silencio — para quien no ve la pantalla, indistinguible de estar
+  colgada. Ahora se anuncia.
+
+- **ADR 0008: un proxy propio, y por qué Supabase.** `EXPO_PUBLIC_*` no es una variable de entorno
+  que el binario lea al arrancar: es una constante compilada dentro del `.ipa`, y un `strings` la
+  devuelve. Con el tier gratuito era una molestia; con link público de TestFlight vivo y modelos
+  pagos, es la tarjeta del proyecto. El ADR compara las cinco opciones evaluadas —Supabase Edge
+  Function, Cloudflare Workers, AWS Lambda, VM self-hosted, seguir sin proxy— con el veredicto de
+  cada una. Gana Supabase por encaje, no por ser la mejor herramienta: ya es el backend declarado
+  (ADR 0002) y ya es dependencia, así que no suma una cuenta más que mantener; Cloudflare es
+  técnicamente mejor proxy pero su ventaja (cold start de decenas de ms) es ruido frente a los 2-3
+  s del modelo; Lambda es desproporcionado para reenviar un POST. **Cierra el pendiente (b) de ADR
+  0006**, abierto desde el 30/08.
+
+- **El proxy es tonto a propósito**, y eso es la decisión, no un atajo. Recibe el cuerpo que el
+  módulo del cliente ya armó, le pone la clave y devuelve el body upstream sin tocarlo. Así la
+  lógica de proveedor no se duplica del lado del servidor y agregar un modelo sigue siendo un
+  cambio en la app. Y reenviar sin leer no es sólo simplicidad: leer para reemitir obligaría a
+  duplicar el parseo de eventos de cada proveedor **y mataría el streaming**.
+
+- **La guarda central es la allowlist por host.** Un proxy que reenvía a la URL que le pasen le
+  entrega la clave al primero que pida un redirect a su propio servidor. Se valida por host y no
+  por URL exacta para que el path lo siga eligiendo el módulo del cliente — y eso resultó tener un
+  rédito que no estaba planeado: la síntesis de voz del PR #50 pasa por el mismo proxy **sin tocar
+  el servidor**, porque `/v1/audio/speech` está en `api.openai.com`, que ya estaba en la tabla.
+
+- **Queda escrito qué compra el proxy y qué no**, en el código y en el ADR, porque es fácil creer
+  que resuelve más de lo que resuelve. No está autenticado: la app no tiene login y la anon key
+  viajaría igual en el bundle, así que exigirla sería una indirección, no una defensa. El endpoint
+  **es abusable**. Lo que cambia es el modo de falla: la clave se rota o se corta en segundos en
+  vez de exigir publicar una versión y esperar revisión de tienda. Las defensas reales son la
+  allowlist, el freno por IP —un badén y no una pared, porque cada isolate cuenta lo suyo— y el
+  tope de gasto en cada proveedor.
+
+- **El archivo de audio se construyó pero salió apagado**, y vale registrar la objeción porque es
+  una decisión sobre la feature tal como estaba pedida: hoy nada lo consume —el hardware no
+  existe— así que prenderlo es pagar una llamada al TTS por cada lectura para producir algo que
+  nadie abre; y cuando el hardware exista puede que no haga falta, porque un MP3 de ~3 s son ~12
+  KB, que por WiFi es nada pero por GATT es del orden de segundos, y quizá convenga que la Raspi
+  haga su propio TTS y sólo reciba el JSON — que es exactamente lo que **ADR 0003** tiene
+  reservado. Se prende con `EXPO_PUBLIC_AUDIO_FILE_ENABLED=1`.
+
+- **Se descartaron dos TTS antes de elegir el tercero.** Google Cloud TTS: una clave de AI Studio
+  no tiene esa API habilitada (son proyectos distintos), así que la clave que ya teníamos no
+  servía. TTS nativo de Gemini: devuelve **PCM crudo**, no MP3, y habría que armar el header WAV a
+  mano en React Native. Queda `gpt-4o-mini-tts`, que devuelve MP3 directo con la clave que el
+  selector ya necesita.
+
+- **El anuncio no puede depender de la red, y ahora el linter también lo dice.** La síntesis se
+  llama **después** de `announce()`, sin `await` en el camino crítico, y traga sus errores: si
+  falla, el usuario ya escuchó el producto. `features/audio/` pasa a tener prohibido importar
+  `@/services/cloud` además de `@/services/vision`, por el mismo motivo de ADR 0001. El transporte
+  se movió de `services/vision/` a `services/cloud/`: no es de visión, y hacer que
+  `services/audio` dependiera de `services/vision` habría sido una dependencia inventada entre dos
+  cosas que sólo comparten el transporte.
+
+- **`docs/qa-modo-supermercado.md`**: 12 bloques partidos por qué necesita cada uno, porque buena
+  parte se prueba hoy con la clave de Gemini y el resto depende de cosas que se hacen una vez. Los
+  pasos 8 y 9 no son sólo QA: son la corrida que alimenta el **dataset de evaluación** de la tesis
+  (la misma foto contra los cuatro modelos, desde la fototeca, anotando `tipo`/`marca`/`detalle`
+  por separado).
+
+- **Deuda consciente, anotada en el paso 8 del QA**: los proveedores de OpenAI y Groq están
+  escritos **contra los docs, no contra la API real**, porque no hay claves todavía. Esta base
+  tiene el estándar contrario a propósito — el de Gemini está verificado contra la API, y por eso
+  encontró que el discriminador es `event_type` y no `type`, algo que los docs no dicen y que
+  descarta todos los eventos en silencio. Hay cuatro cosas concretas por confirmar.
+
+## 2026-09-02 — Medir cambió dos decisiones (y encontró tres bugs que no se veían)
+
+Con las claves de OpenAI y Groq cargadas, se saldó la deuda del PR #48: los proveedores nuevos
+estaban escritos **contra los docs**, que es lo contrario del estándar de esta base. Dos PRs:
+**#52** (los arreglos) y **#53** (el selector nuevo y la documentación).
+
+- **El arnés usa el código de la app, no una réplica.** Importa `buildProductoRequest`,
+  `readEvent` y `parseProductoLeido` de `services/vision/` y sólo reemplaza el transporte
+  (`node:https`, porque el `fetch` global de jest-expo está mockeado y devolvía respuestas vacías
+  en 1 ms). Una réplica mide la réplica; lo único que detecta que un proveedor no se comporta como
+  su documentación es ejercitar el código que va a correr.
+
+- **Los tres proveedores andan y los tres aciertan**: 15/15 corridas con `tipo`, `marca` y
+  `detalle` correctos. La precisión **no** separó a los modelos en esta tarea. Con la salvedad
+  grande de que la imagen es sintética y de alto contraste — el mejor caso posible.
+
+- **Lo que separa es la dispersión, no la mediana.** `qwen/qwen3.8-27b` 846 ms (rango 764-1087),
+  `gpt-5.6-luna` 1668 ms (1410-2490), `gemini-3.5-flash-lite` 10 649 ms (**2820-32 586**). Once
+  veces y media entre el mejor y el peor caso de Gemini, con la cuota fresca y las corridas
+  espaciadas. En una app cuya interfaz es la voz la varianza pesa más que la media: el usuario no ve
+  una barra de progreso y no puede distinguir "está pensando" de "se colgó". Gemini sale del
+  selector.
+
+- **La medición del 30/08 estaba mal reportada, y es la lección metodológica de la sesión.** Había
+  dado 2-3 s para Gemini; los extremos de ahora contienen ese número, así que con pocas muestras
+  cayó en el extremo bueno y se reportó como si fuera el comportamiento. Queda escrito en la skill
+  porque aplica a todo lo que se mida en esta tesis: **cinco corridas y no una, y se reporta el
+  rango, no el mejor número.**
+
+- **El default es Luna y no Groq, aunque Groq gane por 800 ms.** La cuota gratuita de Groq limita
+  por **tokens** por minuto (8000 TPM, ~1974 por foto a tarifa plana) = ~4 lecturas, y alguien
+  recorriendo una góndola hace 2-4. Un default que choca el límite a la cuarta lectura es peor
+  producto que uno 800 ms más lento. Groq queda de segunda opción, que es donde su perfil rinde.
+
+- **La gratuidad de ADR 0006 se sigue cumpliendo, que es lo que importa**: es gratuito *para el
+  usuario*. Paga el proyecto y mil lecturas cuestan menos de USD 0,50. Lo que ya no hay es un
+  default con tier gratuito; el camino gratis existe y es Groq.
+
+- **Tres bugs que sólo aparecen midiendo, ninguno con error visible.** (1) La cuota **no siempre
+  llega como evento SSE**: Groq la devuelve como HTTP 429 antes de abrir el stream, y por ese
+  camino la app lanzaba `VisionHttpError` — el usuario escuchaba "La nube no respondió" en vez de
+  "Cuota agotada, reintentá en N s", con el dato de cuánto esperar llegando y nadie leyéndolo. Es
+  el mismo bug que los errores tipados de esta base existen para evitar, repetido en otro camino.
+  (2) El tope del limitador para Groq estaba en 25/min, el número de un límite por requests que ese
+  proveedor **no tiene**: nunca frenaba, y la tercera lectura seguida daba 429 — pasó en vivo
+  durante la campaña. (3) Apagar el razonamiento **no compra latencia fuera de Gemini**.
+
+- **Una justificación mía era falsa, y quedó corregida en el código.** El comentario de
+  `reasoning_effort` decía que sin apagar el razonamiento la lectura pasaría a decenas de segundos.
+  Eso está medido y es cierto **en Gemini**; acá lo extrapolé. Sobre `gpt-5.6-luna` da igual `none`
+  (1,5-2,1 s), `medium` (1,5 s) o no mandar nada (2,0 s), con los mismos 35 tokens de salida: no
+  gasta razonamiento en tres campos cortos. Se sigue mandando `none` por intención y porque es
+  gratis, pero el comentario ahora dice la razón verdadera.
+
+- **La documentación de Groq tampoco lista sus valores reales**: documenta
+  `reasoning_effort: none | default` y `low` respondió 200. Tercer caso que respalda la regla de
+  verificar contra la API.
+
+- **El techo de 1024 px es correcto, pero no por lo que estaba escrito.** Se midió con cuatro
+  tamaños sobre Luna: los tokens de entrada escalan (346 → 577 → 1138 → 2290) pero las medianas de
+  tiempo **no ordenan** — 640 px salió más lento que 1536 px. A esta escala la latencia la dominan
+  el modelo y la red, y el ruido entre corridas (±800 ms) tapa la diferencia. El techo se mantiene
+  porque baja el costo a la mitad y el tráfico, no porque compre segundos.
+
+- **`docs/mediciones/`, carpeta nueva.** Los datos crudos y el método, un archivo por campaña, con
+  una regla escrita: **una campaña no se edita después de corrida; si se vuelve a medir, es un
+  archivo nuevo.** Los números viejos son el registro de qué se sabía cuándo, y borrarlos hace que
+  las decisiones tomadas con ellos parezcan arbitrarias. El análisis y la decisión siguen en
+  `pruebas-y-decisiones.md`, que es el borrador de la sección de la tesis, y linkean los datos en
+  vez de duplicarlos.
+
+- **Los modelos retirados no se borran**: viven en `PERFILES_RETIRADOS` con la medición que los
+  descartó, y sus proveedores siguen implementados y testeados. Volver a ofrecer uno es mover una
+  entrada de lista, y hay tests que fallan si alguien lo devuelve copiándolo en vez de moviéndolo o
+  si se borra el módulo de un proveedor retirado.
+
+## 2026-09-02 (cont.) — El proxy desplegado, y dos fallos que enseñaron dónde no mirábamos
+
+Segunda mitad del día: PRs **#55** a **#57**. Termina con **el primer build de ViroVision que sale
+sin ninguna clave adentro**, verificado funcionando en el teléfono.
+
+- **Un build salió con el modo supermercado muerto y nadie se enteró.** Al sacar Gemini del
+  selector (#53), el único secret de proveedor del repo dejó de corresponder a un modelo del
+  registro: `availableModels()` quedó en vacío. La app degradó como debía —dijo "no configurado" y
+  el modo ómnibus siguió leyendo— **y ahí está la trampa**: la degradación elegante es correcta en
+  runtime y es un problema en el pipeline. Un build que no puede cumplir la mitad de su función no
+  debería tardar media hora en decirlo, ni exigir que alguien lo abra para descubrirlo.
+
+- **`verificar-claves.mjs` compara lo que efectivamente se desincronizó**: los proveedores que el
+  *registro* ofrece contra las claves que el *entorno* trae. Chequear "¿hay alguna clave?" no habría
+  detectado nada, porque la de Gemini estaba ahí — faltaba una clave de un proveedor *que siguiera
+  en la lista*. Por eso lee `MODEL_PROFILES` y no `PERFILES_RETIRADOS`. Corre antes del build y
+  falla en segundos. **Se verificó reproduciendo el fallo real**: el run del PR #55 falló en ese
+  paso, con el mensaje que nombra el arreglo.
+
+- **La regla que faltaba, escrita**: una clave **gratuita** sin tarjeta puede ir al bundle; una
+  **paga**, no. No es un permiso a medias: el peor caso de que roben una gratuita es que quemen una
+  cuota que se repone sola, y el de una paga es la tarjeta del proyecto. Tratarlas igual sólo
+  lograría que no hubiera modo supermercado en ningún build distribuible hasta que el proxy
+  existiera. Con el proxy activo la regla deja de importar, porque no viaja ninguna.
+
+- **El proyecto de Supabase ya existía**, desde el 18/07, creado para la capa de cuenta de ADR 0002
+  y nunca usado: **0 usuarios, 0 tablas, 0 buckets**. Estaba pausado por inactividad.
+  `PROJECT-STATUS.md` lo daba por inexistente. No hubo nada que borrar; se despausó y se usó para
+  el proxy.
+
+- **El proxy quedó desplegado y verificado con la clave del cliente en vacío**, que es la prueba de
+  que la pone el servidor. Las cuatro guardas responden (destino ajeno 400, proveedor inexistente
+  400, método ≠ POST 405, `http://` sobre host válido 400). El costo es despreciable: Qwen pasa de
+  846 a ~950-1070 ms y Luna se mantiene dentro de su varianza. **Era la apuesta de que fuera un
+  pasamanos y no interpretara la respuesta, y se sostiene.**
+
+- **Riesgo operativo nuevo: el tier gratuito pausa el proyecto** tras una semana sin actividad, y a
+  éste ya le había pasado. Con el proxy en producción y sin claves en el bundle, una pausa deja sin
+  modo supermercado a todos los builds a la vez. Y lo que el usuario escucharía es *"sin conexión a
+  internet"*, que es engañoso: conexión hay, el que no está es el proxy. **Distinguir los dos casos
+  quedó pendiente y ahora pesa más que antes.**
+
+- **Un test mío medía el entorno, no el código.** `sintesis.test.ts` afirmaba "sin proxy sale
+  directo a OpenAI" leyendo el proxy del entorno: pasaba en local —jest no carga `.env`— y falló en
+  el job de publicación, donde la variable sí está. La causa de fondo vale más que el bug: **el CI
+  de PRs corre los tests sin secrets y el workflow de publicación los corre con todos en el `env`
+  del job**. Son dos entornos distintos ejecutando la misma suite, y lo único que evita que eso
+  muerda es que los tests no dependan del ambiente. El proxy pasó a ser inyectable, mismo criterio
+  que el reloj del limitador de cuota, y de paso el test cubre los dos caminos en vez de asumir uno
+  — incluido el que importa: que con proxy **la clave no viaja**.
+
+- **Nota operativa de un error propio**: `supabase projects api-keys` imprime la `service_role` en
+  claro, que es la clave que saltea RLS. No correrlo en un log ni en una sesión compartida. Se
+  resolvió rotando el JWT secret (barato: la app no usa ninguna de las dos claves y el proxy corre
+  con `verify_jwt = false`) y apagando el signup por email, que no usamos y dejaba un endpoint
+  abierto para crear usuarios — verificado desde afuera: `Signups not allowed for this instance`.
+
+- **Verificado en el teléfono.** Build `202609021823`, `VALID` en el grupo interno. El modo
+  supermercado funciona de punta a punta contra el proxy, sin ninguna clave en el binario.
+
+## 2026-09-04 — El selector de modelo se muda a Ajustes
+
+- **El selector del modelo de supermercado ahora vive en Ajustes**, no en Inicio. Elegir el modelo
+  es un ajuste: se toca una vez y no en cada lectura, y en Inicio competía por atención con la
+  acción principal. En Ajustes va **sin rótulo ni texto alrededor** (pedido explícito): el
+  disparador ya se anuncia como *"Modelo seleccionado: <modelo>"* y el menú como *"Seleccionar
+  modelo"*, así que un encabezado repetiría lo que el lector de pantalla ya dice.
+
+- **El hook `useModeloSupermercado` pasó a ser `ModeloSupermercadoProvider`**, montado en el layout
+  raíz. No es refactor de gusto: con el selector en Ajustes y la lectura en Inicio, dos instancias
+  del hook habrían tenido cada una su `useState`, y elegir un modelo en Ajustes **se vería aplicado
+  sin estarlo** hasta remontar Inicio. El storage y el resolver (`modeloSupermercado.ts`) no se
+  tocaron, tal como anticipaba el comentario del propio hook.
+
+- **En Inicio quedó el aviso de "sin clave configurada"**, sólo con el modo supermercado activo. Se
+  dice antes de leer y no al sacar la foto, y sigue valiendo la regla de accesibilidad: el estado no
+  se comunica por un control ausente. El aviso también aparece en Ajustes, donde ahora es el lugar
+  donde el usuario va a buscar el control que no está.
+
+- Verificado: `npm run lint`, `npm run typecheck`, `npm test` (178 tests). Actualizados
+  `PROJECT-STATUS.md` y el recorrido de VoiceOver de `qa-modo-supermercado.md`, que apuntaba
+  explícitamente a que el selector estaba en Inicio "y no en Ajustes".
+
+## 2026-09-04 (cont.) — El enlace placa ↔ teléfono: BLE fijo, la foto se decide midiendo
+
+- **El equipo decidió dónde corre cada cosa**: ómnibus **entero en la placa** (caso B del diagrama
+  canónico: YOLO + OCR cuantizados sobre la Zero 2 W + Coral) y supermercado como placa → foto →
+  teléfono → LLM en la nube → audio de vuelta al auricular de la placa. Restricciones: mínima
+  cantidad de software en la placa, sin cifrar el payload, 3 a 4 s de disparo a audio.
+
+- **Escrito el ADR 0003** (el número que estaba reservado para esto). Lo firme: Pi OS Lite + un
+  servicio systemd (no hay bare-metal: libcamera, libedgetpu, BlueZ); **BLE siempre vivo como plano
+  de control**, porque con el teléfono bloqueado en el bolsillo sólo una notificación BLE despierta
+  a la app; **audio por DAC I2S cableado**, no A2DP (compartiría antena con BLE + WiFi); anuncios
+  de ómnibus **pregrabados** en la SD. Lo abierto, con umbral: **si los 53 KB de la foto bajan por
+  BLE en menos de 2 s no hay WiFi; si no, la placa levanta un AP** (plan B diseñado ya: NetworkManager,
+  credenciales por BLE, HTTP plano, la app siempre tira).
+
+- **La pregunta del día fue "¿vale la pena WiFi?"** La cuenta cambió al mirar lo medido el 02/09: la
+  foto pesa **53 KB**, no 200. Sólo BLE ≈ 6 a 9 s con los 10-20 KB/s típicos del chip; BLE + WiFi ≈
+  3 a 3,5 s. Y "¿si la imagen es más chica?": la transferencia es lineal en bytes pero **el LLM no se
+  acelera** (las medianas del 02/09 no ordenan), y el acierto a 384 px fue sobre una imagen sintética.
+  Conclusión: el número que decide es el throughput BLE real de esta placa, que nadie midió, y el
+  tamaño mínimo de foto que aguanta la precisión con góndolas reales. Las dos variables van a
+  `docs/mediciones/2026-09-04-ble-throughput.md`, con tablas vacías para completar.
+
+- **Primer código del pilar de hardware: `hardware/raspi/`.** Un daemon Python (bluez-peripheral)
+  que anuncia «ViroVision», expone el GATT (modo, control, evento, transferencia, estado) y manda un
+  payload en chunks por notificaciones; cámara real con picamera2 a 1024 px / q70 (lo mismo que la
+  app manda a la nube) o bytes sintéticos sin cámara; máquina de modos de ADR 0007; `setup.sh` +
+  unidad systemd para instalar por SSH; tests puros con pytest. Caveat escrito: notifica por
+  `PropertiesChanged` en D-Bus, así que si la v1 da < 15 KB/s hay que repetir con `AcquireNotify`.
+
+- **La app dejó de tener el BLE en stub**: cliente real sobre `react-native-ble-plx` detrás del
+  selector (stub sólo en Expo Go / web), UUIDs de 128 bits (los `0000fffX` eran del rango de 16 bits
+  del SIG), y **«Medir transferencia»** en Dispositivo, que pide los 53 KB y dice en voz alta cuánto
+  tardaron. Reensamblado, medición y base64 en un módulo puro con tests. `EXPO_PUBLIC_SIMULATE_DEVICE=1`
+  apaga el cliente real: hay que vaciarlo para medir (documentado en `.env.example`).
+
+- **La placa no se pudo alimentar en el viaje** (sin luz: cable USB-C o SD), así que **el daemon
+  ganó un emulador para la Mac**: la lógica se separó en `nucleo.py` (comandos, modos,
+  transferencias; independiente del transporte) y hay dos adaptadores, BlueZ para la placa y
+  CoreBluetooth vía `bless` para la Mac (`python -m virovision.emulador`). Arranca y anuncia
+  «ViroVision» con el UUID del servicio; permite probar la app de punta a punta sin hardware. Lección
+  de CoreBluetooth: una característica con valor en caché tiene que ser de sólo lectura, así que todas
+  van con valor dinámico. El throughput contra la Mac **no** es el de la placa y no decide el ADR.
+
+- Verificado: `npm run lint`, `npm run typecheck`, `npm test` (189 tests); `pytest` en
+  `hardware/raspi` (18); el emulador arranca y anuncia en esta Mac. **Nada probado todavía contra la
+  placa ni desde el iPhone**: lo siguiente es el dev build y conectar contra el emulador.
+
+## 2026-09-05 — La placa en la red y el primer número real del enlace: 11,8 KB/s
+
+- **Configurar la placa sin teclado ni pantalla.** La imagen 2026-06-18 usa cloud-init: se editaron
+  en la partición `bootfs` desde la Mac `network-config` (WiFi de casa sumado), `user-data` (clave
+  SSH de la Mac) y el `instance-id` en `meta-data` y `cmdline.txt` para que reaplique la red. La SD
+  llegó protegida contra escritura por el interruptor del adaptador; una vez destrabado, arrancó y
+  apareció como `virovision.local`. Debian 13 (Trixie), Python 3.13, BlueZ 5.82.
+
+- **Instalación remota del daemon**, con tres arreglos que sólo aparecen en hardware real: `sudo`
+  sin contraseña para el usuario; `Adapter.get_first` de bluez-peripheral explota con BlueZ 5.82
+  porque existe `/org/bluez/test` (se toma `hci0` por ruta); y **dbus-next pierde chunks** cuando se
+  vuelcan sin pausa (175 de 298 llegaron, el `fin` nunca): pausa de 4 ms entre notificaciones,
+  configurable, y `PYTHONUNBUFFERED=1` para ver los `print()` de la librería en el journal.
+
+- **Primera medición real placa → iPhone (build de TestFlight): 53 KB en 4,49 s, 11,8 KB/s, 298
+  chunks de 182 bytes, sin pérdidas.** La Mac como central da lo mismo (12,5). Es una notificación
+  por intervalo de 15 ms: el controlador BCM43438 no tiene Data Length Extension (paquetes de radio
+  de 27 bytes, 15 buffers ACL) y iOS no baja de 15 ms. Chunks más chicos dan menos, no más. Detalle
+  en `docs/mediciones/2026-09-04-ble-throughput.md`. **Está más del doble por encima del umbral de
+  2 s del ADR 0003**: salvo sorpresa en las cinco corridas, la foto va por WiFi (plan B).
+
+- **La app decía «Conectado» con el enlace muerto** después de reiniciar el servicio de la placa, y
+  «No se pudo medir» al instante sin motivo. Arreglado: escucha la desconexión, consulta al stack
+  antes de escribir, y dice el motivo real del fallo por voz y en pantalla. Segundo build a TestFlight
+  con eso. La cámara no la detecta la placa (`No camera number 0 found`): revisar el flex.
+
+- Variable del repo `EXPO_PUBLIC_SIMULATE_DEVICE` pasó de `1` a `0`: los builds de TestFlight usan el
+  BLE real. El emulador de la Mac se apagó al volver la placa (los dos anunciaban «ViroVision»).
+
+- **Medición cerrada con el segundo build**: diez corridas en iPhone, cinco con el WiFi de la placa
+  prendido (mediana 4,44 s) y cinco apagado (4,47 s; el WiFi se apagó con `systemd-run` y un
+  temporizador para no perder el SSH). **53 KB en 4,5 s = 2,2× el umbral**: el ADR 0003 recibe su
+  `## Actualización 2026-09-05` y **la foto va por WiFi (plan B)**; BLE sigue como plano de control.
+  Referencia de WiFi con la misma radio: 46 ms por HTTP desde la Mac. Chunks de 95, 47 y 23 bytes
+  rinden menos que 182; descartada esa palanca. `docs/mediciones/2026-09-04-ble-throughput.md` tiene
+  las tablas y la decisión.
+
+## 2026-09-05 (cont.) — Plan B construido y probado: el híbrido funciona en el caso real
+
+- **PR #60 mergeado; PR #61 con el plan B.** Placa: servidor HTTP (`/salud`, `/medir/<n>`,
+  `/fotos/ultima`, `POST /audio`), `estado` con `ip`/`puerto`/`ap`, punto de acceso `ViroVision`
+  con NetworkManager encendido por BLE con tope de tiempo. App: `services/wifi/descargaHttp.ts`
+  (puro, con tests), dirección de la placa en el resumen, **«Medir por WiFi»**, permisos de red
+  local en HTTP plano. Dos builds a TestFlight.
+
+- **La cámara**: era hot-plug; con un reinicio la placa la tomó. Y no es la Camera Module 3: es la
+  **Raspberry Pi AI Camera (IMX500)**, compraron dos. Foto real por HTTP: 35 KB a 1024×766 en
+  200-235 ms captura incluida. Cambia el pilar de ML (detección en el sensor); otro PR.
+
+- **Medido desde el iPhone**: misma red, 53 KB en 0,04-0,05 s (la primera 2,24 s: permiso de red
+  local). **Unido al AP de la placa**, 0,05-1,03 s, mediana 0,34. BLE en la misma sesión: ~4 s.
+
+- **El hallazgo del día**: con el AP anunciándose como router (default de `ipv4.method shared`), el
+  iPhone quedaba **sin internet** y el modo supermercado con él. Un drop-in de dnsmasq sin las
+  opciones DHCP 3 y 6 hace la red sólo local: **Safari carga, la lectura de supermercado funciona y
+  la foto baja en menos de medio segundo, con el iPhone unido a la placa**. Requisito duro cumplido;
+  regla escrita en el ADR: la placa nunca se anuncia como salida a internet.
+
+- **Respuesta a "¿un híbrido?"**: el híbrido es el diseño. BLE despierta la app y lleva control;
+  WiFi lleva la foto y el audio a demanda; el AP vive con los modos. Presupuesto ≈ 3 s.
+
+- Tres arreglos que sólo aparecen en hardware: el adaptador BlueZ no recibía `control_ap` (bucle de
+  reinicios; test que construye el servicio), la IP se leía de la ruta por defecto (en modo AP no
+  hay; ahora de la interfaz), y el reinicio de la placa con la cámara enchufada tardó más de lo que
+  esperé y pareció muerta.
+
+## 2026-09-05 (cont. 2) — El flujo completo sin configurar nada (PR #62)
+
+- **Pregunta del usuario que ordenó el diseño**: "¿tengo que conectar el Bluetooth y además el WiFi a
+  mano?" No: eso fue sólo la prueba. El diseño final es cero configuración, y este PR lo construye.
+  El único permiso que ve el usuario es el de Bluetooth del sistema; el de la red WiFi lo muestra iOS
+  una sola vez.
+
+- **Placa**: característica `wifi` (credenciales del AP por BLE); **el AP sigue al modo** (arriba con
+  ómnibus o supermercado, abajo en esperando, tope de 20 min; `nmcli` en un hilo para no frenar el
+  BLE); `POST /audio` acepta base64 porque `fetch` de React Native no manda bytes.
+
+- **App**: `DispositivoProvider` compartido por Inicio y Dispositivo. Conecta por BLE al arrancar y
+  reconecta con espera creciente (3 s → 30 s); se une al WiFi de la placa con `react-native-wifi-reborn`
+  (plugin de Expo, entitlements de HotspotConfiguration) cuando ella enciende el AP y sale cuando lo
+  apaga; espera a que `/salud` responda antes de declarar "red lista"; sincroniza el modo por BLE en
+  los dos sentidos. En Inicio, **«Leer con el dispositivo»** reemplaza al botón de la cámara cuando la
+  placa está lista: la foto la saca la placa, viaja por HTTP y entra al mismo pipeline de nube; la
+  cámara del teléfono queda como botón secundario. El MP3 de la lectura vuelve a la placa.
+
+- **El disparador hoy es el botón de la app**, como con los modos: hace el papel del botón físico que
+  la placa no tiene. Cuando exista, el click iniciará el mismo camino desde la placa.
+
+- Lección del linter (React Compiler): nada de `setState` sincrónico dentro de efectos ni escribir
+  refs durante el render. La sincronización de red se dispara desde los manejadores de eventos
+  (conexión, `estado` nuevo) y la primera conexión sale del efecto de montaje en el siguiente tick.
+
+- Secreto `EXPO_PUBLIC_AUDIO_FILE_ENABLED=1` en el repo: sin MP3 no hay audio de vuelta que probar.
+  Cuesta una llamada al TTS por lectura.
+
+- Verificado: lint, typecheck, 199 tests; pytest 34 en la placa; desplegado en la placa real
+  (`/salud` con `ip`, `puerto`, `ap`; cámara detectada). **Falta la prueba de punta a punta desde el
+  iPhone** con el build de TestFlight, en curso.
+
+## 2026-09-06 — El flujo completo funciona en la calle; el resultado se vuelve legible
+
+- **«Funciona bárbaro»**: con el tercer build del PR #62, sin WiFi de infraestructura (el usuario de
+  viaje), la app se conectó sola por BLE, la placa levantó su AP al activar supermercado, el iPhone
+  se unió solo (aviso de iOS una vez), y **«Leer con el dispositivo» sacó la foto con la AI Camera,
+  la mandó a la nube y la app la anunció**. Dos vueltas antes: (1) un toque durante el cambio de red
+  moría a los 20 s → el evento `ap` y la escritura del modo invalidan la dirección hasta que
+  `/salud` responda; (2) la app no se unía al AP → **caché de GATT de iOS** sin la característica
+  `wifi` nueva; remedio: Bluetooth off/on desde Ajustes, y ahora la app lo dice por voz.
+
+- **Pedido**: el resultado en pantalla era el texto crudo del modelo. Ahora son filas
+  (Producto · Marca · Detalle, o Línea · Destino), «sin leer» para un campo nulo, texto crudo sólo en
+  ómnibus o sin lectura estructurada (`features/reader/resultado.ts`, con tests). La voz ya decía la
+  frase; no cambia.
+
+- **«Sin red WiFi» en reposo no es una falla**: sin infraestructura, la placa en esperando no tiene
+  red a propósito (el AP sigue al modo). El texto pasó a «red apagada; se prende al activar un modo».
+
+- **Robustez de red en la placa, pendiente de desplegar** (no hay red común con la Mac fuera de casa):
+  al apagar el AP se pide a NetworkManager conectar wlan0 a la red conocida en vez de confiar en el
+  autoconnect; un vigilante reconecta si pasa más de un minuto sin red fuera del modo AP; `estado`
+  publica el nombre de la conexión activa (`red`). Motivo: un ciclo de AP dejó la placa sin ninguna
+  red y nadie podía ver por qué.
+
+- macOS revocó el acceso de la terminal a `Documents` en medio de la sesión (TCC): «Operation not
+  permitted» hasta en `git status`. Se restauró desde Privacidad y seguridad.
+## 2026-09-07 — Batería y alimentación: qué comprar
+
+- **Pedido**: recomendación de batería para el dispositivo, con el espacio como restricción, y la
+  lista de compra para el grupo. Se escribió en `hardware/README.md` (sección *Alimentación*).
+
+- **La restricción cambió de lugar**: con la batería en una **unidad de bolsillo** (la carcasa que se
+  modela aparte separa cámara + botón en la patilla del resto) el peso deja de mandar y gana la
+  capacidad. **LiPo 103450 de 2000 mAh** (50 × 34 × 10, ~36 g) como celda principal: 3–4 h de uso
+  continuo. La 803040 de 1000 mAh (40 × 30 × 8) queda como alternativa compacta si el reposo real
+  anda cerca de 0,5 W. Siempre con protección y JST PH 2.0, verificando polaridad.
+
+- **Los números**, todos de terceros hasta medir: la Zero 2 W pide ~0,6 W en reposo con OS Lite y
+  ~75 mA apagando HDMI y GPU; la IA del IMX500 suma ~100 mW; en detección continua un usuario gastó
+  60 % de 4400 mAh en 175 min (cota alta, 2–3 W). Sin el Coral el pico baja de ~1,5 A a ~0,6 A.
+
+- **Carga + 5 V: Waveshare UPS HAT (C)** antes que el PowerBoost 1000C. Misma huella que la Zero,
+  pogo pins, 1,8 A, carga con el equipo prendido, y **INA219**: es lo que permite anunciar la
+  batería por voz (`estado.bateria` hoy es `null`, y el comentario de `estado.py` ya lo esperaba).
+  Exige header GPIO soldado en la Pi.
+
+- **Lo primero que se compra es el medidor USB**: la autonomía de arriba es estimación hasta que el
+  daemon real pase por él.
+
+- **Novedad del mismo día: el equipo ya compró la Waveshare UPS HAT (C)**, con la 803040 de 1000 mAh
+  que trae. La propuesta pasa a decisión en `hardware/README.md`, la skill (`references/hardware.md`)
+  y `PROJECT-STATUS.md`. La 103450 de 2000 mAh queda como upgrade por el mismo header JST si la
+  autonomía medida no alcanza. Con el HAT en mano: leer el INA219 desde el daemon hacia
+  `estado.bateria`, medir consumo, y medir la separación de los pogo pins para la carcasa.
+
+## 2026-09-07 (cont.) — La placa vuelve a nacer, y el botón físico entra al daemon
+
+- **Se rompió la microSD soldando el botón.** Al soldar el pulsador al header, la tarjeta original
+  se partió. Reinstalación completa desde la Mac, sin teclado ni pantalla: misma imagen exacta que la
+  primera vez (`2026-06-18-raspios-trixie-arm64-lite`, checksum SHA256 verificado), `dd` a la tarjeta,
+  y cloud-init en `bootfs` (`user-data`, `network-config`, `meta-data`) con usuario `virovision`,
+  clave SSH de la Mac, `sudo` sin contraseña, hostname `virovision.local` y el WiFi de casa.
+  **Todo lo que había en la placa sale del repo**: no se perdió nada de trabajo, y esa es exactamente
+  la propiedad que justifica tener el firmware versionado y un `setup.sh` idempotente.
+
+- **Cómo saber si una placa arrancó sin poder entrar**: la partición ext4 pasó de los 2,4 GB de la
+  imagen a 124,5 GB, y el `cmdline.txt` apareció reescrito con `cfg80211.ieee80211_regdom=UY` (que lo
+  puso un `runcmd` propio). Las dos cosas las hace el propio Linux al bootear. Sirvió para descartar
+  que la soldadura hubiera matado la placa, que era el miedo real.
+
+- **El acceso quedó pendiente y el diagnóstico dio tres lecciones.** (1) La Zero 2 W es **sólo
+  2,4 GHz**: un hotspot de iPhone no le sirve sin *Maximizar compatibilidad*. (2) `network-config` de
+  cloud-init se lee **sólo en el primer arranque**; para reaplicarlo hay que cambiar el `instance_id`
+  de `meta-data`. (3) El truco de **renombrar el hotspot con el SSID y la clave de casa** hace que la
+  placa se conecte sin tocarle la configuración — un cliente WiFi sólo mira SSID + clave. Quedó
+  además habilitado el **USB gadget** (`dtoverlay=dwc2` + `modules-load=dwc2,g_ether`, IP fija
+  10.55.0.1 por un perfil de NetworkManager): acceso a la placa sin depender de ninguna red. Falta un
+  cable micro-USB **de datos** — el que había era de sólo carga, y eso costó una hora.
+
+- **Botón físico implementado** (ADR 0007, era el punto 1 de *qué falta* del README de la placa):
+  `virovision/boton.py` con `DetectorDeClicks` —puro, sin GPIO ni reloj, con el temporizador
+  inyectado— y `Boton`, que lo conecta a gpiozero. Los callbacks de gpiozero corren en su propio
+  hilo, así que entran al loop con `call_soon_threadsafe`: sin eso dos gestos seguidos se pisan el
+  contador de clicks. **Cableado: GPIO 5 (pin 29) y GND (pin 30)**, pull-up interno, y con un tact
+  switch de 4 patas hay que tomar **dos en diagonal** (las de una misma cara vienen en corto).
+  Decisiones que valen: un click largo **no** cuenta además como click al soltar (si no, salir de un
+  modo metería al usuario en otro en el mismo gesto), y el largo se actúa **al cumplirse el umbral**,
+  no al soltar, porque el anuncio de audio tiene que llegar cuando el gesto se cumple. El botón es
+  **opcional**: sin gpiozero o sin permisos el daemon arranca igual y los modos siguen entrando por
+  BLE. En `nucleo.py`, `desde_boton`/`boton_largo` reusan el mismo `_anunciar_modo` que el comando
+  BLE, así que la app no distingue quién cambió el modo y los dos caminos no se desincronizan.
+
+- Verificado: `pytest` en `hardware/raspi` (46, 7 nuevos de botón, 1 skip). **Sin probar contra la
+  placa todavía**: los tres tiempos (`REBOTE_S` 50 ms, `UMBRAL_LARGO_S` 0,8 s,
+  `VENTANA_DOBLE_CLICK_S` 0,4 s) son una primera estimación y hay que calibrarlos con el usuario, con
+  los ojos cerrados, que es como se usa.
+
+## 2026-09-07 — El camino de ómnibus sale del stand by: el repo de Magui anda, y el detector va al sensor
+
+- **Contexto.** Magalí tenía el pipeline de ómnibus en su repo
+  ([bus-banner-recognizer](https://github.com/MagaliDellapiazza02/bus-banner-recognizer): YOLO11n COCO
+  para `bus` + YOLO11n fine-tuneado con 140 fotos de Roboflow para `bus_sign` + PaddleOCR) y reportaba
+  que "tardaba" por procesar el video entero. Arnaldo Castro presta un servidor con **Tesla V100**.
+  Decisión de la sesión: **prescindir del Coral**. La cámara real es la AI Camera (IMX500): el detector
+  corre en el sensor y la Pi Zero 2 W sólo recorta y lee. Clonado en `repositorios/bus-banner-recognizer`,
+  rama `feat/bus-banner-pipeline`, **con push y sin PR** hasta que Magalí lo revise.
+
+- **Diagnóstico**: el repo no "andaba lento", no andaba. Cargaba los 1338 frames en RAM (2,4 GB) y
+  corría dos YOLO por frame; `results.names` sobre una lista (`AttributeError`); filtraba la clase
+  `destination_sign` cuando el modelo se llama `bus_sign` (nunca matcheaba); `NameError` en el dibujo;
+  **el OCR nunca se llamaba**; la API key de Roboflow quedó hardcodeada en el notebook (22 MB de outputs)
+  → **hay que rotarla**, ya está en la historia.
+
+- **Lo construido** (paquete `bus_banner`, pipeline de **foto**, no de video): detector → ómnibus más
+  grande → banner = cartel ancho más alto de su mitad superior → recorte con 12 % de margen → **OCR sólo
+  sobre el recorte** (RapidOCR, PP-OCRv4 mobile en onnxruntime, sin detección de texto; reintento con
+  detección si el parseo sale incompleto) → `{numero, destino, crudo, confianza}` con el mismo criterio
+  que `adivinarLectura` de la app, corregido contra un **catálogo de 503 pares línea/destino** de los datos
+  abiertos de STM + destinos observados. `Resultado.a_evento()` da el JSON ≤ 180 bytes de la
+  característica `evento` (`{t:'resultado', numero, nombre, ms}`). 29 tests (geometría, parseo, evento,
+  smoke con pesos). CLI `bus-banner foto|frame|video|evaluar`. Scripts para la V100: pseudo-etiquetar
+  `bus` con YOLO11x (dataset de **dos clases**, porque en el IMX500 corre una sola red), entrenar
+  (`fliplr=0`, `hsv_h=0.01`, yolo11n a 640) y exportar `format="imx"` (Linux x86, Python ≤ 3.11, Java 17).
+
+- **Medido** (Mac M4 Pro, CPU; 117 imágenes: un frame cada 30 de los tres videos + 14 de test de Roboflow,
+  `datos/eval/gt.csv`): RapidOCR **numero 0,875**, destino 0,732, OCR p50 81 ms; PaddleOCR 0,896 / 0,768,
+  p50 118 ms pero sin wheel para la Pi. CLAHE empeora; detección de texto siempre no mejora. El OCR solo
+  (lo que corre en la placa): 140 MB de RSS y ~5-150 ms en la Mac. Modo video en streaming: 90 frames en
+  8 s. **Ojo**: los videos son tres ómnibus y las fotos de Roboflow son fotos web; el set que vale son fotos
+  del dispositivo.
+
+- **Qué cambia en las decisiones** (enmienda a ADR 0006, y toca 0003 y las referencias): el detector del
+  banner **sí se fine-tunea** ("nada se entrena" queda para el OCR, que se evalúa y sólo se entrena si las
+  métricas lo exigen); el acelerador del camino de ómnibus es el **IMX500**, no el Coral; con eso el USB de
+  la Zero 2 W queda libre y el Spike 4 (libedgetpu en Bookworm) deja de existir.
+
+- **Corrección de Juan Lucas, y es la definición del modo: el modo ómnibus vigila, no saca una foto.**
+  El usuario no ve venir el ómnibus; al activar el modo la cámara queda abierta y el detector corre en
+  cada frame (en el sensor, gratis para la Pi). Se agregó la capa `tracking.py`: identidad de ómnibus
+  por solapamiento entre frames, confirmación (0,3 s), "se acerca" por crecimiento de la caja, lectura
+  sólo del ómnibus principal cuando el banner tiene ≥ 22 px, voto entre lecturas, **un anuncio de
+  presencia y uno de línea por ómnibus** (una pista perdida un instante no se re-anuncia). Simulado sobre
+  los videos con `bus-banner watch`: la línea llega 0,1-0,3 s después del aviso de presencia de día y
+  cerca; de noche insiste 10 lecturas. `scripts/watch_imx500.py` es la prueba de campo en la Pi
+  (picamera2 + IMX500 + `Watcher`, anuncios `.wav` pregrabados, guarda el frame de cada lectura para
+  armar el dataset real). Fork en `juanlu-a/bus-banner-recognizer` para instalar en la placa con `pip
+  install git+…`. Esto no contradice el "nunca siempre prendido" de ADR 0007: el reconocimiento sigue
+  atado a un modo explícito; dentro del modo ómnibus, vigilar **es** la función.
+
+## 2026-09-08 — La app deja de ser su propia consola
+
+Cuatro pedidos, un mismo hilo: la app llevaba encima el andamio con el que se construyó, y con la
+placa andando y los logs en Supabase el andamio ya no sostiene nada.
+
+- **Fuera la información técnica de las pantallas.** Era el pendiente que quedó anotado el 2026-09-07
+  al desplegar la tabla `eventos` y la función `telemetria`. De Inicio se van el texto crudo del OCR,
+  el modelo que respondió, el tiempo y la ruta del `.mp3`, y también la **vista previa de la foto de
+  la placa** con sus bytes y milisegundos. De Dispositivo se va el volcado de telemetría ("lo que
+  informa el dispositivo": modo, AP, wifi, ip, cámara, temp) y, de la tarjeta del dispositivo, la
+  dirección en la red y la versión de firmware. Queda lo que el usuario usa o necesita saber: estado
+  de la conexión, nombre, batería, estado de la red y los avisos cuando algo falla. Un
+  `192.168.4.1:8080` no le dice nada a quien no ve la pantalla, y era una pantalla de diagnóstico
+  incrustada en la interfaz. **Ojo: la app todavía no escribe en `eventos`** — eso sigue pendiente,
+  así que por unos días el diagnóstico no está ni en la pantalla ni en la nube.
+- **Una sola fuente de imagen: la placa.** Se van los botones de la cámara del teléfono y de la
+  fototeca, `capturarFoto`, `prepararParaLaNube`, `calcularRedimension` y sus tests, y del binario
+  `expo-image-picker` con `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription` y
+  `android.permission.CAMERA`. El reescalado a 1024 px no se reemplazó: la placa ya entrega el JPEG a
+  1024 px y calidad 70, y el techo real lo fija ella (`camara.py`), no el teléfono. Sin dispositivo
+  con red, **Leer con el dispositivo** queda deshabilitado y el hint dice qué falta — un control
+  apagado sin explicación es exactamente el defecto que la accesibilidad de esta base no tolera.
+- **Fuera los botones de medición.** «Medir transferencia» y «Medir por WiFi» eran el spike del
+  ADR 0003, que ya está decidido y con el número guardado en `docs/mediciones/`. Con ellos se van
+  `features/device/medicion.ts`, `services/ble/transferencia.ts` (reensamblado por chunks) y
+  `medirDescargaHttp`. Del módulo viejo sobrevive el **base64**, que lo usa cada característica del
+  GATT: se mudó a `services/ble/base64.ts` con su test. `useDeviceConnection` quedó siendo un alias
+  del provider y se borró; Dispositivo consume `useDispositivo()` directo.
+- **Sin barra de desplazamiento vertical.** `showsVerticalScrollIndicator={false}` en `Screen`:
+  aparecía sobre el borde de las tarjetas y en un teléfono la posición ya la da el gesto.
+
+**Lo que esto cuesta, dicho de frente.** La fototeca era el insumo del **dataset de evaluación** —la
+misma foto contra varios modelos, para que la comparación midiera modelos y no fotos (pasos 8-9 de
+`qa-modo-supermercado.md`). Esa corrida ya no se puede hacer desde la app; queda anotado en el ADR
+0006, en la QA y acá abajo. La alternativa cuando toque medir precisión es correrla fuera de la app
+contra el proxy, o reponer una entrada de prueba detrás de una bandera como
+`EXPO_PUBLIC_SIMULATE_DEVICE` — nunca un segundo botón para el usuario.
+
+**Lo que NO se tocó**: la placa sigue publicando la característica `transferencia` y el comando
+`medir`; sacarlos del firmware es un PR del pilar de hardware. `features/device/gatt.ts` los deja
+documentados con una nota que dice que la app ya no los usa, para que nadie los vuelva a cablear
+creyendo que son el camino de la foto.
+
+Verificación: lint (una advertencia preexistente en `DispositivoProvider`), typecheck, **181 tests
+en 19 suites** y `expo export` de iOS, todo verde.
+
+## 2026-09-09 — La app empieza a contar qué le pasa
+
+La otra mitad del PR anterior. El 08/09 la información técnica salió de las pantallas y quedó un
+hueco: el diagnóstico no estaba ni en la pantalla ni en la nube. Esto lo cierra.
+
+**Primero hubo que averiguar el contrato, y eso fue la lección.** La función `telemetria` estaba
+desplegada desde el 07/09 pero **escrita en el dashboard y no versionada**: sondeándola por HTTP se
+sabía que aceptaba `{telefono, sesion, eventos}`, pero cualquier evento contestaba `{"guardados":0}`
+sin decir por qué. Hubo que actualizar el CLI de Supabase y bajarla con Docker
+(`supabase functions download telemetria`) para descubrir que **cada evento necesita `tipo` y
+`momento`**, y que sin ellos se descarta con status 200. Una app que arma mal el cuerpo se ve
+idéntica a una que anda. La función quedó versionada en `supabase/functions/telemetria/` con los
+tipos puestos y la lógica intacta; **falta hacer lo mismo con el `create table` de `eventos`**, que
+sigue viviendo sólo en el dashboard.
+
+**El cliente**: `app/src/services/telemetria/`. Tres reglas que no son estilo sino requisito de
+ADR 0001 — `registrar()` es sincrónico y no devuelve promesa, nada de ahí lanza jamás, y el envío es
+best-effort. La tercera importa más de lo que parece: unido al AP de la placa hay WiFi **sin
+internet** (ADR 0003), así que durante una sesión de uso real los envíos fallan y los lotes se
+acumulan. La cola tiene tope de 500 y **tira lo más viejo**, porque cuando alguien reporta una falla
+lo que se mira son los últimos segundos, no el arranque; lo descartado se cuenta y viaja después como
+`app.error` con `eventosPerdidos`, para que un hueco no se lea como "eso no pasó".
+
+**Qué se registra**: arranque y paso a segundo plano, el enlace BLE entero (búsqueda con su tiempo,
+conexión con el estado en que apareció la placa, fallos POR TIPO de error, pérdidas, reintentos), la
+red con la placa (cuánto tarda en responder — el 06/09 no llegaba nunca a "lista" y no había forma de
+saber dónde se colgaba), lo que la placa informa de sí misma, los cambios de modo con su origen
+(app o botón físico), y la lectura de punta a punta: `foto.ok` con bytes y ms **separados** del total,
+que es lo que distingue "la red está lenta" de "el modelo está lento"; el crudo del OCR, que
+distingue "el cartel no se leyó" de "se leyó y `adivinarLectura` eligió mal"; y el modelo **pedido**
+junto al que **respondió**, que si no coinciden significa que el selector no está mandando.
+
+**Y el manejador global de errores de React Native**, que es el evento más útil que esta tabla puede
+tener y justo el que ningún `try` de la app registra. Se encadena al anterior para no robarle la
+pantalla roja a nadie en desarrollo.
+
+**La frontera de ADR 0001 se extendió al linter**: `@/services/telemetria` queda prohibido desde
+`features/audio/` y `features/recognition/`, como ya lo estaban `services/vision` y `services/cloud`.
+La telemetría es red, y el anuncio tiene que sonar sin internet. Se verificó que el linter lo frena
+de verdad, no que la regla esté escrita.
+
+Verificación: lint (la advertencia preexistente de `DispositivoProvider` sigue ahí), typecheck,
+**197 tests en 21 suites** y `expo export` de iOS.
+
+**Nota operativa**: quedó una fila de sonda (`tipo = 'sonda.contrato'`, `telefono = 'sonda-claude'`)
+en `eventos`, de cuando se verificó el contrato. Borrable.
+
+## 2026-09-09 (cont.) — El esquema versionado, y una rama huérfana que ya lo tenía todo
+
+Con la contraseña de la base se pudo cerrar el pendiente del esquema. Y al abrir la tabla apareció
+algo que conviene dejar escrito, porque es la segunda vez que muerde.
+
+**Ya existía `feat/telemetria-supabase`** (commit 028c045, 2026-09-07): una rama **sin PR y sin
+mergear** que ya hacía las dos cosas de los PRs #68 y #69 — sacaba lo técnico de las pantallas y
+mandaba eventos a `eventos`— y que además traía la migración de la tabla. Se le hizo un build manual
+a TestFlight el 07/09 (por eso la tabla tenía 28 filas antes de que nada de esto se mergeara) y ahí
+quedó. Es exactamente la falla que las convenciones ya documentaban con `feat/lector-en-inicio` y
+`docs/decisiones-equipo-2026-08`, y el chequeo que la habría evitado es de una línea:
+**`git branch -r` antes de empezar, no sólo `git branch --show-current`**. Buscar en `staging` no
+alcanza: lo que está en una rama sin mergear no aparece.
+
+Qué se hizo con eso: la **migración se tomó de esa rama**, con su fecha original
+(`20260907190000_eventos.sql`), y se verificó contra la base real con `supabase db dump` — coincide
+campo por campo e índice por índice. El cliente que queda es el de `staging`, que es un superconjunto
+(manejador global de errores, más eventos de BLE y red, deduplicación de `placa.estado`, reintentos
+con tope, 17 tests). Dos cosas de la rama vieja que valían y **se rescataron** en el mismo PR:
+
+- **La URL de telemetría se deriva de la del proxy** cuando no hay variable propia. No es comodidad:
+  sin eso, un build con el proxy configurado pero sin el secret nuevo sale sin ninguna telemetría y
+  nadie se entera hasta que hace falta diagnosticar algo. Al testear la función rescatada apareció un
+  borde suyo: `https://vision` también «termina en /vision» por la doble barra del esquema, y
+  derivaba `https:/telemetria`. Se saca el esquema antes de comparar.
+- **Un evento por cada llamada al TTS de nube** (`audio.sintesis`), separado del envío al parlante
+  (`audio.envio`): fallan y tardan por motivos distintos, y juntos se ven como un solo «tardó».
+
+**Había dos vocabularios de `tipo` en la tabla**: las 28 filas del build viejo en `snake_case`
+(`app_abierta`, `ble_conectado`, `wifi_lista`) y las nuevas con puntos (`app.inicio`, `ble.conectado`,
+`wifi.listo`). Una consulta que filtrara por `tipo` sin contemplar las dos formas habría mostrado de
+menos **sin avisar**, así que se decidió tabla limpia: las 28 filas viejas se borraron y la tabla
+quedó en cero. La rama `feat/telemetria-supabase` se borró del remoto el mismo día, una vez
+confirmado con `git diff origin/staging` que no le quedaba nada propio — lo único que tenía y
+`staging` no era el estado viejo de la app, que el PR #68 sacó a propósito.
+
+**Un defecto propio, encontrado al mirar el esquema**: el cliente devolvía a la cola cualquier lote
+fallido **sin tope**. Como siempre se sube lo más viejo primero, un lote que el servidor no puede
+aceptar habría tapado toda la telemetría posterior hasta que el tope de la cola lo desalojara — un
+solo evento malo apagando el diagnóstico entero. Ahora se reintenta tres veces y se da por perdido,
+contado. Tiene test.
+
+Lo que **no** resultó ser un defecto: el `check` de la tabla mide bytes del jsonb comprimido (≤ 8192)
+y el corte de la función mide caracteres de JSON (≤ 8000). Parecían un desajuste explotable; se probó
+con 7900 caracteres incompresibles y entró sin problema. Queda anotado en `docs/supabase.md` como
+margen, no como riesgo.
+
+Limpieza: se borraron las filas de sonda (`sonda-claude`, `sonda-limite`, `prueba`) de `eventos`.
+
+## 2026-09-09 (cont. 2) — El código entero pasa a inglés, fronteras incluidas (ADR 0009)
+
+La regla vieja era mixta —identificadores en inglés, comentarios y cadenas en español— y **la
+frontera nunca quedó donde decía**. Había empezado en los identificadores y para hoy estaba en los
+nombres de archivo (`reconocerProducto.ts`, `nucleo.py`), en los métodos (`escribirModo`), en los
+campos (`direccion.puerto`), en los tipos de evento (`lectura.fallo`) y en los flags del daemon
+(`--sin-camara`). No había una línea: había una pendiente, y ya se había deslizado dos veces.
+
+Se decidió y se ejecutó el pase completo (**[ADR 0009](architecture/adr/0009-idioma-del-codigo.md)**),
+con el criterio que sí se puede sostener: **¿lo lee una persona o lo lee una máquina?** Lo que lee
+una persona sigue en español —los *valores* de `i18n/es.ts` (las claves son inglesas), el prompt de
+supermercado porque su respuesta se lee en voz alta, las etiquetas del selector, y **toda la
+documentación**, ADRs y skill incluidos—. Todo el resto, inglés.
+
+**Las fronteras también**, que era la decisión cara y la que se tomó a conciencia:
+
+- **Protocolo BLE**: `{"cmd":"measure"|"photo"|"mode"|"status"|"ap"}`, eventos
+  `{"t":"start"|"end"|"mode"|"ap"|"error"}`, `device_ms` en vez de `ms_placa`; el payload de `status`
+  con `battery`/`camera`/`port`/`network` y las credenciales con `password`.
+- **HTTP de la placa**: `/salud` → `/health`, `/medir/<n>` → `/measure/<n>`, `/fotos/ultima` →
+  `/photos/latest`.
+- **Flags del daemon**: `--sin-camara`/`--sin-ap`/`--sin-boton`/`--nombre`/`--puerto`/`--gpio-boton`
+  → `--no-camera`/`--no-ap`/`--no-button`/`--name`/`--port`/`--button-gpio`.
+- **Supabase**: tabla `eventos` → `events`, columnas `creado_en`/`momento`/`telefono`/`sesion`/
+  `tipo`/`detalle` → `created_at`/`occurred_at`/`phone`/`session`/`type`/`detail`, función
+  `telemetria` → `telemetry`, y el vocabulario de eventos (`app.inicio` → `app.start`, y los otros 24).
+
+Por eso fue **un solo PR y no tres**: las dos puntas del protocolo tienen que moverse juntas, y una
+migración por partes deja ventanas donde la app y la placa hablan distinto. Lo mismo con el esquema.
+
+**La migración renombra, no recrea** (`20260909120000_rename_eventos_to_events.sql`): las filas de
+las primeras sesiones de campo se quedan donde están — son la única evidencia que hay de esas
+salidas, y perderlas por prolijidad habría sido pagar caro. La migración original (`20260907190000`)
+**no se toca**: ya está aplicada, y un log de migraciones se agrega, no se edita. Los `type`
+históricos se traducen en la misma migración: la unión es cerrada y el mapeo es uno a uno, así que
+una consulta no queda arrastrando `type in ('reading.ok','lectura.ok')` para siempre.
+
+Lo que **no** se tocó, a propósito: los 71 commits anteriores (reescribir la historia por cosmética
+no vale la pena) y las entradas viejas de este log, que cuentan lo que pasó cuando pasó — los nombres
+que citan eran los nombres de entonces, y esta entrada es la que los conecta con los de ahora.
+
+Verificación: `npm run lint`, `npm run typecheck` y **205 tests** del lado de la app; **46 tests**
+de la placa (1 skip, el de BlueZ que sólo corre ahí). El linter de la regla de frontera de ADR 0001
+se actualizó para seguir al módulo renombrado — sin eso habría pasado a aprobar en silencio lo que
+existe para prohibir, que es la peor forma de tener un linter.
+
+**Dos cosas que hay que hacer a mano al mergear**, y en este orden:
+
+1. **La base y las funciones antes que el build.** Aplicar la migración, desplegar `telemetry` y
+   `vision`, y recién después dejar salir el build. Una app con el vocabulario nuevo contra la
+   función vieja no guarda nada y contesta `200` — el modo de falla que este contrato siempre tuvo.
+2. **La microSD.** El flag renombrado la deja en una trampa. *(Hecho el 2026-09-10 — ver la entrada
+   de ese día; además apareció un segundo `--sin-ap` en `instalar-daemon.sh` que esta nota no
+   contemplaba. Corregido el mismo día: la primera
+   versión de esta nota decía "editar el drop-in `10-sin-ap.conf`", y ese archivo **no existe** en la
+   tarjeta — se lo escribe y se lo borra un script de arranque, así que un `sed` contra él no habría
+   hecho nada y habría dado la falsa sensación de estar arreglado.)*
+
+   El mecanismo real, que hasta hoy no estaba escrito en ningún lado: en la partición FAT de arranque
+   hay un `virovision-modo-red.service` que corre `/boot/firmware/modo-red.sh` antes que el daemon.
+   Ese script **mira si existe `/boot/firmware/SIN-AP`**: si existe, escribe el drop-in
+   `10-sin-ap.conf` con el flag de desarrollo; si no existe, lo borra y la placa levanta su AP. Hoy
+   la tarjeta está **sin** `SIN-AP`, o sea en modo producto y sin drop-in.
+
+   El problema es que `modo-red.sh` tiene `--sin-ap` **hardcodeado**. En cuanto alguien cree el
+   archivo `SIN-AP` con el daemon nuevo instalado, systemd falla con `unrecognized arguments`. Como
+   está en FAT, se arregla desde cualquier computadora con la tarjeta puesta, sin entrar a la placa:
+
+       sed -i 's/--sin-ap/--no-ap/' /Volumes/bootfs/modo-red.sh
+
+## 2026-09-09 (cont.) — El botón probado en la mano: un gesto nombra un modo, no un paso
+
+- **La máquina de ADR 0007 no se sostuvo en la primera prueba real.** Con el botón soldado y
+  funcionando, los clicks sólo valían desde *esperando*: dentro de un modo el click corto quedaba
+  reservado "para disparar una lectura" y cambiar de ómnibus a supermercado exigía un click largo en
+  el medio. En la mano eso no se lee como "falta un gesto", se lee como **el botón está roto**.
+  Ahora **1 click es siempre ómnibus y 2 clicks siempre supermercado**, desde cualquier estado;
+  entrar a un modo desactiva el anterior. El click largo sigue siendo la salida.
+
+- **La decisión viajó con el código, no detrás.** El test de la app dice explícitamente que ante
+  desacuerdo manda el diagrama canónico, así que el mismo PR mueve las cinco superficies:
+  `docs/architecture/README.md` (el diagrama), ADR 0007 (sección de actualización), `modes.py`,
+  `modes.ts` y los dos tests. El test de la app que afirmaba lo contrario —*"does not allow jumping
+  from one mode to the other"*— quedó **invertido y no borrado**, porque la tentación ahora corre
+  al revés: quien reponga la guarda va a traer de vuelta en silencio el botón que se sentía roto.
+
+- **Los dos modos son de naturaleza distinta y ahora está escrito.** Ómnibus es **continuo**: deja
+  la cámara en vigilancia y anuncia cada ómnibus que aparece. Supermercado es **puntual**: al
+  activarse saca una foto y la procesa, porque el usuario está parado frente a la góndola apuntando
+  a un producto. Por eso el disparo automático de lectura al entrar existe **sólo** en supermercado,
+  y en `useReader` se dispara mirando el modo y no el gesto: así vale igual si el modo vino del
+  botón físico o de la app, que es todo el punto de tener una sola máquina.
+
+- **Se fue el bloque "Red con el dispositivo"** de la pantalla de conexión: era consola del
+  dispositivo, y la app dejó de ser su propia consola (PR #68). Lo que **queda** es el motivo cuando
+  algo falla (`wifiDetail` y `lastNotice`, unificados) — para quien no ve la pantalla, ése es el
+  único texto que explica por qué el botón no hizo nada. Cinco cadenas quedaron huérfanas en
+  `es.ts` y se borraron.
+
+- **Queda abierto** cómo pedir una **segunda** lectura de supermercado sin salir del modo: hoy son
+  dos gestos (click largo y otra vez dos clicks). Que repetir los dos clicks saque otra foto exige
+  que el dispositivo avise cada *gesto* y no sólo cada *cambio de modo* —porque el modo no cambia—,
+  o sea superficie nueva en el protocolo BLE. Se decide con el usuario antes de agregarla.
+
+- Verificado: `pytest` en `hardware/raspi` (48, 1 skip) y `npm run lint && typecheck && test` en
+  `app/` (206). **Sin probar contra la placa**: el daemon instalado sigue siendo el pre-ADR-0009 y
+  habla el protocolo viejo.
+
+## 2026-09-10 — El daemon nuevo en la placa: tres trampas y un desfasaje que se cerró
+
+Con ADR 0009 mergeado, la app de TestFlight hablaba el protocolo nuevo contra una placa que corría el
+daemon viejo en español: el BLE conectaba y la foto no llegaba nunca. Este es el día en que las dos
+puntas volvieron a hablar el mismo idioma, y el flujo completo quedó andando.
+
+**Cómo se llegó a la placa, después de dos intentos malos.** No por el AP. Unir el Mac a
+`ViroVision` lo deja sin internet —el AP no anuncia gateway ni DNS a propósito, ADR 0003— y con una
+sola interfaz de red eso **corta la sesión del agente a la mitad**; encima macOS se vuelve solo a la
+red conocida cuando detecta que la nueva no tiene salida, así que la conexión ni siquiera se sostiene.
+Lo que funcionó fue **pasar la placa a modo desarrollo desde la tarjeta**: crear
+`/Volumes/bootfs/SIN-AP` desde el Mac, arrancar, y la placa se une sola a la WiFi de casa. Quedó en
+`192.168.1.14`, alcanzable por SSH sin tocarle el WiFi a nadie.
+
+Detalle de orden que evitó un problema: **no se corrigió el flag `--sin-ap` en ese momento**. El
+daemon instalado todavía era el viejo, que sólo entiende ese nombre; arreglarlo antes de instalar el
+nuevo habría dejado a systemd sin poder arrancar nada en el arranque siguiente.
+
+**Cómo se instaló.** Bajando `staging` **directo desde GitHub en la propia placa**
+(`codeload.github.com/juanlu-a/viro_vision/tar.gz/refs/heads/staging`) en lugar de copiar la working
+copy del Mac. Empezó como necesidad —el sandbox del agente había dejado de leer el repo— y resultó
+mejor de todos modos: lo instalado es exactamente lo mergeado, no lo que hubiera quedado dando vueltas
+en un directorio local. Respaldo del anterior en `~/virovision/virovision.old-20260910-141514`. No
+hizo falta `setup.sh` ni `apt`: el refactor no agregó dependencias (`requirements.txt` sigue siendo
+sólo `bluez-peripheral==0.1.7`), así que alcanzó con reemplazar el paquete Python sobre el `.venv` ya
+armado — y de paso se esquivó la trampa del reloj sin RTC, que hace fallar `apt` con *"not live
+until"* cuando NTP todavía no sincronizó.
+
+**Trampa 1: el flag viejo estaba en DOS archivos, no en uno.** Además de `modo-red.sh`,
+**`instalar-daemon.sh` también escribe el drop-in** con `--sin-ap` hardcodeado. Se descubrió sólo
+porque el primer arranque del daemon nuevo falló con `unrecognized arguments: --sin-ap` y hubo que ir
+a buscar quién lo había escrito. La lección: cuando se renombra un flag, buscarlo en **todo** `bootfs`
+(`grep -ro -- '--[a-z-]*' /Volumes/bootfs/*.sh`), no en el archivo obvio. Queda una mención en
+`firstrun.sh`, pero es un comentario que narra lo que pasaba antes, y ese script ya está desenganchado
+del `cmdline.txt`.
+
+**Trampa 2: el `.tgz` de `bootfs` tiene que llevar `raspi/` entero.** `instalar-daemon.sh` hace
+`tar xzf` y después `mv /home/virovision/raspi /home/virovision/virovision`, así que necesita
+`raspi/setup.sh`, `raspi/requirements.txt`, `raspi/virovision.service` y `raspi/virovision/`. El
+primer intento se armó sólo con el paquete Python y quedó **incompleto** (21 KB contra 37 KB); se
+detectó verificando los cuatro archivos uno por uno antes de darlo por bueno. Sin ese chequeo, un
+reflasheo futuro habría instalado un daemon a medias y el síntoma habría aparecido meses después, sin
+nada que lo conectara con este día.
+
+**Trampa 3: la sentinela está en ext4.** `instalar-daemon.sh` corre detrás de
+`ConditionPathExists=!/var/lib/virovision-instalado`, y ese archivo **no se puede borrar desde macOS
+con la tarjeta puesta**: `bootfs` es FAT, el resto no. O sea que "meto la tarjeta en la Mac y
+reinstalo" no es un camino. Reemplazar el `.tgz` tampoco alcanza por sí solo.
+
+**Verificación, con la placa todavía en la red de casa y antes de devolverla a modo producto:**
+
+| chequeo | resultado |
+|---|---|
+| `GET /health` | payload nuevo: `battery`, `camera`, `port`, `network` |
+| `GET /salud` | 404 — el endpoint viejo ya no existe |
+| `GET /photos/latest` | 200 · 40 544 bytes · 0,14 s · JPEG 1024x766 del IMX500 |
+| log de arranque | cámara lista, HTTP en 8080, botón en GPIO 5, anunciando por BLE |
+
+Después se borró `SIN-AP`, se reinició, y la placa volvió a modo producto con su AP arriba.
+
+**El cierre, que costó más que el despliegue.** Con todo desplegado, la app seguía diciendo
+«conectado por Bluetooth, red apagada». La placa se descartó **con evidencia, no por descarte**: desde
+el celular unido al AP, `/health` devolvía `"ip":"10.42.0.1","port":8080,"ap":true` y
+`/photos/latest` devolvía la foto. O sea que publicaba bien su dirección y el HTTP andaba; lo que
+fallaba era que la app no llegaba a usarla. Por el código, «red apagada» sale sólo si el estado
+interno del wifi quedó en `off`, y a eso se llega por dos caminos: que `syncNetwork` haya recibido
+`target === null`, o que nunca haya corrido y el estado se haya quedado en su valor inicial. Como el
+`status` de la placa era correcto, el segundo era el sospechoso.
+
+Se destrabó del lado del teléfono, haciendo **tres cosas juntas**: forzar el cierre de la app,
+**olvidar la red WiFi `ViroVision`** y **olvidar el dispositivo en Ajustes → Bluetooth**. Después de
+eso, el flujo completo funcionó.
+
+**No quedó aislado cuál de las tres fue**, y se anota así a propósito: decir cuál sin haberlo medido
+sería inventar justo la parte que alguien va a usar dentro de seis meses. Lo que sí se puede afirmar:
+el conjunto incluye **el remedio que esta base ya tenía documentado** para el caso —olvidar el
+dispositivo en Bluetooth, que es lo que fuerza a iOS a soltar la caché de GATT— y el escenario era el
+exacto que lo dispara: se había reemplazado el daemon entero y reiniciado el servicio con la app
+conectada.
+
+**Lo que este episodio deja como deuda de la app, y es lo que de verdad hay que arreglar:** el
+usuario tuvo que hacer un ritual de tres pasos que la app nunca le pidió. La pantalla decía
+«conectado por Bluetooth, red apagada» y **no ofrecía ninguna salida**: ni un reintento, ni una
+explicación, ni el mensaje que la propia base ya tiene escrito para este caso
+(`strings.connect.wifiNoCredentials`, que dice textualmente que hay que apagar y prender el Bluetooth
+y volver a conectar). Ese mensaje hoy sólo se usa cuando faltan las credenciales del WiFi, no cuando
+la lectura de `status` falla o llega vacía — que es el camino por el que se llega a `off`. Para una
+app cuya interfaz es la voz, un estado sin salida es peor que un error: el usuario no tiene forma de
+saber que el remedio existe.
+
+**Y una lección de herramientas que costó una hora y no es del proyecto:** a mitad de sesión macOS
+revocó por TCC el acceso a `~/Documents` a la terminal. El síntoma engaña — `ls -ld` del repo
+funciona, `ls` de su contenido da `Operation not permitted`, y `git` dice *"Unable to read current
+working directory"*, que parece un problema de git o de permisos de archivo. No lo es; lo delata que
+`~/Desktop` siga funcionando. Bloqueó a las **dos** sesiones a la vez y de paso al CLI de Supabase,
+cuyas credenciales viven dentro del repo, así que ni siquiera se pudo consultar la telemetría para
+diagnosticar. Se resuelve en Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas.
+
+## 2026-09-10 (cont.) — Dos clicks significan «leé esto», y la foto se ve en la pantalla
+
+Probando el botón soldado apareció lo que la actualización anterior de ADR 0007 había dejado
+explícitamente abierto: **el segundo doble click no hacía nada**. El modo ya era supermercado, no
+había transición, y la captura se disparaba con la transición. Para leer el producto siguiente había
+que salir con un click largo y volver a entrar — dos gestos para repetir uno, con el mismo síntoma
+que ya habíamos arreglado un nivel más arriba: el botón se siente muerto.
+
+**El arreglo de fondo no es un caso especial, es un cambio de modelo**: el pedido de lectura deja de
+deducirse de la transición de modo y pasa a ser una **señal explícita**. Es lo que el propio ADR 0007
+anticipaba que costaría (*«exige que el dispositivo avise cada gesto y no sólo cada cambio de
+modo»*), así que el protocolo creció un evento: `{"t":"read","mode":N}` en la característica `event`.
+
+Las dos alternativas más baratas se descartaron, y por qué:
+
+- **Re-anunciar el modo.** La app ignora un `mode` que nombra el modo en el que ya está —como debe, o
+  cada latido de 15 s hablaría— así que se perdería en silencio. Y si no se perdiera, diría «Modo
+  supermercado activado» de nuevo: ruido para quien está leyendo tres productos seguidos, que pidió
+  una foto y no un parte de estado.
+- **Que la placa saque la foto sola.** Rompe ADR 0003: la app tira, la placa nunca empuja. Lo que
+  viaja es la intención, no la imagen.
+
+**Un click sigue sin pedir lectura, y es deliberado.** Ómnibus es vigilancia: ya está mirando y
+anuncia lo que aparece. Si repetir el click pidiera una lectura, cada toque costaría una foto y una
+llamada a la nube. Por eso la pregunta se hace **separada** de la transición en los dos lados
+(`requestsReading` en la app, `ModeMachine.requests_reading` en la placa): las dos respuestas
+difieren — un gesto puede nombrar un modo sin pedir lectura, y puede pedir lectura sin cambiar el
+modo. Si alguna vez se colapsan en una sola, el doble click repetido vuelve a no hacer nada; hay un
+test en cada lado que lo dice.
+
+**Del lado de la app**, los dos orígenes del pedido —el botón físico y la pantalla— son contadores
+que se sirven en un solo lugar, y lo que dispara es que el total **cambie**, nunca su valor: dos
+pedidos idénticos seguidos tienen que ser distinguibles, porque eso es exactamente leer dos productos
+seguidos. De paso desaparece una fragilidad que el código anterior tenía anotada: el efecto dependía
+de `read`, cuya identidad cambia al cambiar de modelo, y llevaba una guarda para no dispararse por un
+motivo ajeno al usuario. **Un pedido que llega con una lectura en curso se ignora y se registra**, no
+se encola: para cuando terminara, esa foto sería de una escena que el usuario ya dejó atrás.
+
+**Dos cosas más que entraron en el mismo PR porque estaban rotas en el mismo lugar:**
+
+- **La pantalla contradecía a la máquina que espeja.** Los botones de modo se deshabilitaban entre sí
+  y un hint decía que había que apagar el modo actual primero — pero desde el 2026-09-09 un gesto
+  nombra un modo desde donde sea, y el firmware lo respetaba. La app era **más estricta que el
+  dispositivo**: exactamente la divergencia que `modes.test.ts` existe para atrapar, y se coló porque
+  la guarda vivía en una pantalla y no en la máquina. Es la lección que vale guardar: un invariante
+  que se sostiene en una pantalla no está sostenido.
+- **La lectura muestra la foto que sacó la placa**, debajo de los campos. No es diagnóstico —de eso
+  se encarga la telemetría desde el 2026-09-07— sino contenido del producto: con algo de visión es lo
+  único que distingue «el modelo se equivocó» de «la foto era del techo». Va *después* de los campos
+  a propósito: la voz ya dijo el resultado y el lector de pantalla llega primero a lo que se puede
+  leer, con `aspect-ratio` fijo para que la tarjeta no salte al cargar.
+
+**El despliegue, esta vez sin tropiezos**, siguiendo el procedimiento que había quedado escrito:
+`SIN-AP` desde la tarjeta → la placa arranca en la red de casa → instalar → verificar → borrar
+`SIN-AP` y reiniciar a modo producto. Dos mejoras sobre la vez anterior: el `.tgz` de `bootfs` se
+refrescó **antes** con `git archive` desde HEAD (verificando los cuatro archivos que el instalador
+necesita y que no hubiera `._` de macOS), y el despliegue se hizo **desde ese `.tgz`**, así el
+paquete que queda en la tarjeta quedó probado y no sólo escrito. Se verificó la lógica nueva en el
+intérprete de la placa antes de arrancar el servicio (`requests_reading(2) = True`, `(1) = False`), y
+después `/health` y `/photos/latest` desde el Mac. **En ningún momento hubo que unirse al AP**, que
+era lo que cortaba la sesión las veces anteriores.
+
+## 2026-09-10 (cont. 2) — El teléfono bloqueado: el arreglo, y una premisa que llevaba días siendo falsa
+
+El usuario probó **lo que el producto realmente es**: teléfono bloqueado, doble click en el botón de
+la placa. **No pasaba nada.** Al desbloquear, ni lectura ni error en Inicio. Es la premisa entera del
+diseño (ADR 0003 §2: «el usuario lleva el teléfono bloqueado en el bolsillo»), así que se abrió el
+spike 1 que estaba anotado desde el 2026-09-04.
+
+**Lo primero que apareció no fue el defecto, fue un error nuestro.** El ADR y este mismo log decían
+que el modo de fondo estaba apagado «hasta el spike 1», porque el plugin de ble-plx tenía
+`isBackgroundEnabled: false`. Leyendo la fuente del plugin resultó que ese flag **no gatea iOS**:
+`withBLE.js` aplica `withBLEBackgroundModes(modes)` de forma incondicional, y `isBackgroundEnabled`
+sólo agrega un `<uses-feature bluetooth_le required>` en Android. Lo que escribe `bluetooth-central`
+es `modes: ["central"]`, que estaba desde el principio; `audio` lo agrega `expo-audio` por su
+default. Confirmado corriendo el prebuild y mirando el `Info.plist`, no de memoria:
+`UIBackgroundModes => [audio, bluetooth-central]`. **Durante casi una semana creímos tener apagado
+algo que estaba prendido**, y ese riesgo mal anotado es lo que cerró la búsqueda antes de empezarla.
+Las dos frases quedaron tachadas y corregidas en el ADR.
+
+**Qué faltaba de verdad**, tres cosas y ninguna es una clave del plist:
+
+1. **Ninguna sesión de audio.** `expo-audio` estaba instalado, estaba como plugin, y **no lo
+   importaba ni un archivo**. Sin `setAudioModeAsync` iOS deja la app en la categoría por defecto,
+   que no tiene permitido sonar con la pantalla bloqueada.
+2. **El botón de la placa viajaba por estado de React y lo servía una pantalla.** `onReadRequest` →
+   `setReadRequest(n+1)` → contexto → `useEffect` de `useReader`, que sólo monta Inicio. Una
+   interrupción de hardware no puede depender de qué pestaña está en pantalla; con la pantalla
+   apagada no hay ninguna.
+3. **No había forma de saber dónde moría la cadena.** Bloqueado no hay consola, y las filas de
+   `events` no decían en qué estado de la app se escribieron ni se subían hasta que algo vaciaba la
+   cola.
+
+**Lo que se hizo.** Una sesión de audio explícita (`services/audio/session.ts`, con la política
+aparte en `audioMode.ts` para poder afirmarla en un test sin dispositivo) con
+`interruptionMode: 'mixWithOthers'`, apartándose a propósito del ejemplo de la documentación de Expo
+que usa `doNotMix`: **VoiceOver es la interfaz de este usuario** y `doNotMix` y `duckOthers` lo
+pisan. Un tono inaudible de −50 dBFS sostenido mientras dura la lectura, porque audio realmente
+sonando es lo que mantiene vivo el proceso bajo el modo `audio` y el presupuesto de iOS al despertar
+por BLE es de unos pocos segundos. Un **chirp de 120 ms al empezar**, que es feedback que no existía
+—hoy el botón no suena nada durante el segundo y medio de la nube— y de paso el mejor diagnóstico
+desplegable que tenemos: bloqueado, o se escucha (despertó, la sesión anda, lo que falle es el
+pipeline) o no se escucha (nunca despertó). El pipeline entero salió de la pantalla a
+`features/reader/readingService.ts`, un módulo sin React que `ReaderBridge` suscribe **directo al
+cliente BLE**; `useReader` quedó como un `useSyncExternalStore` con la misma firma, así que Inicio no
+cambió una línea. `announce()` ahora se puede esperar (`speak()` resuelve en `onDone`) — sin eso,
+soltar la sesión en la línea siguiente cortaba el anuncio por la mitad. Y un tope de 12 s por lectura
+con `AbortController`, con la foto bajando en 4 s en vez de 20: una lectura que se pasa del punto
+donde iOS mata el proceso es una que el usuario nunca escucha **y** de la que nunca se entera.
+
+**La instrumentación es la mitad del PR, y a propósito.** Cada fila de `events` lleva ahora
+`detail.app` con el `AppState` del momento —sin eso una corrida bloqueada y una en pantalla son la
+misma línea de tiempo—; hay `ble.event` con el `t` crudo apenas la radio entrega la trama, incluso
+cuando el JSON no parsea, que antes se descartaba **en silencio**; y la cola se vacía también **al
+volver a primer plano** y al terminar una lectura que empezó en segundo plano, porque hasta ahora eso
+dependía de que un `setTimeout` de 15 s sobreviviera a la suspensión. El bloque E nuevo de
+`qa-modo-supermercado.md` dice cómo leer la tabla, y el discriminador que decide si hace falta
+`restoreStateIdentifier` es el `session`: si cambió entre antes y después de desbloquear, iOS no
+suspendió la app, **la mató**.
+
+Se aprovechó para sacar dos permisos que el producto no usa y que entraban por el default de
+`expo-audio`: `NSMicrophoneUsageDescription` (con texto en inglés, además) y `RECORD_AUDIO` en
+Android. Mismo criterio que el 2026-09-08 con la cámara y la fototeca.
+
+**Lo que este PR NO cierra**: el spike 1 sigue abierto hasta que el bloque E pase **en el teléfono**.
+Lo que se entrega es el arreglo más lo que lo hace verificable. Y queda el riesgo honesto de que
+`AVSpeechSynthesizer` no respete nuestra sesión: si el chirp se escucha y la voz no, la escalera de
+arreglos está escrita en el ADR y el último escalón es el `.mp3` que `services/audio/synthesis.ts` ya
+sabe producir.
+
+## 2026-09-11 — Anduvo: el spike 1 cerrado en el teléfono
+
+Build **`202609110048`** al grupo interno de TestFlight, publicado desde la propia rama con
+*Actions → TestFlight → Run workflow* (no hizo falta mergear para probar). Contra la placa real,
+**el bloque E pasa**: con la pantalla bloqueada el doble click dispara la lectura y se escucha sin
+tocar el teléfono; varias seguidas sin desbloquear salen todas; con VoiceOver prendido el anuncio
+suena y VoiceOver no se corta; y después de un rato largo bloqueado sigue andando.
+
+Las cuatro cosas valen por separado y conviene dejar escrito por qué:
+
+- **Varias seguidas** descarta que iOS nos regale un único despertar y después nos suspenda para
+  siempre. Era el modo de fallo más plausible después del primero.
+- **VoiceOver vivo valida `mixWithOthers`**, que era la decisión más discutible del PR: la
+  documentación de Expo recomienda `doNotMix` para audio en segundo plano, y nos apartamos a
+  propósito porque para este usuario el lector de pantalla **es** la interfaz. De haber estado mal, el
+  arreglo habría roto la app justo para quien la necesita.
+- **El rato largo bloqueado responde lo de `restoreStateIdentifier`**: si iOS hubiera terminado la
+  app en esa ventana, sin preservación de estado CoreBluetooth no la habría relanzado nunca y el
+  botón no habría hecho nada. Anduvo ⇒ la app seguía suspendida y viva, y la preservación de estado
+  **no hace falta para el caso de uso probado**. No que no haga falta: queda como el PR siguiente,
+  porque el síntoma de la terminación es el peor que existe (el botón deja de responder y nada lo
+  explica). El criterio de detección ya está escrito: el `session` de la telemetría cambia entre antes
+  y después de desbloquear.
+- Y el riesgo de `AVSpeechSynthesizer` **no se materializó**: respeta la sesión de `expo-audio`. La
+  escalera de fallbacks del ADR queda escrita por si alguna vez cambia, sin código muerto en el repo.
+
+Con esto **ADR 0003 queda demostrado de punta a punta**: BLE como plano de control es efectivamente
+lo que despierta la app con el teléfono en el bolsillo, que era la hipótesis sobre la que está
+construido todo el diseño del enlace y hasta hoy nadie había verificado.
+
+## 2026-09-11 (cont.) — La placa habla: el lazo de supermercado cerrado, y dónde se escucha se elige
+
+Dos piezas, una en cada pilar, más una tarde de hardware.
+
+### La placa recibía el audio y nunca lo reproducía
+
+`POST /audio` aceptaba el MP3, lo escribía en `/tmp/virovision-audio/` y llamaba a un `play` que
+**`__main__.py` nunca le pasaba**. Cada lectura de supermercado llegaba al dispositivo y moría ahí,
+en silencio, **con un 202 que decía que había salido bien** — la app creía haber entregado el audio y
+la placa creía haberlo guardado. Es la peor forma que puede tener un bug: todas las capas reportan
+éxito. Cerrado con `virovision/audio.py` (PR #82).
+
+Tres decisiones del reproductor que conviene no deshacer: **no espera** a que termine el audio
+(`Popen`, no `run`) porque quien llama es el handler HTTP que le contesta al teléfono; **una lectura
+nueva interrumpe la que suena**, porque frente a la góndola se pide el producto siguiente antes de
+que termine la frase y dos voces a la vez no son información para quien no ve la pantalla; y
+**degrada a un log, nunca a una excepción**.
+
+### Cómo se saca audio de una Zero 2 W: resuelto, en la placa
+
+La Zero 2 W no tiene jack, y eso era una incógnita abierta. Resultó ser un `config.txt` de dos líneas:
+
+```
+dtoverlay=audremap,pins_12_13    # GPIO 12 = pin 32, GPIO 13 = pin 33
+audio_pwm_mode=1
+```
+
+**Sin `enable_jack`, el overlay APAGA el jack.** Eso es lo que hace que la prueba valga: la Pi 3 B+
+prestada *sí* tiene jack, y con el overlay queda comportándose como una Zero 2 W — mismo SoC, mismo
+header, mismos pines. No es una simulación.
+
+**Lo que se probó, en orden:** `aplay -l` lista la tarjeta → tonos de 440 Hz y 1 kHz **audibles** en
+un auricular entre los pines 32 y 34 → `mpg123` instalado (el reloj estaba sincronizado, así que el
+apt que fallaba por no tener RTC no molestó) → daemon nuevo desplegado → **voz real por `POST /audio`
+con `{"played": true}`**, y el journal encadenando todo: audio recibido, reproducción lanzada 5 ms
+después, 202 devuelto a los 6 ms. El teléfono no espera a que termine la frase.
+
+**Dos errores propios que vale registrar.** Se probó primero con **440 Hz sobre un piezo**, que es la
+peor frecuencia posible: un piezo es un capacitor y a 440 Hz presenta ~18 kΩ, así que casi no pasa
+corriente y casi no suena. La pista la dio el usuario: conectado a 3,3 V fijos hacía un clic y no un
+pitido — firma exacta de un piezo *pasivo*, que confirma que el elemento y los contactos andan. Y se
+configuró `pins_18_19` por seguridad (por si un botón había caído en el pin 33, que el overlay
+convierte en **salida**: un botón a masa ahí sería un cortocircuito contra el pad) sin avisar que eso
+requería mover el cable; la tarjeta se fue a la placa con el overlay en un par de pines y el buzzer
+en el otro. Se arregló por SSH, sin sacar la tarjeta.
+
+**Lo que quedó sabido sobre el transductor:** un piezo verifica el camino pero **no sirve para voz**
+—la inteligibilidad vive entre 300 Hz y 3,4 kHz y un piezo resuena arriba de los 2 kHz—; un auricular
+de 16-32 Ω **sí** reproduce voz, y hoy va **sin resistencia en serie**, pidiéndole ~100 mA a un pin de
+16 mA. Anda, pero hay que poner 100-330 Ω. El destino sigue siendo el **DAC I2S**.
+
+### El ajuste «dónde se escucha»
+
+El dispositivo final no existe, así que comparar los dos caminos exige recorrerlos los dos desde la
+app. Ajustes suma un selector: la lectura de supermercado suena **en el teléfono** o **en el parlante
+del dispositivo**. Razonamiento completo en la actualización del
+[ADR 0003](architecture/adr/0003-enlace-placa-telefono.md); lo que importa acá son las dos cosas que
+no eran evidentes.
+
+**El envío pasó a estar DENTRO de la sesión de audio, y eso es lo que lo hace funcionar bloqueado.**
+Antes era `void saveReadingAudio(...)` **después** del anuncio: una copia best-effort para hardware
+que no existía. Ahora puede ser la única salida, y con la pantalla bloqueada iOS sólo deja correr a la
+app mientras el keep-alive suena — un envío fuera de esa ventana lo haría un proceso ya suspendido.
+El test no mira el resultado sino **el orden**: `['begin', 'earcon', 'send', 'end']`.
+
+**El teléfono es siempre el respaldo.** Todos los caminos por los que la placa no puede sonar
+terminan con el teléfono hablando, y el motivo se **registra** (`audio.fallback`) en vez de
+anunciarse: decir «no pude usar la placa» antes de cada frase sería ruido, y el usuario igual recibe
+lo que pidió. Las condiciones se chequean **antes** de sintetizar, porque la síntesis es una llamada
+paga.
+
+**El modo ómnibus queda afuera a propósito**: mandarlo al dispositivo exigiría TTS en la nube y
+ómnibus tiene que funcionar sin internet (ADR 0001). ADR 0003 ya tenía la respuesta —anuncios
+pregrabados en la SD— y no existen todavía. El ajuste lo dice en la misma pantalla donde se elige.
+
+### Casi se duplicó trabajo, y la regla del repo lo evitó
+
+Antes de escribir el ajuste se buscaron ramas sin mergear, como manda `convenciones.md`. Apareció
+`fix/ios-background-reading`, con la sesión de audio, el keep-alive y el refactor de `useReader` a
+`readingService` — justo el código que el ajuste toca. El historial la mostraba con dos commits fuera
+de `staging` y parecía sin mergear; el PR #80 **estaba mergeado**, y `staging` mergea con *squash*,
+así que la rama queda divergente aunque el contenido esté. El chequeo que vale es el que dice el
+repo: la comparación de contenido contra `staging` (sin tres puntos) vacía = está. De paso: la rama
+de audio salió de `staging` **antes** de ese merge, así que el PR #82 está uno atrás.
+
+## 2026-09-11 (cont. 2) — Funcionó, y las dos cosas que estaban mal
+
+Probado de punta a punta por el usuario: **el flujo de supermercado se escucha en la placa**. Con eso
+aparecieron dos defectos que sólo se podían ver oyéndolo.
+
+### Leía en inglés
+
+La placa decía «Macarrones Adria» con acento inglés. La causa: la petición al TTS de la nube mandaba
+`model`, `voice: alloy`, `input` y `response_format`, **y ninguna indicación de idioma**. `alloy`
+arranca en inglés, y el modelo infiere el idioma del texto — pero el nombre de un producto con marcas
+adentro no le alcanza para cambiar.
+
+**Por qué nadie lo había notado**: en el teléfono el problema no existe, porque a `expo-speech` se le
+pasa `es-UY` explícitamente (`tts.ts`). El camino de la nube no tenía equivalente, y hasta hoy nadie
+había escuchado su salida — el archivo se generaba y no lo consumía nadie. Es un defecto que estuvo
+ahí desde que existe `synthesis.ts` y que **sólo podía aparecer el día que el parlante de la placa
+funcionara**.
+
+Arreglado con el parámetro `instructions` de `gpt-4o-mini-tts` (acento, tono y ritmo; `tts-1` lo
+ignora), en español como el prompt de supermercado (ADR 0009): lo que gobierna es **lo que una
+persona escucha**. La instrucción pide español rioplatense, ritmo pausado y dicción nítida, sin
+entonación publicitaria. Queda anotado que el control de acento por `instructions` se reporta
+inconsistente: si el inglés vuelve, la palanca siguiente es la voz, no una instrucción más larga.
+
+### Sonaba muy bajo
+
+El nivel de la placa era **lo que hubiera quedado del último `amixer` a mano** — durante la sesión se
+movió entre 40 % y 85 % probando, y ahí quedó. Un nivel que depende de quién corrió qué no es un
+nivel.
+
+Ahora el daemon lo fija al arrancar (`set_output_volume` en `audio.py`, flag `--volume`). **90 % y no
+100 %**: el audio PWM recorta arriba, y una frase distorsionada es más difícil de entender que una
+suave — que es exactamente lo contrario del objetivo. Con `amixer -M`, que mapea a volumen
+*percibido*; sin `-M` el porcentaje es una posición en la escala de dB y el 40 % es casi inaudible.
+
+## 2026-09-11 (cont. 3) — El alcance se abre a alimentos, y la placa deja de decir «null»
+
+Dos cosas que salieron de la misma prueba con el usuario.
+
+### El modelo es mejor de lo que suponía el alcance
+
+**Identifica cualquier alimento, no sólo los rubros de la canasta básica** — yerba suelta incluida.
+La canasta era el alcance *mientras la precisión era una incógnita*, una forma de acotar el problema
+a algo medible; con el modelo andando, restringirlo en el prompt es pedirle menos de lo que hace.
+
+**La canasta no desaparece: cambia de rol.** Sigue siendo el **dataset de evaluación** —lo que se
+mide— y deja de ser el límite de lo que se contesta. Son dos cosas distintas y vale no volver a
+confundirlas: un dataset acotado y reproducible es lo que hace comparables a los modelos; el alcance
+del modo es lo que el usuario puede pedirle. Por eso `ml/README.md` **no** se tocó: ahí la canasta es
+el dataset y sigue siendo correcta.
+
+Actualizados el prompt, la app, `SKILL.md`, `references/ml.md`, los dos README, `PROJECT-STATUS` y el
+ADR 0006 (con una actualización, no un rename). **Los documentos históricos quedaron intactos** a
+propósito —`REUNIONES-TUTOR.md`, el SESSION-LOG, las entradas viejas de `pruebas-y-decisiones.md`—
+porque registran lo que se dijo entonces, y reescribirlos sería falsear el registro.
+
+### La placa decía «null»
+
+Apuntada a algo que no es un alimento, decía «null» en voz alta. La cadena completa, que vale escribir
+porque ninguno de los dos extremos era obviamente culpable:
+
+1. el modelo contestaba el **literal `null`** (no un objeto);
+2. `parseJsonRecord` lo rechazaba, correctamente — un `null` de JSON no es un registro;
+3. `product` quedaba en `null`, así que `phraseProduct` caía a su **fallback de texto crudo**;
+4. ese fallback existe por una buena razón (si el modelo contesta en prosa en vez de JSON, decirlo es
+   mejor que callarse) pero **no distinguía prosa de basura**, y habló el `"null"`.
+
+Arreglado por los dos lados, porque cada uno solo dejaba el agujero abierto: el prompt pide devolver
+**siempre el objeto** con los tres campos en null y nunca un `null` solo; y el fallback distingue con
+una regla que además cubre casos que no habíamos visto — **la prosa no parsea como JSON**. `null`,
+`{}`, `[]` y un objeto sobrante parsean, y ninguno es una lectura. Eso tapa de paso el JSON válido con
+forma inesperada (`{"producto": "arroz"}`), que antes se leía con nombres de campo y todo.
+
+El mensaje pasa a **«Elemento no reconocible. Probá con una foto más de cerca.»** — «producto» quedó
+angosto con el alcance nuevo, y se conserva el qué hacer porque quien no ve la pantalla no tiene otra
+forma de saber que hay un remedio.
+
+### Para probar
+
+Bloque **G** nuevo en `qa-modo-supermercado.md`: alcance nuevo, lo no reconocible, el idioma en los
+dos caminos y el volumen de la placa.
+
+## 2026-09-13 — El botón y el enlace, medidos contra un dedo y un teléfono reales
+
+Dos quejas de uso seguido, ninguna de ellas donde parecía. Vale la pena el detalle porque las dos
+tenían una causa **determinista** y aun así se leían como «a veces anda».
+
+### «El primer doble click siempre prende ómnibus»
+
+No era la máquina de modos (`modes.py` estaba bien y tenía tests): era el **antirrebote**.
+
+`bounce_time` de gpiozero no significa «ignorá el rebote después de apretar». Significa *ignorá todo
+flanco que llegue dentro de esa ventana del flanco anterior aceptado*, **incluido el de soltar**. O
+sea que es una **cota superior de lo corto que puede ser un click**: si el click dura menos que el
+antirrebote se pierde su flanco de soltar, la pulsación siguiente ya no parece un cambio de estado, y
+el doble click **colapsa en uno solo** — que es exactamente «prendió ómnibus». Los 50 ms se habían
+elegido «con margen sobre los ~10 ms de rebote mecánico», leyendo el parámetro al revés.
+
+Quedó en **15 ms**, y la ventana de doble click pasó de 0,4 s a **0,6 s**: 0,4 s es la cifra de un
+mouse, y esto es un botón en la sien, sin pantalla, apretado por alguien que no lo ve. Lo paga el
+click **simple**, que es el barato — cae en ómnibus, que después vigila solo.
+
+**Las tres pasan a ser banderas** (`--debounce-ms`, `--double-click-ms`, `--long-press-ms`). No es
+comodidad: «calibrar los tiempos del botón» estuvo tres días en los pendientes porque probar un valor
+significaba editar `button.py` por SSH y reiniciar. Y **cada gesto se registra** — los flancos en
+`debug`, la cuenta resuelta en `info`. Sin ese log, «hice doble click y prendió ómnibus» no tiene
+forma de distinguirse de «el gesto se leyó bien y el modo está mal mapeado», y se arreglan en
+archivos distintos.
+
+Los tests que quedaron no prueban gpiozero (no está en la Mac): fijan los **invariantes** de los tres
+números, con el porqué escrito, al estilo de `theme.test.ts`. Si alguno empieza a fallar, la pregunta
+es qué cambió del botón, no qué número mover.
+
+### «Prende supermercado pero no saca la foto; recién el tercer doble click lee»
+
+Ésta era de la app, y **no era una carrera: era determinista**. Un doble click hace que la placa mande
+dos señales —el modo por la característica `mode` y el evento `read`— y desde el PR #80 las dos llegan
+por caminos de velocidad incomparable:
+
+- `read` → `ReaderBridge` → `requestReading()`, **sincrónico**, dentro del callback de BLE;
+- el modo → `onMode` → estado del provider → render → efecto → `setModeFromDevice`.
+
+React no commitea adentro de un callback nativo, así que **la lectura ganaba siempre** y se juzgaba
+contra el modo *anterior* al click. Desde *esperando* eso caía en la guarda `mode === 'idle'` de
+`requestReading` y **se descartaba sin decir nada**: se anunciaba el modo, no se sacaba la foto, y
+recién el doble click siguiente —con el modo ya commiteado— leía.
+
+Lo irónico es que el arreglo ya estaba en el protocolo: el evento **siempre fue `{"t":"read","mode":N}`**
+y la app tiraba el campo `mode` a la basura. Ahora lo usa: `readFromDevice(mode)` aplica el modo de la
+placa **antes** de servir la lectura, en el mismo tick, en vez de correrle la carrera al commit. La
+lógica salió del `.tsx` a `readingService.ts` para poder testearla — y los dos tests nuevos fallan si
+se saca la línea, que es la única forma de saber que pinchan el bug y no otra cosa.
+
+**La lección que vale para el próximo**: cuando el PR #80 sacó el pipeline de React para que el botón
+funcionara con la pantalla bloqueada, creó **dos caminos con latencias de distinto orden** para
+señales que describen un mismo gesto. Eso es una clase de bug, no un caso: si dos señales del mismo
+evento viajan por caminos distintos, la que llega primero no puede depender del estado que trae la
+otra.
+
+### El enlace: «lleva varios intentos de pedido de enlace»
+
+Acá había tres cosas, y la primera es la que más molesta y menos hacía falta.
+
+**1. El emparejamiento no servía para nada.** Ninguna característica pide autenticación —ADR 0003
+decidió **no cifrar** la carga—, así que la app nunca necesitó un vínculo. Pero la placa era
+`Pairable` por defecto, así que se creaba uno igual; y un vínculo del que el teléfono y la placa
+tienen copias que dejan de coincidir es justo la falla reportada: **cada reconexión termina en la
+alerta del sistema**, a veces varias veces. Ahora arranca con `Pairable = false` (`--pairable` lo
+devuelve). Costo, una sola vez por teléfono ya emparejado: *Olvidar este dispositivo*.
+
+**2. Escanear era la peor forma de encontrar una placa conocida.** La app escaneaba **siempre**, y un
+escaneo sólo ve a quien está anunciando. Hay dos situaciones cotidianas en las que la placa no lo
+está, y desde el teléfono se ven idénticas: (a) el periférico **ya está conectado al sistema** —iOS lo
+sostiene entre reinicios de la app, y `startDeviceScan` **nunca** reporta uno conectado, así que la
+app escaneaba 15 s contra una pared y reintentaba—, y (b) la placa cree que el enlace anterior sigue
+vivo y BlueZ no anuncia hasta el *supervision timeout*. El orden pasó a ser: lo que ya está conectado
+al sistema → el identificador recordado (conexión directa, con timeout, sin radio de por medio) →
+escanear. Y toda conexión fallida se cancela explícitamente: en iOS un pedido pendiente bloquea el
+siguiente, que es cómo **un** intento malo se volvía «varios intentos».
+
+**3. La placa no contaba nada del enlace.** Anunciaba, y todo lo demás sólo se veía desde el teléfono
+— la mitad equivocada para quedarse ciego. `virovision/link.py` registra ahora qué central se conecta
+y se va, qué vínculos hay guardados, y cuántas instancias de anuncio tiene BlueZ arriba. Si alguna vez
+aparece `NOT advertising and no central connected`, la falla es de la placa y no hay que deducirlo. La
+condición lleva el «sin nadie conectado» a propósito: BlueZ deja de anunciar **legítimamente**
+mientras hay una central conectada, y un log que grita lobo en cada sesión normal es un log que nadie
+lee — justo la señal que esto existe para dar.
+
+### Un tercer bug, encontrado mientras buscábamos la forma de entrar a la placa
+
+Para desplegar hay que sacar la placa de su AP, y el repo ya nombraba el camino: apagarlo por BLE
+desde la Mac. Se hizo (un script de veinte líneas con `bleak`, que de paso confirmó que **conectarse
+no pide ningún emparejamiento**: leyó `status` y escribió en `control` sin vínculo). La placa contestó
+`ap: false`… y su propio `status`, en el mismo JSON, decía `network: "virovision-ap"`.
+
+`nmcli con down` había devuelto 0 sin hacer nada, y `AccessPoint.turn_off()` ponía `self.on = False`
+**sin verificar**: era una creencia, no una observación. Así, la placa le informa a la app que el AP
+está apagado mientras lo sigue sirviendo — el estado del que la app no puede recuperarse sola, porque
+deja de buscar al dispositivo justo donde está.
+
+Lo irónico, otra vez: `active_connection()` existe desde el 2026-09-06 y se agregó para contestar
+exactamente esta pregunta. Nadie la hacía. Ahora `turn_off` la consulta, `self.on` sale de la
+interfaz, y un AP que no bajó se registra como `ERROR`. `turn_on` se deja como está a propósito:
+`con up` bloquea hasta activar, y `__main__` ya lo verifica contra la dirección real de la interfaz.
+La dirección sin chequeo era ésta.
+
+### Verificación en hardware, el mismo día
+
+`lint`, `typecheck` y los 243 tests de la app en verde; 64 de la placa. Y la placa apareció, así que
+la mitad del hardware **quedó medida en vez de supuesta**.
+
+Entrar costó más que arreglar. La placa arrancó en modo producto, o sea fuera de la red de casa. El
+Mac tenía `virovision.local → 192.168.1.14` en caché —ARP y mDNS contestaban— y no había nadie: ni
+ping, ni 22, ni 8080. Es una forma muy convincente de perder media hora, y la lección es corta:
+**verificá con un servicio, no con que el nombre resuelva.** El barrido bueno es
+`curl http://192.168.1.X:8080/health`, no un `ping`.
+
+El segundo intento fue apagarle el AP por BLE, que es donde apareció el tercer bug (arriba). El que
+funcionó fue la microSD: `touch /Volumes/bootfs/SIN-AP` y arrancar.
+
+De paso, dos cosas que la tarjeta confirmó antes de tocar nada: el `.tgz` del 09-11 **sí tiene**
+`requests_reading`, y el daemon que estaba corriendo también — o sea que el evento `read` salía bien
+de la placa y el bug de «no saca la foto» era **enteramente de la app**. Dejó de ser una deducción.
+
+**El botón, con un dedo real, con el daemon nuevo:**
+
+| Gesto | Repeticiones | Resultado |
+|---|---|---|
+| doble click | 11 | `2 click(s)` — 11/11 |
+| click simple | 10 | `1 click(s)` — 10/10 |
+| click largo | 9 | `long press` → IDLE, sin click residual — 9/9 |
+
+Cero errores en 30 gestos. El **primer** doble click de la sesión —el que siempre caía en ómnibus—
+entró directo a supermercado y además pidió lectura.
+
+Los clicks simples no son ceremonia: bajar el antirrebote de 50 a 15 ms tiene el riesgo **opuesto**
+al que arregla —que el rebote mecánico cuele un click de más y parta un click simple en dos— y los
+dobles no lo detectan. Por eso se midieron los tres gestos y no sólo el que fallaba.
+
+Y el arranque encontró lo que sospechábamos del emparejamiento: **`1 device(s) still bonded`, un
+iPhone** (`Paired: yes, Bonded: yes`). Ese vínculo viejo es la causa de la alerta repetida. Se borró
+de la placa (`bluetoothctl remove`); la mitad del teléfono la tiene que borrar el usuario. Contraprueba
+gratis del mismo rato: el script de `bleak` leyó `status` y escribió en `control` **sin emparejarse**,
+que es justo lo que el ADR sostiene.
+
+**Y la mitad de la app, con el build de la rama puesto**, cerró el mismo día. La secuencia entera son
+164 ms:
+
+```
+18:44:25,720  button: 2 click(s)
+18:44:25,721  mode → SUPERMARKET
+18:44:25,722  button: reading requested in SUPERMARKET
+18:44:25,884  photo of 49019 bytes captured in 91 ms
+18:44:25,885  192.168.1.13 "GET /photos/latest" 200
+```
+
+Es **el primer doble click desde *esperando***: cambió de modo y sacó la foto en el mismo gesto. Eso
+es exactamente lo que antes se descartaba en silencio. Y **ninguna alerta de emparejamiento**: la
+central que se conectó es una dirección aleatoria de iOS, sin vínculo.
+
+### Un hallazgo que no estábamos buscando: el gesto ignorado es mudo
+
+De siete dobles clicks repetidos, **cinco bajaron foto y dos no**. No es un bug: los dos que no caen
+2 a 4 segundos después del anterior, o sea con una lectura todavía en vuelo, y ADR 0007 decidió a
+propósito **no encolar** (para cuando terminara, la foto sería de una escena que el usuario ya dejó
+atrás). El comportamiento es correcto.
+
+Lo que no está bien es **cómo se siente**. En `requestReading` el *earcon* suena **después** de la
+guarda:
+
+```ts
+if (reading) { record(...); return; }   // <- sale acá
+reading = true;
+const audio = await beginReadingAudio();
+playStartEarcon();                       // <- nunca llega
+```
+
+Así que un gesto ignorado no produce **ningún** sonido. Para alguien que no ve la pantalla eso es
+indistinguible de un botón que no anduvo — y «el botón se siente muerto» es literalmente la queja que
+originó las dos actualizaciones anteriores de ADR 0007. Hace falta un sonido corto de «ahora no»
+antes del `return`, distinto del de inicio. Queda anotado abajo; no se metió en esta rama porque es
+una decisión de producto (qué suena, y si además conviene reemplazar la lectura en curso en vez de
+ignorar la nueva), no un arreglo.
+
+## 2026-09-13 — El repo de Magalí pasa a inglés, un archivo por etapa
+
+- Magalí leyó la rama y marcó dos cosas: el repo es en inglés y el nuestro estaba en español, y "el
+  bondi y el cartel están todo mezclado" (un solo `detector.py`). Las dos tenían razón, y ADR 0009 ya
+  pide todo el código en inglés. Refactor sin cambio de lógica (mismos 43 tests, mismas métricas:
+  numero 0,875 / destino 0,732): `bus_banner/detection/bus.py` y `detection/sign.py` separados, con el
+  wrapper de ultralytics compartido y `combined.py` como único lugar que los encadena; `crop.py`,
+  `ocr.py`, `reading.py`, `catalog.py`, `pipeline.py`, `tracking.py`; `data/` y `models/`; scripts
+  `train.py`, `export_imx.py`, `pseudo_label_bus.py`, `build_catalog.py`, `watch_imx500.py`. Rama
+  renombrada a `feat/bus-banner-pipeline` (el PR #1 de su repo la sigue). README y PR reescritos en
+  inglés llano: el pipeline en cinco pasos, un archivo por paso, y el modo ómnibus como cámara en vivo.
+- Lo único que queda en español en ese código es el JSON del evento BLE (`t`, `numero`, `nombre`): es el
+  contrato vigente de la app y cambiarlo es una decisión del lado de la app.
+
+## 2026-09-14 — Entrar a la placa: tres hipótesis mías, las tres equivocadas
+
+Sesión corta y con una sola moraleja, que es metodológica. El bug era chico; lo caro fue que lo
+diagnostiqué mal tres veces seguidas, y cada vez con un argumento que sonaba bien.
+
+El síntoma: pedirle a la placa que apague su AP por BLE no hacía nada. El comando llegaba, la placa
+contestaba, y wlan0 seguía en `virovision-ap`.
+
+**Hipótesis 1: NetworkManager vuelve a elegir el AP.** La descarté mirando los perfiles —
+`Jack_2.4` tiene `autoconnect yes` y el AP `no`, así que `device connect` debería elegir la casa.
+**Era la correcta**, y el motivo por el que la descarté era falso: `autoconnect` gobierna la
+activación *automática*, no un `device connect` explícito.
+
+**Hipótesis 2: el `nmcli` está mal.** Corrí la secuencia a mano y funcionó perfecto, así que la
+descarté. Lo que no vi es que había puesto un `sleep 2` entre `con down` y `device connect` sin
+pensarlo — y en esos dos segundos el autoconnect de NM ya había levantado la casa, así que
+`device connect` no tuvo nada que elegir. **Mi propio experimento contenía el arreglo y no me di
+cuenta.**
+
+**Hipótesis 3: es polkit, el daemon no corre como root.** El servicio tiene `User=root`.
+
+Lo que cerró el caso fue dejar de razonar y **reproducirlo instrumentado**: levantar el AP a mano,
+dejar una ventana de 150 s, mandar el comando por BLE desde la Mac, y tener el journal escribiéndose
+a un archivo que sobreviviera a la caída del SSH. Cinco líneas y no quedó nada que interpretar:
+
+```
+control ← {'cmd': 'ap', 'value': False}
+AP down (ok)
+reconnection to the known network: ok
+ERROR the AP did NOT come down: wlan0 is still on virovision-ap
+```
+
+Los dos comandos devuelven éxito. `nmcli device connect wlan0` **no** significa «reconectá a la red
+que conocés»: significa *activá la mejor conexión **disponible***, y un segundo después de bajar el
+AP la red de casa no está disponible —nadie re-escaneó— mientras que un perfil en modo AP siempre lo
+está, porque no necesita ver nada.
+
+El arreglo invierte el orden: primero se le da la chance al autoconnect de NM, que es el mecanismo
+que se porta bien (2 s medidos, y elige lo que la placa está configurada para preferir); sólo si eso
+no pasa se levanta un perfil **por nombre**, nunca «el mejor disponible», y el AP propio queda
+excluido por construcción. Verificado en la placa: `AP down (ok)` → `back on Jack_2.4 (after 2 s)`,
+cinco segundos de punta a punta.
+
+**Las dos lecciones, que valen más que el bug:**
+
+1. **Un experimento a mano que «funciona» puede estar probando otra cosa.** El `sleep` que agregué
+   por comodidad cambiaba la condición que estaba midiendo.
+2. **Reproducir instrumentado le gana a razonar**, y en esta placa eso significa escribir el log a un
+   archivo: el SSH se cae justo cuando empieza lo interesante, porque lo interesante es la radio.
+
+### La reconexión, verificada
+
+Con el segundo build de la rama y la placa en modo producto: **la reconexión al reabrir la app bajó**
+de los 10-15 s reportados. El arreglo era el presupuesto, no el orden — el intento directo se rendía
+a los 5 s y la placa se libera a los ~6, así que expiraba justo antes de lo que estaba esperando.
+
+Queda una asimetría que vale escribir, porque es el tipo de cosa que se olvida: **el número de arriba
+no es la latencia de la radio**, es cuánto tarda la placa en darse cuenta de que el teléfono se fue.
+Si alguna vez hace falta bajarlo más, lo que hay que tocar es el *supervision timeout* del enlace —
+que lo propone el central (iOS), no la placa—, no el código de la app.
+
+### Y dos cosas anotadas sin arreglar
+
+- **El journal no sobrevive bien a los reinicios.** `/var/log/journal` existe (o sea, es persistente)
+  y aun así `journalctl --list-boots` muestra **un solo arranque**. La placa no tiene RTC: arranca
+  creyendo que es la hora del último apagado y NTP la corrige a mitad de camino, así que las marcas
+  de tiempo saltan y los arranques anteriores desaparecen de la vista. Se perdió así el log de la
+  única prueba en modo producto. Para un dispositivo cuyo único diagnóstico es el log, hay que
+  resolverlo antes de la primera salida a la calle.
+- **Durante el arranque, el teléfono se conectó y desconectó cinco veces en 30 s**, cada conexión de
+  menos de 1,5 s, y después se calmó solo. El daemon tarda ~45 s en inicializar la cámara y registra
+  el servicio GATT **antes** del anuncio, así que un connect directo encolado por iOS puede entrar
+  cuando la placa todavía no está lista. Es una sospecha, no un diagnóstico: el `btmon` llegó tarde y
+  no capturó el motivo de desconexión. Si vuelve a pasar, `sudo btmon | grep -i reason` durante el
+  arranque lo cierra.
+
+## 2026-09-14 — Menos pantalla: un tema, una línea de estado, el modo a secas
+
+Rama `fix/home-and-settings-declutter`, PR a `staging`. Pedido del usuario, cuatro arreglos que en
+el fondo son uno: la app le hablaba a quien la mira, y la usa quien la escucha. Quedó en el
+**ADR 0010**.
+
+- **Inicio pierde el título «RECONOCIMIENTO», la línea del dispositivo y el rótulo «Modo actual».**
+  Muestra sólo el nombre del modo, en tamaño de cuerpo y no de titular. El lector de pantalla sigue
+  oyendo «Modo: Esperando», porque «Esperando» solo no dice qué espera. La pista del botón «Leer con
+  el dispositivo» manda a la pestaña Dispositivo en vez de «arriba». Con eso `useReader` perdió
+  `deviceState` y `deviceConnecting`, y `es.ts` siete cadenas que sólo esa línea usaba.
+- **La pestaña Dispositivo pasa a ser la única línea de estado, y «Conectado» significa «listo».**
+  Verde sólo con BLE y WiFi; si el enlace está y la red no, **«Conectado (falta el WiFi)» en ámbar**,
+  sin más texto: la razón y el remedio siguen en el aviso de abajo. El caso «falta el Bluetooth» no
+  existe como parcial —sin BLE no hay credenciales ni dirección—, así que queda el «Sin conectar» de
+  siempre. La lógica está en `features/device/connectionLabel.ts` con test, fuera del componente.
+  Token nuevo `warning` (`#FFC857` / `#6E4400`), AAA, con su aserción en `theme.test.ts`.
+- **Se retira el selector de tema: la app es sólo oscura.** Se borran `features/theme/`,
+  `services/storage/themePreference.ts` y los `use-color-scheme`. `useTheme()` devuelve
+  `Colors.dark`; el generador pone la paleta oscura en `:root` y se va `darkMode: 'class'` de
+  Tailwind, así ningún frame puede pintar claro y nadie tiene que empujar el esquema a NativeWind;
+  el splash ya no espera a leer una preferencia; `app.json` fija `userInterfaceStyle: "dark"`; el
+  header usa sólo `symbol-dark.png`. La paleta clara **se queda** en `colors.js`, verificada: es la
+  del manual y la usa la tesis.
+- **«Qué reconoce» dice «Identifica alimentos y productos de supermercado»**, sin «almacén». El
+  prompt del modelo no se tocó: sigue diciendo «almacén» porque ahí describe qué contestar, no qué
+  leer en pantalla.
+- Verificación: `typecheck`, `lint` y **250 tests** en verde (uno nuevo, `connectionLabel.test.ts`).
+  Documentación: ADR 0010, `decisiones.md`, `app.md`, la skill de marca, `PROJECT-STATUS.md` y la
+  QA de supermercado (el orden de VoiceOver en Inicio y el texto de «Qué reconoce»).
+
+## 2026-09-14 (cont. 2) — El modo ómnibus corre en la placa: el sensor ve el bondi, la placa habla, el OCR lee
+
+- **Pedido**: llevar lo que anda en la rama de Magalí a la Pi con la AI Camera y probar el flujo entero.
+  Con Magalí se decidió: **el detector es el COCO YOLO11n que trae la cámara** (en el sensor) y **el OCR
+  es el de ella (PaddleOCR)**; el modelo de dos clases y el reentrenamiento del OCR vienen después.
+
+- **Lo que anduvo**: `imx500_network_yolo11n_pp.rpk` (del model zoo de Raspberry Pi) corriendo en el
+  sensor a 15 fps, ómnibus con confianza 0,9 en el video de prueba proyectado en la pantalla de la Mac;
+  el seguidor lo confirma y la placa dice **"se acerca un ómnibus"** por el parlante (386 `.wav`
+  pregrabados con la voz de macOS desde el catálogo STM: `bus.wav`, uno por línea, uno por destino).
+  El OCR sobre el frame guardado lee **`115 / LUIS BRAILLE`** en la Pi. Enfoque manual ajustado con un
+  medidor de nitidez en vivo (`scripts/focus_helper.py`, varianza del Laplaciano).
+
+- **Lo que no anduvo, y por qué**: (1) sin caja de cartel (el modelo COCO no tiene esa clase) el
+  vigilante nunca llamaba al OCR — ahora lee la franja superior del ómnibus; (2) el OCR tarda **~10 s**
+  en la Pi 3 B+ y bloqueaba el loop de cámara: libcamera declara muerto el sensor tras ~1 s sin
+  dequeue ("Camera frontend has timed out"). No era el cable. El OCR pasó a un hilo aparte
+  (`Watcher(async_reads=True)` + `submit_reading`). Cajas duplicadas del mismo ómnibus se deduplican.
+
+- **PaddleOCR en la placa**: paddlepaddle no tiene wheel para Linux ARM64 con Python 3.13 (sólo 3.10-3.12).
+  Se corren **los mismos modelos PP-OCRv5 mobile exportados a ONNX** (`rapidocr` 3.x,
+  `Det.limit_side_len=320 max`: el default de 736 agranda el recorte y fragmenta el texto). Evaluado en la
+  Mac sobre 117 imágenes: numero 0,896 (idéntico a PaddleOCR), destino 0,786 (0,768), 7 ms vs 118 ms.
+
+- **La red se llevó dos horas** y quedó documentada en la memoria del agente: la placa por cable con la
+  Mac como router (alias 10.10.0.2, `pf` NAT, DNS 8.8.8.8 porque 1.1.1.1:53 está bloqueado en esa red;
+  apt en HTTPS porque la red manipula el HTTP plano). Instalados en la placa: `imx500-all`,
+  `imx500-tools`, `python3-opencv`; el daemon `virovision` quedó **parado** para liberar la cámara.
+
+- **Pendiente inmediato**: corrida en vivo con la línea anunciada (la placa quedó sin cable al final),
+  latencia del OCR nuevo en la Pi, y una parada real con `--save-frames`.
+
+## 2026-09-15 — El modo ómnibus entero en la placa: 1,27 s del botón a la línea dicha
+
+Dos ramas: `feat/bus-banner-pipeline` en el repo de Magalí Dellapiazza (`bus-banner-recognizer`) y
+`feat/omnibus-en-el-daemon` acá. Es el día en que el camino de ómnibus dejó de ser un pipeline que
+corre a mano por SSH y pasó a ser **un modo del producto**: se aprieta el botón, la placa vigila, y
+cuando pasa un ómnibus lo dice. Sin teléfono y sin internet, que es lo que el ADR 0001 venía pidiendo
+desde julio.
+
+Los números están en [`mediciones/2026-09-15-omnibus-en-placa.md`](mediciones/2026-09-15-omnibus-en-placa.md).
+El resumen: **1,27 s** desde el click hasta «ómnibus 115, Luis Braille», de los cuales ~1 s es el OCR;
+47 s desde el reinicio en frío hasta que el modo está listo, de los cuales 40 son la carga del OCR.
+
+### El modelo de Magalí, adentro del sensor
+
+Lo que corre en la cámara **es su modelo, sin un solo paso de entrenamiento**: YOLO11n fine-tuneado
+sobre el dataset Roboflow `find-bus-sign` v6 (140 fotos: 98 train, 28 valid, 14 test; una clase
+`bus_sign`, 40 epochs). Verificado leyendo el export, no supuesto: usa la cuantización posterior
+**sin gradientes**, que es la que ultralytics deja por defecto. Los pesos son los de ella redondeados
+a int8, con las escalas elegidas calibrando sobre las **28 fotos de valid**; unas pocas activaciones
+quedan en 16 bits. La **NMS va horneada** con `conf=0,25` / `iou=0,7`, que es la única diferencia que
+cambia el comportamiento y no sólo el formato: en el `.rpk` la confianza ya no se puede bajar en
+caliente. Y pesa 2,64 MB en vez de 5,2. Ocupa el **90 % de los 8 MB** del chip, así
+que un modelo de dos clases entra pero uno más grande no.
+
+Que corra **dentro del sensor** es lo que hace que la cuenta cierre: el detector no consume CPU ni RAM
+de la Pi, y no aparece en el presupuesto de tiempo. La Pi sólo recorta y lee.
+
+El export costó tres intentos de Docker (falta de `openjdk-17-jre-headless` en `python:3.11-slim`, un
+`ImportError` de protobuf, y otro de `MulticlassNMSOBB`) y se cerró fijando el juego exacto de
+versiones que usa ultralytics. **Nada se entrenó en la Mac del usuario**, por pedido explícito.
+
+### El pipeline, partido en dos como pidió Magalí
+
+Su devolución sobre el primer PR fue precisa: el repo es **sólo en inglés** y «¿dónde queda dividido
+lo del bondi y lo del cartel? está todo mezclado». Quedó `detection/bus.py` (COCO yolo11n, sólo la
+clase `bus`) separado de `detection/sign.py` (sus pesos, clase `bus_sign`), y todo el repo en inglés.
+
+Del lado de la lectura, tres cosas que sólo aparecen con carteles reales:
+
+- **El número de línea se perdía con el recorte justo**: el OCR leía `15` donde decía `115` porque el
+  primer dígito se funde con el ícono de silla de ruedas. Tres remedios, los tres puestos: margen
+  izquierdo de recorte **tres veces** el derecho (el número va a la izquierda en los carteles de
+  Montevideo), medio voto para líneas que no están en el catálogo, y reparación contra el catálogo de
+  la STM. El journal muestra `15 LUIS BRALLE` entrando y `115, LUIS BRAILLE` saliendo.
+- **El OCR no puede correr en el hilo de la cámara**: libcamera da el sensor por muerto tras ~1 s sin
+  consumir frames y el OCR tarda ~1 s. Va en un hilo aparte; es lo que hizo desaparecer los
+  «Camera frontend has timed out».
+- **`aplay a.wav b.wav` falla en el segundo archivo** («Unable to install hw params»). Un `aplay` por
+  archivo, en cola. Sin eso el destino no se escuchaba nunca.
+
+**El OCR es PaddleOCR, el que ella eligió**, por pedido del usuario, pero conviene decir en qué se
+parece y en qué no:
+
+- **En su repo el OCR nunca llegó a correr.** `DestinationSignDetector` construye el `PaddleOCR` y no
+  lo llama nunca, y `BusDetector.recognize_text` usa un `self.ocr` que esa clase no define: revienta
+  al primer uso. Por eso el repo detectaba y no leía.
+- **Corre por ONNX** (`rapidocr` con PP-OCRv5 mobile), no por paddlepaddle, que **no tiene wheel** para
+  Linux ARM64 con Python 3.13. Es el mismo modelo, otro motor.
+- **El reconocedor no era el suyo, y eso resultó ser el defecto más caro del día.** Ella pide
+  `lang='es'`, que en PaddleOCR baja el modelo latino. `RapidOcr` nunca seteaba `Rec.lang_type`, así
+  que rapidocr usaba su default: `ch`, el reconocedor de chino más inglés, 18.000 clases y **sin Ñ**.
+  Estábamos leyendo carteles de Montevideo con un modelo entrenado para otro alfabeto. Ver abajo.
+
+### El modo, en el daemon
+
+`virovision/bus.py`, y la cámara que hasta ayer sólo sacaba fotos fijas ahora abre **una sola
+configuración de preview** que sirve para las dos cosas: el modo supermercado sigue sacando su foto
+(`/photos/latest` devuelve el mismo JPEG de 1024×766, verificado) y el modo ómnibus consume frames.
+
+Dos decisiones que se tomaron con el usuario y que cambian reglas escritas:
+
+- **En modo ómnibus la voz respeta el ajuste de la app.** Hasta hoy ómnibus sonaba siempre en el
+  teléfono, y la razón real era que **los anuncios pregrabados no existían**. Ahora existen: 386
+  `.wav` en la SD. Quedó como actualización del [ADR 0003 §5](architecture/adr/0003-enlace-placa-telefono.md).
+- **El click corto dentro del modo ómnibus repite el último anuncio.** Antes no hacía nada.
+
+### Lo que apareció en la primera prueba real
+
+El anuncio salió **dos veces en un segundo**. Era un solo ómnibus: se movió la cámara mientras estaba
+en cuadro, se perdió el track y volvió como uno nuevo. Cualquier cosa que corte el track —una mano, un
+poste, alguien que pasa— haría lo mismo, y **quien no ve no puede distinguir «lo repitió» de «llegó
+otro»**. Una línea recién anunciada queda 10 s en silencio.
+
+Probando después con varios videos distintos aparecieron dos cosas más, las dos del mismo tipo: la
+detección anda, lo que fallaba era **qué se dice y cuándo**.
+
+- **«Se acerca un ómnibus» se repetía muchas veces seguidas.** El silencio anterior cubría la línea y
+  no la presencia, y la presencia se anunciaba **una vez por track**: con videos cortados, cada corte
+  rompía el seguimiento y fabricaba un track nuevo. La frase no distingue un ómnibus de otro, así que
+  repetirla no agrega información aunque el segundo ómnibus sea real. Ventana de 15 s, y el anuncio
+  de una línea también la arma: decir «se acerca un ómnibus» después de «ómnibus 115, Luis Braille»
+  es contar algo que el usuario ya sabe.
+- **A veces decía sólo el número, a veces sólo el destino.** El anuncio salía apenas el número juntaba
+  votos, sin esperar la otra mitad. Los dos campos salen del mismo recorte, así que la mitad que falta
+  suele llegar en la lectura siguiente: ahora espera unos intentos. La paciencia **se termina cuando
+  se termina el ómnibus**: un track que se pierde con una lectura incompleta anuncia lo que tiene al
+  salir, porque ya no va a haber otro intento y media respuesta es mejor que ninguna.
+
+De paso salió un error latente: `time.monotonic()` cuenta desde el arranque del **proceso** en macOS y
+desde el arranque de la **máquina** en Linux, así que inicializar la última marca de tiempo en cero
+silenciaba el primer aviso en una plataforma y no en la otra. Ahora el «todavía no habló» es `None`.
+
+### El OCR leía en chino
+
+Lo encontró y lo midió la sesión paralela que estaba con el detector de dos clases, y explica de
+verdad el síntoma que Juan Lucas venía reportando desde el día anterior —la línea sin el destino, o
+el destino sin la línea—: buena parte de esas mitades faltantes eran mitades mal leídas.
+
+El reconocedor `latin` de PP-OCRv5 tiene 503 clases, tiene los acentos y la Ñ, y pesa la mitad
+(7,5 MB). Sobre las 117 imágenes de `data/eval/gt.csv`, con el mismo pipeline y **la misma latencia**:
+
+| reconocedor | número | destino | lectura completa |
+|---|---|---|---|
+| `ch` (el default) | 79,2 % | 71,4 % | 79,2 % |
+| `latin` | **91,7 %** | **75,0 %** | **87,5 %** |
+
+Está corriendo en la placa desde la noche del 15, y commiteado en el repo de Magalí (`ab34088`).
+Conviene leerlo como advertencia general: la librería eligió por nosotros un default razonable para
+su autor y equivocado para este proyecto, y nadie lo notó durante dos días de pruebas porque el
+síntoma parecía un problema de recorte.
+
+### Dos sesiones sobre la misma placa
+
+Trabajando en paralelo, la otra sesión paró el servicio para usar la cámara mientras esta desplegaba.
+No se perdió nada, pero **el servicio `virovision` y la cámara son exclusivos**: antes de tocarlos hay
+que mirar `pgrep -af watch_imx500` y los `sudo` recientes del journal. Quedó anotado en la skill.
+
+### Operación: lo que ya no hay que volver a preguntar
+
+Tres reglas que costaron horas y ahora viven en la skill
+(`references/placa-acceso.md`, PR #87): **nunca unir la Mac al AP de la placa** (una sola radio: se
+queda sin internet a mitad de una copia), **la microSD es el panel de control** (el archivo `SIN-AP`
+de `bootfs` decide desarrollo o producto, y un `.nmconnection` ahí agrega una red WiFi sin SSH), y
+**la placa guarda varias redes** —hoy casa y oficina— así que mudarse ya no obliga a reescribir nada.
+
+### Verificación
+
+63 tests en `bus-banner-recognizer` y **77 + 2 skipped** en `hardware/raspi`, todos en verde. En la
+placa: reinicio, click, anuncio, repetición por click corto, vuelta a *esperando* y la foto de
+supermercado intacta.
+
+Medido a medias, y anotado: el **costo en precisión del int8**. El float32 da mAP50 **0,781** en el
+split de test; la mitad cuantizada no se pudo correr porque el ONNX del export no carga fuera del
+contenedor (los operadores propios de Sony se pisan entre sí). Queda correr esa validación dentro del
+Docker del export.
+
+## 2026-09-16 — Los avisos también se mudan de parlante: una sola elección para todo lo que suena
+
+Reportado con los anteojos puestos: «los anuncios del modo supermercado y bondi los puedo configurar
+para que salgan por la raspi o por el celular, pero los sonidos de conectado, red lista o modo activo
+sólo se escuchan por el celular».
+
+Lo que estaba pasando, dicho sin vueltas: el ajuste no era una regla, era **dos llamadas que se
+acordaron de consultarlo**. `decideDelivery()` gobernaba las dos lecturas y nada más; todo el resto
+—la conexión, la red, el cambio de modo, el chirp del botón y hasta la confirmación del propio
+ajuste— llamaba directo a `announce()`, que es `expo-speech` y por lo tanto siempre el teléfono. Con
+la salida en la placa el usuario escuchaba el producto en los anteojos y todo el resto en el
+bolsillo, que no es media función: es la app pareciendo rota.
+
+### El aviso de sistema como concepto
+
+La pieza nueva es un **conjunto cerrado de avisos**, con su archivo `.wav` en la SD de la placa y su
+frase en español para el teléfono (`app/src/features/audio/notices.ts` ↔
+`hardware/raspi/virovision/notices.py`). No es free text y no puede serlo: los avisos que más
+importan son los de red, y una frase que necesita la nube para decirse se queda muda justo cuando
+hace falta. «No se pudo usar la red del dispositivo» no puede viajar por la red. Es ADR 0001 aplicado
+al aviso y no sólo al reconocimiento.
+
+Once clips, ~950 KB, generados con `hardware/raspi/tools/make_system_announcements.py` —en **este**
+repo, no junto a los de ómnibus: éstos salen de las cadenas de la app y cambian cuando cambia la app,
+no cuando cambia el catálogo de la STM. Se disparan con `{"cmd":"say","clip":…}` por el canal
+`control` de BLE, que es el enlace que está vivo siempre que hay dispositivo.
+
+**Dos reglas de decisión, no una.** `decideDelivery` (lectura) exige nube y WiFi con la placa
+respondiendo; `decideNoticeDelivery` (aviso) sólo exige el enlace. Juzgar un aviso con la regla de la
+lectura lo mandaría al teléfono cada vez que no hay síntesis o no hay AP — o sea, el mismo bug una
+capa más arriba. Está escrito como test: si alguien funde las dos funciones, falla.
+
+### Lo que apareció al hacerlo
+
+- **«Conectado» no se anunciaba por voz en ningún lado.** No era que sonara en el lugar equivocado:
+  no existía. Estaba sólo como texto en la pestaña Dispositivo, así que la única forma de saber que
+  el enlace subió era mirar la pantalla — lo único que este usuario no puede hacer. Lo que el usuario
+  escuchaba era **VoiceOver leyendo la pantalla**, que sale por donde el sistema operativo decide y
+  la app no puede redirigir. Ahora es un aviso propio, con su contrario («se perdió la conexión»).
+- **El `audio_target` vivía sólo en el `BusWatcher`.** Una placa con modo ómnibus no disponible —sin
+  `.rpk` en el sensor, o sin `bus_banner` instalado— tiraba la elección del usuario a la basura y
+  nadie de este lado la recordaba. Ahora la dueña es el core y el watcher la hereda al engancharse.
+- **El chirp del botón también se muda.** Se pierde el valor de diagnóstico que tenía en el teléfono
+  (se escuchó = la app despertó y su sesión de audio anda), y va igual: un usuario que puso todo en
+  los anteojos y recibe un solo chirp del bolsillo no tiene forma de leer eso como otra cosa que un
+  defecto.
+
+### Lo que se pierde, dicho en voz alta
+
+Tres avisos llevan un detalle variable (qué paso de la red falló, de qué se queja la placa, por qué
+falló la escritura del modo). El teléfono lo agrega; la placa dice una frase fija y completa, porque
+nadie puede grabar un `.wav` por mensaje de error. El detalle queda en pantalla y en telemetría, que
+es donde vive una cadena técnica. Fue una decisión tomada con el usuario, no un descuido.
+
+La otra excepción: si el build no puede sintetizar, elegir «en el dispositivo» se confirma **por el
+teléfono**, porque la frase que hay que decir es justamente que la lectura de supermercado no va a
+poder llegar a la placa, y de eso no hay clip.
+
+### Verificación
+
+`npm run lint`, `npm run typecheck` y `npm test` en verde: **272 tests, 29 suites** (16 nuevos). Del
+lado de la placa, **31 tests** entre `test_notices.py` (nuevo), `test_core.py` y `test_bus.py`.
+
+Dos verificaciones que valen más que el conteo:
+
+- El generador se corrió de verdad: 11 `.wav`, 954 KB, con la misma voz y el mismo formato que los
+  clips de ómnibus (Mónica, 22 kHz mono 16 bit) para que dos anuncios seguidos no suenen como dos
+  dispositivos.
+- El test del espejo entre los dos catálogos se probó **al revés**: renombrando `mode_bus.wav` en el
+  lado de la placa, los dos asserts fallan. Sin esa comprobación el test no valdría nada, porque un
+  nombre que no existe no rompe nada — simplemente no suena, y eso no aparece en ningún log que el
+  usuario alcance.
+
+**Falta la placa.** Todo esto está verificado en la Mac. En la placa hay que copiar
+`announcements/system/` a la SD y escuchar los once avisos; hasta entonces el camino del dispositivo
+está escrito y no probado.
+
+## 2026-09-16 (cont.) — El primer uso real: un lazo de realimentación y la mitad que nunca se desplegó
+
+Reportado apenas llegó el build: «no se escucha por la placa los cambios de modo ni las cosas que
+pedí, sólo dentro de los modos». O sea: las lecturas salen por la placa, los avisos no.
+
+Son **dos causas distintas**, y sólo una es un bug.
+
+### 1. El lazo de realimentación (bug propio, introducido esta misma mañana)
+
+`deviceWarning` tenía clip, así que con la salida en la placa el aviso «el dispositivo avisa: …» se
+mandaba **a la placa**. La placa todavía corría el daemon viejo, que no conoce `say`, así que
+contestaba `{"t":"error","msg":"unknown command: say"}`. La app convierte **todo** error de la placa
+en `deviceWarning`, que volvía a viajar a la placa como otro `say`, que volvía a ser desconocido…
+
+Un intercambio de escrituras BLE que no termina y donde **nunca se dice nada**. Desde afuera es
+indistinguible de «la función no anda», que es exactamente como se reportó.
+
+**La regla que lo reemplaza vale más que el arreglo: la placa no reporta sus propias fallas.** Lo que
+esté roto puede ser justamente lo que tendría que decir la frase, y cuando lo roto es el canal de
+avisos, las dos mitades se alimentan entre sí. Es la misma forma que ya tenía `connectionLost`, que
+no puede anunciar su propia ausencia. `deviceWarning` pasa a ser sólo del teléfono, y quedan **10
+clips** en vez de 11.
+
+### 2. La mitad de la placa nunca se desplegó (no es un bug: es que faltó el paso)
+
+El build de TestFlight lleva **sólo la app**. En la placa siguen el daemon viejo —sin `cmd: 'say'`— y
+un `announcements/` sin la subcarpeta `system/`. Con eso, aunque no existiera el lazo, no habría
+sonado nada. Es la parte que ayer quedó anotada como pendiente y hoy se leyó como defecto, que es
+justo lo que pasa cuando se entrega media función.
+
+### Lo que se arregló para que esto no vuelva a ser mudo
+
+`aplay` escribe su queja a un `/dev/null` que elegimos a propósito, así que **un clip que falta en la
+SD sonaba igual que un parlante sin cablear**: nada, y sin manera de distinguirlos desde el teléfono.
+Ahora el `say` de `__main__` comprueba que el archivo esté antes de reproducir y devuelve si estaba;
+el core emite `missing notice: <archivo>` cuando no. Se escucha por el teléfono —por la regla de
+arriba— y dice exactamente qué falta.
+
+### Verificación
+
+274 tests en la app (2 nuevos: el que fija que una queja de la placa nunca vuelve a la placa, y el
+que exige que todo aviso sobre una falla del dispositivo sea del teléfono) y 86 en la placa (uno
+nuevo: el clip que falta se reporta en vez de callarse). El generador se corrió de nuevo: 10 `.wav`,
+824 KB.
+
+**Sigue faltando la placa.** Nada de esto está escuchado en hardware todavía, y ésa es la lección del
+día: la mitad del dispositivo necesita `python3 tools/make_system_announcements.py`, el `scp` de
+`announcements/system/` y **el daemon actualizado**.
+
+## 2026-09-16 (cont. 2): el cuerpo formal de la tesis, escrito desde lo que el repo ya tenía medido
+
+El pedido fue arrancar la redacción formal a partir de dos tesis de referencia que están en el Drive
+del proyecto: la de **Altamirano y Mira** para el esqueleto del cuerpo (Metodología, Planificación,
+Desarrollo, Despliegue) y la de **Juan Cruz Carrau** para el marco teórico.
+
+Primer dato que conviene no olvidar: **la tesis de Juan Cruz no menciona OCR ni YOLO ni una sola
+vez**. Lo que aporta es la escalera IA → ML → redes → CNN y la definición formal de accuracy,
+precision, recall y F1. Todo lo de OCR, YOLO, hardware embebido, comunicación inalámbrica y app
+móvil hubo que escribirlo de cero.
+
+### Qué se escribió
+
+`docs/tesis/`, un archivo por capítulo:
+
+| Archivo | Qué es |
+|---|---|
+| `03-estado-del-arte-ampliaciones.md` | Los cuatro apartados que estaban vacíos: OCR para ómnibus, productos en góndola, detección en el borde y protocolos |
+| `04-marco-teorico-ampliaciones.md` | Métricas (IoU, mAP), YOLO y una etapa, OCR en dos etapas, Edge AI y cuantización, BLE/GATT y WiFi, TTS y sesión de audio, WCAG |
+| `05-metodologia.md` | Enfoque, organización, **documentación como método** (ADRs, mediciones, skills), Trello, ramas |
+| `06-planificacion.md` | Cinco etapas derivadas de este mismo log, más la tabla de riesgos |
+| `07-desarrollo.md` | El capítulo central: arquitectura, 8 decisiones con su número, dispositivo, pipeline de ómnibus, supermercado, app, accesibilidad, verificación |
+| `08-despliegue.md` | Ramas y canales, CI, firma de iOS, backend, instalación en la placa |
+| `11-bibliografia.md` | Las referencias de los capítulos 3 y 4 |
+| `12-anexo-ampliaciones.md` | GATT completo, hiperparámetros, barrido de márgenes, datos crudos de las tres campañas |
+
+### Dónde quedó
+
+En el Drive compartido, carpeta **Documentos**, como **`ViroVision PFC v2 (completo)`**: el documento
+entero, con lo que ya estaba en el oficial reordenado a la numeración de Altamirano y Mira, más los
+capítulos nuevos. El oficial no se tocó.
+
+### La receta para meter un documento largo en un Google Doc
+
+**El conector de Drive no puede editar un Google Doc que ya existe** (crea, copia, renombra y mueve,
+nada más). Y 183 KB de texto no entran en una llamada. La receta que funciona, con las tres trampas
+que hay que esquivar:
+
+1. **Copiar el doc oficial con `copy_file`**, no crear uno vacío. La carátula (con el logo de la UM,
+   que es una imagen), el índice y los estilos vienen con la copia. Armar la portada desde markdown
+   la destruye.
+2. Armar el markdown del **cuerpo solo**, desde el primer capítulo, y pasarlo a HTML con
+   `pandoc -f gfm -t html` (sin `--standalone`: agrega un `<h1>` con el título que después hay que
+   borrar a mano).
+3. Ponerlo en el portapapeles de macOS con el flavor HTML: `osascript` con
+   `set the clipboard to «data HTML<hex>»`. Verificar con `osascript -e 'clipboard info'`.
+4. En el navegador, **borrar primero el cuerpo viejo y pegar después**, en dos pasos. Si se pega
+   encima de la selección, el texto hereda el formato del punto de inserción: las 78 páginas
+   quedaron en **rojo cursiva**. Con el cursor ya en el hueco, aplicar `cmd+alt+0` (texto normal) y
+   `cmd+\` (borrar formato) antes de `cmd+v`.
+5. El pegado entra en Arial sin justificar: seleccionar el cuerpo (`cmd+shift+down` desde el primer
+   capítulo) y ponerle **Times New Roman** y `cmd+shift+j` para que coincida con el resto.
+6. Actualizar el índice: clic en él y el botón de refrescar que aparece al costado.
+
+**Y la trampa que más caro salió:** en Google Docs, **lo que se tipea cuando un diálogo no tomó el
+foco cae en el cuerpo del documento**. Pasó dos veces, con el diálogo de Buscar y reemplazar y con
+`cmd+f`, y las dos veces el texto quedó incrustado en la carátula. La regla, entonces:
+
+- **No tipear nunca dentro de Docs.** Ni buscar. Para moverse se usa el panel de esquema, que es un
+  clic; para llegar al índice, recargar la página, que abre arriba.
+- **Y si igual pasa, no deshacer a ciegas.** Seis `cmd+z` seguidos se comieron la carátula y el
+  índice enteros, porque el borrado del cuerpo viejo y el pegado son operaciones separadas y el
+  undo atraviesa las dos. Salió más barato tirar el documento y rehacerlo desde una copia nueva del
+  oficial que intentar recomponerlo con redo.
+
+### Dos cosas que la redacción dejó al descubierto
+
+1. **Nunca se entrenó en la V100.** El README y los ADRs venían diciendo «entrenado en la V100 de
+   Arnaldo Castro» como si fuera un hecho. Los dos fine-tunes que existen corrieron **en CPU, 40
+   epochs, batch 16**; los 120 epochs que documenta `scripts/train.py` no se ejecutaron nunca. El
+   acceso SSH al servidor ya está, pero sin usar. El capítulo 7.4.2 lo dice con todas las letras y
+   avisa que las métricas reportadas son un piso.
+2. **Documentación desactualizada que no hay que citar.** `app/README.md` sigue diciendo que BLE es
+   un stub y el audio un TODO; `hardware/README.md` todavía lista Coral TPU y Camera Module 3;
+   `PROJECT-STATUS.md` dice «ML: not started». El capítulo cita los docblocks de los módulos y los
+   ADRs enmendados, que sí están al día. La skill se corrigió en este mismo PR (el proxy está
+   desplegado desde el 2026-09-02, y `ml/` es un stub).
+
+### Convenciones de redacción que quedaron fijadas
+
+Tercera persona siempre («el equipo», «se optó por»), **sin raya larga** (comas, dos puntos o
+paréntesis), coma decimal, y una regla de fondo: **toda cifra remite a un ADR, a una campaña de
+`docs/mediciones/` o a un `summary.json` del repo de ómnibus**, y lo que no está hecho o no está
+medido se dice, no se omite. Están escritas en `docs/tesis/README.md`.
+
+### Lo que falta del documento
+
+- Las **figuras**: van marcadas como `[FIGURA N: ...]` con la descripción de qué tiene que mostrar.
+- Las **columnas reales del Trello** (el tablero es privado y Chrome no tiene sesión de Trello).
+- El **registro de reuniones con el tutor**: `docs/REUNIONES-TUTOR.md` sólo tiene la del 2026-08-10.
+- **Verificar la bibliografía** contra las fuentes antes de entregar.
+- Conclusiones y trabajo futuro, que quedaron fuera de alcance a propósito.
+
+## 2026-09-17 — Los avisos, verificados en la placa: los diez suenan, y las dos ramas de error también
+
+El día anterior cerró con la app entregada y la placa sin tocar. Hoy se cerró la otra mitad, y el
+primer hallazgo fue que la causa no era ninguna de las dos que habíamos supuesto.
+
+### La placa no estaba en modo desarrollo, aunque todo indicaba que sí
+
+`SIN-AP` **no existía** en la tarjeta. Lo único que quedaba era `._SIN-AP`, el archivo de recursos
+que macOS crea al lado de cada archivo que se copia a una FAT: se borró el real y sobrevivió el
+compañero, que es justo el rastro que hace creer que el archivo está. Con eso la placa arranca en
+modo producto, levanta su AP y deja cualquier otra red — sin SSH, invisible en la WiFi. El celular
+la seguía viendo porque **BLE anda igual en los dos modos**, y de ahí la confusión.
+
+Vale como regla: `ls SIN-AP` no alcanza en una tarjeta que pasó por una Mac. Hay que mirar que no
+sea el `._`.
+
+### Lo que se hizo desde la microSD
+
+Creado `SIN-AP`, reconstruido `virovision-daemon.tgz` desde el repo —el de la tarjeta era del 13 de
+septiembre, sin `cmd: 'say'` y **ni siquiera con `bus.py`**, o sea que tampoco era lo que corría— y
+copiados los diez `.wav`. Y `modo-red.sh` pasó a instalar los avisos en cada arranque, para que una
+placa en modo producto, sin SSH, también se pueda actualizar: que es exactamente la situación en la
+que se descubrió que faltaban.
+
+De paso, una trampa que ya estaba: el bucle `for f in /boot/firmware/*.nmconnection` también agarraba
+`._wye-guest.nmconnection` y lo instalaba como perfil de NetworkManager. Ahora los filtra.
+
+### Verificado en hardware, no en la Mac
+
+- Los **diez avisos por BLE**, con `tools/say.py` (nueva, hermana de `ap.py`): en el journal, cada
+  `control ← {'cmd': 'say', …}` seguido de su `audio: playing … (pid N)`. La cadena entera —ajuste,
+  escritura BLE, catálogo, `aplay`— corre.
+- **El rechazo**: `../../etc/passwd` y `mode_train.wav` vuelven como `unknown notice`. La lista
+  blanca hace lo suyo con algo que llegó por el aire.
+- **El clip que falta**: escondiendo `mode_idle.wav` a propósito, la placa contesta
+  `missing notice: mode_idle.wav`. Es la rama escrita ayer para que el fallo mudo dejara de serlo, y
+  es la que habría ahorrado la sesión entera.
+
+### Dos cosas que aparecieron mirando
+
+- **`modo-red.sh` e `instalar-daemon.sh` vivían sólo en la microSD.** Un script de arranque del que
+  existe una única copia, en un medio que se corrompe y se presta. Van al repo en `hardware/raspi/boot/`.
+- **Las fechas de archivo en la placa mienten.** `modo-red.sh` corre antes de que NTP sincronice y la
+  Pi no tiene RTC, así que todo lo que instala queda fechado en el apagado anterior. Hoy eso hizo
+  pensar por un rato que los clips eran de un despliegue viejo cuando se acababan de copiar. Para
+  saber cuándo se instaló algo: `/var/log/virovision-firstrun.log`, no `ls -la`.
+
+### Lo que falta
+
+La prueba con el celular: Ajustes → «Dónde se escucha» → **En el dispositivo**, y escuchar que la
+confirmación misma salga por la placa. Todo lo de arriba prueba que la placa hace su parte cuando se
+le pide; falta ver a la app pidiéndoselo.
+
+## 2026-09-17 (cont.) — El reparto, corregido en uso: qué dice la placa y qué dice el teléfono
+
+Probando en modo producto: con la salida en «dispositivo» la app **no se podía unir al WiFi de la
+placa**; poniéndola en «teléfono», el mismo build andaba. Ese A/B identificó la causa sin ambigüedad.
+
+### El bug
+
+«Dispositivo conectado» se anuncia en el instante en que sube el enlace. Con la salida en la placa,
+eso es una escritura GATT en `control`, disparada **sin `await` una línea antes** de que la app lea la
+característica `wifi` para saber a qué red unirse. Dos operaciones de característica a la vez sobre un
+periférico recién conectado: la lectura volvía vacía, `readWifi()` contesta `null` ante cualquier
+falla, y sin credenciales no hay nada a lo que unirse.
+
+Lo que lo hacía difícil de ver: el síntoma —«no se pudo conectar al WiFi»— apunta a la red, tres capas
+más allá de la escritura BLE que lo causaba. La placa estaba impecable: `ap True`, `ip 10.42.0.1:8080`,
+credenciales correctas viajando por BLE. Leerla con `ap.py --status` descartó esa mitad en un minuto.
+
+### La decisión, que es más importante que el arreglo
+
+Anunciar «conectado» **por el dispositivo** es circular: cuando se anuncia, el dispositivo acaba de
+existir para la app, y el usuario está con el teléfono en la mano emparejando, no con los anteojos
+puestos. El reparto no es «todo lo que suena» sino **por quién está escuchando y dónde**:
+
+- **el teléfono**: el enlace y la red — conectado, perdido, red lista, red falló, los avisos de la
+  placa, el modo que no se pudo escribir;
+- **la placa** (según el ajuste): los modos, el chirp de la lectura, y las lecturas de cada modo como
+  ya venían. Más la confirmación del ajuste y «probar audio», que verifican la salida misma y por eso
+  tienen que salir por ella.
+
+Quedan 6 clips en la SD, no 10.
+
+### El arreglo de fondo
+
+Achicar el catálogo saca la carrera del camino de conexión, pero no la clase de bug: `applyGesture`
+anuncia el modo y lo escribe al dispositivo en la sentencia siguiente, también sin `await`. Así que
+las operaciones de característica pasan por una cola (`services/ble/serialize.ts`): **el orden en que
+se piden es el orden en que ocurren**. Un aviso es lo menos importante que lleva el enlace y estaba
+compitiendo en silencio con lo que el producto necesita.
+
+### Verificación
+
+282 tests en la app (5 del serializador, 2 que fijan el reparto nuevo) y 86 en la placa. Los clips
+regenerados: 6, 503 KB. **Falta llevarlos a la SD y volver a probar con el celular** — el catálogo
+cambió, así que la placa tiene 4 `.wav` que ya nadie pide y le faltan cero.
+
+## 2026-09-17 (cont. 2): la placa entra a la tesis por donde se la usa, no por donde se la programa
+
+Pregunta del equipo sobre el borrador: ¿estaba escrito todo lo que hubo que tener en cuenta para la
+Raspberry, el modo producto, el acceso remoto? **No.** Estaban el interruptor de red en una línea y
+poco más. Faltaba justamente lo que costó tiempo.
+
+### Lo que se agregó
+
+**§7.3.4, los dos modos de operación**, como decisión de diseño y no como detalle: un producto
+terminado son unos lentes con un botón, y durante el desarrollo el mismo hardware tiene que ser
+alcanzable. Sobre una sola radio las dos cosas no conviven. El interruptor vive en la partición FAT
+porque **un dispositivo sin pantalla tiene que ser gobernable sin entrar en él**, la configuración se
+regenera en cada arranque, y el enlace BLE anda igual en los dos modos, que es deliberado y tiene un
+costo de diagnóstico: desde el teléfono los dos modos se ven iguales.
+
+**§8.7, reescrito entero**, con siete subsecciones: la tarjeta como panel de control, las tres vías
+de acceso y la regla de no desplegar desde una máquina con una sola interfaz de red, el
+procedimiento de cinco pasos con sus tres restricciones (el instalador no se reejecuta, el paquete
+tiene que llevar el árbol completo, una bandera puede estar repetida en dos archivos), el
+diagnóstico y su límite (el journal no sobrevive a los reinicios por la falta de RTC, y así se
+perdió el log de la única prueba en modo producto), el punto de acceso sin gateway ni DNS, el
+pipeline de visión como dependencia, y una tabla de deuda operativa declarada.
+
+Las credenciales no se transcriben al documento: se nombra la deuda (rotar lo que se compartió por
+chat y la clave que quedó en el historial de git) sin publicar ningún valor.
+
+## 2026-09-18 — Alinear la placa: dos trampas de despliegue, las dos mudas
+
+El objetivo era chico —dejar la placa con los 6 clips del catálogo nuevo y correr el bloque 4 del
+QA— y salieron dos formas de romper una placa sin que nada lo diga. Las dos valen más que la tarea.
+
+### 1. El `tar` de macOS deja los `.py` en 0 bytes
+
+Empaquetar el daemon con el `tar` de macOS y extraerlo con GNU tar en la Pi dejó **todos los archivos
+del paquete en cero bytes**: nombres correctos, fechas correctas, contenido vacío. El daemon
+arrancaba, importaba módulos vacíos, **salía con código 0** y systemd lo reiniciaba en bucle. En el
+journal no había ni una excepción: sólo «Started» y «Deactivated successfully», cuatro veces.
+
+Lo que lo hizo visible fue `python -m virovision --help` contestando **nada** con exit 0. Un help
+vacío no es un síntoma que uno busque.
+
+Lo que funciona: `scp virovision/*.py placa:…/virovision/`, sin empaquetar. Y la comprobación no es
+que los archivos estén, es **que los bytes coincidan de los dos lados** — 128.804 en este caso.
+
+### 2. La tarjeta le gana a la placa en cada arranque
+
+Tras restaurar, la alineación se deshizo sola: volvieron los 10 clips viejos. La causa es el diseño
+que se agregó el 17: `modo-red.sh` reinstala los avisos desde `/boot/firmware/announcements-system/`
+en **cada** arranque. La placa había reiniciado durante el bucle de fallos, y la tarjeta —que seguía
+vieja, porque el lector de la Mac nunca funcionó— ganó.
+
+O sea que **alinear la placa por SSH no sirve**: hay que actualizar `/boot/firmware/`. Y la buena
+noticia es que **eso se hace por SSH, sin sacar la tarjeta ni necesitar el lector**: `scp` a `/tmp` y
+`sudo install` a `/boot/firmware/…`. Dos días peleando con un lector de tarjetas para algo que no lo
+necesitaba.
+
+### Verificado
+
+Tras reiniciar —que es la única prueba que vale, porque el arranque es donde la tarjeta manda—:
+
+- los **6** clips del catálogo suenan sin error;
+- los **4** retirados se rechazan con `unknown notice`, que es lo que prueba que el daemon también
+  quedó al día y no sólo los archivos;
+- la placa volvió sola a modo producto: `ap=True`, `10.42.0.1:8080`, cámara lista.
+
+Del bloque 4 quedó sin repetir **el clip que falta** (`missing notice`): se verificó el 17 contra el
+mismo código —`_play_notice` no cambió en este despliegue, sólo se achicó el diccionario— y
+repetirlo costaba otro ciclo de bajar y subir el AP sobre una placa que ya estaba en el estado que el
+usuario quería.
+
+## 2026-09-18 (cont.) — Una voz por vez: las dos salidas hablando encimadas
+
+Reportado probando en la placa, y es de los hallazgos que sólo aparecen usando: con la salida en
+«dispositivo», «Probar audio» arranca por el parlante; cambiando el ajuste a «teléfono» a mitad de la
+frase y tocando el botón de nuevo, el celular empieza la misma frase **sin cortar la de la placa**.
+
+**Cada salida sabía interrumpirse a sí misma y ninguna a la otra.** El teléfono llama a
+`Speech.stop()` antes de hablar, la placa corta su `aplay` anterior antes de reproducir. Las dos
+reglas correctas, y juntas insuficientes. El principio ya estaba escrito en `audio.py` desde el
+primer día —«dos voces a la vez es peor que cualquiera de las dos»— implementado dentro de cada
+salida y no entre las dos.
+
+La placa gana un comando `hush`, y la regla se aplica en los dos puntos de entrega que ya existían
+—`notify` y `deliverReading`— y no en cada llamador: un punto de decisión, no varios que se olvidan
+de a uno. Es la misma lección del 16, cuando el ajuste era «dos call sites que se acordaban de
+consultarlo».
+
+### Lo que salió mal en el camino, que también enseña
+
+Al desplegar, el daemon no arrancaba: `TypeError: ViroVisionService.__init__() got an unexpected
+keyword argument 'hush'`. Había agregado el parámetro al `Core` y a la llamada de `__main__`, y me
+olvidé de pasarlo por `gatt.py`, que está en el medio. **Falló ruidosamente, con traceback** — que es
+exactamente lo contrario del despliegue de la mañana, donde el `tar` de macOS dejó los `.py` en cero
+y el daemon moría en silencio con exit 0. La diferencia entre las dos mañanas es la diferencia entre
+un minuto y una hora.
+
+Y el test de «nunca rechaza» atrapó un bug de la propia implementación antes de que llegara a la
+placa: el chequeo del enlace para el `hush` había quedado **fuera** del `try`, así que un `isLinked`
+que explota tiraba el aviso entero. Se consulta una sola vez y se guarda.
+
+### Verificación
+
+284 tests en la app (3 nuevos: el silenciado en las dos direcciones, y que no se le hable a un enlace
+que no existe) y 88 en la placa (2 nuevos: el comando corta, y una placa sin parlante lo ignora sin
+error). En el hardware: el comando se acepta, no genera errores y la placa sigue reproduciendo
+después del corte. **Que el sonido efectivamente se corte lo tiene que confirmar un oído**, como todo
+lo de audio en este proyecto.
+
+## 2026-09-19 — «No se pudo conectar» era mentira, y la placa volvió a ser la Zero
+
+Sesión arrancada a las corridas —había una demo— y terminada con dos defectos entendidos, uno
+arreglado y una placa distinta sobre la mesa.
+
+### La placa estaba en modo producto y parecía rota
+
+Primer síntoma: «me conecto por Bluetooth pero no por WiFi». Leerla con `tools/ap.py --status` lo
+cerró en un minuto: `ap True`, `ip 10.42.0.1:8080`, credenciales correctas viajando por BLE. Estaba
+en modo producto, que es exactamente *no* tener SSH por WiFi. **BLE anda igual en los dos modos**, y
+por eso el modo de red es lo último que uno sospecha. Es la misma confusión del 2026-09-17 entrando
+por otra puerta: aquella vez la creíamos en desarrollo, ésta la creíamos rota.
+
+### El prompt de WiFi que nunca aparecía, y el que aparecía y mentía
+
+Con el build viejo la app **nunca pedía unirse a la red de la placa**: el arreglo del #94 (la
+escritura GATT del aviso pisando la lectura de la característica `wifi`) ya estaba en TestFlight
+desde el día anterior, pero el teléfono tenía un build anterior. Actualizando, el cartel apareció.
+
+Y ahí salió el defecto nuevo, que es más interesante: **el cartel aparece, se acepta, el teléfono se
+une… y diez segundos después la app dice «no se pudo conectar»**. Quince segundos más tarde vuelve a
+preguntar y «a la segunda anduvo» — había estado unido todo el tiempo.
+
+La causa está en la librería: `react-native-wifi-reborn` confirma el join **leyendo el SSID de
+vuelta**, sondeándolo 20 veces cada 0,5 s (`RNWifi.m`, `connectToProtectedSSIDOnce`). Leer el SSID en
+iOS necesita permiso de ubicación — el mismo que hace que `getCurrentWifiSSID` se cuelgue desde el
+2026-09-07 — así que en un teléfono sin ese permiso el sondeo **no puede** tener éxito: espera sus
+diez segundos y llama fallida a una conexión que funcionó. El segundo prompt no era un reintento
+inteligente: era el latido de `status` de la placa, 15 s después, corriendo `syncNetwork` de nuevo.
+
+Arreglo en **PR #98**: `joinWifi()` devuelve `'joined'` o `'unconfirmed'`, y un join sin confirmar no
+se anuncia como fallo — decide `waitForDevice()`, o sea la placa contestando en su IP. Es mejor
+evidencia que la cadena del SSID, que iOS ni siquiera entrega. Cuando contesta, la red queda marcada
+como unida para que el latido siguiente no vuelva a preguntar. El sondeo previo de SSID baja de 3 s a
+1,2 s: sólo evita un prompt redundante y la propia librería repite esa comprobación adentro.
+**Quedan ~10 s** (la promesa recién se resuelve cuando la librería termina su sondeo) y eso no se
+tocó: pasa de ~25-30 s con dos prompts a ~10 s con uno.
+
+### No había un solo log que mirar
+
+Diagnosticar esto llevó más de lo que debía porque **la telemetría está muda desde el 2026-09-10**:
+la tabla `events` tiene 230 filas y la última es de ese día, build `1.0.0+202609091836`. Del 11 en
+adelante no llegó ni un `app.start`. Los secrets del repo están puestos (`EXPO_PUBLIC_TELEMETRY_URL`
+y el proxy existen, y `EXPO_PUBLIC_SIMULATE_DEVICE` es `0`), así que **por qué dejó de mandar sigue
+sin explicación**. Desde el 2026-09-08 la información técnica no está en las pantallas: esa tabla es
+el único diagnóstico que queda, y estuvo ocho días apagada sin que nadie se enterara — que es
+exactamente el escenario contra el que avisa `app/.env.example`.
+
+### El destino del ómnibus: mecanismo encontrado, causa no
+
+Reportado: la placa dice «Ómnibus 115» y no dice «Luis Braille»; lo mismo con 110 Manga y 526 Malvín.
+No es el diccionario de audio: los tres `.wav` están en la placa (147 números + 239 destinos) y se
+reprodujeron por SSH para comprobarlo. El mecanismo es `files_to_play()`
+(`bus_banner/announcements.py`), que arma `dest/<slug>.wav` con el texto leído y **filtra en silencio
+los archivos que no existen**: un destino con una errata no suena y no deja rastro en ningún log.
+Reproducido en la Mac sobre `video1.MP4`: una lectura salió `number "102"`, `destination "GIN T
+LOUERLES"`, y no existe `dest/gin_t_louerles.wav`.
+
+Lo que convierte esa basura en un nombre válido es el catálogo (`fix_destination`, cutoff 0.65), que
+**está** en la placa. Y sobre el frame de humo la Mac lee crudo `'109 P. INDEPENDENCIA'` y anuncia
+«109 / Plaza Independencia», o sea que la cadena entera funciona con el paquete al día. La placa
+tiene `bus_banner 0.2.0` con `rel_y=0.12`, el margen vertical de antes del 2026-09-16 (hoy 0.06, más
+dos commits de crop posteriores). Eso castiga al renglón chico —el destino— pero el barrido medido
+dice 0.819 contra 0.812: **un punto, no un apagón**, así que explica una parte y no todo. Quedó sin
+cerrar por decisión del usuario, que tenía una demo.
+
+### La placa volvió a ser la Zero 2 W
+
+Al final de la sesión volvió la **Raspberry Pi Zero 2 W** y se fue la 3 B+ prestada, que cubrió los
+diez días del CSI roto (2026-09-09 → 2026-09-18). Es otra unidad —otra dirección BLE— y **su cámara
+responde**, así que este CSI está sano. Verificado por BLE y por SSH: tiene el daemon del repo
+**byte a byte** (129 508 bytes en los 17 `.py`, con el `hush` del #97 incluido), los avisos completos
+y el catálogo.
+
+Lo que cambia para siempre, y por eso se tocó la documentación: **la Zero no tiene puerto Ethernet**.
+El camino que `placa-acceso.md` recomendaba primero —cable directo Mac ↔ Pi, que funciona con el AP
+arriba— deja de existir mientras la placa sea ésta. El orden nuevo es: `tools/ap.py` por BLE (5 s, no
+persiste), `SIN-AP` en la microSD (persistente), o entrar al AP desde una máquina con dos interfaces.
+Queda anotado como candidato **sin probar** el gadget Ethernet por USB (`dtoverlay=dwc2` +
+`modules-load=dwc2,g_ether`), que sería el reemplazo natural del RJ45 y se configura desde la tarjeta.
+
+Y una consecuencia que va para arriba: **vuelven a valer las mediciones BLE del ADR 0003**, que son de
+esta radio (BCM43438, BT 4.2, sin Data Length Extension) y que la 3 B+ no podía reproducir. El aviso
+del ADR que decía «no se pueden repetir en la placa que está en uso hoy» quedó enmendado en vez de
+borrado: la 3 B+ puede volver.
+
+## 2026-09-20 — Conectarse era lento y pedía permiso: tres causas, ninguna en el radio
+
+Sesión abierta con un reporte de uso, no con un bug: «la conexión con la placa viene siendo tediosa».
+BLE tarda en conectar; una vez conectado, el WiFi tarda mucho más, suele fallar al primer intento y
+vuelve a pedir permiso para unirse a la red de la placa. Lo que se quiere: una primera conexión
+fluida y, después de ésa, que cerrar y abrir la app conecte solo, sin ningún cartel. Con la Zero 2 W
+de vuelta desde ayer. La rama `fix/wifi-join-retry` (PR #98, cerrado «para rehacerlo de cero») ya
+tenía la mitad del diagnóstico; esta sesión es ese rehacer.
+
+### 1. La placa anunciaba cada 1,28 s
+
+Lo primero fue leer la placa en vez de suponer. `tools/ap.py --status` la mostró en modo producto,
+sana; se le bajó el AP por BLE para entrar por SSH y leer `debugfs`:
+`adv_min_interval` = `adv_max_interval` = **2048**, o sea 1,28 s — el valor por defecto del kernel,
+que nadie había tocado (la unidad fijaba el intervalo de *conexión* y no el de *anuncio*). Un
+teléfono sólo encuentra la placa cuando atrapa un anuncio, y la conexión directa al identificador
+recordado del 2026-09-13 también espera uno: ese intervalo era un piso debajo de todas las conexiones.
+
+Medido desde la Mac (mismo CoreBluetooth que el iPhone), seis búsquedas por intervalo, con el AP
+arriba porque así se usa: con 1,28 s, **11,5 s · 3,1 s · 10,8 s · no apareció en 20 s · 1,6 s · no
+apareció en 20 s**; con 100–152,5 ms, doce búsquedas entre **1,9 y 10,3 s, ninguna fallida**. Los
+valores de la Mac son altos en sí y no bajaron tanto como esperaba; se descartó que fuera la
+coexistencia WiFi/BT de la Zero midiendo con el AP apagado (mismo rango: 1,3–10,6 s), así que es el
+escáner de macOS, que entrega periféricos con pereza. Lo que la Mac mide bien es la cola, y dos de
+seis búsquedas que fallan es exactamente «falla al primer intento». El número del iPhone lo dará
+`ble.connected.ms`. La unidad fija ahora 160–244 (100–152,5 ms; 152,5 está
+en la lista de intervalos para los que Apple afina su escáner) en el mismo `ExecStartPre` de
+`debugfs`. **Desplegado en la placa** por SSH y verificado con `btmon`: el controlador recibe
+`Min advertising interval: 100.000 msec / Max: 152.500 msec`.
+
+De paso, un desvío del repo: la unidad instalada en la placa tenía `EnvironmentFile=-/etc/default/virovision`
+y `$VIROVISION_ARGS` (donde viven `--bus-model` y `--bus-labels`) y la del repo no. Un despliegue
+de la unidad del repo habría borrado el detector en silencio. Ya están iguales.
+
+### 2. Preguntar el SSID era pagar 3 s por una respuesta que nunca llegaba
+
+La app, antes de pedirle al sistema unirse, leía el SSID actual «para no volver a pedir el cartel».
+En iOS leer el SSID exige permiso de ubicación, que la app no pide a propósito: sin él la librería
+no contesta y la app pagaba **3 s de timeout en cada conexión**, para después llamar al join igual.
+Y el join, del lado de la librería, se confirma leyendo el SSID veinte veces cada 0,5 s: mismo
+permiso, así que **no podía confirmar nunca** y a los diez segundos llamaba fallido a un join que
+anduvo (el hallazgo del 2026-09-18). Ésas eran las dos mitades de «tarda mucho y falla al primer
+intento».
+
+La decisión (ADR 0003, act. 2026-09-20): **la única prueba de red que la app acepta es que la placa
+conteste `/health` en su IP**. No necesita permiso, tarda ~50 ms y prueba lo que importa.
+`reachDeviceNetwork` (`services/wifi/join.ts`, puro, con reloj y sondeo inyectables) sondea primero:
+si la placa contesta, la red está lista y al sistema no se le pide nada — el «sin cartel la segunda
+vez». Si no, pide el join **y sigue sondeando en paralelo**: la red se declara lista en cuanto la
+placa contesta, no cuando la librería termina sus diez segundos; de la promesa del join sólo se
+escucha un rechazo real (cancelar, contraseña inválida), que corta la espera al instante. Ocho tests
+fijan la política. `currentSsid` y `waitForDevice` se fueron.
+
+### 3. La app olvidaba la red
+
+`disconnectFromSSID` en la librería es `removeConfigurationForSSID`: al desconectar a mano o al bajar
+el AP, la app **borraba** la red guardada, y la siguiente conexión partía de cero con su cartel. iOS
+muestra ese cartel cada vez que se llama `applyConfiguration` fuera de la red (que la configuración
+exista no lo evita, visto el 2026-09-19), así que la única forma de no verlo es no llamar — y para
+eso la red tiene que seguir guardada. **La red no se olvida nunca**; `leaveWifi` se fue.
+
+### Lo que no se cambió, y por qué
+
+- **No se pide permiso de ubicación.** Habría hecho que la librería confirme en menos de un segundo,
+  pero es un permiso más que explicarle a una persona ciega por un string que ya no necesitamos.
+- **El intervalo de conexión** ya estaba en 7,5–15 ms (la unidad lo fijaba), y la Mac coalesce
+  anuncios, así que el número «real» de descubrimiento desde un iPhone sigue sin medirse: lo dirá
+  `ble.connected.ms` en la tabla cuando la telemetría vuelva.
+- En `DeviceProvider`, los dos disparadores de la comprobación de red (la conexión y cada `status`)
+  pasan por un solo `ensureNetwork`: una comprobación en vuelo no se reinicia ni por el latido ni
+  por la conexión, porque reiniciarla era pedirle al sistema un segundo cartel encima del primero.
+
+**Sin probar en el teléfono.** La prueba está escrita en `docs/PROJECT-STATUS.md` (traspaso): un
+solo cartel la primera vez, ninguno al reabrir, y `wifi.ready` con `via: 'already'` en la tabla.
+
+## 2026-09-22 — Por qué el modo ómnibus no leía: la caja del ómnibus vetaba el cartel
+
+Sesión abierta con un reporte de uso, no con un bug: «no me está gustando mucho cómo funciona, y no
+sé si es por cómo está entrenado o por cómo lo corremos». Tres síntomas, ninguno igual al otro: a
+veces lee sólo el número o sólo el destino, a veces tarda mucho en detectar el ómnibus, y a veces
+—con el video del 115— lo dice entero de entrada. Termina con la respuesta medida: **era cómo lo
+corremos**, y quedó leyendo «115, Luis Braille» **1,6 s** después de que el sensor ve el ómnibus, en
+la Zero 2 W.
+
+Dos ramas: `fix/read-the-sign-without-a-bus` en el repo de Magalí Dellapiazza ([PR #4](https://github.com/MagaliDellapiazza02/bus-banner-recognizer/pull/4),
+en cascada sobre el #3 y el #2) y `feat/bus-mode-timeline` acá.
+
+### Primero, poder ver
+
+El journal dejaba tres clases de línea —«hay un ómnibus», «read in N ms», la línea— y ninguna forma de
+decir dónde se fueron los segundos entre que el ómnibus entra al cuadro y la línea se dice. Con eso,
+un detector lento y un lector lento se ven iguales. Ahora cada track deja una línea de nacimiento con
+la altura del ómnibus y la del cartel, una por segundo mientras no se leyó, una por intento de lectura
+con el tamaño del recorte, y una de cierre que dice si llegó a anunciarse; todo fechado desde que el
+sensor vio ese ómnibus por primera vez.
+
+**Sin eso no se resolvía nada de lo que sigue**: las tres corridas del mismo video daban tres
+resultados distintos y el log era el mismo silencio.
+
+### El hallazgo: una caja mala de ómnibus veta un cartel bueno
+
+Con el modelo de dos clases en el sensor, la línea no se leía nunca. El log dijo por qué:
+
+- el sensor reportaba **el cartel del 115 en casi todos los cuadros** (56 a 80 px de alto, confianza
+  hasta 0,80, aspecto 3 a 4,5): perfectamente legible;
+- las únicas cajas `bus` eran **la pantalla entera** donde se reproducía el video (759x1007 px de
+  766x1024, confianza 0,35), parpadeando en cinco tracks para un solo ómnibus;
+- `pick_banner` exige el cartel en la mitad superior de la caja del ómnibus. Con esa caja la mitad
+  superior terminaba en y=383 y el cartel estaba en y≈490, así que **lo descartaba** y mandaba a leer
+  la franja superior del ómnibus —el techo de la pantalla—: vacía, 1 a 2,6 s por lectura en la única
+  cola de OCR, adelante del único recorte bueno.
+- En la tercera corrida no llegó **ninguna** caja `bus`, y como los tracks nacen sólo de cajas `bus`,
+  no se intentó nada en 23 s.
+
+El diseño asumía que la caja del ómnibus era la mitad confiable (COCO, confianza 0,9) y el cartel la
+frágil. **Con este modelo es al revés**, así que ahora el cartel puede sostenerse solo: una caja que
+cubre más del 80 % del cuadro se descarta; un cartel ancho que ninguna caja reclama se lleva una caja
+propia construida a su alrededor; si el ómnibus más grande no muestra cartel se lee el más grande que
+sí lo muestre; y con clase de cartel en el sensor la franja superior no se lee nunca.
+
+Simulado en la Mac con los pesos de dos clases: video2 lee **115, LUIS BRAILLE a 0,1 s**, video1 lee
+**102, GTA DE LOURDES a 0,6 s**, video3 sigue sin leer (20 s de ómnibus sin cartel utilizable).
+
+### Lo que rompí y hubo que deshacer
+
+Para detectar una cámara muda le puse un plazo al `capture_request` (2 s, tres strikes, reiniciar).
+Fue peor que el problema, y lo midió la propia placa:
+
+- **picamera2 convierte cada llamada en un job de una cola, y un plazo vencido no lo cancela**: queda
+  ahí y se come el frame siguiente. Cada timeout dejaba un huérfano más.
+- **El primer frame después de arrancar la cámara tarda 3,7 s** (medido: el firmware del `.rpk` sube
+  al sensor), así que el plazo de 2 s saltaba en cada arranque.
+
+Resultado: la cámara trabada para todo, **incluida la foto de supermercado** — que es el error que el
+usuario reportó desde la app («the device did not answer in 4 s»). Ahora la captura vuelve a esperar
+sin plazo y un **vigilante en su propio hilo** reabre la cámara tras 12 s sin un frame; tiene que ser
+otro hilo porque el de frames, cuando la cámara calla, está bloqueado adentro de `capture_request` y
+no puede notar nada — cerrar el sensor desde afuera es lo que lo destraba.
+
+De paso se midió lo que faltaba saber de la cámara: **quieta no se duerme**. Sesenta segundos sin que
+nadie pida un frame y el siguiente llega en 1 ms.
+
+### Un diagnóstico que inventaba un problema
+
+La línea por cuadro informaba **el cartel más alto de todo el cuadro** contra la caja de cada track,
+así que un cartel de otro ómnibus —que su propio track estaba leyendo perfectamente— aparecía como
+rechazado. Informa sólo el cartel cuyo centro cae dentro de ese ómnibus, y dice cuál de las dos reglas
+lo rechazó, si alguna. Quedó como test: un diagnóstico que inventa un problema es peor que ninguno.
+
+### Medido en la placa (Zero 2 W, video del 115)
+
+| Qué | Cuándo |
+|---|---|
+| El sensor ve el ómnibus | 0 |
+| Primera lectura (932 ms de OCR) | 1,0 s — cruda: `E s LUS TALLE` |
+| Segunda lectura (583 ms) | 1,6 s — cruda: `5 LUS TALLE` |
+| «Ómnibus 115, Luis Braille» | **1,6 s** |
+
+Y el latido: **75 frames cada 5 s, con detecciones en el 95 %**.
+
+**Lo que esto deja a la vista es que el techo está en el reconocedor.** Ninguna de las dos lecturas
+crudas era buena: lo que dijo «115, Luis Braille» fue la reparación contra el catálogo de la STM.
+Funciona porque las líneas son un conjunto finito, pero con una línea que no esté en el catálogo no
+hay red.
+
+### Los repos no se atan al orden de merge
+
+`signs_expected` sólo existe en `bus_banner` desde el PR #4, y el daemon instala ese paquete como
+wheel **sin versión fijada**: una placa con el paquete publicado se habría encontrado con un keyword
+inesperado y el modo ómnibus no habría arrancado. El daemon mira la firma: con el paquete nuevo el
+cartel se sostiene solo, con el viejo el modo funciona como antes y lo dice en el journal.
+
+### Operación
+
+- **El journal sigue sin sobrevivir al reinicio** y hoy costó caro: el log del error de supermercado
+  se perdió porque la placa se apagó antes de leerlo. Es el pendiente del 2026-09-14, y ya mordió.
+- Desplegar por hotspot de teléfono necesita más de 8 s para abrir SSH (la placa contesta pings en
+  20 ms igual): `deploy_pi.sh` acepta `SSH_TIMEOUT`.
+
+### Verificación
+
+94 tests + 2 skipped en `hardware/raspi` y 70 en `bus-banner-recognizer`, todos en verde. En la placa:
+click, vigilancia, línea dicha a 1,6 s, latido con frames, y la foto de supermercado en 35 ms.
+
+### Apretar el botón recién prendida ya no es silencio
+
+Cierre del día, a pedido del usuario. El modo ómnibus tarda decenas de segundos en estar listo después
+de prender la placa —es lo que demora en cargar el OCR— y el botón contestaba esa ventana con **nada**.
+Para alguien que no ve la pantalla, un dispositivo que no dice nada es indistinguible de un dispositivo
+muerto, y es lo primero que pasa al encenderlo.
+
+Ahora dice «Modo ómnibus. Preparando la lectura, esperá unos segundos», **antes** de ponerse a
+construir: dicho después llegaría junto con la respuesta que venía a anticipar. Las dos mitades, como
+cada lectura: el clip cuando la salida es el dispositivo, y el evento siempre, para que un teléfono
+que esté escuchando lo diga él. Va con los modos y no con las fallas que reporta el teléfono: no es la
+placa en problemas, es la placa que todavía no está lista, y nada del canal de avisos está roto
+mientras suena. Una placa desplegada antes de que el clip existiera se queda callada en vez de negarse
+a entrar al modo.
+
+**Una trampa nueva de operación, que costó la primera verificación**: la tarjeta es la fuente de verdad
+de los avisos (`modo-red.sh` instala desde `bootfs` y **borra del home lo que la tarjeta no trae**), y
+la partición es FAT. Copiar el `.wav` a `/boot/firmware/announcements-system/` y que la placa se apague
+sin cierre limpio deja la escritura sin bajar al medio: al arrancar, la tarjeta no lo tiene, y el
+sincronizador se lleva puesta también la copia buena del home. El síntoma fue `missing notice:
+bus_warming_up.wav` por BLE. **Después de copiar a la tarjeta, `sync`** — y mejor, reiniciar con
+`sudo reboot` en vez de cortar la corriente.
+
+Verificado en la Zero 2 W manejando el `BusWatcher` del propio daemon: `ready=False`, el clip suena
+desde `announcements/system/`, el evento sale, y recién entonces empieza la construcción.
+
+### El destino se leía y se tiraba: dos fallas en el camino placa → teléfono
+
+Prueba real del usuario al final del día: «detecta el número perfecto pero no dice el destino nunca, y
+nunca dice "se acerca un ómnibus"». El journal contestó las dos en una línea cada una, y **ninguna era
+el OCR**: las lecturas estaban completas (`Bus 306, CASABO` a 2,9 s; `Bus 115, LUIS BRAILLE` a 1,2 s).
+Un minuto antes de la prueba la app había mandado `audio → phone`, así que todo lo que el usuario
+escuchó lo dijo el teléfono — y ahí estaban las dos fallas.
+
+- **El destino llegaba al teléfono y se descartaba.** La placa manda `detail: "LUIS BRAILLE"` en el
+  evento BLE desde que el evento se diseñó; el tipo `Detection` de la app **no tenía ese campo** y el
+  formateador decía `Línea ${label}`. Se perdía la mitad que distingue dos ómnibus de la misma línea.
+- **«Se acerca un ómnibus» era imposible de escuchar en el teléfono.** Era el único anuncio que la
+  placa reproducía **sin emitirlo**: con la salida en teléfono `_speak` se calla por elección del
+  usuario y la app no tenía nada que decir. El evento existía en el log (19:02:49) y no salía al cable.
+
+Las dos eran invisibles en el journal porque la placa hacía su mitad bien. Es el mismo patrón que ya
+mordió con los avisos de sistema: **un camino de varios eslabones donde el eslabón que se corta no
+deja rastro**. Lo que lo destrabó fue mirar `audio → phone` en el log y preguntarse quién estaba
+hablando.
+
+Aclaración que quedó del reporte: **que a veces no diga «se acerca un ómnibus» está bien**. Si la
+línea se decide antes de que el track se confirme —pasó, 1,2 s— la frase se omite a propósito: decirla
+después de «115, Luis Braille» es contar algo que el usuario ya sabe.
+
+## 2026-09-23 — La cámara trabada dejaba muda a la placa, el journal vivía en RAM y la telemetría llevaba dos semanas apagada
+
+Reporte de uso: el modo supermercado daba «el dispositivo no pudo mandar la foto en menos de 4 s» y el
+modo ómnibus no andaba. Rama `fix/camera-hang-and-telemetry`.
+
+### Primero: la placa no contestaba ni con error
+
+Con la placa en modo producto, sin SSH, se la probó por BLE desde la Mac (un script con los comandos
+`photo` y `mode`, sin el teléfono): el `photo` se aceptaba y **no volvía nada** en 15 s —ni bytes ni
+error— y en modo ómnibus pasaban 45 s sin un solo evento. `capture_jpeg` tiene un plazo de 8 s, así
+que un silencio total sólo podía salir de un `_restart` colgado: cerraba la cámara **con el lock de
+captura tomado**, y un sensor trabado se queda en `picam.stop()` para siempre. Cada foto posterior
+esperaba ese lock, en silencio.
+
+Arreglo (`camera.py`): el cierre corre en su propio hilo con plazo de 10 s, y si no vuelve **el proceso
+termina** para que systemd levante uno limpio (`Restart=always`): mientras el handle viejo vive,
+libcamera no deja reabrir el sensor, y un proceso que muere es lo único que lo libera. Y la foto toma
+el lock con plazo: detrás de un reinicio falla diciendo por qué en vez de esperar.
+
+**Quedó confirmado en la prueba real, sin buscarlo**: el usuario desenchufó el cable de la cámara sin
+querer, libcamera reportó `Camera frontend has timed out!`, el vigilante del modo ómnibus intentó
+reabrirla a los 13 s, el cierre se colgó —exactamente la hipótesis— y a los 10 s el daemon se
+reinició solo. Antes de esto, la placa habría quedado muda hasta que alguien la desenchufara. Lo que
+dispara la traba original sigue sin saberse: recién arrancada no se reprodujo en 10 minutos de fotos y
+modo ómnibus, con y sin AP.
+
+### El journal vivía en RAM
+
+La nota vieja lo atribuía al salto de reloj de una placa sin RTC. No: Raspberry Pi OS trae
+`/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf` con `Storage=volatile`, y
+`/var/log/journal/` existía vacío. Un drop-in en `/etc` (`Storage=persistent`, tope 64 MB) lo gana;
+está en `setup.sh` y aplicado en la placa. Ya rindió en la misma sesión: la prueba del usuario se leyó
+entera **después** de reiniciar, con tres arranques en `journalctl --list-boots`.
+
+### La telemetría no registraba nada desde el 2026-09-10
+
+La tabla `events` tenía su último evento a las 01:54 UTC del 2026-09-10; la función `telemetry` se
+desplegó a las 01:58, cuando se renombró desde `telemetria`. La URL configurada —el secret
+`EXPO_PUBLIC_TELEMETRY_URL` y el `app/.env` local— seguía apuntando a `/telemetria`, que ahora da
+404. La cola reintenta tres veces y descarta, así que fallaba en silencio. Se corrigió el secret y el
+`.env`; **vuelve con el próximo build de TestFlight**. Es la misma trampa que ya advierte la derivación
+en `config.ts`: una URL armada a mano que se desincroniza del nombre real.
+
+### «Línea… (silencio)… Ciudad Vieja»
+
+Del log de la prueba: algunas lecturas se decidieron **sin número** (`Bus CIUDAD VIEJA`, `Bus
+CIUDADELA`). La placa manda `label: ""` y el formateador de la app decía `Línea ${label}, ${detail}`:
+la pausa donde el usuario espera un número que no llega. Ahora dice sólo el destino, igual que
+`phraseBusReading`. El parlante de la placa ya lo resolvía (tiene un clip propio para «sin número»).
+
+### Lo que el log dice del modo ómnibus, sin tocar
+
+- 115 a 1,2 s y 1,7 s, bien. **El techo es la cola única de OCR**: en una escena con varias cajas se
+  llenó de lecturas de carteles basura (`P`, `T`, `.`, vacías) de 0,7 a 1,5 s cada una, y el cartel
+  bueno esperó atrás; el track 12 tardó 16,8 s. No se ajustó el umbral: ni la confianza ni el aspecto
+  del cartel separan buenos de basura en este log (uno de 0,84 salió vacío, uno de 0,62 se leyó bien),
+  y fijarlo con una corrida sobre un video es ajustar al set.
+- **Una línea equivocada**: `12 NEPENDENC` se decidió como `Bus 2, NEPENDENC`. Decir una línea
+  incorrecta es peor que no decir nada; es de la reparación contra el catálogo en `bus-banner-recognizer`.
+
+### Operación
+
+- **El conector CSI no es hot-plug**: tras desenchufar y volver a enchufar la cámara, el daemon
+  arranca diciendo `camera ready` pero cada buffer da `Input/output error`, y el estado BLE dice
+  `camera: true`. Sólo un reinicio de la placa la recupera.
+- Recordatorio que costó una vuelta: **modo desarrollo = `SIN-AP` = sin AP** (la placa en la WiFi de
+  casa, con SSH); **modo producto = AP** (el teléfono se une a «ViroVision»). Para probar con el
+  teléfono como se usa, modo producto; el journal persistente permite leer la prueba después.
+
+### Verificación
+
+101 tests + 2 skipped en `hardware/raspi`; en `app`, lint, typecheck y 298 tests. En la placa: fotos
+y modo ómnibus con y sin AP, el reinicio automático ante la cámara desconectada, y la foto de nuevo
+después de reiniciar.
+
+## 2026-10-05 — «No la encuentra ni por BT ni por WiFi»: el Bluetooth estaba bloqueado por rfkill
+
+Reporte: placa prendida hace rato, la app no la encuentra. Sesión abierta para repasar toda la
+conexión; terminó primero en una caída total.
+
+### Diagnóstico
+
+La Mac veía 123 dispositivos BLE y ninguno era la placa: no anunciaba. Sin BLE no hay `tools/ap.py`,
+así que se entró por la microSD: `SIN-AP` y el perfil `Iphone de Juanlu` que ya estaba en `bootfs`,
+con la Mac en el mismo hotspot. La placa apareció en `172.20.10.3`.
+
+El journal (persistente desde el 2026-09-23, y rindió) mostró al daemon en bucle: cada ~5 s
+`adapter.set_powered(True)` → `DBusError: Failed`, `Restart=always`, otra vez. `bluetoothctl show`:
+`PowerState: off-blocked`. **El Bluetooth tenía un bloqueo rfkill por software** y `systemd-rfkill`
+lo reponía en cada arranque desde `/var/lib/systemd/rfkill/platform-soc-amba-3f201000.serial:bluetooth`
+(un `1`). Quién lo bloqueó primero no se sabe; lo que importa es que una vez guardado sobrevive a todo.
+`setup.sh` tenía `rfkill unblock bluetooth || true`, que nunca hizo nada: el binario `rfkill` no
+está instalado en Raspberry Pi OS Lite, y el `|| true` se tragaba el error.
+
+### Arreglo
+
+- `virovision.service`: un `ExecStartPre` que pone en 0 el `soft` de cada rfkill de tipo bluetooth
+  por sysfs, en cada arranque del servicio.
+- `setup.sh`: lo mismo por sysfs en vez del binario que no existe.
+- `__main__.py`: si `set_powered` igual falla, el daemon sale con un mensaje que nombra rfkill en
+  vez de un traceback con `Failed`.
+
+Desplegado en la placa (bytes verificados) y probado a propósito: se bloqueó el Bluetooth
+(`off-blocked`), se reinició el servicio y volvió solo a `on`, anunciando; `tools/ap.py --status`
+la encuentra desde la Mac.
+
+### Lo que quedó
+
+- **La cámara no se detecta**: `rpicam-hello --list-cameras` → «No cameras available!», y el kernel
+  ni la sondea. Es físico (cinta o conector): apagar y reasentar.
+- **La placa volvió a modo producto** al final: `SIN-AP` se borró por SSH desde `/boot/firmware`
+  (sin sacar la tarjeta) y, tras reiniciar, `tools/ap.py --status` la mostró con `ap True` en
+  `10.42.0.1`. Alineada con `staging` salvo `camera.py`, que es el del #105 (más nuevo).
+- El reloj de la placa estaba congelado en el 2026-09-23 (sin RTC, sin NTP mientras no tuvo red):
+  las fechas de `journalctl --list-boots` de esos días no son reales.
+- **La tarjeta ya tiene Ethernet por USB configurado** (`dtoverlay=dwc2` + `modules-load=dwc2,g_ether`)
+  y sigue sin probarse: sería la entrada que no depende de ninguna WiFi.
+- Del repaso de la conexión, sin tocar todavía: (1) **la placa anuncia recién al final del arranque**,
+  después de la cámara y del AP con sus reintentos: cualquier traba ahí la deja invisible (el mismo
+  efecto que hoy, por otra puerta). Anunciar primero. (2) La app reintenta con espera creciente
+  hasta 30 s, sumando hasta medio minuto después de que la placa ya está; en iOS un `connect` sin
+  timeout al identificador recordado se cumple solo al primer anuncio. (3) La telemetría sigue muerta
+  hasta el próximo build de TestFlight (el último es del 2026-09-22; la URL se corrigió el 23).
+
+## 2026-10-06 — Visible primero, lento después: la placa anuncia antes de la cámara y del AP
+
+Continuación del 2026-10-05: del repaso de la conexión quedaban dos demoras sin tocar.
+
+### La placa anunciaba al final del arranque
+
+`__main__` abría la cámara —con el IMX500, cargar el detector tarda alrededor de un minuto después
+de un arranque, según el propio `camera.start`— y levantaba el AP —con reintentos de 0+5+10+20+30 s—
+**antes** de registrar el anuncio. Todo ese tiempo la placa estaba prendida, con el GATT listo, e
+invisible para cualquier teléfono. Y cualquier traba en esos pasos la dejaba invisible para siempre:
+el mismo efecto que el rfkill del día anterior, por otra puerta.
+
+Ahora anuncia en cuanto el servicio está registrado. La cámara arranca en segundo plano
+(`_bring_camera_up`) y el AP después. Mientras la cámara arranca:
+- una foto por HTTP contesta **503** (`CameraNotReady`), no un 500 que parece un crash;
+- un toque al modo ómnibus dice «preparando la lectura» y el modo empieza solo cuando la cámara
+  está (`Core.camera_ready`). `starting` se mira **antes** que `available`, porque el handle del
+  sensor existe a mitad del arranque, cuando todavía no hay frames;
+- `status` se empuja apenas sube el AP y apenas está la cámara, no en el próximo latido de 15 s.
+
+Medido en la placa (sin cámara conectada): del `Started virovision.service` al anuncio, **7,4 s →
+1,7 s**. Con la cámara conectada la diferencia suma el minuto de carga del detector, que ya no
+precede al anuncio. Falta medir eso con la cámara puesta.
+
+### La app esperaba a ciegas entre intentos
+
+Las pausas entre intentos de conexión crecían a 20 y 30 s; cada intento ya escucha hasta 30 s
+(conexión directa al identificador recordado + escaneo), así que la pausa es tiempo en que nadie
+busca. Una placa que terminaba de arrancar durante una pausa esperaba al próximo intento. Tope en
+5 s (`RETRIES_MS = [1, 2, 3, 5] s`).
+
+### Pendientes
+
+- Medir el arranque con la cámara conectada y ver el `ble.connected.ms` real en la telemetría, que
+  vuelve con el build del #105.
+- La idea de dejar un `connect` sin timeout al identificador recordado (iOS lo cumple solo al primer
+  anuncio) quedó sin hacer: con un identificador viejo nunca escanearía. Con pausas de 5 s rinde
+  menos de lo que costaría.
+
+## 2026-10-06 (cont.) — Los 15 s entre el «OK» del cartel y la red lista, desarmados
+
+Reporte: Bluetooth lento y, tras aceptar el cartel de la WiFi, ~15 s hasta conectar; reabrir la app
+después conectó rápido. **La telemetría volvió** (build `202610052158`, el del #105) y es lo que
+permitió desarmarlo. Para leerla: un token personal de la cuenta de ViroVision en
+`~/.config/virovision/supabase-token` y `SUPABASE_ACCESS_TOKEN=$(cat …) supabase db query --linked`
+(la CLI de la Mac está logueada en otra organización).
+
+- **El Bluetooth no fue lento**: `ble.connected` 1,6 s, 0,4 s, 1,5 s y 1,7 s en las cuatro sesiones.
+- Las reaperturas: `wifi.ready` en 0,14–0,45 s, `via: already`, sin cartel. Eso ya anda.
+- **La WiFi de la primera: 15,8 s**, `via: joined`. Cruzado con el journal de la placa (que atrasaba
+  140,4 s: en modo AP no hay NTP; se alineó con el instante de la conexión BLE):
+
+| tramo | duración |
+|---|---|
+| `wifi.joining` → cartel aceptado | 3,6 s (la persona) |
+| OK → `AP-STA-CONNECTED` + 4-way | 3,3 s (iOS) |
+| asociado → primer `DHCPDISCOVER` | **5,2 s** |
+| DISCOVER → `DHCPACK` | 1,1 s |
+| `DHCPACK` → primer `/health` que contesta | **2,5 s** |
+
+El último tramo es de la app: cada sondeo durante el join tenía tope de 3 s, y uno mandado antes de
+tener IP sólo termina al vencer. Baja a 1 s (`joinProbeTimeoutMs`).
+
+El de 5,2 s **era de la placa, pero no de la radio**. Se repitió la unión desde cero (olvidar la red
+en el iPhone) con `tcpdump` en `wlan0` y los relojes ya alineados: el `DHCPDISCOVER` llegó a la
+interfaz **90 ms** después de asociarse el iPhone, y la oferta salió **3,0 s** después. Es el *ping
+check* de dnsmasq: antes de ofrecer una dirección le hace ping y espera hasta 3 s (se ven las tres
+consultas ARP por la dirección candidata). dnsmasq anota el DISCOVER recién al decidir, por eso la
+primera vez aparecieron «dos en el mismo milisegundo». Se descartó primero el ahorro de energía (ya
+en `wifi.powersave = 2`) y después la coexistencia BT/WiFi, que era la sospecha anterior.
+
+Arreglo: `no-ping` en `dnsmasq-shared.d` (en `setup.sh`, que de paso reemplaza el archivo con el
+nombre viejo en español que la placa todavía tenía). Repetida la prueba: **oferta en 5 ms**.
+
+| tramo | antes | con `no-ping` |
+|---|---|---|
+| OK → asociado (iOS) | 5,6 s | 5,8 s (con un `AP-STA-POSSIBLE-PSK-MISMATCH` primero) |
+| asociado → DISCOVER (iOS) | 0,09 s | 1,1 s |
+| DISCOVER → OFFER (placa) | **3,0 s** | **0,005 s** |
+| OFFER → ACK (iOS) | 1,05 s | 1,02 s |
+| ACK → `/health` (sondeo ARP de iOS, RFC 5227) | 1,85 s | 1,9 s |
+| **OK → red lista** | **11,7 s** | **10,4 s** |
+
+Lo que queda (~10 s) es todo de iOS, y pasa **una vez por teléfono**: las reaperturas dan
+`via: already` en menos de medio segundo. El `PSK-MISMATCH` del primer intento queda anotado sin
+explicar.
+
+De paso: **la cámara volvió** y, con el arranque nuevo, el anuncio salió 1,8 s después del
+`Started` y la cámara con el detector quedó lista 4 s después — no el minuto que temíamos.
+
+## 2026-10-06 (cont. 2) — «Se perdió la conexión» al prender la placa: el daemon congelado por OpenCV
+
+Prueba del flujo entero (apagar, prender, conectar) en dos escenarios. **B** (abrir la app con la
+placa ya arrancada): BLE en 1,3 s. **A** (la app abierta esperando mientras la placa arranca): el
+teléfono la encontró a los 6 s del anuncio, la conexión quedó colgada 31 s, se cortó y el reintento
+conectó en 1,5 s. La telemetría lo mostró como `ble.connected` con 46,8 s y `firmware: null` en el
+mismo milisegundo que `ble.lost`.
+
+### Diagnóstico
+
+Reproducido desde la Mac reiniciando la placa en frío y leyendo `status` cada segundo con bleak
+(macOS se rinde a los 5 s; iOS, a los 30 del timeout ATT). El journal mostraba al daemon **sin una
+línea durante 13–17 s** después de `camera ready`, y luego varios `central connected/disconnected`
+en el mismo instante: el event loop, que es el que le contesta a BlueZ, estaba congelado.
+
+**Lo agravó el #107**: antes la placa cargaba el modo ómnibus antes de anunciar y en esa ventana era
+invisible; ahora anuncia primero y el teléfono llegaba justo al congelamiento. La «rotación de
+conexiones BLE durante el arranque» del 2026-09-14 era esto mismo, más chico.
+
+Lo que se descartó en el camino, midiendo cada vez:
+- el chequeo `bus_watcher.available` (importa `bus_banner` y `rapidocr`): 0,3 s, inocente; igual pasó
+  a un executor;
+- precalentar la caché de disco desde otro proceso: corrió el congelamiento de lugar, no lo sacó —
+  con la caché caliente seguía;
+- el OCR en un executor: no sirve, armar las sesiones de onnxruntime retiene el GIL.
+
+Las dos causas reales, medidas con `python -X importtime` en la placa:
+1. **`import cv2` tarda 13 s**, con caché fría o caliente: es el `python3-opencv` de Debian, que
+   enlaza 380 librerías (VTK, OpenGL…). Lo importa `bus_banner.crop`.
+2. **Las tres sesiones de onnxruntime** del OCR, 10–20 s más con el GIL tomado.
+
+### Arreglo
+
+- **OpenCV headless** (`opencv-python-headless>=4.10,<5` en `requirements-bus.txt`, con `--no-deps`
+  para no tocar el numpy de apt que usa picamera2): **0,7 s**.
+- **El OCR en su propio proceso** (`virovision/ocr_worker.py`, `OcrProcess`): misma interfaz `read`
+  que `bus_banner.ocr`, así que el repo de Magalí no cambia; `spawn` y no `fork` (el daemon tiene
+  hilos); timeout de 10 s por lectura y un proceso nuevo si el anterior murió o se colgó; si no
+  arranca, el OCR vuelve a armarse en el daemon como antes.
+
+Medido en arranque en frío: **ninguna lectura fallida** (peor, 1,6 s), contra dos cortes de 5 s de
+macOS / uno de 30 s de iOS antes. En la placa: foto por HTTP (19,5 KB en 146 ms), modo ómnibus a 15
+fps sin errores, y el OCR real a través del proceso leyendo «115 LUIS BRAILLE» (0,97) en ~1,1 s.
+
+### Revisión (tackle-review, 4 rondas, opus + sonnet)
+
+Dos majors compartidos y dos más que ya existían antes de este cambio, todos arreglados con tests
+(los de concurrencia, verificados quitando el arreglo: fallan sin él):
+- `warm_up` y un botón durante el arranque armaban **dos procesos de OCR** a la vez → lock en `_build`.
+- Un hijo que se colgaba o moría armando el motor caía al fallback **dentro del daemon** — el
+  congelamiento que esto evita, y en 512 MB el que muere suele ser por memoria → `OcrEngineFailed`.
+- Dos `start()` superpuestos (ómnibus, otro modo, ómnibus, dentro de un armado en frío) lanzaban
+  **dos juegos de hilos** sobre la cámara → `start()` entero bajo el lock (RLock).
+- Salir de ómnibus durante un armado en frío **no lo cancelaba** → `_wanted`, que `stop()` baja sin
+  esperar el lock; el core llama a `stop` siempre que se sale de ómnibus.
+
+Más: el proceso se registra antes de arrancar (el apagado lo puede cortar), espera tras dos caídas
+en 60 s, `is_available` sólo localiza paquetes (`find_spec`). Codex no corrió (modelo no habilitado
+para la cuenta) y haiku cortó por el límite de gasto. **Queda sin aplicar** una propuesta: que un
+segundo `start` no espere el lock — lo toma también `warm_up`, y sin esperar nadie arrancaría el modo.
+
+Repetido el arranque en frío con el código revisado: **ninguna lectura lenta** (140–200 ms todas),
+OCR listo a los 44 s del arranque, modo ómnibus a 15 fps.
+
+### Pendientes
+
+- Repetir el escenario A con el teléfono.
+- **`Camera frontend has timed out!` unos 5 s después de bajar el AP**, dos veces hoy (11:09 y
+  19:43). En uso real el AP no se baja y el arreglo del 2026-09-23 recupera la cámara, pero apunta a
+  algo (¿caída de tensión al cambiar el modo de la WiFi?).
+- `CentralWatcher` no registra la **primera** conexión de una dirección nueva: llega como
+  `InterfacesAdded`, no como `PropertiesChanged`. Diagnóstico, no funcionalidad.
+- El cartel de la WiFi volvió en A y B: con la placa apagada el iPhone vuelve a la red de casa y no
+  regresa solo a «ViroVision». En la calle debería; sin verificar (probar desactivando la conexión
+  automática a `Jack_2.4`).
+- El mensaje «la placa no informó una dirección de red» es técnico; durante una transición de red
+  debería decir que espere unos segundos.
+
+## 2026-10-06 (cont. 3) — 11 s menos de arranque: la placa anuncia a los 16 s y no a los 27
+
+Escenario A repetido con el teléfono tras el #109: **sin «se perdió la conexión»**, y el teléfono
+conectó 0,3 s después de que la placa empezó a anunciar. Lo que se sentía lento era antes y después:
+~25 s de Linux antes de que corriera el daemon, y el cartel de la WiFi (pendiente aparte). Reabrir la
+app: BLE en 1,4 s y red en 0,26 s (`via: already`), sin cartel — el objetivo.
+
+`systemd-analyze critical-chain virovision.service` mostró el arranque esperando cosas que el daemon
+ya no necesita desde que anuncia primero (#107):
+
+| eslabón | costo | qué se hizo |
+|---|---|---|
+| `cloud-init` (main + local + network), en cada arranque | 6,1 s | `/etc/cloud/cloud-init.disabled` en `setup.sh`: sólo sirve en el primer arranque de una tarjeta grabada; el `user-data` no tiene nada por arranque |
+| `NetworkManager` + `NetworkManager-wait-online` | 6,6 s | la unidad depende sólo de `bluetooth.target` |
+| `virovision-modo-red.service` | 3,5 s | sólo hace `daemon-reload` si cambió el drop-in de `SIN-AP` (2,4 s) e instala perfiles/avisos sólo si difieren (`cmp`): 0,27 s sin cambios, ~2,2 s al cambiar de modo; probado en los dos sentidos |
+
+Sin esperar a NM, el primer intento del AP fallaba con «NetworkManager is not running» y el
+reintento de 5 s fijos lo atrasaba 2,3 s: `AccessPoint.wait_for_network_manager` sondea cada 0,5 s.
+
+Medido en la placa, desde el kernel: **anuncio 27,0 → 16,2 s; AP ~29 → 21,7 s; cámara 31,4 → 21,3 s;
+OCR 44,0 → 33,6 s**. Arranque total (`systemd-analyze`) 27,0 → ~21 s.
+
 ## Open threads / next
-- **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales para
-  cerrar la excepción a ADR 0001 (ADR 0006, 2026-08-30); resolver el despliegue de la clave en un
-  build distribuible.
-- **Validar ADR 0006 y 0007 con el tutor** — todo quedó en Proposed.
-- Armar el **dataset de evaluación** (captura + etiquetado esperado/obtenido) para ambos casos.
-- Elegir el **detector para la TPU** y medirlo sobre la RPi Zero 2 W + Coral (riesgo técnico
-  abierto del camino de bondis).
-- Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
-- **Beta App Review del build 1 (oficial)**: `WAITING_FOR_REVIEW` desde el 2026-08-29; al aprobar,
-  el link público queda vivo y hay que enviar a revisión los builds que esperan (o lo hace el
-  próximo run).
-- **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; después: crear
-  la app (package `com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`),
-  `PLAY_ENABLED=true` y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
+
+Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar primero.
+
+### Lo más valioso que falta
+- **Por qué la telemetría dejó de mandar el 2026-09-10** (ver la entrada del 2026-09-19). Los secrets
+  están, el código deriva la URL del proxy, y aun así no llega ni un `app.start` desde entonces. Sin
+  esto, cualquier defecto en el teléfono se diagnostica a mano y de a una sesión por vez; con esto, el
+  del WiFi se habría visto en `wifi.failed` con su `reason` en diez segundos.
+- **El cartel de WiFi en casa** (probado el 2026-09-21 con el build `202609202230` de
+  `fix/device-connect-fast-quiet`: BLE y WiFi rápidos, un solo cartel, sin falso «no se pudo
+  conectar» — pero al reabrir la app a la mañana en casa el cartel volvió). Causa: el teléfono estaba
+  en la WiFi de casa, con internet, e iOS la prefiere sobre la de la placa, que es local; la placa no
+  contesta `/health` y la app tiene que pedir el join, que siempre muestra el cartel. Dos cosas: probar
+  en la calle, sin red conocida (iOS debería unirse solo; en casa se simula con *Conexión automática
+  OFF* en la red propia), y decidir si **la placa se une a la WiFi de casa cuando la ve y levanta el AP
+  sólo sin red conocida** — cero carteles en casa, SSH sin bajar el AP, y la app ya sabe seguir un
+  cambio de red (`ap` event). El permiso de ubicación sigue descartado: no evita el cartel.
+- ~~**Actualizar `bus_banner` en la placa**~~ — hecho el 2026-09-22 (la placa corre la rama del PR #4,
+  márgenes del 16 incluidos). Sigue abierto lo que importaba más: **un destino que no matchea se
+  descarta sin un solo log** (`files_to_play` filtra por `p.exists()`), así que el fallo es invisible
+  en el journal. Que deje un `log.info` con el crudo y el slug buscado.
+- **Medir el arranque en frío del modo ómnibus en la Zero 2 W** (2026-09-22). Los 47 s que figuran en
+  `mediciones/2026-09-15-omnibus-en-placa.md` son de la **3 B+ prestada**, que ya no está; de esta
+  placa sólo tenemos ~24 s de un reinicio del *servicio*, con los modelos en caché de página. Un
+  arranque desde apagado suma el booteo y una caché fría, y la Zero tiene 415 MB de RAM. Se cierra
+  leyendo `journalctl -b -o short-monotonic` después de un arranque en frío: los tiempos monotónicos
+  valen aunque la placa no tenga reloj. Mientras tanto el aviso de «preparando la lectura» hace que el
+  número importe menos.
+- **El reconocedor es el techo del camino de ómnibus** (2026-09-22, medido en la placa). Con el
+  detector arreglado, las dos lecturas crudas del 115 fueron `E s LUS TALLE` y `5 LUS TALLE`: lo que
+  dijo la línea fue el catálogo de la STM, no el OCR. Dos caminos, y hay que elegir uno: **fine-tune
+  del reconocedor PP-OCRv5** con recortes de carteles LED (los 117 de eval más sintéticos en matriz de
+  puntos generados desde los 239 destinos del catálogo), o medir otro reconocedor. Mientras tanto, lo
+  barato: cuando hay número y el destino no matchea ninguna salida de esa línea, decir el número solo
+  en vez de esperar los cuatro intentos de paciencia.
+- **La clase `bus` del modelo de dos clases dibuja cajas malas** (2026-09-22): la pantalla entera con
+  confianza 0,35, parpadeando. La clase `bus_sign` está bien. Es el dato que faltaba para el
+  reentrenamiento en la V100: más fotos, y **desde la perspectiva del dispositivo** (altura de cabeza,
+  en la vereda, el ómnibus llegando de lejos), no frontales y de cerca como las 140 de Roboflow.
+- **Probar el gadget Ethernet por USB en la Zero 2 W** (`dtoverlay=dwc2` + `modules-load=dwc2,g_ether`
+  desde `bootfs`). Sería el reemplazo del RJ45 que se perdió al volver a esta placa: cable directo,
+  con el AP arriba y sin tocarle el WiFi a nadie.
+- **Terminar `docs/qa-avisos-de-sistema.md`: del bloque 4 falta sólo el clip que falta** con el
+  despliegue actual, y las dos comprobaciones que necesitan el teléfono (que apagar la placa diga
+  «se perdió la conexión», y que ningún aviso pise a VoiceOver). El resto del bloque 4 se corrió el
+  2026-09-18.
+  El camino crítico se verificó en la placa el 2026-09-17 —con la salida en «dispositivo» el teléfono
+  se une al WiFi, los modos y el chirp salen por el parlante, la conexión la dice el teléfono— y con
+  eso cierran los cuatro PRs del 16 y 17 (#90, #91, #93, #94). Lo que no se probó es el comportamiento
+  ante fallas, que es justamente donde este subsistema falló tres veces en silencio.
+- **Dataset de evaluación con fotos reales de góndola.** Todo lo medido el 2026-09-02 usa una imagen
+  sintética de alto contraste: es el piso de dificultad, y **los aciertos de ahí no son la precisión
+  del sistema**. Protocolo escrito en los pasos 8 y 9 de `qa-modo-supermercado.md`.
+- **Validar ADR 0006, 0007 y 0008 con el tutor** — 0006 y 0007 siguen en Proposed.
+
+### Deuda técnica conocida
+- ~~**Desplegar la mitad de la placa**~~ (hecho el 2026-09-17: daemon con `cmd: 'say'` y los diez
+  clips, verificados por BLE en hardware). Queda la parte que no tiene automatismo: **el workflow de
+  TestFlight publica la app y nada más**, así que cada cambio en el daemon o en los avisos sigue
+  necesitando tarjeta o SSH. Si el daemon y la app se desincronizan otra vez, el síntoma vuelve a ser
+  silencio.
+- **Sin teléfono conectado, un cambio de modo no se anuncia** (2026-09-16). Con el botón físico el
+  aviso viaja placa → app → placa: la placa notifica el modo, la app decide dónde se escucha y le
+  manda el clip de vuelta. Funciona (BLE despierta la app) y mantiene **un solo punto de decisión**,
+  pero ata a la placa al teléfono para algo que podría decir sola, como ya hace con las lecturas de
+  ómnibus. Moverlo es un cambio aparte porque hay que evitar que lo diga dos veces cuando el teléfono
+  sí está: la app tendría que callarse para las transiciones cuyo `source` es `'device'`.
+- **Los clips de sistema se generan en la Mac y se copian a mano** (2026-09-16). `say` y `afconvert`
+  son de macOS, igual que los de ómnibus. Mientras sea así, un aviso nuevo en `notices.py` no llega a
+  la placa hasta que alguien corre el script y hace `scp`; el test del espejo protege los nombres,
+  no la existencia del archivo en la SD.
+- **`restoreStateIdentifier` en el cliente BLE** (2026-09-11). `bleClientPlx.ts` hace
+  `new BleManager()` sin opciones: si iOS **termina** la app (presión de memoria, muchas horas, el
+  usuario matándola de la bandeja), CoreBluetooth no la vuelve a levantar y **el botón deja de
+  responder sin que nada lo explique**. El bloque E mostró que no hace falta para el caso probado, no
+  que no haga falta. Cómo detectarlo: el `session` de la telemetría cambia entre antes y después de
+  desbloquear. Hacerlo a medias es peor que no hacerlo — iOS relanzaría la app sin monitores.
+- **La cola de telemetría vive en memoria** (2026-09-11): si iOS mata el proceso en segundo plano, lo
+  que no se subió se pierde, y eso se ve igual que "no pasó nada". Es justamente el caso que haría
+  falta diagnosticar para lo de arriba. Persistirla en `AsyncStorage`.
+- **`sse.ts` no tiene timeout propio** (2026-09-11): un stream colgado sólo lo corta el
+  `AbortController` de los 12 s de la lectura.
+- **El dataset de evaluación quedó sin forma de correrse** (2026-09-08): la fototeca era lo que
+  permitía pasarle la misma foto a varios modelos, y se fue con la cámara del teléfono. Decidir si
+  se corre fuera de la app contra el proxy o se repone una entrada detrás de una bandera.
+- **La placa sigue con la transferencia por chunks en el firmware** (característica `transferencia`,
+  comando `medir`), sin ningún cliente desde el 2026-09-08. PR del pilar de hardware.
+- **El error de proxy caído dice "sin conexión a internet"**, que es mentira: conexión hay, el que
+  no está es el proxy. Pesa más desde que el proxy es punto único de falla del modo supermercado.
+  Arreglo chico.
+- **`claude-haiku-4-5` sin verificar** contra su API: requiere tarjeta.
+- **Fallback local de supermercado**: evaluar Gemma 3 1B con visión sobre productos reales, para
+  cerrar la excepción a ADR 0001.
+
+### Operación
+- **El proyecto de Supabase se pausa solo** tras una semana sin actividad, y con el proxy en
+  producción eso deja sin modo supermercado a todos los builds. Usarlo seguido, o **Pro antes de la
+  defensa**.
 - **Sumar a Magalí a TestFlight** (grupo interno) cuando pase su email; Francisco espera el canal
   Android.
-- Pending interactive setup: **Supabase** project + `app/.env`. See `PROJECT-STATUS.md`.
+- **Google Play**: cuenta creada y pagada, **verificación de identidad pendiente**; después: crear
+  la app (`com.virovision.app`), service account (`PLAY_SERVICE_ACCOUNT_JSON`), `PLAY_ENABLED=true`
+  y primera subida manual del `.aab`. Repo listo (`docs/android-play.md`).
+
+### Hardware (la placa ya está; 2026-09-04)
+- **Medir el consumo real del daemon** con el medidor USB (reposo, modo ómnibus, modo supermercado
+  con AP) y confirmar la batería propuesta el 2026-09-07 (`hardware/README.md`, *Alimentación*); con
+  la UPS HAT en mano, leer el INA219 y llenar `estado.bateria`.
+- **Logs a Supabase — hecho (2026-09-09)**, esquema y limpieza de la tabla incluidos. Lo que queda es
+  **mirar la tabla después de una salida real** y ver si lo que se registró alcanza para explicar una
+  falla; si falta un evento, agregarlo es una línea en `tipos.ts`.
+- Después: **parlante en la
+  placa** (DAC I2S) para el audio que ya llega a `/tmp`; Android: API de
+  WiFi silenciosa (`WifiNetworkSuggestion`). Deuda: el AP por `systemd-run` no arrancó una vez sin
+  registro; con el AP siempre encendido la placa no está en la red de casa: para desplegar, apagar el
+  AP por BLE desde la Mac con la app cerrada.
+- **«Red apagada» sin salida: la app tiene que decir qué hacer** (del 2026-09-10). Cuando el estado
+  del wifi queda en `off` con el dispositivo conectado, la pantalla no ofrece nada: ni reintento, ni
+  explicación. El usuario tuvo que adivinar un ritual de tres pasos (cerrar la app, olvidar la red,
+  olvidar el dispositivo BT). El arreglo tiene dos mitades, las dos en `DeviceProvider`:
+  1. **Reintentar la lectura de `status` antes de rendirse.** Hoy `readStatus` traga cualquier error
+     y devuelve `null` una sola vez; con eso `address` queda en null y el estado se planta en `off`
+     hasta el próximo latido, que puede no llegar si la suscripción también quedó vieja.
+  2. **Si igual no hay `status`, decirlo con el mensaje que ya existe.** `strings.connect.wifiNoCredentials`
+     explica exactamente el remedio (apagar y prender el Bluetooth, reconectar) pero sólo se usa
+     cuando faltan las credenciales del WiFi. Ese mismo texto sirve para este camino.
+
+  Es accesibilidad, no pulido: en una app cuya interfaz es la voz, un estado sin salida deja al
+  usuario sin forma de saber que el remedio existe.
+- ~~**AI Camera (IMX500)**: evaluar el camino de ómnibus corriendo la detección en el sensor~~ —
+  **cerrado el 2026-09-15**: corre, y el camino entero tarda 1,27 s desde el botón. Con eso caen
+  también la corrida en vivo con la línea anunciada, la latencia del OCR en la Pi y el código de
+  ómnibus en el daemon, que figuraban acá. **Sigue abierto** de esa lista: la parada real con
+  `--save-frames`, y el modelo de dos clases, que ya existe y está en la placa pero todavía no se
+  eligió frente al de una clase.
+- **El transductor de audio** (del 2026-09-11, con el camino ya resuelto): el piezo verifica pero no
+  sirve para voz; el auricular sí, y hoy va **sin resistencia en serie** pidiéndole ~100 mA a un pin
+  de 16 mA — conseguir 100-330 Ω. Después: `audio_pwm_mode=2` (el default, menos ruido) y un filtro
+  RC. Destino: **DAC I2S MAX98357A**, que necesita GPIO 18/19/21 — y **hay un botón cableado en el
+  21**, así que hay que mudarlo antes.
+- ~~**Anuncios pregrabados en la SD** para el modo ómnibus (ADR 0003 §5)~~ — **cerrado el
+  2026-09-15**: 386 `.wav` en la placa, y ómnibus pasa a respetar el ajuste de dónde se escucha.
+- **En qué GPIO está cada botón, de verdad.** El daemon escucha en **GPIO 5** (log del arranque) y el
+  cable estaría en el 21. Lo resuelve `/boot/firmware/check-pines.sh`, que mira siete pines mientras
+  se aprieta cada botón. Diez segundos, y hasta entonces los defaults del código son una conjetura.
+- **Tabla B** (precisión por tamaño de foto con góndolas reales) queda como optimización, ya no
+  decide transporte. **Android**: una tanda de cinco por BLE cuando haya un teléfono, por completitud.
+- **Cámara**: resuelto (era hot-plug; y es la AI Camera). Ajustar el enfoque manual: las primeras fotos salieron desenfocadas.
+- ~~**Spike 1**: segundo plano en iOS~~ — **cerrado el 2026-09-11** (build `202609110048`, bloque E).
+  La frase que estaba acá («recién ahí `isBackgroundEnabled: true`») era falsa: ese flag nunca gateó
+  iOS. Lo que queda es `restoreStateIdentifier`, abajo.
+- **Spike 2 (sólo si hay WiFi)**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos.
+- **Spike 3**: coexistencia BLE/WiFi en el BCM43438. (El Spike 4, libedgetpu en Bookworm, cayó con el Coral el 2026-09-07.)
+- **El gesto ignorado tiene que sonar** (del 2026-09-13, ADR 0007). Cuando llega un doble click con
+  una lectura en vuelo, `requestReading` sale por la guarda `if (reading)` **antes** de
+  `playStartEarcon()`, así que no suena nada. Ignorar es la decisión correcta —no encolar una foto de
+  una escena que el usuario ya dejó atrás— pero el silencio la vuelve indistinguible de un botón
+  roto para quien no ve la pantalla, que es la queja que originó las dos actualizaciones anteriores
+  del ADR. Falta decidir **qué** suena (un tono corto de «ahora no», distinto del de inicio) y, de
+  paso, si conviene que el gesto nuevo *reemplace* la lectura en curso en vez de perderse.
+- **Reconexión BLE tras cerrar la app del todo**: no se llegó a probar el 2026-09-13 (el caso en que
+  iOS retiene el periférico y ningún escaneo lo ve). Es el camino `via: 'connected'` de la telemetría:
+  si aparece en la tabla, el atajo está trabajando.
+- Mirar si aparece `NOT advertising` tras una desconexión: es la única hipótesis del lado de la placa
+  que sigue sin descartarse.
+- ~~**El journal tiene que sobrevivir a un reinicio**~~ — **cerrado el 2026-09-23**: era
+  `Storage=volatile` de Raspberry Pi OS, no el reloj. Drop-in persistente en `setup.sh`.
+- **Qué traba la cámara** (del 2026-09-23). La placa ya se recupera sola (reinicia el daemon), pero
+  el disparador no se reprodujo. Con el journal persistente, la próxima vez queda el rastro:
+  buscar `frontend has timed out` y `did not close`.
+- **La cola única de OCR se llena de carteles basura** (del 2026-09-23): 16,8 s para decidir un
+  track. Hace falta un criterio medido sobre el set de evaluación, no sobre una corrida.
+- **`Bus 2, NEPENDENC`**: la reparación contra el catálogo dijo una línea equivocada. En
+  `bus-banner-recognizer`.
+- **Verificar la telemetría con el próximo build de TestFlight**: que aparezcan filas nuevas en
+  `events`.
+- **La rotación de conexiones BLE durante el arranque** (del 2026-09-14): cinco conexiones de menos
+  de 1,5 s en 30 s, y se calma sola. Sospecha: el GATT se registra ~45 s antes del anuncio, mientras
+  la cámara inicializa, y iOS entra con un connect encolado. Cerrarlo con `btmon` durante un arranque.
+- Placa: DAC I2S. El detector ya no se elige: corre **dentro del sensor IMX500** y el caso B está
+  medido (2026-09-15). Falta el **costo en precisión del int8**, que necesita correr `yolo val` sobre
+  el modelo cuantizado **dentro de la imagen Docker del export** (fuera de ahí el ONNX no carga).
+- **Un modelo de dos clases** (ómnibus y cartel en el mismo `.rpk`) ya entra en el chip y está
+  entrenado, pero **en CPU y con 40 epochs**. El acceso SSH a la V100 de Arnaldo Castro ya está;
+  falta correr ahí el entrenamiento completo (120 epochs). Con las fotos ya
+  pseudo-etiquetadas para Roboflow, Magalí no tiene que volver a etiquetar a mano.
+- **Rotar la clave de Roboflow** (quedó en el historial de git de `bus-banner-recognizer`) y la
+  contraseña de sudo de la placa, que se compartió por chat.
+- **La calle.** Todo lo medido es contra un video en una pantalla. Falta un ómnibus real, de día, en
+  movimiento, y con eso la lista de fallos que sólo aparecen afuera.
+
+### Suelto
+- Reportar el **bug de visión de `react-native-litert-lm`** con el caso reproducible del spike.
+
+## 2026-10-06 — La batería de la placa llega a la app
+
+- **Pedido**: con la UPS HAT (C) y su LiPo conectadas, ver el porcentaje de batería en la pestaña
+  Dispositivo.
+- **La app ya estaba lista** (`DeviceSummary` muestra `status.battery` como texto y barra, y anuncia
+  «batería baja» por debajo de 20 %); el hueco era el daemon, que publicaba `battery: null` a propósito.
+- **I2C estaba apagado**: `dtparam=i2c_arm=on` venía comentado en `config.txt` y no había `/dev/i2c-1`.
+  Se habilitó en la placa (más `i2c-dev` en `modules-load.d`) y quedó en `setup.sh`. Escaneando el bus
+  aparece **un solo dispositivo, 0x43**: el INA219 en la dirección que dice Waveshare.
+- **`battery.py`**: sólo **lee** el registro de tensión (nunca escribe la calibración, así una placa sin
+  HAT o el emulador no quedan mal configurados). El porcentaje sale de la **curva de descarga de una
+  LiPo**, no del `(V − 3) / 1,2` lineal de Waveshare, que en la meseta de 3,75–3,85 V decía 60 % donde
+  hay ~35 %. Suavizado exponencial (0,3 por lectura de 15 s) para que el pico de consumo de la cámara no
+  haga saltar el número. Sin HAT o sin `smbus2` → `null` («todavía sin informar»), nunca 0.
+- **Medido en la placa**: 4,16 V → **96 %**, con +56 mA por el shunt (probablemente cargando por USB).
+- **Pendientes**: confirmar el signo de la corriente (desenchufar el USB y ver que se vuelve negativa) y,
+  con eso, publicar `charging` para que la app no diga «96 %» de una celda que sólo marca alto porque
+  está cargando; calibrar la curva contra una descarga real con el medidor USB; anunciar la batería por
+  voz al conectar.
+
+
+## 2026-10-06 (cont. 4) — Revisión del codebase entero, y los errores sólo a la telemetría (ADR 0011)
+
+- **Pedido**: revisar todo el código (app y placa) con el loop de revisión multi-modelo, optimizar y
+  ordenar, todo en un PR; y que **la app no muestre errores**: cualquier error o log va a Supabase,
+  y el usuario no se entera.
+- **Cómo**: rama `chore/codebase-review-silent-telemetry` en un worktree aparte (hay sesiones
+  paralelas sobre el checkout). Revisores en paralelo — Opus sobre la app, Opus sobre la placa y
+  Supabase, Sonnet transversal, Haiku (sin hallazgos) — y después dos rondas más sobre el diff hasta
+  que no quedó ningún crítico ni mayor. Codex no corrió: la cuenta de ChatGPT no soporta el modelo
+  que pide.
+- **La decisión (ADR 0011)**: el texto de un error no llega nunca a la pantalla ni a la voz. Se
+  cortaron `La nube no respondió (VISION_HTTP_500)`, la foto fallida que leía en voz alta `the
+  device did not answer in 4 s`, la IP y el error del sistema al unirse a la red, y los avisos de la
+  placa dichos tal cual (`unknown command: say`). Lo que queda es una frase fija de `es.ts` que dice
+  qué hacer — **callar del todo no es opción**: el silencio después del botón es un dispositivo roto
+  para quien no ve. Los avisos internos (placa, escritura de modo) sí se callan del todo, y la
+  pestaña Dispositivo perdió el panel de «último aviso».
+- **Lo que antes no llegaba a ningún lado y ahora llega a `events`**: `console.*` (`app.log`, con
+  presupuesto), promesas rechazadas sin manejar (tracker de Hermes, sólo en release), errores de
+  dibujo (`ErrorBoundary` raíz con pantalla neutra → `app.renderError`), los `catch` silenciosos del
+  cliente BLE (`ble.monitorError`, `ble.readFailed`) y **los logs de la placa**: `log_relay.py` manda
+  las líneas WARNING+ como `{t:'log'}` por BLE (10/min, las últimas 20 guardadas mientras no hay
+  teléfono, con `ago` al reenviarlas) y la app las guarda como `device.log`. La telemetría arranca a
+  nivel de módulo: desde el efecto del layout se encendía después de que montaban los providers.
+- **Bugs reales encontrados y arreglados en la app**:
+  - `withTimeout` de `join.ts` lanzaba dentro del timer: **el tope de 25 s de la unión al WiFi nunca
+    cortaba nada** y la red podía quedar «uniéndose» para siempre.
+  - Refrescar la pestaña Dispositivo estando conectado **apilaba otra tanda de monitores BLE**: todo
+    evento, modo y estado llegaba dos veces. Además ble-plx no cancela el monitor nativo al
+    `remove()`, así que los callbacks llevan ahora una generación de enlace.
+  - Una espera de cuota de 45 s se anunciaba («Sigo en 45 s») dentro de un plazo de 12 s y el plazo
+    la cortaba con «Tardó demasiado». Ahora, si no entra (con 5 s de reserva para la llamada), falla
+    al instante como cuota agotada.
+  - La entrega de la lectura al parlante de la placa no tenía tope: un POST colgado dejaba la
+    lectura «en curso» y cada botón se ignoraba. Tope de 8 s; si vence, habla el teléfono.
+  - El caché de fotos y de MP3 crecía sin límite; ahora queda el último.
+  - Bluetooth apagado decía «no encontré el dispositivo»; ahora tiene su error y su frase.
+  - Desconectar mientras conectaba anunciaba igual la conexión.
+- **Bugs reales en la placa**: el **modo ómnibus moría para siempre después de un reinicio de la
+  cámara** (el loop de frames quedaba con el handle viejo y el watchdog reiniciaba en bucle,
+  recargando el `.rpk`); un nombre de red largo pasaba el `status` de 180 bytes y **el daemon
+  entraba en crash-loop**; `measure` por BLE aceptaba cualquier tamaño (OOM); `/audio` llenaba
+  `/tmp` (tmpfs = RAM); `ip`/`nmcli` corrían sobre el loop que atiende BLE; carreras en la cola de
+  audio y en el arranque/parada del modo ómnibus. La función de telemetría valida evento por evento y
+  reintenta fila por fila: un evento malo ya no tira un lote de 100.
+- **Ordenado**: comentarios en español traducidos (ADR 0009), docblocks que contradecían el código,
+  código muerto (`storage/settings.ts`, `text-field.tsx`, el `reset-project` de la plantilla de Expo,
+  cadenas sin uso).
+
+- **Probado en la placa (Zero 2 W, 21:17)**: daemon de la rama desplegado (respaldo en
+  `~/virovision/virovision.old-20261006-211301`). Nuevo comando BLE `restart_camera` +
+  `tools/restart_camera.py` para forzar el reinicio, que hasta ahora sólo pasaba si la cámara fallaba.
+  En modo ómnibus: 76 frames cada 5 s → `restart_camera` → **frames otra vez a los 1,5 s**, 75-77 cada
+  5 s durante el minuto siguiente, **sin recargar el `.rpk`** (no aparece `detector loaded into the
+  sensor`). Y el relay de logs anduvo de punta a punta: los dos avisos del reinicio llegaron por BLE
+  como `{t:'log', lvl:'error'|'warning', src:'bus'}`.
+
+- **Funciones desplegadas desde la rama, antes del merge** (`telemetry` y `vision`, `--use-api`).
+  `telemetry` probada con un lote de tres eventos, uno con `at` inválido: `{"stored":2,"dropped":1}`
+  (antes el malo tiraba el lote entero); JSON roto → 400. Las filas de prueba (`phone =
+  'deploy-check'`) se borraron. `vision` responde 405/400 como antes.
+
+### Pendientes de esta sesión
+- **La cabecera de IP de `vision`** sigue sin verificar (`cf-connecting-ip` / `x-real-ip`): hace
+  falta loguearlas un momento y pegarle desde el teléfono y con un `curl` que las falsifique.
+- **Detecciones después del reinicio**: en la prueba no había nada delante de la cámara (0
+  detecciones antes y después), así que falta confirmar que el detector del sensor sigue detectando
+  con el handle del IMX500 reutilizado: repetir con un cartel o un ómnibus en pantalla delante de la
+  cámara. Si vuelven frames sin detecciones, el fallback es `self._imx500 = None` en `_restart`.
+- Reiniciar el daemon con el teléfono conectado y ver `device.log` en la tabla; `systemctl stop` con
+  NetworkManager lento.
+- **Sin tocar, a decidir**: `features/auth` y `services/supabase` no se montan en ningún lado
+  (login planeado); dependencias que nadie importa (`@expo/ui`, `expo-device`, `expo-web-browser`,
+  `expo-glass-effect`) — sacarlas cambia el build nativo; el botón de leer en modo ómnibus corre OCR
+  en el teléfono y descarga ~250 MB la primera vez; anunciar la batería baja por voz; selector de
+  modelo y de salida duplicados (`RadioSheet`); la AP con contraseña fija en el repo.
+
+## 2026-10-06 (cont. 5) — El ómnibus se detecta bien; la línea y el destino, no: sólo se dice lo que el catálogo conoce
+
+- **Prueba de campo** (fotos de ómnibus en el celular delante de la cámara): la detección del
+  ómnibus anduvo siempre, pero la línea y el destino salían mal o **deletreados**. Sólo la foto
+  nítida de la 330 Mendoza se leyó bien.
+- **El journal lo explica, y no es la cámara**: los carteles llegan al OCR con unos 30 px de alto de
+  texto y con moiré de pantalla, así que muchas lecturas son basura (`1M12 MITEUE`, `U2 NOEVR`). Lo
+  que fallaba era la decisión: (1) un número que no existe se votaba a medio voto y cuatro lecturas
+  de `1M12` sumaban «Bus 1»; (2) un destino que el catálogo no reconocía se anunciaba **tal cual**, y
+  el TTS no puede hacer otra cosa con `U2 NOEVR` que deletrearlo; (3) la regla del ícono pegado
+  recortaba dígitos hasta encontrar una línea (`92` → línea 2).
+- **Arreglo en `bus-banner-recognizer`, PR #5** (apilado sobre el #4): sólo se dice lo que el
+  catálogo conoce. Destino sin coincidencia → no se dice (queda en `raw`); línea inexistente → no se
+  dice; la regla del ícono saca un solo dígito. La coincidencia aproximada mejoró (dígitos por letras
+  en palabras, sin espacios: `MEMID0ZAE` y `ME MDOZA E` son MENDOZA) con resguardos contra elegir un
+  destino real pero equivocado (mínimo 4 letras, margen de 0,05 sobre el mejor lugar *distinto*, las
+  variantes ortográficas del mismo lugar no compiten). `FUERA DE SERVICIO` se sumó al catálogo.
+- **Medido** (`bus-banner evaluate`, 117 imágenes): destino **76,8 % → 89,3 %**, lectura completa
+  87,5 % → 89,6 %, número igual (89,6 %). Revisión multi-modelo en tres rondas hasta no dejar críticos
+  ni mayores; dos de las rondas encontraron fallas reales de la primera versión (las variantes del
+  mismo lugar se anulaban entre sí: 41 de 257 destinos dejaban de reconocerse).
+- **Desplegado en la placa** (`b08a8c4`), con el catálogo nuevo en `~/models/catalog_stm.csv`
+  (respaldo `.bak-20261006`).
+
+### Pendientes
+- **Volver a probar** con las mismas fotos: lo esperable es menos anuncios con destino, pero ninguno
+  inventado ni deletreado.
+- El techo real es la **resolución del cartel**: ~30 px de alto en un cuadro de 1024 px. Probar un
+  stream principal más grande o un recorte del cartel a resolución completa del sensor, midiendo el
+  costo en la Zero 2 W.
+- Probar con un ómnibus de verdad: el moiré de una pantalla fotografiada no es el de un LED.
+
+## 2026-10-07 — El catálogo completa la mitad del cartel que el OCR no leyó
+
+- **Pedido**: usar el catálogo de líneas como pares (línea, destino) de respaldo. Si el OCR capta
+  sólo la línea o sólo el destino, el catálogo completa la otra mitad, siempre que la confianza del
+  OCR sea **menor a 0,8**.
+- **Arreglo en `bus-banner-recognizer`, PR #6** (apilado sobre el #5):
+  - Se completa sólo lo que no es ambiguo:
+    - Un destino que sirve **una sola línea** da esa línea. Contando las variantes ortográficas como
+      un solo lugar, eso cubre 116 de los 257 destinos.
+    - Una línea que va a **un solo lugar** da ese destino (`270` → PORTONES).
+    - Casi todas las líneas tienen dos terminales, así que «sólo la línea» rara vez se completa.
+  - Lo inferido queda marcado en `Reading.inferred`.
+- **Resguardos**, que salieron de la revisión multi-modelo (tres rondas, dos con fallas reales):
+  - Nunca se infiere una línea encima de dígitos que el OCR sí leyó (`999` o `1` + LUIS BRAILLE).
+  - Lo inferido **no vota**: la misma lectura dudosa vuelve cuadro a cuadro y se daría la razón a sí
+    misma. Sólo llena una mitad que los votos dejaron vacía:
+    - La línea deducida del destino se dice después de la misma paciencia que antes esperaba el
+      destino solo.
+    - El terminal único de una línea leída se dice sin esperar.
+  - Un número leído no se anuncia con el destino de otra línea («330, Luis Braille»).
+- **Medido**: `bus-banner evaluate` no cambia (89,6 / 89,3 / 89,6 %), porque el set tiene casi todo
+  confianza alta. Las lecturas basura de la prueba del 2026-10-06, repetidas a confianza 0,6, no
+  completan nada.
+- **Desplegado en la placa** (`8d9b33f`). El despliegue corta el SSH al reiniciar el daemon; se bajó
+  el AP con `tools/ap.py`, se verificó y se volvió a prender.
+
+### Pendientes
+- Probar en la placa con fotos donde sólo se vea una mitad del cartel.
+- Límite conocido: el Watcher no tiene catálogo. Un número y un destino de varias líneas, leídos en
+  cuadros distintos, se emparejan sin verificar que el par exista. Pasa desde antes; está documentado
+  en `_decide_reading`.
+- Los PRs #4 → #5 → #6 de Magui siguen apilados sin mergear.
+
+## 2026-10-07 (cont.) — El botón «se congelaba»: la app quedaba en un enlace a un daemon que ya no existía
+
+- **Reporte**: después de prender la placa, el botón puso el modo ómnibus y después la app dejó de
+  responder a la placa. Cerrar y abrir la app reconectó, pero el botón seguía sin hacer nada, aunque
+  los modos andaban desde el celular. Un rato después el botón volvió a funcionar.
+- **Lo que dicen el journal y la telemetría** (el reloj de la placa iba 2:28 atrás del teléfono):
+  1. A los 33 s del arranque, libcamera dio `Camera frontend has timed out!`: la cámara se trabó al
+     arrancar. Sin baja tensión (`get_throttled=0x0`).
+  2. El botón puso el modo ómnibus, no llegó ningún cuadro, y el watchdog reinició el daemon para
+     liberar la cámara. Esa recuperación anduvo, unos 25 s.
+  3. **El teléfono siguió conectado al daemon viejo**: BlueZ conserva el enlace, pero el proceso
+     nuevo registra otra aplicación GATT y las suscripciones del teléfono ya no llevan a ningún
+     lado. Durante un minuto y medio el botón cambió modos (ocioso, supermercado con lectura,
+     ómnibus) y la app no se enteró de nada.
+  4. Al reabrir la app, la placa estaba en ómnibus, donde **un clic quiere decir «repetir»**. Sin
+     nada para repetir, se queda en silencio (`bus: nothing to repeat yet`, cuatro veces). Para quien
+     lo usa, eso es «el botón no anda».
+- **Arreglo** (en el PR #112, que ya tocaba ese código): al arrancar, el daemon **corta los enlaces
+  que venían de antes** (`CentralWatcher.drop_links_from_before`, `Device1.Disconnect`). La app
+  reconecta sola, como después de cualquier corte, y se suscribe al proceso que está corriendo.
+  - Se hace después de empezar a anunciarse y sin esperarlo: cada corte tarda ~2 s y la primera
+    versión retrasaba el anuncio 4,5 s con dos enlaces viejos.
+  - **Probado en la placa**: con la Mac conectada por BLE, reinicio del daemon → «dropped the link
+    from before this process» a los 3 s; la placa se anuncia sin demora.
+
+### Pendientes
+- El clic en modo ómnibus sin nada para repetir no dice nada. Falta decidir qué tiene que decir,
+  por ejemplo el modo actual.
+- La cámara trabándose al arrancar (`frontend timed out`) ya pasó más de una vez. La recuperación
+  funciona, pero cuesta ~25 s. Habría que mirar si arrancar la cámara después de que el IMX500
+  termine de cargar su firmware (≈22 s del arranque) lo evita.
+
+## 2026-10-12 — El pipeline de ómnibus pasa a un solo PR (bus-banner-recognizer #7)
+
+- **Por qué**: los PRs del repo de Magalí eran cinco apilados (#2 → #6), cada uno sobre la rama del
+  anterior, con 32 commits que iban y venían (nombres en español que después se pasaron a inglés,
+  reglas del catálogo ajustadas en tres rondas de revisión) y varios ya obsoletos. Magalí se estaba
+  confundiendo al revisarlos: leerlos en orden era leer código que ya no existe.
+- **Qué se hizo**: rama `feat/bus-line-reader` desde `main`, con **el mismo código que corre la placa**
+  (la punta del #6), reorganizado en **11 commits, uno por pieza** y en el orden en que corre el
+  pipeline: estructura del paquete, detección, recorte, OCR, lectura + catálogo, pipeline, seguimiento,
+  CLI + evaluación, placa, modelo de dos clases y README. Cada mensaje de commit explica qué hace la
+  pieza, por qué es así y la medición detrás de cada decisión. **Cada commit pasa lint y tests por
+  separado** (95 tests al final). PR #7 abierto; #2 a #6 cerrados con un comentario que apunta al #7.
+  Las ramas viejas quedan.
+- **Diferencias con la punta del #6** (`git diff` lo confirma, nada más cambia):
+  - El smoke test se salteaba siempre: buscaba `rapidocr_onnxruntime`, el paquete viejo de PP-OCRv4.
+    Ahora importa `rapidocr` y pasa con los modelos reales.
+  - El tiempo de `parse` se medía con dos lecturas de reloj seguidas después de parsear: daba siempre
+    ~0 ms y el parseo se contaba como OCR. Se fue también un `Pipeline._complete` que nadie llamaba.
+  - `data/data_bus_sign.yaml` tiene `path:` explícito: al moverlo a `data/`, ultralytics buscaba las
+    imágenes en `data/train/images`.
+  - `resultados/` no entra: eran salidas de una versión vieja de `evaluate`, anterior al reconocedor
+    `latin` y al catálogo.
+  - Versión 0.3.0 en `pyproject.toml`, comentarios en inglés, `uv.lock` regenerado e instrucciones de
+    instalación que apuntan a `scripts/deploy_pi.sh`. El README se reescribió: seguía describiendo la
+    Pi 3 B+, un evento BLE viejo y 43 tests.
+- **Medido hoy sobre las 117 imágenes** (Mac): dos modelos → número 91,7 % / destino 89,3 % / lectura
+  completa 91,7 %; modelo de dos clases (el del sensor) → 91,7 % / 85,7 % / 87,5 %. La punta del #6 en el
+  venv viejo da 89,6 % en número: la diferencia es **una sola imagen**, el 109 de noche, que lee `109` o
+  `10` según la versión de onnxruntime/OpenCV. No es un cambio de código.
+
+### Pendientes
+- Que Magalí revise el #7 commit por commit y lo mergee.
+- Rotar la API key de Roboflow, que sigue en la historia del repo de Magalí.
+- El modelo de dos clases lee peor el destino (85,7 % contra 89,3 %): la palanca siguiente es reentrenar
+  el reconocedor, no el recorte.
+
+## 2026-10-12 — El modo ómnibus guarda lo que vio, y la foto llega a la telemetría unida a su log
+
+- **Pedido**: saber qué ve efectivamente la placa cuando reconoce un ómnibus y cuando el OCR devuelve
+  una línea, con **el log conectado a la foto correspondiente** para analizarlo después. El log decía
+  «115 LUIS BRAILLE» y nada de la imagen: un cartel chico, un recorte que corta medio destino, un
+  reflejo o un error del OCR se veían igual.
+- **Placa** (`hardware/raspi/virovision/evidence.py`, enganchado en `bus.py`): cada corrida del modo
+  deja una carpeta en la microSD con el cuadro del aviso «se acerca un ómnibus» (aunque la frase se
+  silencie), el recorte exacto de cada lectura, el cuadro entero cuando el OCR leyó algo, y un JSON
+  por registro (textos y scores del OCR, ms, decisión). Las líneas del journal llevan
+  `(evidence <corrida>/t003-…)`.
+  - Hilo propio con cola de 4 y descarte: el hilo de cámara no puede esperar un JPEG.
+  - Tope de 500 MB y piso de 1 GB libre: la microSD es de la que arranca la placa.
+- **A la app, como el modo supermercado** (pedido explícito: nada de una galería web en la placa).
+  Un primer intento servía una galería HTML en `/evidence/`; se descartó. Ahora la placa avisa por
+  BLE `{t:"evidence", ref}` y la app baja ese registro y sus fotos por WiFi (`services/evidence/`).
+- **A Supabase, junto a la telemetría** (elegido entre «sólo en el teléfono», «Supabase» y «las
+  dos»): la app graba en el momento una fila `bus.evidence` con lo que leyó el OCR y la ruta de
+  cada foto en Storage, y sube las fotos después a esa misma ruta (función `evidence`, bucket privado
+  `evidence`). Rutas deterministas: la fila es correcta aunque la foto suba una hora más tarde —con
+  el celular en el AP de la placa no hay internet—, y la cola en el teléfono tiene tope.
+- **Es temporal**: decisión del equipo de sacarlo para la versión final. La lista de qué sacar
+  está en `docs/ROADMAP.md` («Antes de la versión final»), y cada archivo lo dice en su cabecera.
+- **Verificado**: tests nuevos en la placa (`tests/test_evidence.py`, 174 en verde) y en la app
+  (`services/evidence/*.test.ts`, 328 en verde); lint y typecheck limpios.
+- **Desplegado en Supabase**: migración del bucket aplicada con `supabase db push` (bucket `evidence`
+  privado, sólo JPEG, 2 MB) y función `evidence` desplegada. Probada con `curl`: rechaza una ref
+  inválida y un archivo que no es JPEG, y guarda uno válido en `<phone>/<corrida>/<archivo>`; la
+  prueba se borró y el bucket quedó vacío. **No verificado todavía** en la placa ni en el teléfono.
+
+### Pendientes
+- Desplegar en la placa, build de la app, y una corrida en la parada: mirar los recortes de las
+  lecturas fallidas.
+- Antes de la versión final: sacar la evidencia entera (lista en el ROADMAP).

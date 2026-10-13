@@ -1,22 +1,21 @@
 /**
- * Config plugin: apaga ENABLE_USER_SCRIPT_SANDBOXING en el proyecto iOS.
+ * Config plugin: turns ENABLE_USER_SCRIPT_SANDBOXING off in the iOS project.
  *
- * POR QUÉ HACE FALTA
- * El prebuild de Expo genera el target con `ENABLE_USER_SCRIPT_SANDBOXING = YES`. Con eso activo,
- * la fase "Bundle React Native code and images" no puede escribir `ip.txt` dentro del .app —
- * el archivo con la IP del dev server que el dev client necesita para conectarse a Metro — y el
- * build muere con:
+ * WHY IT IS NEEDED
+ * Expo's prebuild generates the target with `ENABLE_USER_SCRIPT_SANDBOXING = YES`. With that on, the
+ * "Bundle React Native code and images" phase cannot write `ip.txt` inside the .app — the file with
+ * the dev server's IP that the dev client needs to connect to Metro — and the build dies with:
  *
  *   error: Sandbox: bash(NNNNN) deny(1) file-write-data .../ViroVision.app/ip.txt
  *
- * POR QUÉ ES UN PLUGIN Y NO UN CAMBIO EN XCODE
- * `app/ios/` es un artefacto regenerable (continuous native generation): cualquier ajuste hecho a
- * mano en Xcode se pierde en el próximo `expo prebuild`. `expo-build-properties` no expone esta
- * build setting (revisado contra los docs de SDK 57), así que la única forma de que el cambio
- * sobreviva es aplicarlo en el prebuild, acá.
+ * WHY IT IS A PLUGIN AND NOT AN XCODE CHANGE
+ * `app/ios/` is a regenerable artefact (continuous native generation): any adjustment made by hand
+ * in Xcode is lost on the next `expo prebuild`. `expo-build-properties` does not expose this build
+ * setting (checked against the SDK 57 docs), so the only way for the change to survive is to apply
+ * it during prebuild, here.
  *
- * Sólo afecta builds locales de desarrollo: el sandboxing de scripts es una defensa contra scripts
- * de build no confiables, y acá los scripts son los de React Native y Expo.
+ * It only affects local development builds: script sandboxing is a defence against untrusted build
+ * scripts, and here the scripts are React Native's and Expo's.
  */
 const { withXcodeProject } = require('expo/config-plugins');
 
@@ -25,7 +24,7 @@ module.exports = function withoutUserScriptSandboxing(config) {
     const configurations = cfg.modResults.pbxXCBuildConfigurationSection();
 
     for (const key of Object.keys(configurations)) {
-      // La sección intercala entradas `<uuid>_comment` que son strings, no objetos.
+      // The section interleaves `<uuid>_comment` entries that are strings, not objects.
       const entry = configurations[key];
       if (typeof entry !== 'object' || entry === null) continue;
       if (!entry.buildSettings) continue;

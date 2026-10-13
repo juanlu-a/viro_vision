@@ -1,11 +1,11 @@
 /**
- * Contenedor de superficie: agrupa contenido relacionado.
+ * A surface container: it groups related content.
  *
- * Escrito con clases de Tailwind (vía NativeWind). Los nombres son **semánticos**: `bg-surface`,
- * no `bg-blue-900`. Un rol sobrevive a un cambio de marca; un color, no.
+ * Written with Tailwind classes (via NativeWind). The names are **semantic**: `bg-surface`, not
+ * `bg-blue-900`. A role survives a rebrand; a colour does not.
  *
- * No hace falta `dark:`: cada rol es una variable CSS y lo que cambia entre temas es su valor, no
- * la clase. Los hex salen de `constants/colors.js`, la misma tabla que verifica `theme.test.ts`.
+ * No `dark:` needed: each role is a CSS variable and what changes between themes is its value, not
+ * the class. The hex values come from `constants/colors.js`, the same table `theme.test.ts` checks.
  */
 import { View, type ViewProps } from 'react-native';
 

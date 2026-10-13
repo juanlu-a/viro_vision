@@ -81,19 +81,64 @@ ViroVision:
 - **Complement with real usability testing** with blind / low-vision users — a correct API is
   necessary but not sufficient.
 
-## Two communication channels with the device
-BLE cannot carry real-time audio (low bandwidth), so the device uses **two channels**:
-1. **Data/control — BLE (GATT):** `react-native-ble-plx` (+ its Expo config plugin). Connection
-   state, commands, recognition results.
-2. **Audio — separate channel:** the TTS/recognition audio to the device earphone goes over a
-   Bluetooth Classic profile (A2DP/HFP) or a wired connection (hardware team's decision).
+## Enlace con el dispositivo (ADR 0003)
+1. **Control — BLE (GATT), siempre vivo:** `react-native-ble-plx` (+ su config plugin). Modo,
+   comandos, eventos, resultados, y la medición de transferencia. Cliente real detrás del selector de
+   `services/ble/bleClient.ts`; stub tipado en Expo Go / web. Necesita development build.
+2. **La foto (supermercado):** por BLE en chunks, o por un AP WiFi de la placa con HTTP plano si la
+   medición de throughput lo pide (umbral: 53 KB en < 2 s). Se decide midiendo.
+3. **Audio:** sale por la placa (DAC I2S cableado, no A2DP). Para supermercado la app manda el MP3
+   que ya sintetiza (`services/audio/synthesis.ts`); no hay que enrutar la salida del teléfono.
 
-### Audio routing
-The app must **explicitly route its output** to the device's audio endpoint instead of the system
-default, using each platform's session/routing APIs (`AVAudioSession` on iOS,
-`AudioManager`/`AudioDeviceInfo` on Android) or a RN library that exposes output-device selection
-(e.g. `expo-audio` / `react-native-track-player`). Full routing is a later task; the scaffold keeps
-it as a typed stub.
+### Sesión de audio y segundo plano (2026-09-11)
+**Hay una sesión de audio explícita** desde que se cerró el spike 1 de ADR 0003:
+`services/audio/session.ts` (política aparte en `audioMode.ts`, para poder afirmarla en un test sin
+dispositivo). Tres cosas que **no** se tocan sin leer el ADR:
+
+- **`interruptionMode: 'mixWithOthers'`**, aunque la documentación de Expo recomiende `doNotMix` para
+  audio en segundo plano. **VoiceOver es la interfaz de este usuario**: `doNotMix` lo interrumpe y
+  `duckOthers` lo baja a la mitad de una frase. Verificado en el teléfono.
+- **`shouldPlayInBackground` + un tono inaudible sostenido mientras dura la lectura.** iOS da unos
+  pocos segundos al despertar por BLE; audio realmente sonando es lo que mantiene vivo el proceso.
+- **`allowsRecording: false`**, que en iOS es lo que deja la sesión en `.playback` y no en
+  `.playAndRecord`. La app no graba nada, y los permisos de micrófono se sacaron a mano del default
+  del plugin de `expo-audio`.
+
+**El pipeline de lectura no vive en un hook**: `features/reader/readingService.ts` es un módulo sin
+React y `ReaderBridge` lo suscribe directo al cliente BLE, arriba del navegador. Es a propósito — con
+el disparo del botón viajando por estado de React y servido por la pantalla de Inicio, el botón no
+hacía nada con el teléfono bloqueado, que es el caso de uso entero. `useReader` es un
+`useSyncExternalStore` sobre ese módulo.
+
+### Audio routing (pendiente, otra cosa)
+Distinto de lo anterior: el audio hoy sale por el **parlante del teléfono**. Que salga por el
+auricular de la placa exige el DAC I2S (ADR 0003 §5) y **enrutar la salida** con las APIs de sesión
+de cada plataforma. La app ya sintetiza el `.mp3` (`services/audio/synthesis.ts`, detrás de una
+bandera) y la placa ya acepta `POST /audio`; falta el hardware.
+
+### Dónde se escucha la lectura (Ajustes, 2026-09-11)
+
+La lectura de **supermercado** sale por el teléfono o por el **parlante de la placa**, a elección del
+usuario en Ajustes (`features/audio/audioOutput.ts` + `AudioOutputSelector`). Existe porque el
+dispositivo final no existe y comparar los dos caminos exige recorrerlos los dos.
+
+Tres reglas que no se deducen del código:
+
+1. **El envío a la placa se espera DENTRO de la sesión de audio.** Antes era `void` después del
+   anuncio (una copia best-effort para hardware inexistente). Ahora puede ser la única salida, y con
+   la pantalla bloqueada iOS sólo deja correr a la app mientras el keep-alive suena: fuera de esa
+   ventana, el POST lo haría un proceso suspendido. El test fija **el orden**, no el resultado:
+   `['begin', 'earcon', 'send', 'end']`.
+2. **El teléfono es siempre el respaldo.** Todo camino que falle termina con el teléfono hablando; el
+   motivo se **registra** (`audio.fallback`) y no se anuncia. El silencio es el único resultado
+   prohibido. Y las condiciones se chequean **antes** de sintetizar, porque la síntesis se paga.
+3. **Ómnibus queda afuera**: mandarlo a la placa exigiría TTS en la nube y tiene que funcionar sin
+   internet (ADR 0001). ADR 0003 §5 ya tiene la respuesta —anuncios pregrabados en la SD— y no
+   existen todavía.
+
+La política es pura y vive sin el módulo nativo (mismo criterio que `services/audio/audioMode.ts`):
+`readingService.ts` la importa, y su suite no puede necesitar un mock de AsyncStorage para verificar
+una decisión que no toca el disco.
 
 ## Auth / backend (online account layer) — ARCHIVED, app has NO login
 Decision (2026-07-20, team + tutor): **the app ships without a login** — it opens directly to the tabs.
@@ -113,8 +158,10 @@ Ya no es un scaffold. Lo que existe y funciona:
   comprueban contraste WCAG en los dos temas; ya atajó tres regresiones invisibles a ojo. Identidad
   aplicada según el manual v1.0 (ver la skill `virovision-marca`), con tipografía de marca embebida
   en el binario.
-- **Selector de tema** claro/oscuro/sistema, persistido en AsyncStorage — es una preferencia de
-  accesibilidad, así que funciona sin red ni cuenta.
+- **Un solo tema, el oscuro** (ADR 0010, 2026-09-14). Hubo selector claro/oscuro/sistema hasta esa
+  fecha; se retiró porque la interfaz es la voz y sostener dos esquemas en dos sistemas de estilo
+  costaba más de lo que daba. La paleta clara sigue en `colors.js`, verificada, sin que nadie la
+  renderice.
 - **Benchmark de latencia contra modelos de visión en la nube** (`services/vision/`), con
   time-to-first-token medido sobre streaming SSE, limitador de cuota y estadística de mediana/p90.
   Es instrumentación de desarrollo, no producto.

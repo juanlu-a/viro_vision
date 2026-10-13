@@ -1,16 +1,16 @@
 """
-Rasteriza un SVG a PNG CON transparencia.
+Rasterizes an SVG to a PNG WITH transparency.
 
-`qlmanage` compone el alfa sobre blanco, así que un símbolo sobre fondo transparente sale con un
-rectángulo blanco (y una pupila blanca desaparece dentro de él). Se resuelve renderizando dos veces:
+`qlmanage` composites the alpha over white, so a symbol on a transparent background comes out with a
+white rectangle (and a white pupil disappears inside it). It is solved by rendering twice:
 
-  A = el arte tal cual, sobre blanco
-  M = las MISMAS formas en negro, sobre blanco  -> su luminancia da la cobertura
+  A = the artwork as it is, over white
+  M = the SAME shapes in black, over white  -> its luminance gives the coverage
 
-  alfa   = 1 - luminancia(M)
-  color  = (A - blanco*(1-alfa)) / alfa      (des-premultiplicado)
+  alpha = 1 - luminance(M)
+  color = (A - white*(1-alpha)) / alpha      (un-premultiplied)
 
-Con eso el antialiasing de los bordes queda correcto en vez de recortado.
+With that, the edges' antialiasing comes out right instead of clipped.
 """
 import struct, subprocess, sys, zlib, re, os
 
@@ -50,7 +50,7 @@ def write_png(path,w,h,rgba):
 
 def rasterize(svg_path, size, out_png):
     src = open(svg_path).read()
-    # Máscara: las mismas formas, todas en negro
+    # Mask: the same shapes, all in black
     mask_svg = re.sub(r'(stroke|fill)="#[0-9A-Fa-f]{6}"', r'\1="#000000"', src)
     mask_path = '/tmp/vv-alpha/_mask.svg'
     open(mask_path,'w').write(mask_svg)
@@ -68,12 +68,12 @@ def rasterize(svg_path, size, out_png):
             if a < 0.004:
                 line.append((0,0,0,0)); continue
             ar,ag,ab = A[y][x]
-            # des-premultiplicar contra el blanco sobre el que compuso qlmanage
+            # un-premultiply against the white qlmanage composited over
             c = tuple(max(0,min(255,round((v - 255*(1-a))/a))) for v in (ar,ag,ab))
             line.append((c[0],c[1],c[2],round(a*255)))
         out.append(line)
     write_png(out_png,w,h,out)
-    print(f'  {os.path.basename(out_png)}  {w}x{h}  esquina alfa={out[0][0][3]}')
+    print(f'  {os.path.basename(out_png)}  {w}x{h}  corner alpha={out[0][0][3]}')
 
 if __name__ == '__main__':
     rasterize(sys.argv[1], int(sys.argv[2]), sys.argv[3])

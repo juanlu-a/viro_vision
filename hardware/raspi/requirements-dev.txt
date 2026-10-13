@@ -1,0 +1,2 @@
+# Only to run the tests on the Mac/CI. Not needed on the device.
+pytest>=7

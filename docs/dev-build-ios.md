@@ -135,6 +135,14 @@ la app TestFlight muestra todos los builds a los que uno tiene acceso y se elige
 elija. Apple admite **un solo build por versión en revisión a la vez** (el script lo trata como
 aviso). Un build tarda ~30 min de runner + 5–15 de procesamiento de Apple.
 
+⚠️ **No expirar un build con Beta App Review pendiente.** Cancela la revisión, pero el slot de
+"un build por versión en revisión" queda ocupado por un fantasma durante horas: pasó el 2026-08-31
+con el build 1 — la API de lectura mostraba **cero** submissions en toda la app y
+`POST /v1/betaAppReviewSubmissions` seguía respondiendo `ANOTHER_BUILD_IN_REVIEW`, y dos reenvíos
+llegaron a verse `WAITING_FOR_REVIEW` y se evaporaron. El estado real se consulta **por build**
+(`GET /v1/builds/{id}/betaAppReviewSubmission`); el listado de builds con `include` puede mentir
+mientras el backend de Apple converge.
+
 Se evaluó publicar la β como **app aparte** (`com.virovision.app.beta`, `app.config.js` con
 `APP_VARIANT=beta`) para tener las dos instaladas a la vez, y se descartó: exige otra ficha en App
 Store Connect y otra revisión, a cambio de algo que tres devs no necesitan. Queda reservado.
@@ -184,6 +192,48 @@ npx expo run:android   # requiere Android Studio + SDK
 o un APK por EAS, que no requiere toolchain local ni cuenta paga.
 
 ## Problemas conocidos
+
+### Una capacidad nueva en `app.json` no alcanza: hay que habilitarla en el App ID
+
+Lección del 2026-09-06. El plugin de `react-native-wifi-reborn` agregó a los entitlements
+`com.apple.developer.networking.HotspotConfiguration` y `wifi-info`, el build compiló y subió sin
+quejas, y en el teléfono `NEHotspotConfigurationManager` devolvía **"internal error"**: la app no podía
+unirse al WiFi de la placa. El App ID `com.virovision.app` sólo tenía habilitada *In-App Purchase*; la
+firma automática en la nube no agrega capacidades por su cuenta. Se habilitaron por la API de App
+Store Connect (rol Administración) y el build siguiente salió firmado con ellas:
+
+```sh
+# desde app/, con ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_PATH en el entorno
+node --input-type=module -e "
+import { asc } from './scripts/asc.mjs';
+const r = await asc('GET', '/v1/bundleIds?filter[identifier]=com.virovision.app&include=bundleIdCapabilities');
+console.log((r.included ?? []).map(c => c.attributes.capabilityType));   // ver las habilitadas
+// habilitar una: POST /v1/bundleIdCapabilities con capabilityType HOT_SPOT | ACCESS_WIFI_INFORMATION | …
+"
+```
+
+Regla: **cada entitlement nuevo que aparezca en `npx expo config --type introspect` tiene que existir
+como capacidad del App ID** antes del build, o la app falla en runtime sin ningún error de compilación.
+
+### Y con la capacidad habilitada tampoco alcanzó: el archive sin firmar perdía los entitlements
+
+Mismo día, un paso después. Con `HOT_SPOT` ya en el App ID, el build siguió dando «internal error».
+`testflight.sh` ahora exporta el `.ipa` y lee sus entitlements con `codesign` antes de subir, y eso
+mostró la causa: el `.ipa` llevaba **sólo `team-identifier`**. El archive se generaba sin firmar
+(`CODE_SIGNING_ALLOWED=NO`, decisión de agosto para no agotar certificados de desarrollo) y al
+exportar, la firma automática en la nube aplica lo mínimo, no los entitlements del proyecto.
+
+Solución: **firma manual en CI con certificado propio**. Por la API de ASC se creó un certificado
+*Apple Distribution* (CSR generado localmente; la clave privada queda en `~/.private_keys`) y un
+perfil *App Store* «ViroVision App Store» que trae las capacidades del App ID. Viven en los secretos
+`IOS_DIST_P12_B64`, `IOS_DIST_P12_PASSWORD` e `IOS_PROFILE_B64`; el workflow los importa en un
+llavero temporal y exporta `IOS_SIGNING_PROFILE`; `plugins/withDevelopmentTeam.js` fija
+`CODE_SIGN_STYLE=Manual` y el perfil **sólo en el target de la app** (pasarlo por línea de comandos
+alcanzaría a los Pods, cuyos bundles no se pueden firmar con ese perfil). La verificación de
+entitlements queda como red: si falta uno requerido, el build no sube.
+
+Cuando se agregue otro entitlement: habilitar la capacidad en el App ID, **regenerar el perfil**
+(`POST /v1/profiles`, el viejo queda inválido) y actualizar `IOS_PROFILE_B64`.
 
 - **`xcodebuild` no encuentra destino de simulador**: pasaba el 2026-07-18 porque el runtime
   instalado era iOS 26.2 y Xcode esperaba 26.5. Se resolvió instalando el runtime que falta

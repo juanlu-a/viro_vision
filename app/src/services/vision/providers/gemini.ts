@@ -1,27 +1,27 @@
 /**
- * Proveedor Gemini (Interactions API). Primario del modo supermercado: tier gratuito sin tarjeta
- * (la restricción de gratuidad para el usuario de ADR 0006).
+ * Gemini provider (Interactions API). Primary for supermarket mode: free tier with no card (ADR
+ * 0006's free-for-the-user constraint).
  *
- * Forma verificada CONTRA LA API REAL (agosto 2026), no sólo contra los docs:
+ * Shape verified AGAINST THE REAL API (August 2026), not only against the docs:
  *   POST https://generativelanguage.googleapis.com/v1beta/interactions
  *   header  x-goog-api-key
  *   body    { model, input: [...], stream: true, response_format: {...} }
  *
- * El discriminador de los eventos es **`event_type`**, no `type` — los docs no lo muestran y
- * leerlo mal descarta todos los eventos en silencio (cero texto, TTFT en NaN). La secuencia real:
+ * The event discriminator is **`event_type`**, not `type` — the docs do not show it and reading it
+ * wrong drops every event silently (zero text, TTFT as NaN). The real sequence:
  *
  *   interaction.created → interaction.status_update
- *   step.start { step: { type: 'thought' } }          ← el modelo piensa primero
+ *   step.start { step: { type: 'thought' } }          ← the model thinks first
  *   step.delta { delta: { type: 'thought_signature' } }
  *   step.stop
- *   step.start { step: { type: 'model_output' } }     ← acá arranca el texto visible
+ *   step.start { step: { type: 'model_output' } }     ← the visible text starts here
  *   step.delta { delta: { type: 'text', text } }      ← TTFT
  *   step.stop → interaction.completed
  *
- * Que haya un paso de "thought" antes del texto significa que la primera respuesta visible tarda
- * lo que tarda el pensamiento; se emite `text-start` aparte para poder distinguirlo.
+ * A "thought" step before the text means the first visible answer takes as long as the thinking
+ * does; `text-start` is emitted separately so that can be told apart.
  *
- * Módulo puro: arma y traduce, no toca la red. Ver providers.test.ts.
+ * Pure module: it builds and translates, it does not touch the network. See providers.test.ts.
  */
 import { GEMINI_INTERACTIONS_URL } from '../config';
 import type {
@@ -42,8 +42,8 @@ function buildRequest(input: BuildRequestInput): ProviderRequest {
     body: {
       model: input.model.id,
       stream: true,
-      // La instrucción de sistema va como primer bloque de texto: la Interactions API recibe
-      // todo en un único `input`, sin campo `system` separado.
+      // The system instruction goes as the first text block: the Interactions API receives
+      // everything in a single `input`, with no separate `system` field.
       input: [
         { type: 'text', text: input.prompts.system },
         { type: 'image', data: input.imageBase64, mime_type: input.mediaType },
@@ -54,15 +54,16 @@ function buildRequest(input: BuildRequestInput): ProviderRequest {
         mime_type: 'application/json',
         schema: input.schema,
       },
-      // Sin esto, Gemini piensa por defecto y la lectura pasa de ~3 s a decenas de segundos: el
-      // paso de 'thought' de arriba es el que se come el TTFT. La forma también está verificada
-      // contra la API real — `thinking_config`, `thinking_budget`, `reasoning` y `effort` dan 400
-      // ("Unknown parameter"); el único que existe es `generation_config.thinking_level`, y sólo
-      // acepta 'minimal' | 'low' | 'medium' | 'high'.
+      // Without this, Gemini thinks by default and the reading goes from ~3 s to tens of
+      // seconds: the 'thought' step above is what eats the TTFT. The shape is also verified against
+      // the real API — `thinking_config`, `thinking_budget`, `reasoning` and `effort` all give 400
+      // ("Unknown parameter"); the only one that exists is `generation_config.thinking_level`, and
+      // it only accepts 'minimal' | 'low' | 'medium' | 'high'.
       //
-      // `minimal` es el piso y lo aceptan los Flash Lite, que son los únicos Gemini del registro.
-      // OJO: los Flash grandes (3.6, 3.7, flash-latest) lo RECHAZAN con 400 y exigen al menos
-      // 'low' — si alguna vez vuelve uno al registro, hay que mapear su piso, no copiar esta línea.
+      // `minimal` is the floor and the Flash Lite models accept it, which are the only Gemini in
+      // the registry. CAREFUL: the large Flash models (3.6, 3.7, flash-latest) REJECT it with 400
+      // and demand at least 'low' — if one ever comes back to the registry, map its floor, do not
+      // copy this line.
       generation_config: {
         thinking_level: input.thinking === 'off' ? 'minimal' : input.effort,
         max_output_tokens: input.maxTokens,
@@ -71,7 +72,7 @@ function buildRequest(input: BuildRequestInput): ProviderRequest {
   };
 }
 
-/** El discriminador real es `event_type`; se acepta `type` como respaldo por si vuelve a cambiar. */
+/** The real discriminator is `event_type`; `type` is accepted as a fallback in case it changes again. */
 export function eventTypeOf(payload: Record<string, unknown>): string | null {
   if (typeof payload.event_type === 'string') return payload.event_type;
   if (typeof payload.type === 'string') return payload.type;
@@ -83,28 +84,29 @@ function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
 
   switch (type) {
     case 'step.start': {
-      // Sólo el paso de salida marca el arranque del texto visible; el de 'thought' no.
+      // Only the output step marks the start of the visible text; the 'thought' one does not.
       const step = payload.step as { type?: string } | undefined;
       return step?.type === 'model_output' ? { kind: 'text-start' } : { kind: 'start' };
     }
     case 'step.delta': {
       const delta = payload.delta as { type?: string; text?: string } | undefined;
-      // Los deltas del paso de pensamiento son 'thought_signature' y no cuentan como respuesta.
+      // The thinking step's deltas are 'thought_signature' and do not count as an answer.
       if (delta?.type === 'text' && typeof delta.text === 'string') {
         return { kind: 'text', text: delta.text };
       }
       return null;
     }
     case 'interaction.completed':
-      // Siempre es un cierre, con o sin uso adjunto. Devolver sólo el uso perdería la marca de
-      // cierre y el total se mediría contra el fin del stream, inflado por transporte.
+      // It is always a close, with or without usage attached. Returning only the usage would
+      // lose the close marker and the total would be measured against the end of the stream,
+      // inflated by transport.
       return { kind: 'stop', usage: readUsage(payload) };
     case 'interaction.failed':
     case 'error': {
       const error = payload.error as { message?: string; code?: string } | undefined;
-      const message = error?.message ?? 'error de stream';
-      // El error de cuota trae en el propio texto cuánto esperar ("Please retry in 29.2s").
-      // Aprovecharlo evita adivinar un backoff.
+      const message = error?.message ?? 'stream error';
+      // The quota error carries how long to wait in the text itself ("Please retry in 29.2s").
+      // Using it avoids guessing a backoff.
       const match = /retry in ([\d.]+)s/i.exec(message);
       return {
         kind: 'error',
@@ -117,11 +119,11 @@ function readEvent(payload: Record<string, unknown>): ProviderEvent | null {
     case 'interaction.status_update':
       return { kind: 'start' };
     default:
-      return null; // step.stop y tipos futuros
+      return null; // step.stop and future types
   }
 }
 
-/** El uso de tokens puede venir en el evento de cierre; su ubicación exacta varía por versión. */
+/** Token usage can arrive in the close event; its exact location varies by version. */
 function readUsage(payload: Record<string, unknown>): TokenUsage | undefined {
   const usage = (payload.usage ?? payload.usage_metadata) as
     | Record<string, number | undefined>

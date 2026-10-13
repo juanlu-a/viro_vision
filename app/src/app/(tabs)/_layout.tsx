@@ -1,14 +1,14 @@
 /**
- * Barra de pestañas NATIVA de cada plataforma.
+ * Each platform's NATIVE tab bar.
  *
- * Usa `NativeTabs` de expo-router en vez de la barra dibujada en JS. En iOS 26 eso significa una
- * UITabBar real, con Liquid Glass y el comportamiento flotante del sistema; en Android, la
- * BottomNavigationView de Material. No es sólo estética: la barra nativa hereda gratis el manejo
- * de accesibilidad del sistema —foco, rotor de VoiceOver, tamaños de texto, Reduce Motion— que en
- * una barra pintada a mano hay que reimplementar y mantener.
+ * It uses expo-router's `NativeTabs` instead of the JS-drawn bar. On iOS 26 that means a real
+ * UITabBar, with Liquid Glass and the system's floating behaviour; on Android, Material's
+ * BottomNavigationView. It is not only aesthetics: the native bar inherits the system's
+ * accessibility handling for free —focus, VoiceOver rotor, text sizes, Reduce Motion— which in a
+ * hand-painted bar has to be reimplemented and maintained.
  *
- * En iOS NO se fija `backgroundColor` a propósito: hacerlo vuelve opaca la barra y se pierde el
- * Liquid Glass. Sólo se tiñe el ítem activo con el color de marca.
+ * On iOS `backgroundColor` is deliberately NOT set: setting it makes the bar opaque and the Liquid
+ * Glass is lost. Only the active item is tinted with the brand colour.
  */
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Platform } from 'react-native';
@@ -22,11 +22,11 @@ export default function TabsLayout() {
   return (
     <NativeTabs
       tintColor={theme.primary}
-      // La barra se minimiza al bajar y vuelve al subir: deja respirar el contenido y es el
-      // gesto que iOS 26 espera. Sin efecto en versiones anteriores.
+      // The bar minimizes on scroll down and comes back on scroll up: it lets the content breathe
+      // and it is the gesture iOS 26 expects. No effect on earlier versions.
       minimizeBehavior="onScrollDown"
-      // Android no tiene Liquid Glass: ahí sí conviene un fondo sólido de marca para que la
-      // barra no quede flotando sobre el contenido sin separación.
+      // Android has no Liquid Glass: there a solid brand background is worth it so the bar does not
+      // float over the content with no separation.
       {...(Platform.OS === 'android'
         ? { backgroundColor: theme.surface, indicatorColor: theme.primaryMuted }
         : null)}>

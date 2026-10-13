@@ -47,3 +47,37 @@ account y JWT RS256 en `node:crypto`). A mano no se puede: el Mac del equipo no 
 
 Secrets: `PLAY_UPLOAD_KEYSTORE_B64`, `PLAY_UPLOAD_KEYSTORE_PASSWORD` (ya cargados),
 `PLAY_SERVICE_ACCOUNT_JSON` (pendiente de la cuenta). Variable: `PLAY_ENABLED`.
+
+## Mientras tanto: el `.apk` a mano (sideload)
+
+Un `.aab` **no se instala en un teléfono** — es formato de publicación, Google lo re-parte por
+dispositivo. Así que hasta que exista la cuenta de Play, poner la app en el Android de alguien que
+está al lado tuyo se hace con un `.apk` universal firmado. Es el equivalente Android del grupo
+interno de TestFlight.
+
+`.github/workflows/android-apk.yml` (runner Linux, gratis) →
+`scripts/apk.sh` (Gradle `assembleRelease` con la upload key inyectada, mismo `versionCode` =
+minutos desde 1970) → artefacto `virovision-apk` del run, con el `.apk` nombrado
+`virovision-<versión>-<versionCode>.apk`.
+
+| Cuándo corre | Qué deja |
+|---|---|
+| push a `staging` con cambios en `app/` | un `.apk` fresco como artefacto, listo para bajar y mandar |
+| *Actions → Android APK (sideload) → Run workflow* | lo mismo desde **cualquier rama**, sin mergear |
+
+El disparo por push se apaga solo cuando `PLAY_ENABLED=true`: ahí *internal testing* hace ese
+trabajo y el workflow queda sólo manual.
+
+Bajarlo: *Actions → el run → Artifacts*, o `gh run download <run-id> -n virovision-apk`. GitHub
+entrega los artefactos **en un .zip**, hay que descomprimir antes de mandar el `.apk`.
+
+Para instalarlo, el teléfono tiene que permitir orígenes desconocidos: al abrir el archivo Android
+pregunta y manda a *Instalar apps desconocidas* → habilitar la app desde la que se abre (Archivos,
+WhatsApp, Drive). Google Play Protect avisa que no reconoce la app: *Instalar de todos modos*.
+Un `.apk` posterior se instala **encima** del anterior sin desinstalar, porque el `versionCode`
+siempre crece y la firma es la misma.
+
+> ⚠️ **Firma.** Este `.apk` va firmado con nuestra upload key; el que salga de Google Play va
+> firmado con la clave que guarda Google (Play App Signing). Son firmas distintas: el día que la app
+> se publique, quien tenga este `.apk` **tiene que desinstalarlo** antes de instalar el de la tienda.
+> Se pierden los datos locales de la app, nada más.

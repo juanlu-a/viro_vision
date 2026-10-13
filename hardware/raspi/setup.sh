@@ -1,0 +1,107 @@
+#!/bin/sh
+# Installs the daemon on a Raspberry Pi OS Lite (Bookworm) and leaves it running as a service.
+# Run it with sudo from the directory hardware/raspi was copied to:  sudo ./setup.sh
+set -eu
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "run it with sudo" >&2
+  exit 1
+fi
+
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+echo "→ installing in $INSTALL_DIR"
+
+echo "→ system packages"
+apt-get update -qq
+# --no-install-recommends: picamera2 drags in Qt and more if left alone. None of that is needed on Lite.
+# gpiozero + lgpio: the physical button (ADR 0007). They go through apt like picamera2 — gpiozero's
+# backend on Trixie is lgpio, and the apt package is the one that brings the version matching the kernel.
+# alsa-utils + mpg123: playing the reading the phone sends back (`audio.py`). alsa-utils brings
+# `aplay` (WAV) and `amixer`; mpg123 decodes the MP3 the app actually sends. Without mpg123 the audio
+# arrives at the device and is never heard, which is exactly the failure this closed.
+# python3-smbus2: reading the UPS HAT's INA219 over I2C for the battery level (`battery.py`).
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+  bluez python3-venv python3-pip python3-picamera2 python3-gpiozero python3-lgpio \
+  alsa-utils mpg123 python3-smbus2 python3-opencv imx500-all imx500-tools git
+
+echo "→ venv (with the system packages, because of picamera2)"
+if [ ! -d "$INSTALL_DIR/.venv" ]; then
+  python3 -m venv --system-site-packages "$INSTALL_DIR/.venv"
+fi
+"$INSTALL_DIR/.venv/bin/pip" install -q -r "$INSTALL_DIR/requirements.txt"
+
+# Bus mode's reading half, WITHOUT dependency resolution: pip must not replace the numpy and opencv
+# that picamera2 was built against (see requirements-bus.txt). A failure here is not fatal — the
+# device still takes photos and answers the app, and bus mode reports itself unavailable.
+"$INSTALL_DIR/.venv/bin/pip" install -q --no-deps -r "$INSTALL_DIR/requirements-bus.txt" ||
+  echo "WARNING: bus mode's reading half did not install; the daemon will start without it"
+
+# The pipeline arrives as a wheel (its repo is private: see requirements-bus.txt).
+for wheel in "$INSTALL_DIR"/wheels/*.whl; do
+  [ -e "$wheel" ] || continue
+  "$INSTALL_DIR/.venv/bin/pip" install -q --no-deps --force-reinstall "$wheel" ||
+    echo "WARNING: could not install $wheel"
+done
+
+echo "→ I2C on, for the battery"
+# Raspberry Pi OS Lite ships it commented out, and without /dev/i2c-1 `status` reports the battery as
+# null forever with the HAT plugged in (2026-10-06). Takes effect on the next boot.
+sed -i 's/^#dtparam=i2c_arm=on/dtparam=i2c_arm=on/' /boot/firmware/config.txt
+grep -q '^dtparam=i2c_arm=on' /boot/firmware/config.txt || echo 'dtparam=i2c_arm=on' >> /boot/firmware/config.txt
+echo i2c-dev > /etc/modules-load.d/i2c.conf
+
+echo "→ Bluetooth: powered on and with the adapter's power saving off"
+# Through sysfs: the `rfkill` binary is not installed on Raspberry Pi OS Lite. The unit repeats this on
+# every start, because systemd-rfkill restores a saved block on each boot (2026-10-05).
+for d in /sys/class/rfkill/rfkill*; do [ "$(cat "$d/type")" = bluetooth ] && echo 0 > "$d/soft"; done || true
+systemctl enable --now bluetooth.service
+bluetoothctl power on >/dev/null || true
+
+echo "→ WiFi without power saving"
+# Measured on 2026-09-05: the first GET after a while idle took 153 ms against 41-59 for the following
+# ones; that is the WiFi power save waking up. For plan B (the photo over HTTP) it is better not to pay it.
+mkdir -p /etc/NetworkManager/conf.d
+printf '[connection]\nwifi.powersave = 2\n' > /etc/NetworkManager/conf.d/10-virovision-wifi-powersave.conf
+systemctl reload NetworkManager 2>/dev/null || true
+
+echo "→ local-only AP: no gateway and no DNS in the DHCP"
+# Measured on 2026-09-05: with the AP advertising itself as a router, the iPhone joined to "ViroVision"
+# was left without internet (Safari: "no connection"). Without options 3 (router) and 6 (DNS) the network
+# is local only and the phone keeps its default route over cellular data. It is plan B's hard
+# requirement (ADR 0003).
+mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+# The file used to be called 10-virovision-solo-local.conf; a stale copy would apply the same options
+# twice, so it is removed rather than left behind.
+rm -f /etc/NetworkManager/dnsmasq-shared.d/10-virovision-solo-local.conf
+# `no-ping`: by default dnsmasq pings an address and waits up to 3 s for an answer before offering it.
+# Measured on 2026-10-06: the iPhone's DHCPDISCOVER reached wlan0 90 ms after it associated and the
+# offer left 3.0 s later, a third of the wait between accepting the join prompt and the network being
+# ready. On an AP whose only clients are this user's phones, the address cannot be in use by anyone.
+printf 'dhcp-option=3\ndhcp-option=6\nno-ping\n' > /etc/NetworkManager/dnsmasq-shared.d/10-virovision-local-only.conf
+
+echo "→ cloud-init off once the board is installed"
+# cloud-init is how the SD card configures the board on its FIRST boot (user, hostname, the daemon's
+# install: boot/user-data). Left on, it runs again on every boot and sits at the front of the critical
+# chain: measured on 2026-10-06, 6.1 s of every boot spent before Bluetooth could even start. This
+# script runs after that first boot, so nothing is lost; deleting the file brings it back.
+touch /etc/cloud/cloud-init.disabled
+
+echo "→ a journal that survives a reboot"
+# Raspberry Pi OS ships /usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf with
+# Storage=volatile: the journal lives in RAM and every power-off erases it. That, and not the clock
+# jump of a board with no RTC, is why only the current boot was ever visible — and on 2026-09-22 and
+# 2026-09-23 it cost the log of a jammed camera, twice. /etc wins over /usr/lib; the cap keeps a
+# microSD from filling up.
+mkdir -p /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\nSystemMaxUse=64M\n' > /etc/systemd/journald.conf.d/50-virovision-persistent.conf
+systemctl restart systemd-journald
+journalctl --flush || true
+
+echo "→ systemd service"
+sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$INSTALL_DIR/virovision.service" > /etc/systemd/system/virovision.service
+systemctl daemon-reload
+systemctl enable --now virovision.service
+
+echo
+echo "done. follow the logs:      journalctl -u virovision -f"
+echo "check what it advertises:   bluetoothctl show | grep -i -e powered -e discoverable"

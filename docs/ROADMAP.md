@@ -36,9 +36,10 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 - **A2 · Permissions + accessible onboarding** *(next, parallel to A1)* — `app/src/features/permissions/`
   + a rationale-first onboarding route. Update `app.json`: Bluetooth (present) + WiFi/local-network
   (iOS `NSLocalNetworkUsageDescription`/`NSBonjourServices`; Android WiFi + `NEARBY_WIFI_DEVICES`) +
-  camera (via `expo-camera` when A5 nears). ✅ iOS `bundleIdentifier` / Android `package` fijados en
-  `com.virovision.app` (2026-08-10 — ver `dev-build-ios.md`); `expo-image-picker` ya trae
-  `NSPhotoLibraryUsageDescription` (elegir la foto a leer).
+  camera. ✅ iOS `bundleIdentifier` / Android `package` fijados en `com.virovision.app`
+  (2026-08-10 — ver `dev-build-ios.md`). Los permisos de cámara y fototeca salieron del manifiesto
+  el 2026-09-08 con `expo-image-picker`: la foto la saca la placa, así que la app no necesita
+  ninguno de los dos.
 - **A3 · Navigation + core screens** ✅ *(done — no login)* — iOS bottom tabs (Inicio / Dispositivo /
   Ajustes), app opens directly (no login gate — see ADR 0002 update). Home / Dispositivo / Ajustes
   rebuilt on the design system. (Real Settings model backed by `services/storage` still pending.)
@@ -54,9 +55,14 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
   los modelos vienen preentrenados. El trabajo es (a) armar los **datasets de evaluación** (bondis y
   productos): resultado esperado vs. obtenido → **recall, precision, accuracy, F1** — la forma de
   medir precisión del proyecto; (b) elegir el detector para la TPU (`rfdetr-nano` / `yolo26` /
-  YOLO11-nano) y **medirlo sobre la RPi Zero 2 W + Coral** (riesgo técnico abierto); (c) cerrar la
-  decisión de supermercado midiendo **Gemma 3 1B con visión** contra Gemini Flash. Deliverable: el
-  pipeline de bondis exportado + la tabla de métricas.
+  YOLO11-nano) y **medirlo sobre la RPi Zero 2 W + Coral** (riesgo técnico abierto); (c) medir
+  **Gemma 3 1B con visión** como **fallback local** de supermercado — la decisión de qué corre en
+  producción ya está tomada (nube, ADR 0006), lo que falta es cerrar la excepción a ADR 0001.
+  Deliverable: el pipeline de bondis exportado + la tabla de métricas.
+  > **Supermercado ya tiene su protocolo escrito**: pasos 8 y 9 de `docs/qa-modo-supermercado.md`
+  > (la misma foto contra los cinco modelos, anotando `tipo`/`marca`/`detalle` por separado).
+  > **El camino de ómnibus quedó en stand by el 2026-09-01**: elegir entre sus dos variantes
+  > (modelo parcial o completo en la Raspi) exige tener el hardware para medirlas.
   > La pregunta de alcance de ADR 0004 quedó **cerrada por ADR 0006** con la evidencia del spike:
   > el VLM no reemplaza a detección + OCR (6,4 s contra fracciones de segundo, sin coordenadas).
   > Queda como término de comparación en el informe. Validación con el tutor pendiente.
@@ -79,8 +85,10 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 [0007 Botones físicos y modos de operación](architecture/adr/0007-botones-fisicos-modos-de-operacion.md)
 *(Proposed — a validar con tutor)*.
 
+[0003 Enlace placa ↔ teléfono](architecture/adr/0003-enlace-placa-telefono.md)
+*(Proposed — el transporte de la foto se decide con la medición de throughput BLE, 2026-09-04)*.
+
 **Por escribir:**
-- **ADR 0003 — Image transport for offload-to-phone** (WiFi/local-network vs BLE).
 - **ADR 0005 — Design system & accessibility standards** (tokens, Dynamic Type, contrast, motion,
   screen-reader testing as a required step).
 
@@ -91,6 +99,22 @@ in [`SESSION-LOG.md`](SESSION-LOG.md).
 4. In parallel, finish the pending interactive setup (EAS, Supabase, Apple) — see `PROJECT-STATUS.md`.
 
 Recognition wiring in the app (**A5**) waits for B1/B2.
+
+## Antes de la versión final (entrega del 30/11) — sacar lo que es sólo de desarrollo
+
+Herramientas que se usan mientras se ajusta el sistema y **no van en la versión que se entrega**:
+
+- [ ] **Evidencia del modo ómnibus** (2026-10-12): la placa guarda el cuadro de cada ómnibus y el
+  recorte de cada lectura del OCR, la app los baja y los sube a Supabase junto a la telemetría.
+  Son fotos de la calle, con gente. Decisión del equipo: queda mientras se prueba y se saca para la
+  versión final. Qué sacar:
+  - Placa: `hardware/raspi/virovision/evidence.py`, la ruta `/evidence/` de `http_server.py`, las
+    banderas `--evidence-dir`/`--no-evidence` y el `evidence=` de `__main__.py`, los ganchos en
+    `bus.py`, `tests/test_evidence.py` y la sección del README. Borrar `/home/virovision/evidence`.
+  - App: `src/services/evidence/`, `onEvidence` en `services/ble/`, el `evidenceAddress` de
+    `DeviceProvider.tsx`, los tipos `bus.evidence*` de la telemetría y el grupo en `eslint.config.js`.
+  - Supabase: la función `evidence` (y su bloque en `config.toml`), y vaciar y borrar el bucket
+    `evidence` con una migración nueva.
 
 ## Verification per phase
 - **A1–A3:** launch app (dev client), drive each flow with VoiceOver + TalkBack; check focus order,

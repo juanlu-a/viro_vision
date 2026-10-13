@@ -15,11 +15,12 @@ node_modules/
 # --- Python (hardware/ and ml/) ---
 __pycache__/
 *.py[cod]
-.venv/
+.venv*/
 venv/
 env/
 *.egg-info/
 .ipynb_checkpoints/
+.pytest_cache/
 
 # --- ML: datasets, weights and runs (keep out of git; store via DVC / external storage) ---
 ml/datasets/
@@ -36,3 +37,6 @@ ml/**/*.weights
 
 # --- Logs ---
 *.log
+
+# Artefactos locales de la CLI de Supabase (el proyecto vinculado, tokens de sesión)
+supabase/.temp/

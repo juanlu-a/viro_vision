@@ -1,0 +1,101 @@
+name: Android APK (sideload)
+
+# Builds an .apk that can be installed BY HAND on an Android phone, with no store in the middle.
+#
+# It exists because android-play.yml produces an .aab, and an .aab cannot be installed on a phone:
+# it is a publishing format that Google re-splits per device. While the Play account does not exist
+# (PLAY_ENABLED), the only way to put the app on somebody's Android is to hand them an .apk — this
+# is the Android equivalent of the internal TestFlight group.
+#
+#   - push to staging → an .apk as an artefact of the run, ready to download and send. It only runs
+#                       while Play is off: with PLAY_ENABLED=true, internal testing takes over that
+#                       job and this workflow stays manual.
+#   - manual          → from any branch, to hand out a build that is not merged yet.
+#
+# It signs with the same upload key as Play (secrets already loaded). Careful, it is written in
+# scripts/apk.sh too: an .apk signed with our key and one installed from Play have different
+# signatures, so whoever gets this one has to uninstall it before installing the store one.
+#
+# It does NOT run lint/typecheck/tests: ci.yml already gates everything that reaches staging, and
+# what this workflow is for is having the binary in hand fast. The keys check does run — it is
+# seconds and it is what stops a build going out with supermarket mode dead.
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'app/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: ./app
+
+jobs:
+  apk:
+    name: Build the .apk
+    # On a push it steps aside once Play is on; run manually it always builds.
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.PLAY_ENABLED != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Same as android-play.yml: one key per selector provider (ADR 0006); the missing ones just
+      # leave their model out of the selector. With the ADR 0008 proxy set, none of them is needed.
+      EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
+      EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
+      EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
+      EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
+      EXPO_PUBLIC_VISION_PROXY_URL: ${{ secrets.EXPO_PUBLIC_VISION_PROXY_URL }}
+      EXPO_PUBLIC_TELEMETRY_URL: ${{ secrets.EXPO_PUBLIC_TELEMETRY_URL }}
+      EXPO_PUBLIC_AUDIO_FILE_ENABLED: ${{ secrets.EXPO_PUBLIC_AUDIO_FILE_ENABLED }}
+      EXPO_PUBLIC_SIMULATE_DEVICE: ${{ vars.EXPO_PUBLIC_SIMULATE_DEVICE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies
+        run: npm ci
+      - name: Check the build carries some cloud model
+        run: npm run keys
+      - name: Credentials (upload key)
+        # The same key as Play. If the secret is not there the build still works: apk.sh falls back
+        # to the template's debug key, which is enough to install it.
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.p12"
+            echo "APK_KEYSTORE=$RUNNER_TEMP/upload.p12" >> "$GITHUB_ENV"
+          fi
+        env:
+          KEYSTORE_B64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}
+      - name: Build the .apk
+        run: bash scripts/apk.sh
+        env:
+          APK_KEYSTORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+      - name: Name it after the version
+        # The artefact travels by WhatsApp to a person: "app-release.apk" says nothing about which
+        # build it is, and two of them in a chat are indistinguishable.
+        id: name
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          CODE=$(cat android/app/build/outputs/apk/release/VERSION_CODE)
+          NAME="virovision-$VERSION-$CODE.apk"
+          mv android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/$NAME"
+          echo "path=$RUNNER_TEMP/$NAME" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "### $NAME" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: virovision-apk
+          path: ${{ steps.name.outputs.path }}
+          retention-days: 30

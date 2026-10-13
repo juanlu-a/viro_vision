@@ -55,10 +55,14 @@ a detección + OCR en el camino del teléfono (6,4 s contra fracciones de segund
 para priorizar). Detección + OCR es el camino primario de bondis; el VLM queda como término de
 comparación en el informe.
 
-## Datasets — evaluation, not training (ADR 0006)
+## Datasets — evaluation first (ADR 0006, enmendado 2026-09-07)
 Custom **evaluation datasets** to be generated and labeled for (a) metropolitan bus lines and (b)
-basic-basket supermarket products: expected result vs. obtained result. The models are pretrained;
-**nothing gets trained**. The metrics — **recall, precision, accuracy, F1** — are *the* way this
+food items on a supermarket shelf: expected result vs. obtained result. The **basic basket is the
+dataset**, not the scope of the mode (widened 2026-09-11). The models are pretrained,
+**with one exception since 2026-09-07: the banner detector is fine-tuned** (no pretrained `bus_sign`
+class exists; yolo11n with 2 classes on Magalí's Roboflow dataset, on the V100). The OCR stays
+pretrained and is evaluated (PaddleOCR PP-OCRv5 models, via paddlepaddle on the Mac and via ONNX on
+the device; Tesseract as baseline) on the same `gt.csv`. The metrics — **recall, precision, accuracy, F1** — are *the* way this
 project measures precision, and the instrument that closes the pending supermarket decision
 (Gemma 3 1B vs. Gemini Flash). Definitions and what each metric captures per use case:
 [`docs/pruebas-y-decisiones.md`](../../../../docs/pruebas-y-decisiones.md).
@@ -71,6 +75,10 @@ project measures precision, and the instrument that closes the pending supermark
 
 ## Status
 Pipelines decided per use case (ADR 0006, Proposed — tutor validation pending): buses = detection
-on Coral TPU → banner crop → OCR; supermarket = vision LLM (local small vs. cloud, **pending**).
-Still to be done: evaluation datasets + metrics, detector export/measurement on the Coral TPU, and
-the supermarket decision.
+**en el sensor IMX500** (sin Coral) → banner crop → OCR en la Pi; supermarket = vision LLM en la nube.
+**El pipeline de ómnibus existe y corre en la placa** (repo `bus-banner-recognizer` de Magalí, todo en el
+PR #7, rama `feat/bus-line-reader`, desde 2026-10-12). Sobre las 117 imágenes, medido el 2026-10-12:
+con dos modelos (COCO + cartel) número 91,7 % / destino 89,3 % / lectura completa 91,7 %; con el modelo
+de dos clases que corre en el sensor, 91,7 % / 85,7 % / 87,5 %.
+Still to be done: entrenar el modelo de 2 clases en la V100, exportar a IMX500 y medir en la placa, set
+de evaluación con fotos del dispositivo, integración en el daemon, y la decisión de supermercado.

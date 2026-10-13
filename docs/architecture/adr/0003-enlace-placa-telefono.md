@@ -1,0 +1,794 @@
+# ADR 0003 — Enlace placa ↔ teléfono: BLE como plano de control, la foto se decide midiendo
+
+- **Status:** Proposed (2026-09-04) — **actualizado 2026-09-05: la medición cerró el transporte de la
+  foto: WiFi (plan B)**. Falta validar con el tutor
+- **Date:** 2026-09-04
+- **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
+- **Tags:** hardware, app, architecture, ble, wifi
+- **Relates to:** [ADR 0001](0001-offline-first-on-device-inference.md),
+  [ADR 0006](0006-pipelines-por-caso-de-uso.md),
+  [ADR 0007](0007-botones-fisicos-modos-de-operacion.md)
+
+## Contexto
+
+El 2026-09-04 el equipo fijó dónde corre cada cosa:
+
+- **Modo ómnibus: entero en la placa** (caso B del diagrama canónico en
+  [`architecture/README.md`](../README.md)): detección y OCR cuantizados sobre la Zero 2 W + Coral,
+  anuncio por el parlante de la placa. El teléfono no participa. Es el caso que mejor cumple ADR 0001.
+- **Modo supermercado: la placa captura, el teléfono procesa.** La placa manda la foto al teléfono,
+  la app llama al LLM con visión (ADR 0006, vía el proxy de ADR 0008) y devuelve el resultado, como
+  JSON o como audio, para reproducirlo en el auricular de la placa.
+
+Hay que definir **el enlace placa ↔ teléfono** con tres restricciones que puso el equipo:
+
+1. **La mínima cantidad de software** en la placa.
+2. **Sin cifrar el payload**: los datos no son sensibles y TLS agrega latencia y código.
+3. **Presupuesto de tiempo en supermercado: 3 a 4 s** desde que el usuario dispara la foto hasta que
+   empieza el audio. El usuario está quieto frente a la góndola; no es el ómnibus que se mueve.
+
+Y una pregunta concreta: **¿vale la pena WiFi para el payload, o alcanza BLE?** La Zero 2 W trae las
+dos radios en el mismo chip (BCM43436/8: WiFi 2,4 GHz, Bluetooth 4.2) y comparten antena.
+
+### Lo que ya está medido y cambia la cuenta
+
+| dato | valor | fuente |
+|---|---|---|
+| foto que hoy sube a la nube | **~53 KB** (1024 px lado mayor, JPEG 0,7) | `docs/mediciones/2026-09-02-modelos-supermercado.md`, Resultado 4 |
+| lo mismo a 768 / 640 / 384 px | ~35 / 30 / 15 KB | ídem |
+| latencia del LLM | mediana 1,7 s (Luna, default) / 0,85 s (Qwen) | ídem, Resultado 1 |
+| latencia del LLM según tamaño de foto | **no baja** con la foto más chica: las medianas no ordenan | ídem, Resultado 4 |
+| TTS a MP3 en la nube (`gpt-4o-mini-tts`) | ~1 a 1,5 s; MP3 de ~12 KB | ADR 0006, `services/audio/synthesis.ts` |
+| throughput BLE de la Zero 2 W hacia un iPhone | **sin medir** | — |
+
+Throughput BLE típico de este chip (Bluetooth 4.2, sin 2M PHY) con notificaciones GATT hacia iOS:
+**10 a 20 KB/s**, con reportes de hasta ~30 KB/s bien afinado. Es un número de terceros sobre el
+mismo chip en una Pi 3; **no es nuestro** y por eso la decisión se posterga a medirlo.
+
+### Presupuesto de tiempo (disparo → audio)
+
+| etapa | sólo BLE | BLE + WiFi |
+|---|---|---|
+| foto de 53 KB, placa → teléfono | 2,7-5,3 s a 10-20 KB/s; 1,8 s a 30 KB/s | ~0,1 s |
+| LLM (mediana Luna / Qwen) | 1,7 / 0,85 s | 1,7 / 0,85 s |
+| TTS en la nube a MP3 | ~1 a 1,5 s | ~1 a 1,5 s |
+| audio de ~12 KB, teléfono → placa | 0,6-1,2 s | ~0,05 s |
+| **total** | **~6 a 9 s; ~4,5 s en el mejor caso** | **~3 a 3,5 s; ~2,5 s con Qwen** |
+
+La transferencia no se solapa con nada: la foto tiene que llegar entera antes de llamar al modelo.
+Todo el exceso de "sólo BLE" es transferencia.
+
+**El tamaño de la foto es la palanca principal sobre BLE, y ninguna sobre WiFi.** La transferencia
+es lineal en bytes; el LLM no se acelera con la foto más chica. A 640 px (30 KB) y 15 KB/s la foto
+tarda 2 s y el total queda en ~5 a 5,5 s; a 30 KB/s entra en 4 s sin WiFi. **Pero** el acierto 3/3 a
+384 px del 02/09 fue sobre una imagen sintética con texto de 90 px y contraste máximo; una góndola
+real tiene el peso neto en cuerpo 8 y reflejos. Bajar el techo exige medir precisión con fotos
+reales.
+
+## Decisión
+
+### 1. Software de la placa: Raspberry Pi OS Lite + un servicio
+
+No hay camino sin Linux en la Zero 2 W: la Camera Module 3 necesita libcamera, el Coral necesita
+libedgetpu sobre libusb, y BLE necesita BlueZ. Lo mínimo honesto es **Raspberry Pi OS Lite 64-bit,
+sin escritorio, y un único servicio de systemd** con un daemon Python asyncio (picamera2,
+tflite/pycoral, gpiozero y BlueZ por D-Bus son Python-first; lo pesado corre en librerías nativas
+igual). El hotspot WiFi, si hace falta, lo da NetworkManager que ya viene. Buildroot/Yocto sólo si el
+arranque de 20 a 30 s molesta, y antes de eso se resuelve con una señal de audio de "listo". Más
+adelante, raíz de sólo lectura (overlayfs) para que un corte de batería no rompa la SD.
+
+El código vive en [`hardware/raspi/`](../../../hardware/raspi/README.md).
+
+### 2. BLE (GATT) es el plano de control, siempre vivo
+
+Independientemente de por dónde viaje la foto, **BLE queda conectado siempre** y lleva modo,
+comandos, eventos y resultados. La razón fuerte no es el consumo: **el usuario lleva el teléfono
+bloqueado en el bolsillo**, y en iOS un socket WiFi no puede despertar una app; una notificación
+GATT sí (modo de fondo `bluetooth-central`). El ciclo entero de supermercado, entonces, es: botón en
+la placa → notificación BLE despierta la app → la app tiene unos segundos de ejecución en segundo
+plano para bajar la foto, llamar a la nube, sintetizar y devolver el audio.
+
+Perfil GATT (servicio `4380c500-7ca3-4e37-b27d-f60e8d8d73d1`, UUIDs de 128 bits generados al azar; los
+placeholders `0000fffX` que había en la app eran del rango de 16 bits reservado al Bluetooth SIG):
+
+| característica | props | contenido |
+|---|---|---|
+| `mode` | read · notify · write | uint8: 0 esperando, 1 ómnibus, 2 supermercado (ADR 0007) |
+| `control` | write | JSON `{cmd: measure \| photo \| mode \| status, …}` |
+| `event` | notify | JSON ≤ 180 bytes: inicio/fin de transferencia, cambio de modo, error, resultado |
+| `transfer` | notify | binario: header de 4 bytes (`seq` u16 LE, `total` u16 LE) + datos |
+| `status` | read · notify | JSON: versión, temperatura, uptime, batería (null hoy), cámara, wifi |
+| `wifi` | read | **reservada** para el plan B: SSID, contraseña, IP y puerto del AP de la placa |
+
+> Los nombres de las características y de los comandos pasaron a inglés el **2026-09-09**
+> ([ADR 0009](0009-idioma-del-codigo.md)); los UUIDs y la semántica no cambiaron. La tabla está
+> actualizada: cuando se decidió, se llamaban `modo`, `evento`, `transferencia`, `estado` y los
+> comandos `medir`/`foto`/`modo`/`estado`.
+
+El perfil está duplicado a mano en `hardware/raspi/virovision/gatt.py` y
+`app/src/features/device/gatt.ts`, con el aviso en los dos lados.
+
+### 3. El transporte de la foto se decide midiendo, con umbral escrito
+
+**Umbral: si los 53 KB de la foto de referencia bajan por BLE en menos de 2 s (≥ ~27 KB/s), no hay
+WiFi. Si no, la placa levanta un AP WiFi para la foto (plan B).** La medición es el spike 0, con
+protocolo y tablas en [`docs/mediciones/2026-09-04-ble-throughput.md`](../../mediciones/2026-09-04-ble-throughput.md).
+Mide **dos variables**, porque las dos deciden: throughput BLE a 53 / 35 / 30 / 15 KB, y precisión
+del modelo con fotos reales de góndola a 1024 / 768 / 640 px. BLE se construye igual en los dos
+escenarios, así que medir primero no cuesta software de más, y cierra además la "comparación de
+protocolos" que la tesis tiene marcada como `PENDIENTE`.
+
+Al cerrar la medición este ADR recibe una sección `## Actualización` con el rango medido y la
+decisión final.
+
+### 4. Plan B WiFi, diseñado ahora para no rediseñar después
+
+Si el umbral no se cumple:
+
+- **La placa es el punto de acceso**, con SSID y clave fijos por unidad, IP fija y DHCP, todo con
+  NetworkManager (`nmcli device wifi hotspot`). El teléfono se une; **no al revés** (ver
+  alternativas). La placa no necesita internet en ningún caso.
+- **BLE lleva las credenciales**: la app lee la característica `wifi` y se une con la API del sistema
+  (`NEHotspotConfigurationManager` en iOS, con un aviso una sola vez; `WifiNetworkSpecifier` en
+  Android, que además mantiene datos móviles para internet). Requiere `NSLocalNetworkUsageDescription`
+  y la excepción ATS `NSAllowsLocalNetworking`.
+- **HTTP plano en la placa**, sin TLS: `GET /fotos/{id}` (JPEG ya reducido), `POST /audio` (MP3 a
+  reproducir), `GET /health`. WPA2 ya cifra el aire; la app usa `fetch` sin dependencias nuevas. **La
+  app siempre tira, la placa nunca empuja**: así el teléfono no necesita servidor HTTP.
+- El AP puede levantarse sólo con un modo activo y apagarse en *esperando*, para no gastar batería
+  anunciando una red que nadie usa.
+
+### 5. Qué vuelve al auricular, según el modo
+
+- **Supermercado → audio ya sintetizado.** Reusa el TTS del teléfono y el MP3 que ADR 0006 dejó
+  implementado detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED`; la placa sólo reproduce un archivo. Por
+  el mismo transporte que trajo la foto. Si no hay enlace tampoco hubo foto: no hace falta un camino
+  degradado. El JSON del resultado viaja igual por BLE para que la app lo muestre y lo registre.
+- **Ómnibus → anuncios pregrabados en la SD.** La placa tiene que hablar sin teléfono, y las líneas
+  de Montevideo son un conjunto finito: pregrabar cada anuncio con una voz buena da latencia cero y
+  no exige correr un TTS en 512 MB de RAM. Los avisos de sistema (cambio de modo, "sin conexión con
+  el teléfono", "listo") también pregrabados.
+- **Palanca pendiente de medir**: TTS en la placa (Piper, voces en español) para supermercado costaría
+  parecido a la nube (~1 a 1,5 s) pero sacaría la vuelta del audio y una dependencia. No se decide acá.
+
+### 6. Salida de audio de la placa: DAC I2S cableado
+
+La Zero 2 W no tiene jack. **DAC I2S con amplificador** (MAX98357A o PCM5102A) a un auricular
+cableado. Descartado A2DP desde la placa: BLE, WiFi y audio Bluetooth compartirían el mismo chip y la
+misma antena, y eso produce cortes de audio; además A2DP suma 150 a 250 ms de codificación. USB está
+ocupado por el Coral. Esto reemplaza el "Bluetooth Classic (A2DP/HFP) o cableado" que decían los
+documentos hasta hoy.
+
+## Alternativas consideradas
+
+- **Hotspot del teléfono y la placa como cliente.** Rechazado. En iOS la app no puede encender el
+  hotspot; el usuario tiene que activar además "Maximizar compatibilidad" porque la placa es sólo
+  2,4 GHz; y el hotspot deja de ser visible a los pocos segundos si nadie está conectado. Para una
+  persona ciega es una trampa. En Android existe `LocalOnlyHotspot`, pero no da lo mismo en las dos
+  plataformas.
+- **Wi-Fi Direct / Wi-Fi Aware.** No existen en iOS (Multipeer Connectivity es sólo Apple).
+- **Sólo BLE, sin medir.** Con 53 KB y 10 a 20 KB/s el total da 6 a 9 s, el doble del presupuesto.
+  Podría cerrar con 640 px y 30 KB/s, pero ninguno de los dos números está probado. De ahí el umbral.
+- **BLE con L2CAP CoC** (canal orientado a conexión, 2 a 3× el throughput de GATT). `react-native-ble-plx`
+  no lo soporta, y sobre Bluetooth 4.2 sin 2M PHY tampoco alcanza los 27 KB/s con margen. Más
+  software, no menos.
+- **Decidir WiFi ahora.** Menos incertidumbre, pero paga desde el día uno el costo que no está en la
+  placa sino en la app: módulo nativo para unirse a la red, permiso de red local en iOS, el riesgo
+  de "WiFi sin internet" y algo de batería. Se paga sólo si la medición lo pide.
+- **A2DP desde la placa al auricular Bluetooth.** Ver §6.
+- **Imagen Buildroot/Yocto.** Arranque de ~5 s en vez de ~25 s, a cambio de mantener una distro
+  propia. No para una tesis; queda como optimización si el arranque resulta un problema de uso.
+
+## Consecuencias
+
+### Positivas
+
+- La app puede despertarse con el teléfono en el bolsillo: BLE siempre vivo es lo único que lo permite.
+- Se construye una sola vez lo que hace falta en los dos escenarios (BLE + GATT), y la medición que
+  decide el resto es un deliverable de la tesis.
+- La placa lleva un solo proceso y ningún secreto: sin TLS, sin claves, sin cuenta.
+- Los dos casos de ómnibus del diagrama canónico quedan resueltos en B; A deja de estar en stand by.
+
+### Costos / riesgos — cada uno es un spike con criterio
+
+0. **Throughput BLE real** (este PR lo deja listo para correr): 53 KB en < 2 s ⇒ sin WiFi.
+   Caveat: `bluez-peripheral` notifica por `PropertiesChanged` en D-Bus, un mensaje por chunk; si la
+   v1 da < 15 KB/s hay que repetir con `AcquireNotify` antes de concluir. Medir con el WiFi de la
+   placa apagado y prendido: comparten antena.
+1. **Segundo plano en iOS**: con la pantalla bloqueada, una notificación BLE despierta la app y el
+   ciclo completo (foto → nube → TTS → audio a la placa) termina antes de que iOS la suspenda. Con
+   las medianas medidas entra, pero hay que verlo. ~~Hasta entonces el plugin de ble-plx queda con
+   `isBackgroundEnabled: false`.~~ **Esa frase era falsa y se corrige en la actualización del
+   2026-09-10**: ese flag nunca gateó iOS.
+2. **Sólo si hay WiFi**: iOS unido a un WiFi sin internet enruta el HTTPS del proxy por datos móviles.
+   Funciona en general; hay que verlo con nuestra app.
+3. **Coexistencia BLE/WiFi** en el BCM43438: jitter en las notificaciones durante una transferencia.
+4. **libedgetpu/pycoral en Bookworm**: los paquetes oficiales quedaron en Python 3.9; hay builds de la
+   comunidad. No es de este ADR pero condiciona la "mínima cantidad de software" del pilar.
+
+## Implicaciones para el código actual
+
+- `app/src/features/device/gatt.ts`: UUIDs de 128 bits y las características nuevas (hecho en este PR).
+- `app/src/services/ble/`: cliente real sobre `react-native-ble-plx` detrás del selector, módulo puro
+  de reensamblado y medición con tests, botón «Medir transferencia» en Dispositivo que anuncia el
+  resultado por voz (hecho en este PR).
+- `hardware/raspi/`: daemon con el GATT, la transferencia medible, captura con picamera2 y la máquina
+  de modos de ADR 0007 (hecho en este PR). Faltan botón GPIO, DAC y anuncios pregrabados.
+- `app.json`: sin cambios de permisos; ~~`isBackgroundEnabled` sigue en `false` hasta el spike 1~~
+  (falso: ver la actualización del 2026-09-10).
+- Si gana el plan B: característica `wifi` en los dos lados, módulo nativo para unirse a la red,
+  `NSLocalNetworkUsageDescription` + `NSAllowsLocalNetworking`, hotspot + servidor HTTP en la placa.
+
+## Actualización 2026-09-05 — La medición decidió: la foto va por WiFi
+
+Se corrió el spike 0 con la placa real (Raspberry Pi OS 2026-06-18, Trixie, BlueZ 5.82) y el build de
+TestFlight del día. Diez corridas en iPhone, cinco con el WiFi de la placa prendido y cinco apagado:
+
+| WiFi de la placa | mediana | rango | KB/s |
+|---|---|---|---|
+| apagado | **4,47 s** | 3,58-5,01 | 11,8 |
+| prendido | **4,44 s** | 4,08-6,15 | 11,9 |
+
+**53 KB tardan 4,5 s: 2,2 veces el umbral de 2 s.** No es del daemon (entrega los 298 chunks en
+1,7 s) ni del receptor (la Mac da 12,5 KB/s): es **una notificación de 182 bytes por intervalo de
+conexión de 15 ms**, el mínimo que acepta iOS. El controlador BCM43438 **no tiene Data Length
+Extension** (paquetes de radio de 27 bytes, 15 buffers ACL), y chunks más chicos rinden menos, no más.
+El caveat de D-Bus resultó real pero de otra forma: sin pausa, dbus-next **pierde** chunks; con una
+pausa de 4 ms no pierde ninguno y no es el cuello. Como referencia, el mismo archivo por HTTP sobre la
+misma radio WiFi baja en 46 ms. Detalle en `docs/mediciones/2026-09-04-ble-throughput.md`.
+
+> ✅ **Actualización 2026-09-19: la placa en uso volvió a ser la Zero 2 W**, así que estas mediciones
+> vuelven a ser del hardware que está sobre la mesa y el aviso de abajo deja de aplicar. La unidad es
+> otra (otra dirección BLE) pero el SoC y la radio son los mismos: **BCM43438, BT 4.2, sin Data Length
+> Extension**, que es lo que decide este ADR. Lo que queda abierto —el throughput BLE hacia un iPhone,
+> «sin medir» en la tabla de §3— vuelve a ser medible donde corresponde.
+>
+> ⚠️ **Estas mediciones son de la Zero 2 W, y no se pueden repetir en la placa que estuvo en uso entre
+> el 2026-09-09 y el 2026-09-18.**
+> En esos diez días se trabajó con una **Raspberry Pi 3 Model B+ prestada** (se rompió el
+> conector CSI de 22 pines de la Zero 2 W), y su radio es otra: **Cypress CYW43455, HCI 5.0** contra
+> el **BCM43438 (BT 4.2)** de la Zero. La ausencia de Data Length Extension en el BCM43438 es *toda*
+> la razón del techo de 11,8 KB/s que mandó al plan B, y la 3 B+ no la tiene. **Un número mejor
+> medido ahí no reabre esta decisión: mide otro hardware.** Quien mida en la placa prestada y
+> concluya que "BLE alcanza" va a estar sacando la conclusión contraria a la de este ADR.
+
+**Decisión:** transporte de la foto por **WiFi, según el plan B de §4**: la placa como AP, credenciales
+por BLE, HTTP plano, la app siempre tira. **BLE sigue siendo el plano de control siempre vivo** (§2), y
+todo lo demás del ADR queda como estaba. La Tabla B (precisión por tamaño de foto) deja de decidir el
+transporte y pasa a ser una optimización de tokens y tráfico, como ya decía la medición del 02/09.
+
+Consecuencias inmediatas: se ejecuta la lista de §Implicaciones "si gana el plan B": característica
+`wifi` en los dos lados, módulo nativo para unirse a la red (`NEHotspotConfigurationManager` /
+`WifiNetworkSpecifier`), `NSLocalNetworkUsageDescription` + `NSAllowsLocalNetworking`, hotspot con
+NetworkManager y servidor HTTP en la placa. Y el spike 2 (iOS en un WiFi sin internet enruta el HTTPS
+del proxy por datos móviles) pasa a ser el primero de la lista. El AP se levanta sólo con un modo
+activo: el primer `GET` tras despertar el WiFi de la placa tardó 153 ms contra 41-59 los siguientes.
+
+## Actualización 2026-09-05 (2) — El plan B probado en el caso real: funciona, con una condición
+
+Mismo día, con el PR #61 (servidor HTTP en la placa, AP con NetworkManager, «Medir por WiFi» en la
+app). iPhone **unido al AP de la placa**, sin ninguna otra red, con datos móviles:
+
+- Foto de 53 KB por HTTP: 0,05 a 1,03 s, mediana **0,34 s** (misma sesión por BLE: ~4 s).
+- **Safari carga y la lectura de supermercado funciona** con el teléfono unido a la placa: el
+  teléfono conserva internet por datos. Era el spike 2, y era el requisito duro del equipo.
+- **La condición**: el AP tiene que ser una red **sólo local**. Con el DHCP anunciando la placa como
+  router y DNS (lo que hace NetworkManager por defecto en modo `shared`), iOS quedaba **sin internet**.
+  Quitar las opciones DHCP 3 y 6 lo resuelve; está en `setup.sh`. Es una regla del diseño, no un
+  ajuste: **la placa nunca se anuncia como salida a internet.**
+
+**El híbrido queda confirmado como diseño**: BLE es el plano de control siempre vivo (despierta la app,
+lleva botón, modo, eventos, resultados y credenciales) y WiFi lleva sólo el payload, a demanda. Es el
+patrón de las cámaras vestibles y de acción que mueven fotos al teléfono. Presupuesto del ciclo de
+supermercado: ~50 ms de foto + ~1,5 s de nube + 1 a 1,5 s de TTS + ~50 ms de audio ≈ **3 s**.
+
+Queda para el PR siguiente: (1) la app se une al AP sola (`NEHotspotConfigurationManager` /
+`WifiNetworkSpecifier`) con las credenciales de la característica `wifi`; (2) el AP vive con los
+modos: arriba con un modo activo, abajo en *esperando*, siempre con tope de tiempo; (3) el audio de
+vuelta por `POST /audio` al parlante; (4) el spike 1, segundo plano en iOS. Y una deuda del día:
+el AP levantado con un temporizador externo (`systemd-run`) no arrancó en un intento y no quedó
+registro de por qué; el camino que vale es el comando `ap` del daemon, que trae su propio tope.
+
+## Actualización 2026-09-07 — El AP queda siempre encendido; la red se une al conectar
+
+Con el flujo completo funcionando, esperar ~20 s al activar un modo (AP que sube, iOS que se une,
+sondeo) resultó inaceptable: para el usuario final, entrar al supermercado, apretar el botón y
+esperar veinte segundos es una experiencia espantosa. **Decisión**: la placa levanta su AP al
+arrancar y lo mantiene mientras está encendida (con reintentos hasta que la interfaz tenga su IP,
+porque NetworkManager puede no estar listo al inicio); la app se une **en cuanto conecta por BLE**,
+en segundo plano, y al activar un modo la foto está disponible al instante. Consecuencias: (1) el
+costo es batería de la placa, a medir; (2) mientras la placa esté encendida el teléfono está en su
+red y usa datos para internet, también en casa, aceptado explícitamente por el equipo; (3) el aviso
+de iOS para unirse a la red aparece **una sola vez** por teléfono; la app comprueba antes si ya está
+unida para no volver a pedirlo. El comando `ap` sigue existiendo para desarrollo: con el AP arriba la
+placa no está en ninguna otra red y se pierde el SSH; se apaga por BLE desde la Mac.
+
+## Actualización 2026-09-08 — Se retiran los botones de medición
+
+La medición cumplió: el ADR está decidido (la foto va por HTTP sobre WiFi) y el número quedó
+registrado en [`docs/mediciones/2026-09-04-ble-throughput.md`](../../mediciones/2026-09-04-ble-throughput.md).
+Los dos botones que la disparaban —«Medir transferencia» por BLE y «Medir por WiFi»— salen de la
+pestaña Dispositivo, y con ellos el módulo de reensamblado por chunks del lado de la app
+(`services/ble/transferencia.ts`) y `medirDescargaHttp`. Del módulo viejo sobrevive sólo el base64,
+que usa cada característica del GATT y se mudó a `services/ble/base64.ts`.
+
+**La placa sigue publicando la característica `transfer` y el comando `measure`**: sacarlos del
+firmware es un PR del pilar de hardware. El espejo de `features/device/gatt.ts` los documenta con
+una nota que dice que la app ya no los usa, para que nadie los vuelva a cablear creyendo que son el
+camino de la foto.
+
+## Actualización 2026-09-10/11 — El spike 1 (cerrado), y la premisa que era falsa
+
+Probado en el iPhone con el build de TestFlight: **con la pantalla bloqueada el doble click en el
+botón de la placa no hacía nada**. Al desbloquear no había lectura ni error en Inicio. Es la premisa
+del producto entera —el teléfono va bloqueado en el bolsillo— así que se abrió el spike 1.
+
+### Lo primero que apareció: el modo de fondo nunca estuvo apagado
+
+Este ADR decía, en el riesgo 1 y en *Implicaciones*, que el fondo estaba desactivado "hasta el
+spike 1" porque el plugin de ble-plx tenía `isBackgroundEnabled: false`. **Es falso.**
+
+```js
+// node_modules/react-native-ble-plx/plugin/build/withBLE.js
+config = withBLEBackgroundModes(config, _props.modes || []);   // ← incondicional
+```
+
+`isBackgroundEnabled` sólo viaja a `withBLEAndroidManifest`, donde agrega
+`<uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>`. **Nunca toca
+el `Info.plist`.** Lo que escribe `bluetooth-central` es `modes: ["central"]`, que estaba puesto
+desde el principio. Y el plugin de `expo-audio` trae `enableBackgroundPlayback = true` por defecto,
+que agrega `audio`. Verificado corriendo el prebuild:
+
+```sh
+npx expo prebuild -p ios --clean && plutil -p ios/ViroVision/Info.plist | grep -A4 UIBackgroundModes
+# "UIBackgroundModes" => [ 0 => "audio", 1 => "bluetooth-central" ]
+```
+
+La lección es la que vale más que el arreglo: **el ADR describía la configuración de memoria y no de
+la fuente**, y durante casi una semana el equipo creyó tener apagado algo que estaba prendido. Un
+riesgo anotado con una causa equivocada es peor que un riesgo sin anotar, porque cierra la búsqueda.
+
+### Lo segundo: qué faltaba de verdad
+
+Tres cosas, ninguna de ellas una clave del plist.
+
+1. **No había ninguna sesión de audio.** `expo-audio` estaba instalado y como plugin, y **no lo
+   importaba ni un archivo**. Sin `setAudioModeAsync`, iOS deja la app en la categoría por defecto,
+   que no tiene permitido sonar con la pantalla bloqueada. El anuncio salía por `expo-speech` sin
+   que nadie hubiera pedido nunca la sesión.
+2. **El disparo del botón viajaba por estado de React y lo servía una pantalla.** El camino era
+   `onReadRequest` → `setReadRequest(n + 1)` en `DeviceProvider` → contexto → `useEffect` de
+   `useReader`, que **sólo monta Inicio**. Una interrupción de hardware no puede depender de qué
+   pestaña está en pantalla, y con la pantalla apagada no hay ninguna.
+3. **No había cómo saber dónde moría la cadena.** Con el teléfono bloqueado no hay consola: la única
+   evidencia es la tabla `events`, y hasta ahora las filas no decían en qué estado de la app se
+   escribieron, ni se subían hasta que algo vaciaba la cola.
+
+### Decisión
+
+- **Sesión de audio explícita** (`app/src/services/audio/session.ts`, política en `audioMode.ts`):
+  `playsInSilentMode`, `shouldPlayInBackground`, `allowsRecording: false` (que en iOS es lo que la
+  deja en `.playback` y no en `.playAndRecord`) y **`interruptionMode: 'mixWithOthers'`**. Este
+  último se aparta a propósito del ejemplo de la documentación de Expo, que usa `doNotMix`:
+  **VoiceOver es la interfaz de este usuario** y tanto `doNotMix` como `duckOthers` lo pisan.
+- **Tono de mantenimiento mientras dura la lectura.** iOS da unos pocos segundos al despertar por
+  BLE; el ciclo mide ~3 s de mediana pero la cola no (la nube encola, el limitador de cuota espera).
+  Un audio realmente sonando es lo que mantiene vivo al proceso bajo el modo `audio`, así que la
+  lectura sostiene un tono inaudible de −50 dBFS de punta a punta. Es una señal real y no silencio
+  digital a propósito: el archivo de ceros es el truco viejo y es el que un sistema operativo puede
+  dejar de honrar.
+- **Chirp al empezar.** 120 ms audibles apenas entra el pedido. Es feedback que no existía —hoy el
+  botón no suena nada durante el segundo y medio de la nube— y además es **el mejor diagnóstico que
+  podemos desplegar**: con la pantalla bloqueada, o se escucha (la app despertó y la sesión de audio
+  anda, y lo que falle después es el pipeline) o no se escucha (nunca despertó).
+- **El pipeline sale de la pantalla**: `features/reader/readingService.ts` es un módulo sin React y
+  `ReaderBridge` lo suscribe **directo al cliente BLE**, arriba del navegador. `useReader` queda como
+  un `useSyncExternalStore` sobre él, con la misma firma, así que Inicio no cambia. `DeviceProvider`
+  deja de exponer el contador `readRequest`: sólo registra el evento.
+- **`announce()` ahora se puede esperar** (`speak()` resuelve en `onDone`). Sin eso, soltar la sesión
+  en la línea siguiente cortaba el anuncio por la mitad.
+- **Tope de 12 s por lectura** con `AbortController`, y la foto baja con 4 s en vez de 20. Una
+  lectura que se pasa del punto donde iOS mata el proceso es una lectura que el usuario nunca
+  escucha **y** de la que nunca se entera; mejor fallar en voz alta.
+- **Telemetría que sirva de noche**: cada fila lleva `detail.app` (el `AppState` del momento), hay
+  `ble.event` con el `t` crudo apenas la radio entrega la trama —incluso cuando el JSON no parsea, que
+  antes se descartaba en silencio—, hay `reading.requested`, `audio.session` y `audio.spoken`, y la
+  cola se vacía **también al volver a primer plano** y al terminar una lectura que empezó en segundo
+  plano.
+
+Se aprovechó para sacar dos permisos que el producto no usa y que entraban por el default del plugin
+de `expo-audio`: `NSMicrophoneUsageDescription` (con un texto en inglés, además) y `RECORD_AUDIO` en
+Android. Mismo criterio que el 2026-09-08 con la cámara y la fototeca.
+
+### Verificado en el dispositivo: **el spike 1 queda cerrado** (2026-09-11)
+
+Build `202609110048` en el grupo interno de TestFlight, corrido contra la placa real. Pasa el bloque
+E de [`qa-modo-supermercado.md`](../../qa-modo-supermercado.md):
+
+| Qué | Resultado |
+|---|---|
+| Doble click con la pantalla bloqueada | **la lectura sale y se escucha, sin tocar el teléfono** |
+| Varias lecturas seguidas sin desbloquear | salen todas |
+| VoiceOver prendido | sigue vivo: ni se corta ni baja de volumen |
+| Bloqueado un rato largo antes de apretar | anduvo igual |
+
+Las cuatro filas importan por separado. La primera es el criterio del arreglo. La segunda descarta
+que iOS nos dé un único despertar y después nos suspenda para siempre. **La tercera es la que valida
+`mixWithOthers`**: era la decisión más discutible del PR —la propia documentación de Expo recomienda
+`doNotMix` para audio en segundo plano— y la que, de estar mal, habría roto la app justo para quien
+la necesita. **Y la cuarta responde la pregunta de `restoreStateIdentifier`**: si iOS hubiera
+terminado la app en ese rato, sin preservación de estado CoreBluetooth no la habría relanzado nunca y
+el botón no habría hecho nada. Anduvo, así que en ese horizonte la app sigue suspendida y viva.
+
+**ADR 0003 queda entonces demostrado de punta a punta**: BLE como plano de control es lo que despierta
+la app con el teléfono en el bolsillo, y el ciclo completo entra en el presupuesto.
+
+### Lo que sigue abierto
+
+- **`restoreStateIdentifier`.** `bleClientPlx.ts` sigue haciendo `new BleManager()` sin opciones: si
+  iOS **termina** la app —presión de memoria, muchas horas, el usuario matándola de la bandeja—
+  CoreBluetooth no la vuelve a levantar nunca. La corrida del 2026-09-11 muestra que **no hace falta
+  para el caso de uso probado**, no que no haga falta. El síntoma sería el peor posible: el botón deja
+  de responder y nada lo explica. Queda como el siguiente PR del tema, con su criterio de detección ya
+  escrito (el `session` de la telemetría cambia entre antes y después de desbloquear). A medias es
+  peor que nada: iOS relanzaría la app sin monitores y se comería el presupuesto de despertar sin
+  reportar nada.
+- **`sse.ts` no tiene timeout propio.** Un stream colgado sólo lo corta el `AbortController` de la
+  lectura. Deuda anotada.
+- **La cola de telemetría vive en memoria.** Si iOS termina el proceso en segundo plano, lo que no se
+  subió se pierde, y eso se ve igual que "no pasó nada". Persistirla en `AsyncStorage` es lo que haría
+  falta para poder diagnosticar justamente el caso de la terminación.
+- **El audio sigue saliendo por el parlante del teléfono.** Que salga por la placa es el producto
+  final y depende del DAC I2S (§5 de este ADR), no de esto.
+
+### Android
+
+Fuera de alcance. Necesitaría un foreground service propio atado a la conexión BLE
+(`FOREGROUND_SERVICE_CONNECTED_DEVICE`, `POST_NOTIFICATIONS`, `WAKE_LOCK`) y una exención de la
+optimización de batería; hoy sólo está el `FOREGROUND_SERVICE_MEDIA_PLAYBACK` que hereda de
+`expo-audio` y ningún servicio que la app arranque. Con Doze, la conexión se cae mucho antes de que
+alguien apriete el botón.
+
+## Actualización 2026-09-11 — Dónde se escucha la lectura, se elige en Ajustes
+
+**El dispositivo final no existe todavía, y comparar los dos caminos exige poder recorrerlos los
+dos** — parado frente a la góndola, no recompilando. Así que la app suma un ajuste: la lectura de
+supermercado suena **en el teléfono** o **en el parlante del dispositivo**.
+
+Hasta ahora el teléfono hablaba siempre y el envío a la placa era una copia *best-effort* detrás de
+`EXPO_PUBLIC_AUDIO_FILE_ENABLED`: se disparaba **después** del anuncio, sin esperar, porque era un
+extra para hardware que no existía. Con el ajuste puede ser **la única salida**, y eso cambia dos
+cosas de fondo.
+
+### 1. El envío pasa a estar DENTRO de la sesión de audio
+
+Es el punto que decide si funciona con el celular bloqueado, y no es evidente. Con la pantalla
+bloqueada iOS le presta a la app unos segundos que compra la notificación BLE, y lo que los estira es
+el keep-alive de `services/audio/session.ts`. El envío viejo, sin `await` y después del anuncio,
+quedaba **fuera** de esa ventana: con el teléfono en el bolsillo, el POST lo haría un proceso que iOS
+ya suspendió. Ahora se espera antes de que el `finally` libere la sesión.
+
+El test que lo fija no mira el resultado sino **el orden**: `['begin', 'earcon', 'send', 'end']`. Es
+el requisito escrito como aserción.
+
+### 2. El teléfono es siempre el respaldo
+
+Una lectura que el usuario pidió y no puede oír es el único resultado que esta app no tiene derecho a
+producir: la voz es la interfaz, y el silencio es indistinguible de un dispositivo colgado. Así que
+**todos** los caminos por los que la placa no puede sonar terminan con el teléfono hablando:
+
+| Situación | Dónde suena | Se registra |
+|---|---|---|
+| eligió teléfono | teléfono | — |
+| eligió dispositivo, todo bien | dispositivo | `audio.spoken` con `target: device` |
+| el build no puede sintetizar | teléfono | `audio.fallback` `not-configured` |
+| el dispositivo no está disponible | teléfono | `audio.fallback` `device-unreachable` |
+| el envío falló | teléfono | `audio.fallback` `send-failed` |
+
+El motivo **se registra y no se anuncia**: decir «no pude usar la placa» antes de cada frase sería
+ruido para quien está leyendo tres productos seguidos, y el usuario igual recibe lo que pidió. La
+tabla de telemetría es la que después dice si el camino de la placa es usable de verdad.
+
+Las dos condiciones se chequean **antes** de sintetizar: la síntesis es una llamada paga y un par de
+segundos, y gastarlos en audio que no tiene dónde ir es peor que chequear dos veces.
+
+### El modo ómnibus queda afuera, y eso no es una omisión
+
+Mandar una lectura de ómnibus al dispositivo exigiría sintetizarla con un TTS **en la nube**, y el
+modo ómnibus tiene que funcionar sin internet ([ADR 0001](0001-offline-first-on-device-inference.md),
+[ADR 0006](0006-pipelines-por-caso-de-uso.md)). Este ADR ya tenía la respuesta correcta en §5:
+**anuncios pregrabados en la SD de la placa**, porque las líneas son un conjunto finito. No existen
+todavía; hasta que existan, ómnibus habla por el teléfono **cualquiera sea el ajuste**, y conserva su
+copia *best-effort* a la placa (no esperada, sin poder degradar nada). El ajuste lo dice en la misma
+pantalla donde se elige: es lo único que sorprende de él.
+
+## Actualización 2026-09-13 — La placa deja de emparejarse, y la app deja de buscar a ciegas
+
+Dos síntomas de la primera semana de uso real, con la misma raíz: **nada de lo que hace falta para
+reconectarse estaba donde parecía**.
+
+### 1. El «pedido de enlace» no hacía falta para nada
+
+Ninguna característica de este perfil pide autenticación —este ADR decidió **no cifrar la carga**
+(§2)—, así que la app **nunca necesitó un vínculo (*bond*)** para leer, escribir ni suscribirse. Un
+vínculo no compraba nada y costaba justo la falla que el usuario reportó: el iPhone guarda una clave
+para la placa, las dos copias dejan de coincidir (una reinstalación, un `/var/lib/bluetooth` limpio,
+una dirección aleatoria que deja de resolverse) y desde ahí **cada reconexión termina en la alerta
+del sistema «ViroVision quiere emparejarse»**, a veces más de una vez antes de que la app vea el
+dispositivo.
+
+**Decisión: la placa arranca con `Pairable = false`.** Sin clave no hay clave en la que discrepar.
+`--pairable` devuelve el comportamiento anterior en una bandera si alguna vez el intercambio sale
+mal.
+
+> **Costo, una sola vez, en un teléfono que ya se emparejó:** iOS conserva su mitad de la clave e
+> intenta cifrar. *Ajustes → Bluetooth → ViroVision → Olvidar este dispositivo*, una vez, y se
+> termina. Va en las notas del build.
+
+### 2. Escanear era la peor forma de encontrar una placa que ya conocíamos
+
+La app escaneaba **siempre**, y un escaneo sólo ve a un periférico que está anunciando. Hay dos
+situaciones cotidianas en las que el nuestro no lo está, y desde el teléfono son idénticas:
+
+- **Ya está conectado al sistema.** iOS sostiene el periférico entre reinicios de la app, y Ajustes u
+  otra app pueden tenerlo tomado. Un periférico conectado no anuncia y `startDeviceScan` **no lo
+  reporta nunca**: la app escaneaba 15 s, fallaba y reintentaba contra la misma pared. `connectedDevices`
+  es la única API que los ve.
+- **La placa cree que el enlace anterior sigue vivo.** Si el teléfono se va sin cerrar la conexión,
+  BlueZ la sostiene hasta el *supervision timeout* y mientras tanto no anuncia.
+
+**Decisión: el escaneo pasa a ser el último recurso.** El orden es (1) lo que ya está conectado al
+sistema, (2) el identificador recordado de la última vez —conexión directa, sin radio de por medio—,
+(3) escanear. Y toda conexión fallida se cancela explícitamente: en iOS un pedido de conexión
+pendiente bloquea el siguiente, que es cómo un intento malo se volvía «varios intentos».
+
+### 3. Lo que la placa nunca contó
+
+La placa no registraba **nada** sobre el enlace: anunciaba, y todo lo demás sólo se veía desde el
+teléfono — la mitad equivocada para quedarse ciego, porque «la app no encuentra nada» tiene dos
+causas opuestas que se ven igual. Ahora el journal dice qué central se conecta y se desconecta, qué
+vínculos hay guardados, y cuántas instancias de anuncio tiene BlueZ arriba (`virovision/link.py`).
+Si alguna vez aparece `NOT advertising and no central connected`, la falla es de la placa y ya no hace
+falta deducirlo — y la condición incluye «sin nadie conectado» porque BlueZ deja de anunciar
+**legítimamente** mientras hay una central conectada.
+
+## Actualización 2026-09-15 — Los anuncios pregrabados existen, y ómnibus deja de sonar siempre en el teléfono
+
+El §5 decía que en modo ómnibus la placa habla con anuncios pregrabados. Era una intención: no había
+anuncios, así que el código hacía lo contrario —el modo ómnibus quedaba **excluido** de la elección
+teléfono/dispositivo y sonaba siempre en el teléfono (`app/src/features/audio/audioOutput.ts`)—. Esa
+exclusión contradecía el ADR 0001: el único modo que funciona sin internet era el único que no podía
+sonar sin el teléfono.
+
+Ahora existen: **386 `.wav`** en la SD de la placa (los números de línea y los destinos del catálogo
+de la STM, más «se acerca un ómnibus» y «ómnibus sin número»), generados con
+`scripts/make_announcements.py`. *(Corregido el 2026-09-16: este párrafo decía «y los avisos de
+sistema» y era falso — los avisos de sistema no existían todavía, y ésa resultó ser exactamente la
+pieza que faltaba. Ver la actualización de abajo.)* Con eso el camino
+entero corre en el dispositivo: detección en el sensor, OCR en la Pi, voz por el parlante, **1,27 s
+desde el botón hasta la línea dicha** ([medición](../../mediciones/2026-09-15-omnibus-en-placa.md)).
+
+**Decisión: en modo ómnibus la voz respeta el ajuste de Ajustes**, igual que supermercado. Por
+defecto, en la placa. El JSON del resultado sale por BLE en los dos casos, porque la app muestra la
+lectura aunque no sea ella la que habla.
+
+Dos reglas que salieron de la primera prueba real y que valen como contrato del modo, no como detalle
+de implementación:
+
+- **Un ómnibus es un anuncio.** El tracker de por sí no lo garantiza: si algo corta el track —una
+  mano en la cámara, un poste, alguien que pasa— el mismo ómnibus vuelve como uno nuevo y el anuncio
+  se repite. Quien no ve no puede distinguir «lo repitió» de «llegó otro», así que una línea recién
+  anunciada queda en silencio 10 s.
+- **El click corto dentro del modo ómnibus repite el último anuncio.** Es el remedio para el caso en
+  que el usuario no llegó a escuchar, y no necesita nada del teléfono.
+
+## Actualización 2026-09-16 — La elección de salida vale para todo lo que suena, no sólo para las lecturas
+
+El 15 se cerró la mitad visible del problema: las dos lecturas —supermercado y ómnibus— salen por
+donde el usuario eligió. Probándolo con los anteojos puestos apareció la otra mitad. **Todo lo demás
+que la app dice seguía saliendo por el teléfono**: que el dispositivo se conectó, que la red quedó
+lista, que falló, que cambió el modo, el chirp del botón y hasta la confirmación del propio ajuste.
+Con la salida en el dispositivo, el usuario escuchaba el producto en los anteojos y todo el resto en
+el bolsillo.
+
+No era una regla escrita en ningún lado: era que el ajuste se consultaba en los dos únicos caminos
+donde alguien se acordó de consultarlo (`decideDelivery`), y el resto llamaba directo a `announce()`,
+que es `expo-speech` y por lo tanto siempre el teléfono.
+
+**Decisión: el ajuste gobierna todo lo que suena.** Un usuario no tiene forma de leer «la mitad de
+los sonidos se mudan de parlante y la otra mitad no» como otra cosa que un defecto.
+
+**Cómo, y por qué no puede ser de otra manera.** Los avisos de sistema son un **conjunto cerrado de
+frases pregrabadas** en la SD (`announcements/system/`, 10 `.wav`, ~820 KB), disparadas por el canal
+`control` de BLE con `{"cmd":"say","clip":"<archivo>"}`. Hay tres razones y las tres son la misma:
+
+1. **Un aviso de red no puede necesitar la red.** Sintetizarlo en la nube —que es como viaja la
+   lectura de supermercado— lo dejaría mudo justo cuando hace falta: la frase «no se pudo usar la red
+   del dispositivo» saldría por el único camino que acaba de fallar. Es ADR 0001 aplicado al aviso,
+   no sólo al reconocimiento.
+2. **BLE está vivo siempre que hay dispositivo.** Un aviso no necesita ni WiFi, ni AP, ni clave, ni
+   `photoAvailable`: sólo el enlace. Por eso hay **dos** funciones de decisión y no una
+   (`decideDelivery` para la lectura, `decideNoticeDelivery` para el aviso). Juzgar un aviso con la
+   regla de la lectura lo mandaría al teléfono cada vez que no hay síntesis o no hay AP, que es
+   precisamente cuando más se lo necesita.
+3. **El teléfono sigue siendo el fallback de todo.** Sin enlace, o si la escritura falla, habla el
+   teléfono. Un aviso que nadie escucha es igual a no avisar, y éstos son los que explican por qué
+   otra cosa se quedó callada.
+
+**Lo que se pierde, dicho en voz alta.** Tres avisos llevan un detalle variable (qué paso de la red
+falló, de qué se queja la placa, por qué falló la escritura del modo). El teléfono lo agrega; la
+placa dice una frase fija y completa, porque nadie puede grabar un `.wav` por mensaje de error. El
+detalle queda en pantalla y en telemetría, que es donde vive una cadena técnica.
+
+**Dos cosas más que aparecieron al hacerlo:**
+
+- **«Conectado» no se anunciaba por voz en ningún lado.** Estaba sólo como texto en la pestaña
+  Dispositivo, así que la única forma de enterarse de que el enlace subió era mirar la pantalla — lo
+  único que este usuario no puede hacer. Ahora es un aviso, con su contrario («se perdió la
+  conexión»), que por definición sale por el teléfono: la placa no puede anunciar su propia ausencia.
+- **El ajuste vivía sólo en el `BusWatcher`.** Una placa sin modo ómnibus disponible —sin `.rpk` en
+  el sensor, o sin `bus_banner` instalado— tiraba la elección del usuario a la basura y nadie de este
+  lado la recordaba. Ahora la dueña es el core (`core.audio_target`) y el watcher la hereda al
+  engancharse.
+
+**Corrección del mismo día, encontrada en el primer uso real.** El aviso «el dispositivo avisa: …»
+tenía clip y por lo tanto viajaba a la placa. La placa contesta los comandos que no conoce con un
+evento de error, la app convierte todo error de la placa en ese aviso, y el aviso volvía a la placa
+como otro comando: un lazo de escrituras BLE que no termina y en el que **nunca se dice nada**. La
+regla que lo cierra es más general que el bug: **la placa no reporta sus propias fallas** — lo que
+esté roto puede ser justo lo que tendría que decir la frase. Quedan 10 clips.
+
+De paso se tapó el otro agujero mudo: `aplay` falla hacia `/dev/null`, así que un `.wav` que no está
+en la SD sonaba igual que un parlante sin cablear. Ahora la placa avisa `missing notice: <archivo>`,
+y ese aviso lo dice el teléfono.
+
+## Actualización 2026-09-17 — Qué dice la placa y qué dice el teléfono: el reparto, corregido en uso
+
+La actualización anterior mandó a la placa **todo** lo que la app decía de sí misma. Probándolo en la
+placa apareció que eso estaba mal por dos motivos distintos, uno técnico y otro de producto, y el
+segundo es el que manda.
+
+**El técnico.** Con la salida en «dispositivo» la app dejó de poder unirse al AP. El aviso «dispositivo
+conectado» se anuncia en el instante en que sube el enlace, y con la salida en la placa eso es una
+**escritura GATT en `control`**, disparada sin `await` una línea antes de que la app **lea** la
+característica `wifi` para saber a qué red unirse. Dos operaciones de característica a la vez sobre un
+periférico recién conectado: la lectura volvía vacía, `readWifi()` contesta `null` ante cualquier
+falla, y sin credenciales no hay nada a lo que unirse. Con la salida en «teléfono» el mismo build
+andaba — el A/B que lo identificó.
+
+**El de producto, que es el que decide.** Un aviso sobre el enlace que viaja por ese mismo enlace es
+circular: cuando se anuncia que el dispositivo se conectó, el dispositivo **acaba de existir** para la
+app, y el usuario está con el teléfono en la mano emparejando, no con los anteojos puestos. Y el que
+dice que la red falló no puede ir por la red.
+
+**Decisión: el reparto no es «todo lo que suena», es por quién está escuchando y dónde.**
+
+| lo dice el teléfono | lo dice la placa (según el ajuste) |
+|---|---|
+| conectado, se perdió la conexión | los modos: espera, ómnibus, supermercado |
+| red lista, la red falló | el chirp al pedir una lectura |
+| los avisos de la propia placa | las lecturas de cada modo (como ya venía) |
+| no pude avisarle el modo | la confirmación del ajuste y «probar audio» |
+
+Las dos últimas de la derecha son la excepción razonada: verifican **la salida misma**, y una
+confirmación de «se escucha en el dispositivo» dicha por el teléfono no confirma nada. Ninguna corre
+durante una secuencia BLE — las dispara el usuario desde Ajustes.
+
+Quedan **6 clips** en la SD, no 10.
+
+**Y el arreglo de fondo, que sobrevive a la decisión.** Achicar el catálogo saca la carrera del camino
+de conexión, pero no la clase de bug: `applyGesture` anuncia el modo y lo escribe al dispositivo en la
+sentencia siguiente, también sin `await`. Así que las operaciones de característica pasan ahora por
+una cola (`services/ble/serialize.ts`): **el orden en que se piden es el orden en que ocurren**. Un
+aviso es lo menos importante que lleva el enlace y estaba compitiendo en silencio con lo que el
+producto necesita.
+
+## Actualización 2026-09-18 — Una voz por vez, venga del lado que venga
+
+Encontrado probando en la placa. Con la salida en «dispositivo», «Probar audio» empieza a sonar por
+el parlante; cambiando el ajuste a «teléfono» y tocando el botón otra vez, el celular arranca la
+misma frase **sin cortar la de la placa**, y quedan dos voces encimadas.
+
+La causa: **cada salida sabía interrumpirse a sí misma y ninguna sabía interrumpir a la otra.** El
+teléfono llama a `Speech.stop()` antes de hablar; la placa corta su `aplay` anterior antes de
+reproducir. Las dos reglas son correctas y juntas no alcanzan.
+
+No es un detalle estético. Está escrito desde el principio en `audio.py` —*«dos voces a la vez es
+peor que cualquiera de las dos: para alguien que no ve la pantalla, el audio solapado no es
+información»*— sólo que implementado dentro de cada salida y no entre las dos.
+
+**Decisión: quien empieza a hablar, calla al otro.** La placa gana un comando `{"cmd":"hush"}` que
+corta lo que esté sonando; el teléfono lo manda antes de hablar, y llama a `stopSpeaking()` antes de
+mandarle un aviso a la placa. Se aplica en los dos puntos de entrega que ya existían —los avisos de
+sistema y las lecturas— y no en cada llamador, por el mismo motivo de siempre: un punto de decisión,
+no varios que se olvidan de a uno.
+
+El silenciado de la placa va **sin `await`**: es mejor arriesgar un solapamiento de milisegundos que
+demorar un anuncio detrás de una escritura BLE. El del teléfono es local y gratis.
+
+**Lo que queda pendiente**, anotado para no descubrirlo en la calle: con el botón físico, el cambio
+de modo lo anuncia la app, así que viaja placa → app → placa. Funciona (BLE despierta la app), pero
+significa que **sin teléfono conectado un cambio de modo no se anuncia**. La placa podría decirlo
+sola, como ya hace con las lecturas de ómnibus; es un cambio aparte porque mueve el punto de decisión
+y hay que evitar que lo diga dos veces.
+
+## Actualización 2026-09-20 — Conectarse era lento y pedía permiso: tres causas, ninguna en el radio
+
+Con la Zero 2 W de vuelta, el reporte del usuario: BLE tarda en conectar; una vez conectado, el WiFi
+tarda mucho más, suele fallar al primer intento y **vuelve a pedir permiso para unirse a la red**
+en cada conexión. La actualización del 2026-09-07 prometía «el aviso de iOS aparece una sola vez por
+teléfono; la app comprueba antes si ya está unida». La promesa era correcta y la comprobación no
+funcionaba. Tres causas, medidas, y una decisión por cada una.
+
+### 1. La placa anunciaba cada 1,28 s
+
+Leído en la placa (`/sys/kernel/debug/bluetooth/hci0/adv_min_interval` = 2048 × 0,625 ms): el
+kernel anuncia con su valor por defecto, 1,28 s, y nadie lo había tocado. El teléfono sólo encuentra
+la placa —y sólo completa una conexión directa al identificador recordado del 2026-09-13— cuando
+**atrapa un anuncio**, así que ese intervalo es un piso debajo de *todas* las conexiones, incluidas
+las que no escanean. Medido desde la Mac (mismo CoreBluetooth que el iPhone), seis búsquedas por
+intervalo con el AP arriba, que es como se usa:
+
+| intervalo | tiempo hasta ver la placa |
+|---|---|
+| 1,28 s (antes), 6 búsquedas | 11,5 · 3,1 · 10,8 · **no apareció en 20 s** · 1,6 · **no apareció en 20 s** |
+| 100–152,5 ms (ahora), 12 búsquedas | 1,9 · 3,9 · 7,6 · 3,3 · 7,6 · 6,0 · 8,2 · 7,3 · 3,0 · 10,3 · 3,5 · 8,5 s |
+| 100–152,5 ms, **AP apagado**, 6 búsquedas | 3,9 · 6,7 · 7,0 · 1,3 · 9,7 · 10,6 s |
+
+Dos de seis búsquedas **fallaban** con el intervalo viejo: eso es «falla al primer intento» con otro
+nombre; con el nuevo, cero de doce. **Decisión**: `virovision.service` fija 100–152,5 ms por el mismo
+`debugfs` con el que ya fijaba el intervalo de conexión; 152,5 ms está en la lista de intervalos para
+los que Apple afina su escáner (*Accessory Design Guidelines*). Verificado con `btmon`: el
+controlador recibe `Min advertising interval: 100.000 msec / Max: 152.500 msec`. El costo de radio es
+despreciable frente a la Pi misma.
+
+Honestidad sobre el instrumento: **la Mac es un mal escáner**. Los tiempos siguen siendo de
+segundos con el intervalo nuevo, y la tercera fila descarta que sea la coexistencia WiFi/BT de la
+Zero (con el AP apagado da lo mismo): es macOS, que entrega los periféricos con pereza y coalesce
+duplicados. Lo que la Mac sí mide con claridad es la cola —«no apareció»— y ésa desapareció. El
+número que vale, el del iPhone, lo dará `ble.connected.ms` en la tabla cuando la telemetría vuelva.
+
+### 2. La comprobación de «¿ya estoy unido?» nunca podía contestar, y la confirmación del join tampoco
+
+La app preguntaba el SSID actual antes de pedirle al sistema unirse. En iOS **leer el SSID exige
+permiso de ubicación**, que esta app no pide a propósito (un permiso más que explicarle a una persona
+ciega, por un string que no necesitamos): sin él la librería no contesta nunca (`getCurrentWifiSSID`,
+colgado desde el 2026-09-07) y la app pagaba **3 s de timeout en cada conexión** para después
+preguntar igual. Y la propia librería confirma un join **leyendo el SSID de vuelta**, veinte veces
+cada 0,5 s (`RNWifi.m`): con el mismo permiso ausente, el sondeo no puede tener éxito, espera sus
+diez segundos y llama fallida a una conexión que funcionó (medido el 2026-09-18: cartel, aceptar, el
+teléfono se une, y diez segundos después «no se pudo conectar»; el latido de `status` de 15 s
+volvía a preguntar y «a la segunda anduvo»). Era el diagnóstico del PR #98, cerrado para rehacerlo.
+
+**Decisión: la única prueba de red que la app acepta es que la placa conteste `/health` en su IP.**
+No necesita permiso, tarda ~50 ms, y es evidencia de lo que importa (hay ruta hasta la placa) y no
+de un string. `reachDeviceNetwork` (`services/wifi/join.ts`) hace: (1) **sondear primero**; si la
+placa contesta, la red está lista y **al sistema no se le pide nada** — ése es el «sin permiso la
+segunda vez»; (2) si no, pedir el join **y seguir sondeando en paralelo**: la red se declara lista
+en cuanto la placa contesta, no cuando la librería termina su sondeo de diez segundos; de la promesa
+del join sólo se escucha un rechazo real (el usuario canceló, contraseña inválida), que corta la
+espera al instante. `unableToConnect` deja de ser un fallo: es «no pude confirmar», y confirma la placa.
+
+### 3. La app olvidaba la red, y olvidarla es lo que trae el cartel de vuelta
+
+iOS muestra «¿Querés unirte a ViroVision?» **cada vez** que se llama `applyConfiguration` estando el
+teléfono fuera de esa red; que la configuración esté guardada de la vez anterior no lo evita (el
+2026-09-19, la segunda llamada del día volvió a preguntar). Es una alerta del sistema y no hay API
+para suprimirla: la única manera de no verla es **no llamar**. Pero además la app **borraba** la
+configuración (`removeConfigurationForSSID`) al desconectar a mano y al bajar el AP, y con eso la
+siguiente conexión partía de cero. **Decisión: la red de la placa no se olvida nunca.** Una
+configuración guardada para un SSID ausente no cuesta nada; iOS suelta sola una red que desaparece.
+`leaveWifi` y `currentSsid` se retiran del código.
+
+### Lo que sigue midiéndose
+
+`wifi.ready` lleva ahora `via: 'already' | 'joined'`: **`already` es lo que tiene que decir toda
+conexión después de la primera**. Si la tabla muestra `joined` en conexiones repetidas, iOS no está
+volviendo solo a la red guardada (por ejemplo, porque prefiere la WiFi de casa, que sí tiene
+internet) y ése sería el próximo tema — no éste.
+
+## Ver también
+
+- Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).
+- Protocolo de la medición: [`docs/mediciones/2026-09-04-ble-throughput.md`](../../mediciones/2026-09-04-ble-throughput.md).
+- Instalación y perfil de la placa: [`hardware/raspi/README.md`](../../../hardware/raspi/README.md).

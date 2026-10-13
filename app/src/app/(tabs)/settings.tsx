@@ -6,8 +6,10 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { announce } from '@/features/audio/announcer';
-import { ThemeSelector } from '@/features/theme/ThemeSelector';
+import { notify } from '@/features/audio/systemNotice';
+import { AudioOutputSelector } from '@/features/audio/AudioOutputSelector';
+import { ModelSelector } from '@/features/reader/ModelSelector';
+import { useProductModel } from '@/features/reader/ProductModelProvider';
 import { strings } from '@/i18n';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -27,8 +29,8 @@ function FeatureRow({
       accessible
       accessibilityRole="text"
       accessibilityLabel={`${title}. ${desc}`}>
-      {/* Relleno verde con el glifo oscuro encima, no al revés: el verde de marca sobre su
-          propio tinte claro da 2.24:1 y un ícono necesita 3:1 (WCAG 1.4.11). */}
+      {/* Green fill with the dark glyph on top, not the other way round: the brand green over its
+          own light tint gives 2.24:1 and an icon needs 3:1 (WCAG 1.4.11). */}
       <View className="h-[44px] w-[44px] items-center justify-center rounded-md bg-primary">
         <Ionicons name={icon} size={24} color={theme.onPrimary} />
       </View>
@@ -44,18 +46,39 @@ function FeatureRow({
   );
 }
 
+/**
+ * Settings. No appearance section since 2026-09-14 (ADR 0010): the app ships dark only, so there is
+ * nothing to choose. What is left are decisions about the reading (model, where it is heard) and the
+ * explanation of what the app recognizes.
+ */
 export default function SettingsScreen() {
   const t = strings.settings;
+  const { model, models, choose } = useProductModel();
 
   return (
     <Screen scroll>
       <ScreenHeader title={t.title} />
 
+      {/* No surrounding label, by request: the trigger already announces itself as "Modelo
+          seleccionado: X" and the menu as "Seleccionar modelo". With no key in the build there is
+          nothing to choose and it says so, because an absent control communicates no state. */}
+      <Card>
+        {model ? (
+          <ModelSelector value={model} options={models} onChange={choose} />
+        ) : (
+          <ThemedText type="small" themeColor="textSecondary">
+            {strings.reader.cloudNotConfigured}
+          </ThemedText>
+        )}
+      </Card>
+
+      {/* Above "cómo funciona" and below the model: it is a decision about the reading, like the
+          model, and not part of the explanation of the app. */}
       <Card>
         <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {t.appearance.toUpperCase()}
+          {t.audioOutput.toUpperCase()}
         </ThemedText>
-        <ThemeSelector />
+        <AudioOutputSelector />
       </Card>
 
       <Card>
@@ -72,7 +95,10 @@ export default function SettingsScreen() {
           label={strings.home.testAudioButton}
           hint={strings.home.testAudioHint}
           variant="secondary"
-          onPress={() => announce(strings.home.testAudioPhrase)}
+          // Through the notice router: a button whose whole job is checking the audio output has to
+          // come out of the output being checked, or it verifies the one thing the user did not ask
+          // about. Since 2026-09-16 the board has this phrase recorded too.
+          onPress={() => void notify('audioTest')}
         />
       </Card>
 

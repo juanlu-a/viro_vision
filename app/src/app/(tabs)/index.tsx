@@ -1,13 +1,25 @@
 /**
- * Inicio: los modos de operación (ADR 0007) al frente.
+ * Home: the operating modes (ADR 0007) up front.
  *
- * Los dos botones de modo son la versión de desarrollo del botón físico del dispositivo:
- * aplican los mismos gestos (click, doble click, click largo) a la misma máquina de estados.
- * Cada botón muta entre activar y desactivar en lugar de intercambiarse por otro — si el botón
- * cambiara de identidad, VoiceOver perdería el foco (trampa ya pisada, ver convenciones).
- * El botón del modo contrario se deshabilita porque el diagrama canónico no tiene salto directo
- * entre modos: se pasa por esperando, acá y en el firmware.
+ * The two mode buttons are the development version of the device's physical button: they apply the
+ * same gestures (click, double click, long press) to the same state machine. Each button mutates
+ * between activate and deactivate instead of being swapped for another one — if a button changed
+ * identity, VoiceOver would lose focus (a trap already stepped on, see the conventions).
+ *
+ * Neither is disabled by the other's mode: since ADR 0007's 2026-09-09 update a gesture names a
+ * mode from wherever the device is, and the firmware honours that. Until 2026-10 this screen still
+ * blocked the direct jump and said so in a hint, so the app was stricter than the device it mirrors
+ * — the exact drift `modes.test.ts` exists to catch, and it slipped through because the guard lived
+ * in a screen and not in the machine.
+ *
+ * The screen shows the RESULT and the photo behind it, nothing else. The timings, which model
+ * answered and the OCR's raw text are recorded in Supabase since 2026-09-07: they were a
+ * diagnostics screen embedded in the interface of an app for people who do not see it. Since
+ * 2026-09-14 the device's status line is gone too: the Device tab already says whether the device is
+ * fully usable, and saying it twice made Home read like a dashboard. What Home keeps is the reason a
+ * read cannot happen, in the read button's hint, because that is actionable right here.
  */
+import { Image } from 'expo-image';
 import { View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
@@ -15,124 +27,139 @@ import { Card } from '@/components/card';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { formatMs } from '@/features/reader/lectura';
-import { ModelSelector } from '@/features/reader/ModelSelector';
-import type { Modo } from '@/features/reader/modes';
-import { useLector } from '@/features/reader/useLector';
+import { Radius } from '@/constants/theme';
+import type { Mode } from '@/features/reader/modes';
+import { busLineRows, productRows } from '@/features/reader/result';
+import { useReader } from '@/features/reader/useReader';
 import { strings } from '@/i18n';
 
-const MODO_LABEL: Record<Modo, string> = {
-  esperando: strings.reader.modeEsperando,
-  omnibus: strings.reader.modeOmnibus,
-  supermercado: strings.reader.modeSupermercado,
-};
-
-const READ_HINT: Record<Modo, string> = {
-  esperando: strings.reader.readHintEsperando,
-  omnibus: strings.reader.readHintBus,
-  supermercado: strings.reader.readHintSuper,
+const MODE_LABEL: Record<Mode, string> = {
+  idle: strings.reader.modeIdle,
+  bus: strings.reader.modeBus,
+  supermarket: strings.reader.modeSupermarket,
 };
 
 export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
-  const { state, aplicarGesto, leer, modelo, modelos, elegirModelo } = useLector();
+  const { state, applyGesture, read, model, deviceReady } = useReader();
 
-  const ocupado = state.estado !== 'idle';
-  const enOmnibus = state.modo === 'omnibus';
-  const enSupermercado = state.modo === 'supermercado';
+  const busy = state.status !== 'idle';
+  const rows = state.product ? productRows(state.product) : state.reading ? busLineRows(state.reading) : null;
+  const inBus = state.mode === 'bus';
+  const inSupermarket = state.mode === 'supermarket';
 
   return (
     <Screen scroll>
       <ScreenHeader title={t.title} subtitle={t.subtitle} mark="large" />
 
-      {/* La acción principal: primera en la pantalla y primera para el lector de pantalla. */}
+      {/* The main action: first on the screen and first for the screen reader. */}
       <Card>
-        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {r.section.toUpperCase()}
-        </ThemedText>
-
-        {/* El modo también como texto: el estado nunca se comunica sólo por botones o color. */}
-        <View accessible accessibilityRole="text" accessibilityLabel={`${r.modeLabel}: ${MODO_LABEL[state.modo]}`}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {r.modeLabel}
+        {/* The mode as text too: state is never communicated by buttons or colour alone. Only the
+            mode's name, in body size: the "Modo actual" caption and the display-size word were the
+            largest thing on the screen for the least useful information on it. The screen reader
+            still gets the caption, because "Esperando" on its own does not say what is waiting. */}
+        <View accessible accessibilityRole="text" accessibilityLabel={`${r.modeLabel}: ${MODE_LABEL[state.mode]}`}>
+          <ThemedText type="default" className="font-sans-bold">
+            {MODE_LABEL[state.mode]}
           </ThemedText>
-          <ThemedText type="subtitle">{MODO_LABEL[state.modo]}</ThemedText>
         </View>
 
         <AccessibleButton
-          label={enOmnibus ? r.modeBusOff : r.modeBusOn}
-          hint={enSupermercado ? r.modeBlockedHint : enOmnibus ? r.modeOffHint : r.modeBusOnHint}
+          label={inBus ? r.modeBusOff : r.modeBusOn}
+          hint={inBus ? r.modeOffHint : r.modeBusOnHint}
           variant="secondary"
-          onPress={() => aplicarGesto(enOmnibus ? 'clickLargo' : 'click')}
-          disabled={ocupado || enSupermercado}
+          onPress={() => applyGesture(inBus ? 'longPress' : 'click')}
+          disabled={busy}
         />
         <AccessibleButton
-          label={enSupermercado ? r.modeSuperOff : r.modeSuperOn}
-          hint={enOmnibus ? r.modeBlockedHint : enSupermercado ? r.modeOffHint : r.modeSuperOnHint}
+          label={inSupermarket ? r.modeSuperOff : r.modeSuperOn}
+          hint={inSupermarket ? r.modeOffHint : r.modeSuperOnHint}
           variant="secondary"
-          onPress={() => aplicarGesto(enSupermercado ? 'clickLargo' : 'dobleClick')}
-          disabled={ocupado || enOmnibus}
+          onPress={() => applyGesture(inSupermarket ? 'longPress' : 'doubleClick')}
+          disabled={busy}
         />
-        {/* El modelo de nube pertenece al modo supermercado y sólo aparece con ese modo activo:
-            es el único que va a la nube (ADR 0006), y en los otros modos el control no hace nada.
-            Aparece justo debajo del botón que lo habilita, así el foco de VoiceOver lo encuentra
-            en el siguiente elemento tras activar el modo. Sin clave no hay selector: se dice acá
-            en vez de dejar que el usuario lo descubra recién al elegir una foto — el estado nunca
-            se comunica sólo por un control ausente. */}
-        {enSupermercado &&
-          (modelo ? (
-            <ModelSelector value={modelo} options={modelos} onChange={elegirModelo} disabled={ocupado} />
-          ) : (
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.cloudNotConfigured}
-            </ThemedText>
-          ))}
+        {/* Choosing the model is a setting and lives in Settings; what stays here is only the notice
+            that this build ships no key, and only with the mode that needs it active. It is said
+            before reading instead of letting the user discover it when taking the photo: state is
+            never communicated by an absent control alone. */}
+        {inSupermarket && !model && (
+          <ThemedText type="small" themeColor="textSecondary">
+            {r.cloudNotConfigured}
+          </ThemedText>
+        )}
 
+        {/* A single read button, and the photo is ALWAYS taken by the device (ADR 0003). Without it
+            there is no image, so it is disabled instead of hidden —an absent control communicates no
+            state— and the hint says what is missing and where to look (the Device tab). The button
+            mutates and is not swapped for another one, so VoiceOver does not lose focus when the
+            state changes. */}
         <AccessibleButton
           label={
-            state.estado === 'preparing' && state.progreso != null
-              ? `${r.reading} ${Math.round(state.progreso * 100)} %`
-              : state.estado === 'reading'
+            state.status === 'preparing' && state.progress != null
+              ? `${r.reading} ${Math.round(state.progress * 100)} %`
+              : state.status === 'reading'
                 ? r.reading
-                : r.readButton
+                : r.readWithDeviceButton
           }
-          hint={READ_HINT[state.modo]}
-          onPress={leer}
-          disabled={ocupado || state.modo === 'esperando'}
-          loading={ocupado}
+          hint={deviceReady ? r.readWithDeviceHint : r.readNeedsDeviceHint}
+          onPress={read}
+          disabled={busy || state.mode === 'idle' || !deviceReady}
+          loading={busy}
         />
 
-        {state.mensaje !== '' && (
-          <View accessible accessibilityRole="text" accessibilityLabel={state.mensaje}>
+        {/* The voice already said the phrase; the screen shows the fields one by one, readable and
+            walkable with the screen reader. */}
+        {state.message !== '' && !rows && (
+          <View accessible accessibilityRole="text" accessibilityLabel={state.message}>
             <ThemedText type="small" themeColor="textSecondary">
               {r.resultLabel}
             </ThemedText>
-            <ThemedText type="subtitle">{state.mensaje}</ThemedText>
+            <ThemedText type="subtitle">{state.message}</ThemedText>
           </View>
         )}
-        {state.textoCrudo && (
-          <View accessible accessibilityRole="text">
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.rawLabel}
+        {rows && (
+          <View className="gap-two">
+            <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+              {r.resultLabel.toUpperCase()}
             </ThemedText>
-            <ThemedText type="code">{state.textoCrudo.slice(0, 200)}</ThemedText>
+            {rows.map((row) => (
+              <View
+                key={row.label}
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`${row.label}: ${row.value}`}
+                className="flex-row items-baseline justify-between gap-three">
+                <ThemedText type="small" themeColor="textSecondary">
+                  {row.label}
+                </ThemedText>
+                <ThemedText type={row.empty ? 'small' : 'subtitle'} themeColor={row.empty ? 'textSecondary' : undefined} className="flex-1 text-right">
+                  {row.value}
+                </ThemedText>
+              </View>
+            ))}
           </View>
         )}
-        {state.modelo && (
-          <View accessible accessibilityRole="text">
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.modelUsedLabel}
+
+        {/* The photo the device took, below the result. It is not a diagnostic —telemetry handles
+            that— but product content: someone with some vision uses it to see what the camera
+            framed, which is the only thing that tells "the model got it wrong" from "the photo was
+            of the ceiling". It goes AFTER the fields on purpose: the voice already said the result
+            and the screen reader reaches what can be read first.
+
+            Fixed 4:3 `aspect-ratio`, which is what the board delivers (1024x766): without it the
+            height would be decided by the image on load and the card would jump. */}
+        {state.photoUri && (
+          <View className="gap-two">
+            <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+              {r.photoLabel.toUpperCase()}
             </ThemedText>
-            <ThemedText type="code">{state.modelo}</ThemedText>
-          </View>
-        )}
-        {state.ms != null && (
-          <View accessible accessibilityRole="text">
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.timeLabel}
-            </ThemedText>
-            <ThemedText type="code">{formatMs(state.ms)}</ThemedText>
+            <Image
+              source={{ uri: state.photoUri }}
+              style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: Radius.md }}
+              contentFit="contain"
+              accessibilityLabel={r.photoHint}
+            />
           </View>
         )}
       </Card>

@@ -3,14 +3,19 @@
 System architecture, component and data-flow diagrams, and Architecture Decision Records (ADRs).
 
 - **System overview** — app ↔ device ↔ (optional) phone-side processing.
-- **App ↔ device integration** — the two channels: BLE (GATT) for data/control + a separate audio
-  channel (A2DP/HFP or wired) for the recognition TTS to the device earphone.
+- **App ↔ device integration** — [ADR 0003](adr/0003-enlace-placa-telefono.md): BLE (GATT) siempre
+  vivo como plano de control (es lo único que despierta a la app con el teléfono en el bolsillo); la
+  foto del modo supermercado viaja por BLE o por un AP WiFi de la placa según una medición con umbral;
+  el audio sale por un DAC I2S cableado en la placa (no A2DP: compartiría antena con BLE y WiFi).
 - **Recognition data flow** — per use case since [ADR 0006](adr/0006-pipelines-por-caso-de-uso.md):
-  buses = on-device detection (Coral TPU) → banner crop → OCR → announcement; supermarket =
-  vision LLM (local small model or cloud, pending) → announcement.
-- **ADRs** — see [`adr/`](adr/) for the full index (0001 offline-first, 0002 Supabase,
-  0004 on-device runtime, 0006 pipelines por caso de uso, 0007 botones físicos y modos).
-  To backfill: RPi Zero 2 W + Coral TPU, React Native (Expo), on-device vs. offload-to-phone.
+  buses = on-device detection (**dentro del sensor IMX500**, no en una TPU aparte) → banner crop →
+  OCR en la Pi → announcement, medido de punta a punta el 2026-09-15; supermarket =
+  cloud vision LLM chosen by the user → announcement (decided 2026-08-30; the local fallback is
+  still open). Los tres flujos, dibujados, en [Flujos por caso de uso](#flujos-por-caso-de-uso).
+- **ADRs** — see [`adr/`](adr/) for the full index (0001 offline-first, 0002 Supabase, 0003 enlace
+  placa ↔ teléfono, 0004 on-device runtime, 0006 pipelines por caso de uso, 0007 botones físicos y
+  modos, 0008 proxy de claves).
+  To backfill: RPi + AI Camera (IMX500), React Native (Expo), on-device vs. offload-to-phone.
 
 ## Modos de operación (diagrama canónico)
 
@@ -29,12 +34,15 @@ stateDiagram-v2
     Esperando --> ModoSupermercado : 2 clicks
 
     ModoOmnibus : Modo detección de ómnibus
-    ModoOmnibus : detección en TPU → recorte del banner → OCR
+    ModoOmnibus : cámara en vigilancia: detección → recorte del banner → OCR
     ModoSupermercado : Modo supermercado
-    ModoSupermercado : LLM con visión (local chico o nube, pendiente)
+    ModoSupermercado : al activarse saca una foto y la procesa (LLM con visión en la nube)
 
-    ModoOmnibus --> ModoOmnibus : sin click largo
-    ModoSupermercado --> ModoSupermercado : sin click largo
+    ModoOmnibus --> ModoSupermercado : 2 clicks
+    ModoSupermercado --> ModoOmnibus : 1 click
+
+    ModoOmnibus --> ModoOmnibus : 1 click (ya está activo: no pasa nada)
+    ModoSupermercado --> ModoSupermercado : 2 clicks (ya está activo: LEE DE NUEVO)
 
     ModoOmnibus --> Esperando : click largo
     ModoSupermercado --> Esperando : click largo
@@ -42,3 +50,108 @@ stateDiagram-v2
 
 En reposo el dispositivo está **conectado y esperando**: ni captura ni anuncia. Cada transición de
 modo se anuncia por audio — el usuario no tiene otro indicador de estado.
+
+**Un gesto nombra un modo, no un paso** (actualización del 2026-09-09, ver ADR 0007): 1 click es
+siempre ómnibus y 2 clicks siempre supermercado, esté el dispositivo donde esté. Entrar a un modo
+desactiva el anterior. Hasta esa fecha los clicks sólo valían desde *esperando* y cambiar de modo
+exigía un click largo en el medio; probado en la mano, se sentía como que el botón estaba roto.
+
+**Dos clicks piden una lectura, siempre** (actualización del 2026-10, ver ADR 0007). Estando ya en
+supermercado, el doble click no cambia de modo y aun así saca una foto nueva: frente a la góndola el
+usuario repite el gesto para leer el producto siguiente. Hasta esa fecha la captura se disparaba con
+la *transición* de modo, así que el segundo doble click no hacía nada y el botón se sentía muerto —
+la misma queja que la actualización anterior arregló un nivel más arriba. El click simple es el gesto
+opuesto: ómnibus ya está vigilando solo, así que repetirlo no pide nada nuevo.
+
+Los dos modos se comportan distinto por naturaleza, y eso es deliberado: **ómnibus es continuo**
+—la cámara queda vigilando y anuncia cada ómnibus que aparece— mientras que **supermercado es
+puntual**: activarlo saca una foto y la procesa, porque el usuario está parado frente a la góndola
+apuntando a un producto.
+
+## Flujos por caso de uso
+
+Transcripción de [`documents/logicas-casos-de-uso.pdf`](../../documents/logicas-casos-de-uso.pdf),
+el diagrama dibujado a mano en el que se acordaron los tres flujos. Están acá en mermaid y no como
+imagen porque así se versionan como texto, se leen en un diff y GitHub los renderiza; el PDF queda
+como registro de la fuente.
+
+En los tres, el **audio siempre sale por el parlante del dispositivo**: el usuario tiene las manos
+libres y no mira el teléfono. Lo que cambia entre casos es **dónde corre cada modelo** y, por lo
+tanto, qué viaja por el enlace.
+
+### Caso ómnibus A — modelo parcial en la Raspi
+
+La TPU hace de **preprocesadora**: detecta el ómnibus y recorta el banner, y por el enlace viaja
+el **recorte**, no el frame entero. El OCR corre en el teléfono.
+
+```mermaid
+flowchart LR
+    subgraph HW["Dispositivo (RPi + AI Camera IMX500)"]
+        direction TB
+        CAM["Cámara"] --> YOLO["Detección<br/>(modelo en el sensor)"]
+        SPK["Parlante"]
+    end
+
+    subgraph PHONE["Smartphone"]
+        direction TB
+        OCR["OCR local"] --> JSON["{ numero: 456,<br/>destino: … }"]
+    end
+
+    YOLO -->|"BLE + WiFi<br/>recorte del banner"| OCR
+    JSON -->|"BLE + WiFi<br/>audio"| SPK
+```
+
+### Caso ómnibus B — modelo completo en la Raspi
+
+Todo en el dispositivo: no hay enlace en el camino de reconocimiento, y el teléfono no participa.
+Es el caso que mejor cumple ADR 0001, y el que más exige del hardware.
+
+```mermaid
+flowchart LR
+    subgraph HW["Dispositivo (RPi + AI Camera IMX500)"]
+        direction LR
+        CAM["Cámara"] --> YOLO["Detección<br/>(modelo en el sensor)"]
+        YOLO --> OCR["OCR"]
+        OCR --> JSON["{ numero: 456,<br/>destino: … }"]
+        JSON --> SPK["Parlante"]
+    end
+```
+
+### Caso supermercado — modelo en la nube
+
+El dispositivo sólo captura y transmite; el reconocimiento lo hace un **LLM con visión** al que
+llama la app. Es el único camino que sale a internet (ADR 0001 enmendado + ADR 0006): el usuario
+está quieto frente a la góndola y tolera latencia a cambio de precisión.
+
+**La foto la saca la placa** y baja al teléfono por WiFi (ADR 0003). Hasta el 2026-09-08 la cámara
+del teléfono ocupaba ese lugar mientras no había hardware; con la placa andando se retiró, y sin
+dispositivo conectado la app no lee: el botón queda deshabilitado y la pantalla dice por qué.
+
+```mermaid
+flowchart LR
+    subgraph HW["Dispositivo (RPi)"]
+        direction TB
+        CAM["Cámara"] --> PLACA["Placa<br/>(captura, sin inferencia)"]
+        SPK["Parlante"]
+    end
+
+    subgraph PHONE["Smartphone"]
+        direction TB
+        CALL["Llamada al modelo<br/>elegido en Inicio"] --> JSON["{ tipo: macarrones,<br/>marca: Adria,<br/>detalle: … }"]
+    end
+
+    CLOUD["LLM con visión<br/>en la nube"]
+
+    PLACA -->|"BLE + WiFi<br/>foto"| CALL
+    CALL <-->|"HTTPS"| CLOUD
+    JSON -->|"BLE + WiFi<br/>audio"| SPK
+```
+
+> **Estado (2026-09-01).** El caso supermercado es el que está en desarrollo. Los dos casos de
+> ómnibus quedaron **en stand by**: la app implementa hoy el camino local (OCR sobre la foto) que
+> ambos comparten, y elegir entre A y B depende de tener el hardware para medirlos.
+>
+> **Actualización (2026-09-04).** El equipo eligió el **caso B** para ómnibus (todo en la placa) y
+> confirmó el flujo de supermercado tal como está dibujado. El "BLE + WiFi" de las flechas se
+> resuelve en [ADR 0003](adr/0003-enlace-placa-telefono.md): BLE siempre, WiFi sólo si la medición
+> de throughput lo pide.

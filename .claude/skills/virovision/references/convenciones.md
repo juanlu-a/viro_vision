@@ -80,7 +80,7 @@ falta.
 Un módulo que **no debe ser llamado desde cierto camino** lleva un comentario que lo dice, cita el
 ADR y explica la consecuencia. Dos vivos:
 
-- `services/vision/reconocerProducto.ts` — *REGLA DE FRONTERA (ADR 0001 + ADR 0006)*: la nube sólo
+- `services/vision/recognizeProduct.ts` — *REGLA DE FRONTERA (ADR 0001 + ADR 0006)*: la nube sólo
   desde el modo supermercado; nunca desde el camino de ómnibus, que corre local. El linter lo fuerza
   (`eslint.config.js`).
 - `services/supabase/client.ts` — *BOUNDARY RULE (ADR 0001 + 0002)*: la cuenta online no puede estar
@@ -100,6 +100,12 @@ error transporta un dato accionable (cuánto esperar, qué status), va como camp
 **alguien tiene que leerlo**: hubo un bug real donde `VISION_STREAM_ERROR` mostraba su propio nombre
 y el detalle quedaba en un campo que nadie miraba.
 
+**El texto de un error nunca llega al usuario (ADR 0011, 2026-10-06).** Ni en pantalla ni en voz:
+nada de `` `${t.algo} ${err.message}` ``. El error va a la telemetría con
+`record(tipo, { detail: { message: errorDetail(err), type: errorType(err) } })` y al usuario le llega
+una clave fija de `es.ts` que dice qué hacer. Un `catch` que no registra nada es un bug: si el error
+no le importa al usuario, igual le importa a quien lee la tabla `events`.
+
 ## Tests
 
 - **Co-locados**: `foo.test.ts` al lado de `foo.ts`. No hay carpeta `__tests__/`.
@@ -114,6 +120,13 @@ y el detalle quedaba en un campo que nadie miraba.
   deliberados: si algún día pasaran, hay que revisar la decisión.
 - Reloj y esperas **inyectables** en cualquier cosa con tiempo (`now`, `sleep`), o el test tarda un
   minuto real.
+- **Y la configuración de entorno también inyectable, por el mismo motivo.** Un test que lee
+  `process.env` mide dónde corre, no qué hace el código. La suite se ejecuta en **dos entornos
+  distintos**: el CI de PRs corre sin secrets, y los workflows de publicación corren con todos en
+  el `env` del job. Un test de `services/audio/synthesis.ts` que asumía "no hay proxy configurado"
+  pasaba en local —jest no carga `.env`— y **rompió el build de TestFlight** el 2026-09-02. Pasá la
+  URL del proxy, la clave y cualquier bandera como parámetro con default, como ya hacen
+  `resolveTransport` y el limitador de cuota, y cubrí los dos caminos en vez de asumir uno.
 
 ## i18n
 
@@ -123,10 +136,16 @@ solo lugar. Los componentes importan `strings` de `@/i18n`.
 
 ## Idioma
 
-Identificadores en **inglés**; comentarios y cadenas en **español** en todo lo escrito desde
-2026-08-10. Los sustantivos del dominio quedan en español aun en código inglés (`BusReading.numero`,
-`BusReading.nombre`). **Al tocar un archivo, seguí el idioma que ya tiene** — hay archivos de julio
-enteramente en inglés y no se traducen porque sí.
+**Todo el código va en inglés** desde el 2026-09-09 (ADR 0009): identificadores, nombres de archivo,
+comentarios, mensajes de test, ramas y commits. También las fronteras — el protocolo BLE, los
+endpoints HTTP de la placa, los flags del daemon y el esquema de Supabase.
+
+**Lo que sigue en español es lo que una persona lee o escucha**: los *valores* de `src/i18n/es.ts`
+(las claves son inglesas), las etiquetas de los modelos del selector, el prompt del modo supermercado
+—porque su respuesta se lee en voz alta— y **toda la documentación**: `docs/`, los ADRs, esta skill y
+la tesis. Los nombres propios de marca (Azul Profundo, Verde Lectura) tampoco se traducen.
+
+Si encontrás un identificador en español, es un resto: renombralo al tocarlo.
 
 ## Accesibilidad
 
@@ -158,8 +177,14 @@ Trampas ya pisadas, que no hay que repetir:
   crea la rama nueva. La lección viene de dos ramas que quedaron huérfanas sin PR
   (`feat/lector-en-inicio`, `docs/decisiones-equipo-2026-08`) mientras los ADRs ya referenciaban
   su contenido como existente.
-- **Conventional Commits con scope**, asunto en español: `fix(vision):`, `feat(marca):`,
-  `docs:`. El cuerpo explica **el razonamiento**, no el diff — se lee dentro de seis meses.
+- **Antes de escribir una línea, `git fetch && git branch -r`.** No alcanza con buscar en `staging`:
+  lo que vive en una rama sin mergear no aparece ahí, y el repo ya tuvo tres. El 2026-09-09 se
+  reimplementaron enteros la telemetría y el sacar lo técnico de las pantallas sin ver que
+  `feat/telemetria-supabase` ya los tenía, con su migración, desde el 07/09. Si el nombre de una
+  rama se parece a lo que vas a hacer, mirala (`git log --oneline origin/<rama> -3`) antes.
+- **Conventional Commits con scope**, asunto en inglés desde el 2026-09-09 (ADR 0009): `fix(vision):`,
+  `feat(brand):`, `docs:`. El cuerpo explica **el razonamiento**, no el diff — se lee dentro de seis
+  meses. Los 71 commits anteriores están en español y se dejan como están.
 - **Nunca agregues un trailer de co-autoría de IA.** Los commits son del autor humano.
 - **Una rama por cambio, desde un `staging` al día. Sin apilar PRs.** La lección viene de los PRs
   #1–#4. Si hay dos temas, son dos ramas en secuencia: se mergea la primera, se actualiza
@@ -183,12 +208,14 @@ git diff origin/staging <rama-vieja>   # vacío = todo el contenido está en sta
 
 | Evento | Efecto |
 |---|---|
-| merge a `staging` (cambios en `app/`) | build de TestFlight al grupo **interno** *Equipo ViroVision* (devs, sin revisión, minutos) y — cuando `PLAY_ENABLED=true` — `.aab` a *internal testing* de Google Play |
+| merge a `staging` (cambios en `app/`) | build de TestFlight al grupo **interno** *Equipo ViroVision* (devs, sin revisión, minutos), un `.apk` de sideload como artefacto del run (workflow `android-apk.yml`, mientras Play esté apagado) y — cuando `PLAY_ENABLED=true` — `.aab` a *internal testing* de Google Play |
 | PR `staging → main` mergeado (= release) | build al grupo **externo** *Testers ViroVision*, link público <https://testflight.apple.com/join/jbE7GDqV> (Beta App Review del 1.er build de cada versión) |
-| *Actions → TestFlight / Google Play → Run workflow* | publicar cualquier rama al destino que se elija |
+| *Actions → TestFlight / Google Play / Android APK → Run workflow* | publicar cualquier rama al destino que se elija; el `.apk` se baja del run y se manda por donde sea |
 
 Cada grupo de TestFlight muestra **un solo build** (el último; el externo conserva además el último
-aprobado). Un build tarda ~30 min de runner + procesamiento de la tienda. Lo que no va a producción
+aprobado). El grupo interno **no tiene link para compartir** (regla de Apple): sus testers son
+usuarios de App Store Connect, se invitan en ASC y TestFlight les avisa solo; el link compartible
+es el del grupo externo, <https://testflight.apple.com/join/jbE7GDqV>. Un build tarda ~30 min de runner + procesamiento de la tienda. Lo que no va a producción
 se **revierte en `staging` con un PR de revert** antes del release.
 
 ## Qué documento actualizar

@@ -1,0 +1,243 @@
+"""The device's HTTP server: the photo path over WiFi (ADR 0003's plan B).
+
+Measured on 2026-09-05: over BLE the photo's 53 KB take 4.5 s (one notification per 15 ms interval,
+controller without DLE); over HTTP on the same WiFi radio, 46 ms. BLE stays as the control plane and
+this carries the payload. **The app always pulls, the device never pushes**: that way the phone needs
+no server. No TLS on purpose (ADR 0003): WPA2 already encrypts the air and the data is not sensitive;
+the IP and the port travel through the GATT `status` characteristic.
+
+Stdlib and one thread, no dependencies: `ThreadingHTTPServer` serves on its own thread and the BLE
+asyncio loop never notices. Capture and status reading are passed in as callables.
+
+    GET  /health           status JSON (the same one as the `status` characteristic)
+    GET  /measure/<bytes>  <bytes> random bytes, to measure the download without a camera
+    GET  /photos/latest    captures now and returns the JPEG (1024 px, q70); 503 without a camera
+    POST /audio            stores the body (MP3/WAV) to play it; 202 with the size
+    GET  /evidence/<run>/<file>  one record (.json) or picture (.jpg) of bus mode, after the device
+                           announced it over BLE [TEMPORARY, removed before the final version:
+                           see evidence.py]
+"""
+
+from __future__ import annotations
+
+import base64
+import binascii
+import json
+import logging
+import os
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import ThreadingMixIn
+from typing import Callable, Optional
+
+from . import evidence
+from .camera import CameraNotReady
+from .core import MEASURE_MAX_BYTES
+
+log = logging.getLogger(__name__)
+
+DEFAULT_PORT = 8080
+AUDIO_MAX_BYTES = 5_000_000
+AUDIO_DIRECTORY = "/tmp/virovision-audio"
+AUDIO_FILES_KEPT = 3
+"""How many received readings stay in AUDIO_DIRECTORY. On Trixie /tmp is a tmpfs, so every MP3 the
+phone sent was RAM the board never got back: a shopping trip of readings, kept forever, on 512 MB
+(review of 2026-10-06). Three and not one so the file a player was just handed —`Popen` returns before
+`mpg123` opens it— is never the one deleted; an older one still playing is safe anyway, because Linux
+keeps a deleted file's data until its last reader closes it."""
+REQUEST_TIMEOUT_S = 15.0
+"""Per socket operation. Without it a phone that walked out of WiFi range mid-request left a handler
+thread blocked on `recv` for good, and keep-alive connections the app never closed piled up the same
+way."""
+
+
+def _prune_audio(directory: str, keep: int = AUDIO_FILES_KEPT) -> None:
+    """Deletes all but the newest `keep` readings. Best-effort: a file that will not go is a log
+    line, never a failed `/audio` — the reading itself already arrived and is playing."""
+    try:
+        names = [n for n in os.listdir(directory) if n.startswith("audio-")]
+    except OSError:
+        return
+    # The names carry the millisecond they arrived (`audio-<ms>.<ext>`), so sorting by that number is
+    # sorting by age without a `stat` per file.
+    names.sort(key=_arrival)
+    for name in names[:-keep] if keep > 0 else names:
+        try:
+            os.remove(os.path.join(directory, name))
+        except OSError as exc:
+            log.debug("could not remove old audio %s: %s", name, exc)
+
+SyncCapture = Callable[[], bytes]
+
+
+def _arrival(name: str) -> int:
+    stamp = name[len("audio-") :].split(".", 1)[0]
+    return int(stamp) if stamp.isdigit() else 0
+
+
+class _QuietServer(ThreadingHTTPServer):
+    """A client that hangs up is not an incident.
+
+    `socketserver` prints a twenty-line traceback for any exception while handling a request,
+    `ConnectionResetError` included — and that one is what a phone does every time it drops a
+    keep-alive connection, which on this device is *normal traffic*: the app polls `/health` and
+    then goes away. Seen on 2026-09-13, right after a reading that had worked perfectly.
+
+    It matters because of what the journal is for here. This board has no screen, so the log is the
+    only place a failure can be noticed, and a scary traceback for routine behaviour is exactly how
+    a log stops being read — the same reason `report_visibility` only warns when nobody is connected.
+    A real error still goes through: only the peer going away is demoted to a debug line.
+    """
+
+    def handle_error(self, request, client_address) -> None:
+        if isinstance(sys.exc_info()[1], (ConnectionResetError, BrokenPipeError, TimeoutError)):
+            log.debug("client %s hung up", client_address[0] if client_address else "?")
+            return
+        ThreadingMixIn.handle_error(self, request, client_address)
+
+
+class HttpServer:
+    def __init__(
+        self,
+        read_status: Callable[[], dict],
+        synthetic_payload: Callable[[int], bytes],
+        capture: Optional[SyncCapture],
+        port: int = DEFAULT_PORT,
+        play: Optional[Callable[[str], None]] = None,
+        evidence_dir: Optional[str] = None,
+    ) -> None:
+        server = self
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+            server_version = "ViroVision/0.1"
+            timeout = REQUEST_TIMEOUT_S
+
+            def log_message(self, fmt, *args):  # noqa: N802 — logging goes through logging, not stderr
+                log.info("%s %s", self.address_string(), fmt % args)
+
+            def _respond(self, code: int, body: bytes, content_type: str) -> None:
+                self.send_response(code)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def _json(self, code: int, obj: dict) -> None:
+                self._respond(code, json.dumps(obj, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+
+            def do_GET(self):  # noqa: N802
+                path = self.path.split("?", 1)[0]
+                if path == "/health":
+                    self._json(200, server._read_status())
+                elif path.startswith("/measure/"):
+                    try:
+                        amount = int(path[len("/measure/") :])
+                    except ValueError:
+                        self._json(400, {"error": "invalid bytes"})
+                        return
+                    if not 0 <= amount <= MEASURE_MAX_BYTES:
+                        self._json(400, {"error": f"bytes out of range (0-{MEASURE_MAX_BYTES})"})
+                        return
+                    self._respond(200, server._synthetic_payload(amount), "application/octet-stream")
+                elif path == "/photos/latest":
+                    if server._capture is None:
+                        self._json(503, {"error": "no camera"})
+                        return
+                    t0 = time.monotonic()
+                    try:
+                        jpeg = server._capture()
+                    except CameraNotReady as exc:
+                        # Still starting after a boot (it takes about a minute), or it never came up.
+                        self._json(503, {"error": str(exc)[:200]})
+                        return
+                    except TimeoutError as exc:
+                        # The camera jammed: we say so right away (the app would wait 20 s) and the
+                        # camera is already restarting on the device's side.
+                        self._json(504, {"error": str(exc)[:200]})
+                        return
+                    except Exception as exc:  # the camera fails in varied ways; the client deserves a 500 and not a cut socket
+                        log.exception("capture failed")
+                        self._json(500, {"error": str(exc)[:200]})
+                        return
+                    log.info("photo of %d bytes captured in %d ms", len(jpeg), (time.monotonic() - t0) * 1000)
+                    self._respond(200, jpeg, "image/jpeg")
+                elif path.startswith("/evidence/"):
+                    self._evidence(path)
+                else:
+                    self._json(404, {"error": "not found"})
+
+            def _evidence(self, path: str) -> None:
+                """One file the device announced (`{"t": "evidence"}`), and only names `evidence.py`
+                could have written (`find_file`). No listing: the app asks for what it was told about."""
+                root = server._evidence_dir
+                parts = path[len("/evidence/") :].split("/")
+                found = evidence.find_file(root, *parts) if root is not None and len(parts) == 2 else None
+                if found is None:
+                    self._json(404, {"error": "not found"})
+                    return
+                kind = "image/jpeg" if found.suffix == ".jpg" else "application/json; charset=utf-8"
+                self._respond(200, found.read_bytes(), kind)
+
+            def do_POST(self):  # noqa: N802
+                path = self.path.split("?", 1)[0]
+                if path != "/audio":
+                    self._json(404, {"error": "not found"})
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length") or 0)
+                except ValueError:
+                    # Was a traceback in the journal and a socket cut with no answer (2026-10-06).
+                    self._json(400, {"error": "invalid Content-Length"})
+                    return
+                if not 0 < length <= AUDIO_MAX_BYTES:
+                    self._json(400, {"error": f"Content-Length out of range (1-{AUDIO_MAX_BYTES})"})
+                    return
+                body = self.rfile.read(length)
+                # React Native's `fetch` does not send raw bytes: the app sends the MP3 as base64 and
+                # says so with this header. A client like curl sends the bytes as they are.
+                if (self.headers.get("X-Encoding") or "").lower() == "base64":
+                    try:
+                        body = base64.b64decode(body, validate=True)
+                    except (binascii.Error, ValueError):
+                        self._json(400, {"error": "invalid base64"})
+                        return
+                content_type = self.headers.get("Content-Type", "application/octet-stream")
+                extension = "mp3" if "mpeg" in content_type or "mp3" in content_type else "wav" if "wav" in content_type else "bin"
+                os.makedirs(AUDIO_DIRECTORY, exist_ok=True)
+                file_path = os.path.join(AUDIO_DIRECTORY, f"audio-{int(time.time() * 1000)}.{extension}")
+                with open(file_path, "wb") as f:
+                    f.write(body)
+                _prune_audio(AUDIO_DIRECTORY)
+                log.info("audio received: %d bytes (%s) → %s", length, content_type, file_path)
+                if server._play is not None:
+                    try:
+                        server._play(file_path)
+                    except Exception as exc:
+                        log.warning("could not play %s: %s", file_path, exc)
+                self._json(202, {"bytes": len(body), "file": file_path, "played": server._play is not None})
+
+        self._read_status = read_status
+        self._synthetic_payload = synthetic_payload
+        self._capture = capture
+        self._play = play
+        self._evidence_dir = evidence_dir
+        self._server = _QuietServer(("0.0.0.0", port), Handler)
+        self._server.daemon_threads = True
+        self._thread: Optional[threading.Thread] = None
+
+    @property
+    def port(self) -> int:
+        return self._server.server_address[1]
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._server.serve_forever, name="http", daemon=True)
+        self._thread.start()
+        log.info("HTTP listening on port %d", self.port)
+
+    def stop(self) -> None:
+        self._server.shutdown()
+        self._server.server_close()

@@ -1,6 +1,6 @@
 # ADR 0006 — Pipelines por caso de uso: bondis local, supermercado nube o LLM chico
 
-- **Status:** Proposed — a validar con el tutor
+- **Status:** Proposed — a validar con el tutor (enmendado 2026-09-07: el detector se fine-tunea y corre en el sensor IMX500, sin Coral)
 - **Date:** 2026-08-22 (reunión de equipo del 2026-08-21)
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, architecture
@@ -143,6 +143,126 @@ decide si el producto sirve, la marca sólo cuál de los que sirven. Separados, 
 el tipo aunque la marca no se lea (y al revés) en vez de perder los dos por un campo que el modelo
 no pudo completar entero. La frase hablada queda "arroz Saman, Blue Patna 1 kg".
 
+## Actualización 2026-09-01 — cae la gratuidad como restricción, y el selector pasa a cinco modelos
+
+**Qué cambia.** La decisión original ponía como restricción dura que el modelo fuera **gratuito**,
+y eso, en la práctica, dejaba el selector reducido a Gemini. Se levanta: el proyecto **paga** para
+poder comparar los modelos más rápidos del mercado, que es exactamente lo que la tesis necesita
+medir. Lo que **no** cambia es la gratuidad **para el usuario final**: pedirle credenciales propias
+a una persona ciega sigue descartado, y por eso la clave pasa a vivir en un proxy propio
+([ADR 0008](0008-proxy-propio-para-claves-de-nube.md)), que es lo que cierra el pendiente (b) de la
+actualización del 30/08.
+
+**Los cinco modelos, elegidos por latencia.** El criterio no cambió desde la medición del 30/08: el
+usuario está parado frente a la góndola, y un modelo que tarda medio minuto en decir "arroz Saman"
+no es una opción aunque acierte.
+
+| # | Proveedor | Modelo | Por qué |
+|---|---|---|---|
+| 1 | Google | `gemini-3.5-flash-lite` | El default. 2-3 s medidos contra la API real, acierto pleno en las corridas del 30/08, y tier gratuito. |
+| 2 | OpenAI | `gpt-5.6-luna` | El escalón más chico y barato de la familia vigente (≈USD 0,20/1,20 por MTok), con visión, structured outputs y streaming. La comparación obvia contra Gemini. |
+| 3 | Anthropic | `claude-haiku-4-5` | Ya estaba en el registro esperando clave. Tercera familia, para que la comparación no sea entre dos. |
+| 4 | Groq | `qwen/qwen3.6-27b` | El caso interesante del experimento: no es otro modelo grande sino **otro tipo de hardware** (LPU, 500+ tok/s). Si un modelo abierto de 27B sobre silicio dedicado le gana en latencia a los propietarios, eso es un resultado que la tesis quiere reportar. ⚠️ Groq lo sirve como *preview*: hay que medirlo antes de darlo por bueno. |
+| 5 | Arnaldo Castro | Gemma / Qwen-VL sobre vLLM | **Sólo documentado**, sin implementar: no hay endpoint todavía. Ver [ADR 0008](0008-proxy-propio-para-claves-de-nube.md). |
+
+**Un solo módulo cubre tres de los cinco.** OpenAI, Groq y un vLLM propio hablan el mismo dialecto
+(`/v1/chat/completions`, `response_format: {type: 'json_schema'}`, deltas en
+`choices[0].delta.content`). Se escribe un `providers/openaiCompatible.ts` parametrizado por base
+URL, en vez de tres proveedores casi idénticos.
+
+**Qué sale del selector, y por qué.** El registro tenía además `gemini-flash-lite-latest` (el alias
+que Google mueve solo) y `claude-opus-5` (como techo de precisión). Con los cinco de arriba el
+selector quedaría en siete opciones, y **un `radiogroup` de siete recorrido con VoiceOver frente a
+una góndola es peor producto que uno de cinco**: cada opción de más es un swipe más entre la
+persona y la lectura. La accesibilidad es el criterio de diseño, también cuando el que sobra es un
+control técnicamente útil. Si en algún momento hace falta el techo de precisión para el informe,
+`claude-opus-5` vuelve con una línea — pero al banco de pruebas, no al selector del usuario.
+
+**La entrada del flujo, mientras no haya hardware.** El diagrama acordado
+([`documents/logicas-casos-de-uso.pdf`](../../../documents/logicas-casos-de-uso.pdf), transcrito en
+[`docs/architecture/README.md`](../README.md#flujos-por-caso-de-uso)) pone la captura en la placa
+del dispositivo. Como el hardware no existe, **la cámara del teléfono ocupa ese lugar**: la app saca
+la foto y el resto del flujo es idéntico. Hasta ahora la app abría la **fototeca**, que servía para
+probar pero no era el flujo; la fototeca queda igual como segunda acción, porque es lo que permite
+pasarle **la misma foto** a los cinco modelos y que la comparación mida modelos y no fotos.
+
+**La lectura además deja un `.mp3`, apagado por defecto.** En el diagrama acordado el audio sale
+por el parlante del dispositivo, no por el del teléfono. `expo-speech` usa el motor TTS del sistema
+y **no exporta a archivo**, así que el `.mp3` tiene que venir de un TTS de nube: se usa el de OpenAI
+(`gpt-4o-mini-tts`), que devuelve MP3 directo con la clave que el selector ya necesita y sale por el
+mismo proxy — descartados Google Cloud TTS (una clave de AI Studio no tiene esa API habilitada: son
+proyectos distintos) y el TTS nativo de Gemini (devuelve PCM crudo, habría que armar el header WAV a
+mano en React Native).
+
+Va **apagado** detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED` por dos razones que conviene dejar
+escritas. Una: hoy nada consume el archivo —el hardware no existe— y prenderlo sería pagar una
+llamada a la API en cada lectura para producir algo que nadie abre. Dos: cuando el hardware exista,
+puede que no haga falta. Un MP3 de ~3 s a 32 kbps son ~12 KB; por WiFi es nada, por GATT es del
+orden de segundos, y si el transporte termina siendo BLE probablemente convenga que la Raspi haga su
+propio TTS y sólo reciba el JSON. Eso es materia de **ADR 0003**, que está reservado justo para esa
+decisión.
+
+Lo que **no** cambia: el anuncio sigue siendo `expo-speech`, inmediato y sin red. La síntesis del
+archivo se llama **después** de anunciar, sin bloquear, y traga sus errores — si falla, el usuario ya
+escuchó el producto. El linter lo fuerza: `features/audio/` tiene prohibido importar
+`@/services/cloud`, así que el archivo no puede meterse dentro de `announce()`.
+
+**El camino de ómnibus queda en stand by.** Los dos casos del diagrama (modelo parcial o completo
+sobre la Raspi) quedan dibujados y versionados, sin implementar: elegir entre ellos exige tener el
+hardware para medirlos, y hasta entonces la app sostiene el camino local (OCR sobre la foto) que
+los dos comparten.
+
+## Actualización 2026-09-02 — medido contra las APIs reales; el selector queda en dos modelos
+
+Los proveedores nuevos se habían escrito contra los docs porque no había claves. Con las claves, se
+midió con **el código de la app** contra las APIs reales: cinco corridas espaciadas por modelo,
+mismo prompt y mismo schema. Números, método y limitaciones en
+[`docs/mediciones/2026-09-02-modelos-supermercado.md`](../../mediciones/2026-09-02-modelos-supermercado.md);
+el análisis en [`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md).
+
+**Qué cambia**: el selector pasa a ofrecer **`gpt-5.6-luna` (default) y `qwen/qwen3.8-27b`**.
+`gemini-3.5-flash-lite`, que era el default, sale.
+
+| Modelo | Mediana | Rango | Dispersión | Acierto | Cuota |
+|---|---|---|---|---|---|
+| `qwen/qwen3.8-27b` | 846 ms | 764-1087 ms | 1,4× | 5/5 | ~4 lecturas/min |
+| `gpt-5.6-luna` | 1668 ms | 1410-2490 ms | 1,8× | 5/5 | holgada |
+| `gemini-3.5-flash-lite` | 10 649 ms | 2820-32 586 ms | 11,6× | 5/5 | 20/min |
+
+**La precisión no separó a los modelos** (15/15 corridas correctas), con la salvedad de que la
+imagen era sintética y de alto contraste. Lo que separa es la latencia y, dentro de ella, **la
+dispersión**: Gemini va de 2,8 a 32,6 s con la cuota fresca. Para quien espera el audio frente a la
+góndola, un modelo que a veces tarda medio minuto es peor que uno que siempre tarda dos.
+
+Esto **corrige la medición del 30/08**, que dio 2-3 s para Gemini con menos muestras: los extremos
+de ahora la contienen, así que aquella campaña cayó en el extremo bueno. Lección metodológica que
+vale para el resto de la tesis: **cinco corridas y no una, y reportar el rango, no el mejor número**.
+
+**El default no es el más rápido, a propósito.** Groq gana por 800 ms pero su cuota gratuita limita
+por *tokens* por minuto (~4 lecturas), y alguien recorriendo una góndola hace del orden de 2 a 4. Un
+default que choca el límite a la cuarta lectura es peor producto que uno 800 ms más lento. Groq
+queda como segunda opción, que es donde su perfil sirve.
+
+**Qué pasa con la gratuidad.** La restricción de este ADR —gratuito **para el usuario**— se sigue
+cumpliendo: paga el proyecto (mil lecturas cuestan menos de USD 0,50) y el usuario no pone
+credenciales. Lo que ya no hay es un default con tier gratuito; el camino gratis existe y es Groq.
+
+**Los modelos retirados no se borran.** Viven en `RETIRED_PROFILES` con la medición que los
+descartó, y sus proveedores siguen implementados y testeados: volver a ofrecer uno es mover una
+entrada de lista. `gemini-3.5-flash-lite` conserva la mejor cuota de las tres y la peor latencia, así
+que si algún día la cuota pesara más que el tiempo, es el candidato.
+
+**El techo de 1024 px se mantiene, por otro motivo del que estaba escrito.** Se midió: los tokens
+escalan con el tamaño pero la latencia no (a esta escala la dominan el modelo y la red). El techo
+baja el costo a la mitad y el tráfico, no los segundos.
+
+**Tres defectos que sólo aparecieron midiendo**, ninguno con error visible: la cuota de Groq llega
+como HTTP 429 y no como evento SSE (la UI decía "la nube no respondió" en vez de "cuota agotada");
+el tope del limitador para Groq estaba en 25/min cuando su límite es por tokens (~4); y apagar el
+razonamiento no compra latencia fuera de Gemini, donde sí está medido. Todos corregidos.
+
+Sigue **sin verificar** `claude-haiku-4-5`: requiere tarjeta y no hay clave.
+
 ## Implicaciones para el código actual
 
 - El lector de Inicio (`app/src/features/reader/`) implementa los dos modos; los modos del producto
@@ -152,9 +272,93 @@ no pudo completar entero. La frase hablada queda "arroz Saman, Blue Patna 1 kg".
 - `ml/` deja de planificar entrenamiento: su trabajo pasa a ser el dataset de evaluación y el
   export del detector a la TPU.
 
+## Actualización 2026-09-08 — La entrada del flujo es la placa, y sólo la placa
+
+Lo de arriba («la cámara del teléfono ocupa ese lugar mientras no haya hardware») era una condición
+con fecha de vencimiento, y venció: la placa saca la foto y baja por WiFi (ADR 0003). Se retiran de
+Inicio el botón de la cámara del teléfono y el de la fototeca, y del binario `expo-image-picker` con
+los permisos de cámara y fotos. La app vuelve a tener **una** entrada, la del diagrama acordado.
+
+**Lo que se pierde, dicho explícitamente**: la fototeca era el insumo del dataset de evaluación —
+pasarle *la misma* foto a varios modelos para que la comparación midiera modelos y no fotos (pasos
+8-9 de [`docs/qa-modo-supermercado.md`](../../qa-modo-supermercado.md)). Esa corrida ya no se puede
+hacer desde la app. Cuando toque medir precisión por modelo hay que hacerlo fuera de la app —contra
+el proxy, con el set de fotos guardado— o reponer una entrada de prueba detrás de una bandera, como
+`EXPO_PUBLIC_SIMULATE_DEVICE`. Lo que no se repone es una segunda fuente de imagen para el usuario.
+
+## Actualización 2026-09-11 — El alcance deja de ser la canasta básica: son alimentos
+
+**Probado con la placa de verdad, el modelo identifica cualquier alimento**, no sólo los rubros de la
+canasta básica — yerba suelta incluida. Funcionó mejor de lo esperado, y eso cambia una premisa: la
+canasta era el alcance **mientras la precisión era una incógnita**, una forma de acotar el problema a
+algo medible. Con el modelo andando, restringirlo en el prompt es pedirle menos de lo que hace.
+
+**La canasta básica no desaparece: cambia de rol.** Sigue siendo el **dataset de evaluación** —lo que
+se mide, con recall/precision/accuracy/F1— y deja de ser el límite de lo que se contesta. Son dos
+cosas distintas y conviene no confundirlas de nuevo: un dataset acotado y reproducible es lo que hace
+comparables a los modelos; el alcance del modo es lo que el usuario puede pedirle.
+
+Lo que cambió en concreto:
+
+- El prompt dice **«alimentos y productos de almacén»** y aclara que sirve cualquier alimento —
+  envasado, suelto, fresco o a granel (`services/vision/providers/prompts.ts`).
+- La app dice «Identifica alimentos y productos de almacén» donde decía «productos de la canasta
+  básica».
+- El mensaje de no reconocido pasa a **«Elemento no reconocible»**: con el alcance viejo «no pude
+  identificar el producto» tenía sentido, pero ahora el modo no se limita a productos envasados y
+  «producto» quedó angosto.
+
+**Y un defecto que salió de la misma prueba.** Apuntado a algo que no es un alimento, el modelo
+contestaba el literal `null`; el parser lo rechazaba —un `null` de JSON no es un registro— y la frase
+caía al *fallback de texto crudo*, que existe para cuando el modelo contesta en prosa en vez de JSON.
+Resultado: **la placa dijo «null» en voz alta**. Arreglado por los dos lados, porque cada uno solo
+dejaba el agujero abierto:
+
+1. el prompt pide devolver **siempre el objeto** con los tres campos en null, y nunca un `null` solo;
+2. el fallback ahora distingue prosa de basura con una regla simple: **la prosa no parsea como
+   JSON**. `null`, `{}`, `[]` y un objeto sobrante parsean, y ninguno es una lectura.
+
 ## Ver también
 
 [`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md) (el registro completo de lo
 probado), [`docs/spike-vision-local.md`](../../spike-vision-local.md) (las mediciones),
 [ADR 0007](0007-botones-fisicos-modos-de-operacion.md) (los modos que activan cada pipeline) y el
 diagrama de modos en [`docs/architecture/README.md`](../README.md).
+
+## Actualización 2026-09-07 — el detector del banner se fine-tunea y corre en el sensor IMX500, sin Coral
+
+Dos cosas cambian respecto del texto de arriba, y una se confirma.
+
+**El acelerador del camino de bondis es la AI Camera (Sony IMX500), no la Coral TPU.** La cámara que
+se compró (dos unidades, en la placa desde el 2026-09-05) trae el acelerador en el sensor: el detector
+corre ahí y la Pi Zero 2 W recibe las cajas por `picamera2` sin tocar el USB. Consecuencias: el Coral
+sale del diseño (con él, la restricción "USB ocupado" de ADR 0003 y el Spike 4 de libedgetpu en
+Bookworm); la Pi hace sólo recorte + OCR + anuncio, que es lo que el spike ya mostró barato. El export
+es `ultralytics format="imx"` (sólo YOLOv8n/YOLO11n, int8, Linux x86 con Python ≤ 3.11 y Java 17) y el
+`.rpk` se arma en la Pi con `imx500-package`. El riesgo abierto pasa de "YOLO sobre el Coral, sin medir"
+a "int8 en el IMX500 sobre carteles chicos, sin medir": se compara ONNX fp32 vs int8 sobre el set de
+evaluación antes de flashear.
+
+**El detector del banner sí se entrena.** "No hay que entrenar" valía para `bus` (COCO). Para el
+cartel no existe clase preentrenada, y Magalí ya fine-tuneó yolo11n con 140 fotos etiquetadas
+(Roboflow `find-bus-sign` v6). Como en el IMX500 corre **una** red, el objetivo es un solo yolo11n de
+**dos clases** (`bus_sign` + `bus`, las cajas de ómnibus pseudo-etiquetadas con YOLO11x y revisadas a
+mano), entrenado en la V100 de Arnaldo Castro. "Nada se entrena" queda vigente para el **OCR**: se
+evalúa (RapidOCR / PaddleOCR / Tesseract sobre el mismo `gt.csv`) y sólo se fine-tunearía si las
+métricas lo exigen.
+
+**Se confirma el recorte como frontera del OCR.** Medido el 2026-09-07 sobre 117 imágenes: con el
+recorte del banner RapidOCR acierta el número en el 87,5 % y el destino en el 73 %; con 25 % de margen
+vertical perdía el primer dígito, con 12 % no. El catálogo finito de líneas de STM (503 pares desde
+datos abiertos) corrige el destino por similitud y da la lista de anuncios a pregrabar (ADR 0003).
+Código, métricas y scripts: repo `bus-banner-recognizer`, rama `feat/bus-banner-pipeline` (desde el
+2026-10-12, PR #7, rama `feat/bus-line-reader`).
+
+**El modo ómnibus es vigilancia continua, no una foto.** El usuario no ve venir el ómnibus: al activar
+el modo (ADR 0007) la cámara queda abierta y el detector corre en cada frame dentro del sensor; una capa
+de seguimiento confirma la pista, anuncia la presencia ("se acerca un ómnibus"), lee el banner del
+ómnibus principal cuando es legible, vota entre lecturas y anuncia la línea **una vez por ómnibus**. La
+lectura por foto queda como caso particular (un frame). Esto no contradice el "nunca siempre prendido"
+de ADR 0007: el reconocimiento sigue atado a un modo explícito; dentro del modo ómnibus, vigilar es la
+función. Costo a medir: consumo de cámara + sensor durante el modo (UPS HAT), con apagado automático
+tras un tiempo sin ómnibus.

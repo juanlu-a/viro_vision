@@ -1,33 +1,61 @@
+/**
+ * Device: what the device is doing and the two controls the user has over it.
+ *
+ * Until 2026-09-08 this screen was also the project's console: two buttons to measure the transfer
+ * (the ADR 0003 spike, already decided in favour of WiFi) and the raw dump of what the device
+ * reports about itself. With the logs in Supabase that is read where a log is read, not on the
+ * screen of someone who does not see it. What stays is what the user can use or needs to know:
+ * whether the device is there, how its network is doing and its battery. Since 2026-10-06 not even
+ * the device's error notices: every error goes to telemetry and none to the user.
+ */
 import { View } from 'react-native';
 
 import { AccessibleButton } from '@/components/accessible-button';
 import { Card } from '@/components/card';
+import { describeConnection, type ConnectionTone } from '@/features/device/connectionLabel';
 import { DeviceSummary } from '@/features/device/DeviceSummary';
 import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
-import { useDeviceConnection } from '@/features/device/useDeviceConnection';
+import type { ThemeColor } from '@/constants/theme';
+import { notify } from '@/features/audio/systemNotice';
+import { useDevice } from '@/features/device/DeviceProvider';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
+
+const TONE_COLOR: Record<ConnectionTone, ThemeColor> = {
+  success: 'success',
+  warning: 'warning',
+  danger: 'danger',
+  neutral: 'textSecondary',
+};
 
 export default function ConnectScreen() {
   const t = strings.connect;
   const theme = useTheme();
-  const { state, connect, disconnect } = useDeviceConnection();
+  // No error panel since 2026-10-06: the device's own notices and the reason the network failed
+  // go to telemetry only. The status line below already says what is missing, in plain language.
+  const { connection, wifi, connect, disconnect } = useDevice();
 
-  const isConnected = state.status === 'connected';
-  const isBusy = state.status === 'scanning' || state.status === 'connecting';
-  const dotColor =
-    isConnected ? theme.success : state.status === 'error' ? theme.danger : theme.textSecondary;
+  const isConnected = connection.status === 'connected';
+  const isBusy = connection.status === 'scanning' || connection.status === 'connecting';
+  // Green only when the device is fully usable; amber says what is still missing. Since 2026-09-14
+  // this is the only status line in the app, so "Conectado" has to mean "ready to use", not "the
+  // Bluetooth link is up". The colour reinforces the text, it never replaces it.
+  const label = describeConnection(connection, wifi);
+  const labelColor = TONE_COLOR[label.tone];
 
   return (
     <Screen
       scroll
-      // Tirar hacia abajo = buscar/actualizar el dispositivo: el gesto estándar de "traeme la
-      // información fresca", aplicado a lo único que esta pantalla informa. Si ya hay una
-      // operación en vuelo, el gesto no la pisa.
+      // Pull down = search for / refresh the device: the standard "bring me fresh information"
+      // gesture, applied to the only thing this screen reports. If an operation is already in
+      // flight, the gesture does not step on it.
       onRefresh={async () => {
-        if (!isBusy) await connect();
+        // Connected already means fresh: the status arrives on its own every 15 s, so the gesture
+        // only confirms out loud — a silent gesture is indistinguishable from a broken one.
+        if (isConnected) await notify('connected');
+        else if (!isBusy) await connect();
       }}>
       <ScreenHeader title={t.title} subtitle={t.intro} />
 
@@ -37,22 +65,22 @@ export default function ConnectScreen() {
           accessible
           accessibilityRole="text"
           accessibilityLiveRegion="polite"
-          accessibilityLabel={`${t.statusLabel}: ${state.message}`}>
-          <View className="h-[12px] w-[12px] rounded-pill" style={{ backgroundColor: dotColor }} />
+          accessibilityLabel={`${t.statusLabel}: ${label.text}`}>
+          <View className="h-[12px] w-[12px] rounded-pill" style={{ backgroundColor: theme[labelColor] }} />
           <View className="flex-1 gap-[2px]">
             <ThemedText type="small" themeColor="textSecondary">
               {t.statusLabel.toUpperCase()}
             </ThemedText>
-            <ThemedText type="default" className="font-sans-bold">
-              {state.message}
+            <ThemedText type="default" className="font-sans-bold" themeColor={labelColor}>
+              {label.text}
             </ThemedText>
           </View>
         </View>
       </Card>
 
-      {isConnected && state.device && (
+      {isConnected && connection.device && (
         <Card>
-          <DeviceSummary device={state.device} />
+          <DeviceSummary device={connection.device} />
         </Card>
       )}
 

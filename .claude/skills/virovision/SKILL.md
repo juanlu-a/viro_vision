@@ -2,7 +2,7 @@
 name: virovision
 description: >-
   ViroVision thesis context — an assistive device + mobile platform for people with low or
-  no vision that identifies metropolitan bus lines and basic-basket supermarket products and
+  no vision that identifies metropolitan bus lines and food items on a supermarket shelf and
   gives real-time auditory feedback, using Computer Vision, ML and OCR. Covers the three
   project pillars (React Native app, Raspberry Pi / IoT hardware, ML/OCR/CV). Use this whenever
   working on any ViroVision code, hardware, ML model, or thesis document.
@@ -26,7 +26,11 @@ camera device mounted on the temple of a pair of glasses captures the environmen
 1. **Bus-line identification** — recognize the line of an approaching metropolitan bus (OCR on
    the bus's number/name display) and announce it. When several buses are present, prioritize
    the most relevant one (by position/proximity) without auditory overload.
-2. **Supermarket products** — identify basic-basket products on the shelf and announce them.
+2. **Supermarket products** — identify **food items** on the shelf and announce them. **Scope widened
+   2026-09-11**: the basic basket was the scope while the accuracy was unknown; measured against the
+   real device the model identifies whatever food is in front of it — loose yerba included — so the
+   basket survives as the **evaluation dataset** (what is measured), never as the limit of what is
+   answered. The prompt says "alimentos y productos de almacén".
 
 ### Optional goals (nice-to-have, not core scope)
 - **Fingertip pointing selection** — for products, only announce the item the user is pointing
@@ -52,7 +56,7 @@ final integration, bug-fixing and joint testing).
 |--------|--------|---------|
 | **Mobile app** | `app/` | React Native (Expo). BLE (GATT) data/control link to the device, routing TTS audio to the device's earphone, config, and first-class accessibility. See [references/app.md](references/app.md). |
 | **Hardware / IoT** | `hardware/` | Glasses-mounted camera device: Raspberry Pi Zero 2 W + Coral TPU + Camera Module 3. See [references/hardware.md](references/hardware.md). |
-| **ML / OCR / CV** | `ml/` | Per-use-case pipelines (ADR 0006): buses = pretrained detection on the Coral TPU → banner crop → OCR; supermarket = vision LLM (local small vs. cloud, pending). Evaluation datasets with recall/precision/accuracy/F1. See [references/ml.md](references/ml.md). |
+| **ML / OCR / CV** | `ml/` | Per-use-case pipelines (ADR 0006): buses = detection inside the IMX500 sensor (the Coral left the design on 2026-09-07) → banner crop → OCR; supermarket = cloud vision LLM, five models chosen by latency (ADR 0006, updated 2026-09-01); the local fallback is still open. Evaluation datasets with recall/precision/accuracy/F1. See [references/ml.md](references/ml.md). |
 
 Y tres referencias transversales, que aplican al trabajo diario más que cualquier otra cosa de este
 documento:
@@ -61,11 +65,15 @@ documento:
 |---|---|
 | [references/convenciones.md](references/convenciones.md) | **Antes de escribir código o abrir un PR.** Stack, estructura, patrones de servicio, errores tipados, tests, accesibilidad, y el flujo de ramas/commits. |
 | [references/decisiones.md](references/decisiones.md) | Antes de tomar una decisión que quizá ya se tomó. Índice de ADRs con su estado y **qué cambió** en cada enmienda. |
+| [references/placa-acceso.md](references/placa-acceso.md) | **Antes de tocar la Raspberry Pi**: cómo entrar (cable, microSD, redes WiFi guardadas), qué no hacer nunca (unir la Mac al AP de la placa) y las trampas ya pisadas. |
 | skill **`virovision-marca`** | Ante cualquier cosa visual: colores, tokens de tema, íconos, tipografía, material de la tesis. |
 
 ## Cross-cutting conventions & constraints
-- **Language:** the project and its documentation are in **Spanish**. Prefer Spanish for
-  user-facing strings, thesis docs and comments where the surrounding context is Spanish.
+- **Language (ADR 0009, 2026-09-09):** **all code is English** — identifiers, file names, comments,
+  tests, branches, commits, and the wire (BLE protocol, the device's HTTP endpoints, the Supabase
+  schema). **Spanish is for what a person reads or hears**: the *values* in `app/src/i18n/es.ts`
+  (the keys are English), the supermarket prompt (its answer is spoken aloud), the model labels in
+  the selector, and **all documentation** — `docs/`, the ADRs, this skill and the thesis.
 - **Accessibility is a hard requirement**, not a nice-to-have. Every UI decision is evaluated
   against blind/low-vision usability and native screen readers (VoiceOver / TalkBack).
 - **Offline-first / self-contained (hard requirement).** The **essential features** — object
@@ -78,9 +86,10 @@ documento:
   default. Losing connectivity may cost accuracy or latency, never the recognition or the audio.
   This is still a core differentiator vs. cloud-dependent tools (Seeing AI, Lookout, OrCam).
   There is no single on-device runtime: since **ADR 0006** (2026-08-22) each use case has its own
-  pipeline — buses = local detection (Coral TPU) → banner crop → OCR; supermarket = vision LLM
-  (local small model or cloud, pending). ADR 0004's "Gemma via LiteRT-LM" is no longer the primary
-  path. In the "offload to phone" architecture the model runs **locally on the phone**, not on a
+  pipeline — buses = local detection (Coral TPU) → banner crop → OCR; supermarket = **cloud vision
+  LLM** (decided 2026-08-30), with the local fallback still open. ADR 0004's "Gemma via LiteRT-LM"
+  is no longer the primary path. Since **ADR 0008** (2026-09-01) the cloud keys live in the
+  project's own proxy, not in the app bundle. In the "offload to phone" architecture the model runs **locally on the phone**, not on a
   server.
 - **Low cost, portable.** Hardware and processing choices balance accuracy against cost, size, power
   and feasibility. The device must be cheap and easy to carry.
@@ -104,9 +113,15 @@ no haya dos copias que se desincronicen.
 
 ## Repository map
 - `app/` — React Native mobile app (scaffolded with Expo + dev client).
-- `hardware/` — RPi Zero 2 W firmware/scripts, BLE peripheral, 3D casing models.
-- `ml/` — YOLO11 training, OCR, datasets, edge export (TFLite).
-- `docs/` — thesis deliverables, architecture, ADRs.
+- `hardware/` — RPi Zero 2 W: `raspi/` es el daemon Python (periférico BLE + cámara + modos, ADR
+  0003); READMEs con componentes y enlace. Carcasa pendiente.
+- `ml/` — **stub**: sólo un README. El pipeline de ómnibus (YOLO11n, dataset, OCR, export IMX500) vive en
+  el repo aparte `bus-banner-recognizer` de Magalí, y se instala en la placa como dependencia.
+- `docs/` — thesis deliverables, architecture, ADRs, and the end-to-end QA checklist
+  (`qa-modo-supermercado.md`).
+- `documents/` — source documents versioned as-is (the hand-drawn use-case diagram).
+- `supabase/` — el proxy de claves de nube (ADR 0008) y la función de telemetría. **Desplegadas y
+  activas** desde 2026-09-02 y 2026-09-09; los builds no llevan ninguna clave de proveedor.
 
 ## Open / pending items (flagged `PENDIENTE` in the source thesis document)
 These are explicitly incomplete in the thesis and should be treated as open research:

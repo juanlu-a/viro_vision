@@ -1,7 +1,7 @@
 # ViroVision
 
 **ViroVision** is an assistive system for people with **low or no vision** that identifies
-**metropolitan bus lines** and **basic-basket supermarket products** and gives **real-time auditory
+**metropolitan bus lines** and **food items on a supermarket shelf** and gives **real-time auditory
 feedback**. A camera device mounted on the temple of a pair of glasses captures the environment;
 a paired mobile app handles connectivity, processing support, and interaction.
 
@@ -13,7 +13,9 @@ Sebastián García Parra.
 
 1. **Bus lines** — recognize the line of an approaching bus (OCR) and announce it, prioritizing the
    most relevant one when several are present.
-2. **Supermarket products** — identify basic-basket products and announce them.
+2. **Supermarket products** — identify food items and announce them. The scope was the basic basket
+   while the accuracy was unknown; measured on the real device (2026-09-11) the model identifies any
+   food, loose yerba included, so the basket stays as the **evaluation dataset**, not as the limit.
 
 ## Monorepo layout
 

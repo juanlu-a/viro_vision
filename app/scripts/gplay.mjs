@@ -1,18 +1,18 @@
 /**
- * Subida de un .aab a Google Play con la Google Play Developer API, sin dependencias.
+ * Upload of an .aab to Google Play with the Google Play Developer API, with no dependencies.
  *
- * Espejo de testflight-distribute.mjs para Android. Autenticación con una *service account*
- * (JSON de Google Cloud, con permiso de releases en Play Console): JWT RS256 → access token.
- * Flujo de la API: edits.insert → bundles.upload → tracks.update → edits.commit.
+ * A mirror of testflight-distribute.mjs for Android. Authentication with a *service account* (a
+ * Google Cloud JSON, with release permission in the Play Console): RS256 JWT → access token.
+ * API flow: edits.insert → bundles.upload → tracks.update → edits.commit.
  *
- * Pistas (Google) ↔ grupos (Apple), decisión del 2026-08-30:
- *   - `internal`: hasta 100 testers por email, sin revisión de Google, llega en minutos
- *     (= grupo interno "Equipo"). Recibe `staging`.
- *   - `alpha` (closed testing): testers por lista o link de opt-in; la primera release pasa por
- *     revisión de Google (= grupo externo "Testers"). Recibe `main`.
+ * Tracks (Google) ↔ groups (Apple), decision of 2026-08-30:
+ *   - `internal`: up to 100 testers by email, no Google review, arrives in minutes (= the internal
+ *     "Equipo" group). It receives `staging`.
+ *   - `alpha` (closed testing): testers by list or opt-in link; the first release goes through
+ *     Google's review (= the external "Testers" group). It receives `main`.
  *
- * Uso:
- *   PLAY_SA_PATH=… node scripts/gplay.mjs --aab ruta.aab --track internal --notes "Qué cambió"
+ * Usage:
+ *   PLAY_SA_PATH=… node scripts/gplay.mjs --aab path.aab --track internal --notes "What changed"
  */
 import { createPrivateKey, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -25,13 +25,13 @@ const args = Object.fromEntries(
 );
 const aabPath = args.aab;
 const track = args.track || 'internal';
-const notes = args.notes || 'Build automático.';
+const notes = args.notes || 'Automatic build.';
 if (!aabPath) {
-  console.error('Uso: --aab ruta.aab [--track internal|alpha] [--notes "texto"]');
+  console.error('Usage: --aab path.aab [--track internal|alpha] [--notes "text"]');
   process.exit(2);
 }
 const saPath = process.env.PLAY_SA_PATH;
-if (!saPath) throw new Error('Falta PLAY_SA_PATH (JSON de la service account).');
+if (!saPath) throw new Error('PLAY_SA_PATH missing (the service account JSON).');
 
 const appJson = JSON.parse(readFileSync(new URL('../app.json', import.meta.url)));
 const pkg = appJson.expo.android.package;
@@ -85,7 +85,7 @@ const bundle = await api(
   readFileSync(aabPath),
   true,
 );
-console.log('aab subido, versionCode', bundle.versionCode);
+console.log('aab uploaded, versionCode', bundle.versionCode);
 
 await api('PUT', `/edits/${edit.id}/tracks/${track}`, {
   track,
@@ -98,4 +98,4 @@ await api('PUT', `/edits/${edit.id}/tracks/${track}`, {
   ],
 });
 await api('POST', `/edits/${edit.id}:commit`);
-console.log(`✓ versionCode ${bundle.versionCode} → pista "${track}" en Google Play`);
+console.log(`✓ versionCode ${bundle.versionCode} → "${track}" track on Google Play`);

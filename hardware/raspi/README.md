@@ -1,0 +1,643 @@
+# Daemon de la placa (Raspberry Pi Zero 2 W)
+
+Un solo proceso Python que hace de **periférico BLE** (servidor GATT sobre BlueZ), captura con la
+Camera Module 3 y lleva la máquina de modos de [ADR 0007](../../docs/architecture/adr/0007-botones-fisicos-modos-de-operacion.md).
+Hoy su trabajo principal es **el spike del [ADR 0003](../../docs/architecture/adr/0003-enlace-placa-telefono.md)**:
+medir cuánto tarda una foto de ~53 KB en llegar al teléfono por BLE, para decidir si hace falta WiFi.
+
+Software mínimo a propósito: Raspberry Pi OS **Lite** 64-bit (Bookworm), BlueZ que ya viene, un venv,
+un servicio de systemd. No hay camino sin Linux: la cámara necesita libcamera, el Coral libedgetpu, el
+BLE BlueZ.
+
+
+> **Antes de tocar la placa** leé `.claude/skills/virovision/references/placa-acceso.md`: cómo entrar por cable o
+> por la microSD, cómo agregar redes WiFi sin SSH (`bootfs/*.nmconnection`), y por qué **nunca** hay que unir la Mac
+> al AP «ViroVision».
+
+## Instalación (una vez, por SSH)
+
+Desde la Mac, en la raíz del repo, con la placa prendida y en la misma red:
+
+```sh
+scp -r hardware/raspi <usuario>@<host-o-ip-de-la-pi>:~/virovision
+ssh <usuario>@<host-o-ip-de-la-pi>
+cd ~/virovision && sudo ./setup.sh
+```
+
+`setup.sh` instala `bluez`, `python3-picamera2` y `python3-venv`, crea `.venv` (con
+`--system-site-packages`, porque picamera2 viene por apt), instala `requirements.txt`, enciende el
+Bluetooth y deja `virovision.service` habilitado y corriendo. Tarda unos minutos la primera vez.
+
+Verificar:
+
+```sh
+journalctl -u virovision -f          # tiene que decir: anunciando «ViroVision» ...
+bluetoothctl show | grep -i powered   # Powered: yes
+```
+
+Desde el iPhone, antes de tocar la app: **nRF Connect** o **LightBlue** (gratis) ven un periférico
+`ViroVision` con un servicio `4380c500-…` y cinco características. Si eso se ve, la placa está bien.
+
+## Cómo arranca la microSD que está en uso (y por qué no se parece a `setup.sh`)
+
+La tarjeta que está en la placa **no se instaló con los pasos de arriba** y su comportamiento no se
+deduce del repo. Escribirlo acá es la única forma de que alguien entienda por qué la placa hace algo
+distinto de lo que dice el código. Todo vive en `/boot/firmware`, que es **FAT**: se toca desde
+cualquier computadora con la tarjeta puesta, sin herramientas de ext4 y sin entrar a la placa.
+
+**El interruptor de modo de red.** Un `virovision-modo-red.service` (`Before=virovision.service`)
+corre `/boot/firmware/modo-red.sh` en **cada** arranque, y ese script decide según exista o no un
+archivo:
+
+| `/boot/firmware/SIN-AP` | qué hace `modo-red.sh` | consecuencia |
+|---|---|---|
+| **existe** | escribe el drop-in `/etc/systemd/system/virovision.service.d/10-sin-ap.conf` con `--no-ap` | desarrollo: la placa se queda en la WiFi conocida, **hay SSH**, y la app dice «red apagada» (`status.ip` llega null) |
+| **no existe** | borra ese drop-in | producto: la placa levanta su AP al arrancar (ADR 0003) y deja cualquier otra red, así que **no hay SSH** por la red de casa |
+
+Por eso **el drop-in no se edita a mano**: lo pisa el próximo arranque. Lo que se cambia es el
+archivo `SIN-AP`, y si hay que cambiar el flag, `modo-red.sh`.
+
+> ✅ **Resuelto el 2026-09-10.** El flag estaba hardcodeado con el nombre viejo (`--sin-ap`, que
+> ADR 0009 renombró a `--no-ap`) **en dos archivos, no en uno**: `modo-red.sh` y también
+> `instalar-daemon.sh`, que escribe el mismo drop-in por su cuenta después de instalar. Los dos
+> quedaron corregidos en la tarjeta. Queda una mención en `firstrun.sh`, pero es un comentario que
+> narra lo que pasaba antes y ese script ya no está enganchado en `cmdline.txt`.
+>
+> **La lección, si algún día se renombra otro flag:** buscarlo en TODO `bootfs`, no en el archivo
+> obvio — `grep -ro -- '--[a-z-]*' /Volumes/bootfs/*.sh`. Un flag repetido en dos scripts se corrige
+> en uno solo y vuelve en el próximo arranque.
+
+> 💡 **Para entrar sin la tarjeta: `tools/ap.py`.** Apaga el punto de acceso por BLE desde la Mac y
+> la placa vuelve sola a la WiFi conocida, así que hay SSH sin apagar nada ni abrir la caja.
+> **Medido en la placa el 2026-09-14: cinco segundos de punta a punta.**
+>
+> ```sh
+> cd hardware/raspi
+> ./.venv-mac/bin/python tools/ap.py --status   # sólo mira
+> ./.venv-mac/bin/python tools/ap.py            # apaga el AP -> vuelve a la red de casa -> hay SSH
+> ./.venv-mac/bin/python tools/ap.py --on       # lo vuelve a encender
+> ```
+>
+> La app del teléfono tiene que estar **cerrada**: mientras una central está conectada la placa deja
+> de anunciar. La primera corrida pide permiso de Bluetooth para la terminal; sin él el escaneo
+> devuelve vacío **sin ningún error**, que es la forma más confusa de fallar.
+
+**Con el AP arriba sí se puede entrar.** `sshd` escucha en todas las interfaces: uniéndose a la red
+`ViroVision` (clave `virovision2026`) se llega a `ssh virovision@10.42.0.1`. Lo que se pierde en esa
+computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a propósito (ADR 0003).
+
+> ⚠️ **Aun así, no despliegues desde una máquina con una sola interfaz de red.** Si el equipo sólo
+> tiene WiFi, unirse al AP lo deja sin internet, y macOS además **se vuelve solo** a la red conocida
+> cuando detecta que la nueva no tiene salida: la conexión no se sostiene, y una copia de archivos
+> cortada por la mitad deja el daemon roto. Los dos caminos buenos, en orden:
+>
+> 1. **Bajarle el AP por BLE**, con la app del teléfono cerrada: `tools/ap.py` sin flags. En ~5 s la
+>    placa vuelve sola a la WiFi conocida y hay SSH, sin sacar la tarjeta ni apagar nada. Dura hasta
+>    el próximo reinicio, que es justo lo que se quiere para un despliegue y no para dejarla así.
+> 2. **Pasarla a modo desarrollo desde la tarjeta**: crear `/Volumes/bootfs/SIN-AP` desde cualquier
+>    computadora y arrancar. Es persistente, y es lo que se hizo el 2026-09-10.
+> 3. **Cable Ethernet a la placa** — sólo si la placa lo tiene. La Pi 3 B+ prestada traía RJ45; **la
+>    Zero 2 W, que es la que está en uso desde el 2026-09-19, no**. Cuando aplica es el camino más
+>    cómodo: la placa queda en la red de casa, se la alcanza sin tocarle el WiFi a nadie y el AP sigue
+>    arriba para el teléfono.
+
+**El primer arranque.** Un `firstrun.sh` lanzado una sola vez desde `systemd.run=` en `cmdline.txt`
+(target mínimo, sin red) instala ese servicio, lo aplica para ese arranque y **se saca del
+`cmdline.txt`** para no repetir el arranque mínimo. Log en `/var/log/virovision-firstrun.log`.
+
+**El daemon no se reinstala solo.** `instalar-daemon.sh` está detrás de
+`ConditionPathExists=!/var/lib/virovision-instalado`, y esa sentinela ya existe: descomprimir un
+`virovision-daemon.tgz` nuevo en `bootfs` **no alcanza**. Y la sentinela vive en **ext4**, no en
+`bootfs`, así que **no se borra desde macOS con la tarjeta puesta** — "meto la tarjeta en la Mac y
+reinstalo" no es un camino posible.
+
+Cómo se desplegó el 2026-09-10, que es el procedimiento probado:
+
+```sh
+# 1. Desde el Mac, con la tarjeta puesta: pasar la placa a modo desarrollo
+touch /Volumes/bootfs/SIN-AP        # NO corregir todavía el flag: el daemon viejo sólo entiende --sin-ap
+
+# 2. Arrancar la placa; se une a la WiFi de casa. Buscarla y entrar:
+ssh virovision@<ip-en-la-red-de-casa>
+
+# 3. En la PLACA: bajar staging de GitHub e instalar sobre el .venv ya armado.
+#    No hace falta setup.sh ni apt mientras no cambien las dependencias — y así se
+#    esquiva el apt que falla por el reloj sin RTC ("not live until") si NTP no sincronizó.
+curl -fsSL https://codeload.github.com/juanlu-a/viro_vision/tar.gz/refs/heads/staging -o /tmp/vv.tgz
+mkdir -p /tmp/vv-src && tar -xzf /tmp/vv.tgz -C /tmp/vv-src --strip-components=1 --wildcards '*/hardware/raspi/*'
+sudo systemctl stop virovision
+mv ~/virovision/virovision ~/virovision/virovision.old-$(date +%Y%m%d-%H%M%S)   # respaldo
+cp -r /tmp/vv-src/hardware/raspi/virovision ~/virovision/virovision
+~/virovision/.venv/bin/python -c 'import virovision.core'                        # que importe antes de arrancar
+
+# 4. AHORA sí, los flags (los dos archivos) y el .tgz de bootfs
+sudo sed -i 's/--sin-ap/--no-ap/g' /boot/firmware/modo-red.sh /boot/firmware/instalar-daemon.sh
+sudo sed -i 's/--sin-ap/--no-ap/g' /etc/systemd/system/virovision.service.d/10-sin-ap.conf
+tar -czf /tmp/vv-daemon.tgz -C /tmp/vv-src/hardware raspi && sudo cp /tmp/vv-daemon.tgz /boot/firmware/virovision-daemon.tgz
+
+# 5. Verificar y volver a modo producto
+sudo systemctl daemon-reload && sudo systemctl restart virovision
+curl -s http://localhost:8080/health
+sudo rm -f /boot/firmware/SIN-AP && sudo systemctl reboot
+```
+
+> ⚠️ **Si rehacés el `.tgz`, tiene que llevar `raspi/` ENTERO.** El instalador hace `tar xzf` y
+> después `mv /home/virovision/raspi /home/virovision/virovision`, así que necesita `raspi/setup.sh`,
+> `raspi/requirements.txt`, `raspi/virovision.service` y `raspi/virovision/`. Un `.tgz` armado sólo
+> con el paquete Python instala un daemon a medias, y el síntoma aparece meses después sin nada que
+> lo conecte con el día en que se armó mal. Verificá los cuatro antes de copiarlo a `bootfs`.
+
+**Por qué nada de esto usa cloud-init como corresponde.** En esta imagen cloud-init lee
+`network-config` y **no lo aplica** (`No network config applied. Neither a new instance nor
+datasource network update allowed`; falta el módulo `cc_netplan_nm_patch`), así que el WiFi hay que
+escribirlo a mano como keyfile de NetworkManager. Todo el andamiaje de arriba existe por eso.
+
+## Emular la placa desde la Mac (sin hardware)
+
+El mismo núcleo (`virovision/core.py`: comandos, modos, transferencias) se puede publicar por
+CoreBluetooth desde una Mac con `bless`. Sirve para probar la app contra el perfil GATT real: conectar,
+leer estado, cambiar de modo y reensamblar una transferencia. **El throughput contra la Mac no es el
+de la placa** (otro chip, Bluetooth 5, otro stack): valida la app, no decide el ADR 0003.
+
+```sh
+cd hardware/raspi
+python3.11 -m venv .venv-mac && .venv-mac/bin/pip install -r requirements-mac.txt   # python3 ≥ 3.9 sirve
+.venv-mac/bin/python -m virovision.emulator -v
+```
+
+La primera vez macOS pide permiso de Bluetooth para la terminal (Privacidad y seguridad → Bluetooth).
+Con el emulador corriendo, el iPhone ve «ViroVision» igual que vería la placa; la app se conecta con
+*Buscar dispositivo* y *Medir transferencia* funciona de punta a punta. `--name ViroVision-Mac` si
+la placa real está cerca y querés distinguirlas. Sin cámara: el comando `foto` responde con error, y
+`medir` manda bytes sintéticos.
+
+## Correr a mano (depurar)
+
+```sh
+sudo systemctl stop virovision
+sudo .venv/bin/python -m virovision -v            # con cámara
+sudo .venv/bin/python -m virovision -v --no-camera
+```
+
+Necesita root: BlueZ sólo deja registrar aplicaciones GATT y anuncios desde el bus del sistema.
+
+## Perfil GATT
+
+Servicio `4380c500-7ca3-4e37-b27d-f60e8d8d73d1`. Copiado a mano en
+`app/src/features/device/gatt.ts`: **si cambia uno, cambia el otro en el mismo PR.**
+
+| característica | UUID (…c5**XX**) | props | contenido |
+|---|---|---|---|
+| `mode` | 01 | read · notify · write | `uint8`: 0 esperando, 1 ómnibus, 2 supermercado |
+| `control` | 02 | write · write w/o response | JSON con `cmd` (abajo) |
+| `event` | 03 | notify | JSON ≤ 180 bytes |
+| `transfer` | 04 | notify | binario: header 4 B (`seq` u16 LE, `total` u16 LE) + datos |
+| `status` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `battery` (0-100 del UPS HAT; null sin HAT), `camera`, `wifi`, `ip`, `port`, `ap` |
+| `wifi` | 06 | read | JSON `{ssid, password, ip, port}` del punto de acceso; la app se une sola con esto |
+
+Comandos de `control`:
+
+| comando | efecto |
+|---|---|
+| `{"cmd":"measure","bytes":53000,"chunk":182,"interval_ms":0}` | manda `bytes` aleatorios por `transfer`. `chunk` = tamaño de notificación (default: MTU − 3); `interval_ms` = pausa entre chunks (default 0) |
+| `{"cmd":"photo"}` | captura con la cámara (1024 px lado mayor, JPEG q70: lo mismo que la app manda a la nube) y la transfiere igual |
+| `{"cmd":"mode","value":2}` | cambia de modo (equivale al botón) |
+| `{"cmd":"status"}` | fuerza una notificación de `status` |
+| `{"cmd":"ap","value":true,"minutes":10}` | enciende el punto de acceso por tiempo acotado (tope 60); `value:false` lo apaga |
+
+Cada transferencia va envuelta en dos eventos: `{"t":"start","id":1,"kind":"measurement","bytes":53000,"chunks":298,"chunk":182}`
+y `{"t":"end","id":1,...,"device_ms":N}`. **`device_ms` no es la medición**: es cuánto tardó la placa
+en entregarle los chunks a BlueZ. El número que vale lo mide la app, del primer chunk al último.
+`status` se notifica solo cada 15 s.
+
+Los otros eventos que viajan por `event`:
+
+| evento | cuándo |
+|---|---|
+| `{"t":"mode","value":N}` | el modo cambió (por el botón o por BLE) |
+| `{"t":"read","mode":N}` | **el botón pide una lectura AHORA** (ADR 0007, act. 2026-10) |
+| `{"t":"ap","on":…,"minutes":…}` | el AP se encendió o se apagó |
+| `{"t":"error","msg":…}` | algo le falló a la placa y la app lo dice en voz alta |
+
+**`read` es un evento aparte y no un `mode` repetido**, a propósito: la app ignora un `mode` que
+nombra el modo en el que ya está —como debe, o cada latido hablaría—, así que un re-anuncio se
+perdería en silencio; y si no se perdiera, haría decir «Modo supermercado activado» otra vez a quien
+está leyendo tres productos seguidos. La placa **no** saca la foto por su cuenta: viaja la intención,
+y la app la busca por HTTP (ADR 0003).
+
+**El campo `mode` de `read` no es decorativo: la app lo aplica antes de leer.** El doble click que
+además cambia de modo manda dos cosas, y en el teléfono no llegan a la misma velocidad — `read` se
+sirve sincrónicamente y el modo viaja por el estado de React. Hasta el 2026-09-13 la lectura ganaba
+siempre y se juzgaba contra el modo anterior: desde *esperando* se descartaba en silencio, y por eso
+el doble click prendía supermercado sin sacar la foto.
+
+## Plan B: la foto por WiFi (HTTP) y el punto de acceso
+
+Decidido el 2026-09-05 (ADR 0003, Actualización): por BLE la foto tarda 4,5 s; por WiFi, 46 ms. El
+daemon levanta un **servidor HTTP** en el puerto 8080 (`--port`, `--no-http`) y publica su IP y
+puerto en la característica `status` (`ip`, `port`, `ap`). La app siempre tira; la placa nunca empuja.
+
+| ruta | qué hace |
+|---|---|
+| `GET /health` | el mismo JSON que `status` |
+| `GET /measure/<bytes>` | `<bytes>` aleatorios (hasta 5 MB), para medir la descarga sin cámara |
+| `GET /photos/latest` | captura ahora y devuelve el JPEG (1024 px, q70); 503 sin cámara |
+| `POST /audio` | guarda el MP3/WAV en `/tmp/virovision-audio/` **y lo reproduce** por el parlante; 202 con el tamaño. Con `X-Encoding: base64` decodifica el cuerpo (así lo manda la app: `fetch` de RN no envía bytes) |
+
+Dos modos de red, y el que importa es el segundo:
+
+1. **Placa y teléfono en la misma red WiFi** (casa, laboratorio): no hay que hacer nada; la app baja de
+   la IP que informa `status`. Sirve para desarrollar y medir.
+2. **Sin WiFi de infraestructura** (la calle, el supermercado): la placa levanta su **punto de acceso**
+   `ViroVision` (clave `virovision2026`, IP `10.42.0.1`) con NetworkManager, y el teléfono se une. El
+   teléfono conserva internet por datos (en iOS hay que verificarlo: es el spike que queda). La placa
+   tiene una sola radio: con el AP arriba deja su red anterior y **se pierde el SSH**; por eso el AP
+   se enciende siempre **por tiempo acotado** (default 10 min, tope 60) y vuelve solo a la red
+   conocida. **El AP sigue al modo**: se enciende al entrar a ómnibus o supermercado (20 min de tope,
+   renovados en cada cambio) y se apaga al volver a esperando. Comando manual:
+   `{"cmd":"ap","valor":true,"minutos":10}` por `control`; `{"cmd":"ap","valor":false}` lo baja antes.
+   Evento `{"t":"ap","on":…,"minutes":…}`, `status.ap`, y `status` vuelve a notificarse con la
+   IP nueva (10.42.0.1) para que la app sepa de dónde bajar la foto.
+   **El AP es una red sólo local**: `setup.sh` deja un drop-in de dnsmasq sin puerta de enlace ni DNS
+   (opciones DHCP 3 y 6). Con el default de NetworkManager el iPhone quedaba sin internet; así
+   conserva su ruta por datos móviles (medido el 2026-09-05).
+
+Para probar el modo 2 sin la app: unirse desde Ajustes del teléfono al WiFi `ViroVision`, abrir
+`http://10.42.0.1:8080/health` en el navegador, y comprobar que el teléfono sigue con internet (abrir
+cualquier sitio). Desde la placa, a mano y con vuelta automática:
+
+```sh
+sudo systemd-run --unit=ap-prueba sh -c 'nmcli con up virovision-ap; sleep 600; nmcli con down virovision-ap'
+```
+
+`setup.sh` deja el WiFi sin ahorro de energía (`wifi.powersave = 2`): el primer GET tras un rato quieto
+tardaba 153 ms contra 41-59 los siguientes.
+
+## Cómo medir (spike ADR 0003)
+
+Protocolo y tablas en [`docs/mediciones/2026-09-04-ble-throughput.md`](../../docs/mediciones/2026-09-04-ble-throughput.md).
+En corto: app conectada → *Medir transferencia* → cinco corridas por tamaño (53, 35, 30, 15 KB) → con
+el WiFi de la placa prendido y apagado (`sudo rfkill block wifi` / `unblock`; comparten antena) →
+anotar el **rango**, no el promedio.
+
+### Caveat: D-Bus (medido el 2026-09-05)
+
+`bluez-peripheral` notifica con `PropertiesChanged` sobre D-Bus, un mensaje por chunk. **Sin pausa
+entre chunks, dbus-next pierde mensajes**: el socket hacia bluetoothd se llena en ~250 ms, la
+librería recibe `EAGAIN` (`BlockingIOError: Resource temporarily unavailable`) y descarta el resto.
+Al receptor le llegaron 175 de 298 chunks y nunca el evento `fin`. Por eso `gatt.py` duerme 4 ms
+entre notificaciones (`VIROVISION_PAUSA_MS` para experimentar); con 1 ms tampoco perdió. La pausa no
+sesga la medición: el daemon entrega los 298 chunks en ~1,7 s y el aire tarda 4,5 s. El arreglo de
+fondo sigue siendo `AcquireNotify` (un fd con backpressure real), pero ya no cambia la conclusión:
+el techo de ~12 KB/s lo pone el controlador (sin DLE, 27 bytes por paquete de radio, 15 buffers) con
+el intervalo de 15 ms de iOS.
+
+### Otras lecciones de la primera instalación
+
+- **BlueZ 5.82 expone `/org/bluez/test`**, y `Adapter.get_first` de bluez-peripheral lo toma por un
+  adaptador y explota. El daemon toma `hci0` por su ruta (`--hci`).
+- **`PYTHONUNBUFFERED=1` en el servicio**: las excepciones que bluez-peripheral imprime con `print()`
+  no llegaban al journal hasta que el proceso moría.
+- **iOS cachea la lista de características de la placa.** Cuando el perfil GATT gana una característica
+  (el 2026-09-05, `wifi`), el iPhone puede seguir sirviéndole a la app la lista anterior: la app no
+  la encuentra y el flujo falla sin error visible (el AP se levantaba y la app no se unía). Remedio:
+  apagar y prender el Bluetooth del teléfono desde Ajustes. Cada vez que cambie el GATT, avisarlo
+  en las notas del build.
+- **Si el servicio se reinicia con el teléfono conectado**, la app puede seguir diciendo «Conectado»
+  con el enlace muerto; desde el build del 2026-09-05 la app lo detecta y avisa. Con builds anteriores:
+  Desconectar y Buscar dispositivo de nuevo.
+
+## Botón físico (ADR 0007)
+
+El único control en la placa. `virovision/button.py`; los modos que dispara viven en `modes.py`.
+
+| Gesto | Desde | Efecto |
+|---|---|---|
+| 1 click | cualquier estado | modo ómnibus. Si ya está en ómnibus, **repite el último anuncio** |
+| 2 clicks | cualquier estado | modo supermercado **y una lectura**. Si ya está en supermercado, **lee de nuevo** |
+| mantenerlo apretado | cualquier modo | volver a *esperando* |
+
+**Un gesto nombra un modo, no un paso** (ADR 0007, act. 2026-09-09): no hay que pasar por *esperando*
+para saltar de un modo al otro. Y **dos clicks piden una lectura siempre** (act. 2026-10), cambie o
+no el modo: frente a la góndola el usuario repite el gesto para leer el producto siguiente, y hasta
+esa fecha el segundo no hacía nada porque la captura se disparaba con la transición.
+
+Cada transición se notifica por `mode` y `event` igual que si la hubiera pedido la app, así que **la
+app no distingue** si el modo lo cambió el dedo del usuario o ella misma. El pedido de lectura viaja
+aparte, como `read`.
+
+**Cableado**: pulsador entre **GPIO 5 (pin físico 29)** y **GND (pin 30, el de al lado)**. Pull-up
+interno, sin resistencia externa. Con un tact switch de 4 patas hay que usar **dos patas en
+diagonal**: las dos de una misma cara vienen unidas de fábrica y darían un botón apretado para
+siempre. `--button-gpio N` para otro pin, `--no-button` para ignorarlo.
+
+**Tiempos** (en `button.py`, recalibrados el 2026-09-13 tras la primera sesión de uso seguido):
+
+| Constante | Bandera | Valor | Por qué |
+|---|---|---|---|
+| `DEBOUNCE_S` | `--debounce-ms` | **15 ms** | `bounce_time` de gpiozero ignora **todo** flanco dentro de esa ventana del anterior, el de soltar incluido: es una **cota superior de lo corto que puede ser un click**. Con 50 ms, un doble click rápido perdía un flanco y colapsaba en **un** click — por eso el primer doble click encendía ómnibus |
+| `LONG_PRESS_S` | `--long-press-ms` | 0,8 s | salir por accidente es peor que tener que insistir. Tiene que quedar **más largo que la ventana de doble click**, o los dos gestos dejan de distinguirse por duración (hay un test que lo fija) |
+| `DOUBLE_CLICK_WINDOW_S` | `--double-click-ms` | **0,6 s** | 0,4 s era la cifra del mouse; acá el botón está en la sien y no hay feedback hasta que el gesto resuelve. Lo paga el click **simple**, que cae en ómnibus y después vigila solo |
+
+Las tres son banderas porque se calibran **contra un dedo real**: editar el archivo por SSH en cada
+prueba es por qué estuvieron tres días sin calibrar.
+
+**Cada gesto queda en el journal.** La cuenta de clicks resuelta va en `info`; los flancos sueltos,
+en `debug` (`-v`). Es lo único que distingue «el gesto se leyó mal» de «el gesto se leyó bien y el
+modo está mal mapeado», que se arreglan en archivos distintos:
+
+```sh
+journalctl -u virovision -f | grep button
+# button: 2 click(s)
+# button: long press
+```
+
+El botón es **opcional**: sin gpiozero, sin permisos sobre el pin o sin botón soldado, el daemon
+arranca igual (log `sin botón físico`) y los modos entran por BLE. Una placa sin daemon sería peor.
+
+## Modo ómnibus (todo en la placa)
+
+Desde el 2026-09-15 el camino de ómnibus corre entero en el dispositivo: la detección **dentro del
+sensor** de la AI Camera, el recorte y el OCR en la CPU de la Pi, y la voz por el parlante con
+anuncios pregrabados. Sin teléfono y sin internet. **1,27 s** desde el click hasta la línea dicha
+([medición](../../docs/mediciones/2026-09-15-omnibus-en-placa.md)).
+
+`virovision/bus.py` es el dueño del modo. Lo que hay que saber para tocarlo:
+
+- **El OCR no puede correr en el hilo de la cámara.** libcamera da el sensor por muerto tras ~1 s sin
+  consumir frames, y el OCR tarda ~1 s. Va en un hilo aparte con una cola; el hilo de la cámara sólo
+  copia el frame cuando hay algo para leer, que es lo caro en una Pi 3 B+.
+- **Un ómnibus es un anuncio.** Una línea recién anunciada queda 10 s en silencio
+  (`SAME_LINE_SILENCE_S`), porque cualquier cosa que corte el track del ómnibus lo devuelve como uno
+  nuevo y quien no ve no puede distinguir «lo repitió» de «llegó otro».
+- **Si falta el modelo o falta el OCR, el modo queda inerte y el daemon sigue vivo.** Se registra la
+  advertencia y se sigue: una placa sin daemon es peor que una placa con un modo apagado.
+
+### Qué vive fuera de git, y cómo se rehace
+
+Pesan demasiado para el repo. Los dos se reconstruyen desde `bus-banner-recognizer`:
+
+| En la placa | Qué es | Cómo se rehace |
+|---|---|---|
+| `/home/virovision/models/bus_sign.rpk` | el detector de carteles, int8, para el sensor | `imx500-package -i packerOut.zip -o out/` sobre `models/bus_sign_v6_yolo11n_imx_model/packerOut.zip`, que sí está en el repo (LFS) |
+| `/home/virovision/announcements/` | 386 `.wav`: números de línea y destinos de la STM, más `bus.wav` y `no_number.wav` | `scripts/make_announcements.py`, en `bus-banner-recognizer` |
+| `/home/virovision/announcements/system/` | 10 `.wav` (~820 KB): los avisos de sistema — conexión, red, modo, ajuste — y el chirp del botón | `python3 tools/make_system_announcements.py` **en este repo**, y `scp -r announcements/system virovision.local:~/announcements/` |
+| `/home/virovision/models/catalog_stm.csv` | el catálogo de líneas y destinos de Montevideo, que repara lecturas del OCR | `scripts/build_catalog.py` |
+
+Banderas: `--bus-model`, `--bus-labels`, `--announcements`, `--bus-catalog`, y `--no-bus` para
+apagar el modo. `--announcements` gobierna las dos carpetas: los clips de ómnibus salen de la raíz y
+los de sistema de su subcarpeta `system/`.
+
+Los avisos de sistema se generan **acá** y no junto a los de ómnibus a propósito: los de ómnibus
+salen del catálogo de la STM y cambian cuando cambia el catálogo; éstos salen de las cadenas de la
+app (`app/src/features/audio/notices.ts`) y cambian cuando cambia la app. Los nombres de archivo
+están espejados en `virovision/notices.py`, y `notices.test.ts` del lado de la app falla si los dos
+catálogos se desincronizan — un nombre que no existe no rompe nada, simplemente no suena, y eso no se
+ve en ningún log que el usuario alcance.
+
+### Qué vio la cámara: los cuadros y recortes de cada corrida
+
+> ⚠️ **Temporal, sólo para desarrollo.** Se saca antes de la versión final (decisión del equipo,
+> 2026-10-12; anotado en `docs/ROADMAP.md`, «Antes de la versión final»).
+
+Cada vez que arranca el modo ómnibus, la placa guarda en la microSD lo que hubo detrás de cada
+anuncio (`virovision/evidence.py`), para poder separar después un cartel muy chico, un recorte que
+cortó medio destino, un reflejo en los LED o un error del OCR — en el log los cuatro se ven igual:
+
+```
+/home/virovision/evidence/<AAAAMMDD-HHMMSS>/
+    t003-bus.jpg / .json      el cuadro de «se acerca un ómnibus», con todas las cajas del sensor
+    t003-r02-crop.jpg         el recorte exacto que leyó el OCR (lectura 2 del track 3), sin agrandar
+    t003-r02-frame.jpg        el cuadro entero con el ómnibus y el recorte marcados (sólo si leyó algo)
+    t003-r02.json             qué devolvió el OCR, sus scores, cuánto tardó
+    t003-decided.json         qué decidieron los votos y si se dijo o se calló como eco
+    events.jsonl              todos esos registros en orden, para quien lea la tarjeta
+```
+
+**Llegan a la app igual que la foto del modo supermercado**: la placa avisa por BLE
+(`{"t":"evidence","ref":"<corrida>/t003-r02"}`) y la app baja `GET /evidence/<ref>.json` y las fotos
+que lista. No hay listado ni páginas: sólo se sirve lo que se anunció, y sólo nombres que escribe
+`evidence.py` (el daemon corre como root). Lo que la app hace después está en `docs/supabase.md`
+(«Edge Function `evidence`»): una fila `bus.evidence` en la telemetría con lo que leyó el OCR y la
+ruta de cada foto en Storage, y la foto subida a esa ruta.
+
+**El log queda conectado con la foto** también en el journal de la placa:
+
+```
+bus: track 3 is a bus, saying so (evidence 20261012-101500/t003-bus)
+bus: track 3 read in 512 ms at 1.4 s: 115 LUIS BRAILLE (evidence 20261012-101500/t003-r02)
+bus: track 3 decided at 2.1 s after 3 reads: Bus 115, LUIS BRAILLE (evidence 20261012-101500/t003-*)
+```
+
+- Se escribe en un hilo propio con una cola corta: si la tarjeta no da abasto se descartan imágenes,
+  nunca se frena la cámara (`dropped_before` en el registro siguiente dice cuántas).
+- Tope de **500 MB** entre todas las corridas, y nada si quedan menos de 1 GB libres: al empezar
+  una corrida se borran las más viejas. Sin teléfono escuchando, la tarjeta es la única copia
+  (`rsync -av virovision@<ip>:evidence/ ./evidence/`).
+- El nombre de la carpeta es la hora de la placa, que no tiene RTC: antes de NTP puede estar
+  corrida horas.
+- **Son fotos de la calle, con gente.** Para apagarlo: `--no-evidence` en `/etc/default/virovision`;
+  `--evidence-dir` cambia la carpeta.
+
+### Cambiar el detector sin editar dos archivos
+
+Las banderas del daemon viven en **`/etc/default/virovision`**, en la placa, y las leen tanto la
+unidad base como el drop-in que `modo-red.sh` reescribe en cada arranque. Es lo que hace que
+sobrevivan al cambio entre desarrollo y producto; puestas en la unidad, se perdían al pasar a
+producto, que es cuando nadie puede entrar a arreglarlo.
+
+```sh
+# en la placa
+sudo nano /etc/default/virovision      # VIROVISION_ARGS=--bus-model … --bus-labels …
+sudo systemctl restart virovision
+```
+
+**`--bus-labels` no es decorativo.** De ahí sale si el detector encuentra ómnibus o sólo carteles:
+con un modelo de una clase cada cartel hace de ómnibus para que el seguimiento tenga algo que
+seguir, y con uno de dos clases eso sobra y le daría al tracker dos cajas por ómnibus. Se deriva de
+las etiquetas a propósito: dos banderas para un mismo hecho terminan contradiciéndose de noche en la
+placa.
+
+### Paquetes
+
+`setup.sh` suma por apt `imx500-all`, `imx500-tools`, `python3-opencv` y `git`, y el grupo de OCR de
+`requirements-bus.txt`. Ese grupo se instala **con `--no-deps`, y no es opcional**: sin eso pip pisa
+el numpy con el que se compiló picamera2 y la cámara deja de abrir.
+
+**El OpenCV que usa el daemon no es el de apt** (desde el 2026-10-06): `requirements-bus.txt` trae
+`opencv-python-headless` 4.x, que dentro del venv tapa a `python3-opencv`. El de Debian enlaza 380
+librerías (VTK, OpenGL, GTK…) y tarda **13 s en importarse** en la Zero 2 W, con caché o sin ella;
+ese import retiene el GIL y dejaba al daemon sin contestar por BLE justo después de empezar a anunciar.
+El headless tarda 0,7 s. Se comprueba con
+`sudo .venv/bin/python -c "import cv2; print(cv2.__file__)"`: tiene que decir `.venv/`, no
+`/usr/lib/python3/dist-packages`.
+
+**El OCR corre en su propio proceso** (`virovision/ocr_worker.py`, mismo 2026-10-06): armar los
+modelos de onnxruntime también retiene el GIL, 10–20 s. En el journal se ve como
+`OCR running in its own process (pid N)`.
+
+Dos trampas que ya costaron una tarde:
+
+- **`pip` sin `sudo` instala en `~/.local` y el daemon (que corre como root) no lo ve.** El venv es de
+  root: `sudo /home/virovision/virovision/.venv/bin/pip install …`.
+- **La placa no tiene git ni credenciales**, a propósito: un aparato que sale a la calle no debería
+  llevarlas. El paquete de `bus-banner-recognizer` se construye en la Mac (`uv build --wheel`) y se
+  copia con `scp`.
+
+Los tres pasos están en **`scripts/deploy_pi.sh`, en el repo de `bus-banner-recognizer`**, que es el
+único script de despliegue del proyecto: instala el paquete, copia los scripts y el catálogo, rehace
+el `.rpk` en la placa si se le pasa un modelo, y espera a que el daemon avise que el modo ómnibus
+está listo. Con `FIELD=1` deja el servicio parado e imprime el comando de la prueba de campo, porque
+**el servicio y la cámara son exclusivos**: si el daemon está arriba, el script de campo no abre la
+cámara.
+
+## Salida de audio (el modo supermercado, de punta a punta)
+
+El lazo que el usuario siente: **dos clicks** → la app baja la foto por WiFi → el modelo en la nube
+la lee → la app sintetiza la frase y la manda con `POST /audio` → **la placa la reproduce**.
+
+> ✅ **El último paso faltaba hasta el 2026-09-11.** `http_server.py` aceptaba el archivo, lo
+> escribía en `/tmp/virovision-audio/` y llamaba a un `play` que `__main__.py` **nunca le pasaba**:
+> cada lectura llegaba a la placa y moría ahí, en silencio y con un 202 que decía que había salido
+> bien. Es el peor tipo de falla —todas las capas reportan éxito— y por eso `tests/test_audio.py`
+> existe.
+
+`virovision/audio.py`, y tres cosas que conviene no deshacer:
+
+- **No espera a que el audio termine** (`Popen`, no `run`). Quien llama es el handler HTTP que le
+  contesta al teléfono, y la app **espera** esa respuesta: sostenerla lo que dura la frase haría
+  parecer lenta a la placa justo cuando está hablando.
+- **Una lectura nueva interrumpe la que suena.** Frente a la góndola el usuario pide el producto
+  siguiente antes de que termine la frase anterior, y dos voces a la vez no son información para
+  alguien que no ve la pantalla. La app hace lo mismo en su `speak()`.
+- **Degrada a un log, nunca a una excepción.** Sin decodificador, sin placa de sonido o sin parlante
+  soldado, el daemon tiene que seguir contestando BLE.
+
+**Qué decodifica qué**: `.mp3` → `mpg123 -q` (es lo que manda la app); `.wav` → `aplay -q` (viene con
+alsa-utils, sin decodificador). Los dos los instala `setup.sh`. Si en alguna placa apt no se puede
+(en ésta falla cuando el reloj no sincronizó — no tiene RTC), la salida es que la app mande WAV. El
+daemon **dice al arrancar** con qué formatos cuenta:
+
+```
+audio: .mp3 yes, .wav yes
+audio: no player installed; readings will arrive and not be heard   ← el aviso
+```
+
+`--no-audio` recibe el audio y **no** lo reproduce (guarda nada más), para depurar una lectura sin
+sonido.
+
+### Por dónde sale el sonido físicamente
+
+La Zero 2 W **no tiene jack**, así que el audio PWM se redirige a dos GPIO con `audremap` en
+`config.txt`. Sin `enable_jack` el overlay **apaga el jack**, así que una Pi que sí lo tiene queda
+comportándose como una Zero 2 W — la prueba es real, no una simulación.
+
+```
+dtoverlay=audremap,pins_12_13    # GPIO 12 = pin 32, GPIO 13 = pin 33
+audio_pwm_mode=1                 # legacy: conmuta menos (ver abajo)
+```
+
+| Cable | Pin físico | |
+|---|---|---|
+| señal | **32** | GPIO 12, canal izquierdo |
+| masa | **34** | GND, el de al lado |
+
+> ⚠️ **Antes de elegir los pines, mirar qué hay soldado.** El overlay convierte esos pines en
+> **salidas**: un botón a masa en uno de ellos, al apretarlo, es un cortocircuito contra el pad. Por
+> eso 12/13 se eligió recién después de confirmar que el pin 33 estaba libre. La alternativa es
+> `pins_18_19`, pero ésos son los del futuro DAC I2S (18 BCLK, 19 LRC, 21 DIN).
+>
+> ⚠️ **Y el transductor.** Un GPIO da **16 mA**. Un piezo es un capacitor: no pasa continua, sólo
+> picos en cada flanco, y va directo (con `audio_pwm_mode=1`, que conmuta menos, el pico es menor).
+> Un **auricular o parlante de 16-32 Ω es resistivo**: pediría ~100 mA continuos, seis veces el
+> límite, y **necesita una resistencia en serie de 100-330 Ω** o el DAC.
+>
+> Un piezo alcanza para verificar el camino, **no para voz**: resuena en una banda angosta y el habla
+> sale apenas inteligible. Eso no es una falla del PWM.
+
+## El enlace: la placa no se empareja, y lo dice
+
+Desde el 2026-09-13 ([ADR 0003](../../docs/architecture/adr/0003-enlace-placa-telefono.md),
+actualización): **la placa arranca con `Pairable = false`**. Ninguna característica de este perfil
+pide autenticación —ADR 0003 decidió no cifrar la carga—, así que la app nunca necesitó un vínculo
+(*bond*) para nada. Un vínculo no compraba nada y costaba la falla que el usuario reportó: iOS guarda
+su clave, las dos copias dejan de coincidir y desde ahí **cada reconexión termina en «ViroVision
+quiere emparejarse»**, a veces varias veces seguidas.
+
+> **En un teléfono que ya se emparejó antes, una sola vez:** *Ajustes → Bluetooth → ViroVision →
+> Olvidar este dispositivo*. iOS conserva su mitad de la clave e intenta cifrar hasta que se la
+> borra.
+
+`--pairable` devuelve el comportamiento anterior. En la placa, los vínculos guardados se listan al
+arrancar (log) y se borran con `bluetoothctl remove <MAC>`.
+
+**Y el journal cuenta el enlace**, que antes era el hueco grande: la placa anunciaba y todo lo demás
+sólo se veía desde el teléfono, así que «la app no encuentra nada» tenía dos causas opuestas
+indistinguibles.
+
+```sh
+journalctl -u virovision -f | grep -E 'central|bonding|advertising'
+# bonding disabled: no central can pair ...
+# central connected: 4A:BF:... (BlueZ stops advertising while it is)
+# central disconnected: 4A:BF:... (advertising should resume)
+# NOT advertising and no central connected: no phone can find this board   <-- ⚠️ la falla es de la placa
+```
+
+### Anuncia cada 100–152,5 ms, no cada 1,28 s
+
+Desde el 2026-09-20 (ADR 0003, actualización). El kernel anuncia por defecto cada **1,28 s**
+(`adv_min_interval` = 2048 × 0,625 ms, leído en esta placa) y nadie lo había tocado. El teléfono sólo
+encuentra la placa —y sólo completa la conexión directa al identificador recordado— cuando atrapa un
+anuncio, así que ese intervalo era un piso debajo de todas las conexiones. Medido desde la Mac con el
+AP arriba: con 1,28 s, dos de seis búsquedas no la veían en 20 s; con 100–152,5 ms, cero de doce (los
+tiempos absolutos de la Mac son ruido —macOS escanea con pereza—; el número del iPhone lo da
+`ble.connected.ms` en la telemetría).
+`virovision.service` lo fija por `debugfs` en el mismo `ExecStartPre` que ya fijaba el intervalo de
+conexión. Para verificar que el controlador lo recibió:
+
+```sh
+sudo cat /sys/kernel/debug/bluetooth/hci0/adv_min_interval /sys/kernel/debug/bluetooth/hci0/adv_max_interval   # 160 y 244
+sudo btmon | grep -A2 'LE Set Advertising Parameters'   # y reiniciar el servicio en otra terminal
+```
+
+Si cambiás la unidad, en la placa se reinstala a mano: `sed "s|__INSTALL_DIR__|/home/virovision/virovision|g"
+virovision.service`, `sudo install` a `/etc/systemd/system/`, `daemon-reload`, `restart`. `setup.sh`
+sólo lo hace en la instalación inicial.
+
+## Problemas conocidos
+
+- `BlueZ no está disponible en D-Bus`: `sudo systemctl start bluetooth` y revisar `rfkill list`.
+- El iPhone ve `ViroVision` pero no conecta: borrar el dispositivo en *Ajustes → Bluetooth* del
+  teléfono (iOS cachea el GATT viejo) y reiniciar el servicio.
+- **El iPhone pide emparejarse solo**: la placa está corriendo con `--pairable`, o con un daemon
+  anterior al 2026-09-13. Ver la sección de arriba.
+- **La app dice «no se encontró el dispositivo» y la placa parece bien**: mirar `central connected`
+  en el journal. Si hay una central conectada, la placa no está anunciando **a propósito** y el
+  teléfono que la tiene tomada no es necesariamente el que está buscando — desde el build del
+  2026-09-13 la app mira primero lo que ya está conectado al sistema, justamente por esto.
+- Sin cámara detectada: `libcamera-hello --list-cameras`; en Bookworm la Camera Module 3 va sin
+  tocar `config.txt`. El daemon sigue igual sin cámara, sólo `foto` falla.
+- `pip` se queja de *externally-managed-environment*: es que no se activó el venv; `setup.sh` instala
+  siempre dentro de `.venv`.
+
+## Tests (en la Mac)
+
+```sh
+cd hardware/raspi && pip install -r requirements-dev.txt && python3 -m pytest
+```
+
+Sólo lo puro: el partido en chunks, la máquina de modos y el núcleo de comandos (que es el mismo
+código en la placa y en el emulador). Lo que habla con BlueZ se prueba en la placa; lo que habla con
+CoreBluetooth, arrancando el emulador.
+
+## Qué falta (en orden)
+
+1. **El transductor definitivo.** El camino de audio ya está (`audio.py` + `audremap`), lo que falta
+   es por dónde sale: un piezo verifica pero no sirve para voz; un parlante de 8-32 Ω necesita
+   resistencia; el destino es el **DAC I2S** (MAX98357A, pines 18/19/21). Y los **anuncios
+   pregrabados** de modo y de líneas de ómnibus en la SD (ADR 0003), que hoy no existen: la placa
+   sólo reproduce lo que le manda el teléfono.
+2. Pipeline de ómnibus en placa (Coral): detección → recorte → OCR.
+3. Si la medición lo pide: AP WiFi con NetworkManager + servidor HTTP (`GET /fotos/{id}`, `POST /audio`).
+4. Calibrar los tiempos del botón con el usuario (ver *Botón físico*): los actuales son una primera
+   estimación, no una medición.

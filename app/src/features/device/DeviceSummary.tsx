@@ -1,9 +1,13 @@
 /**
- * Resumen del dispositivo conectado: nombre, batería y firmware.
+ * Summary of the connected device: name and battery.
  *
- * La batería se comunica **por texto**, no sólo por la barra: para un usuario ciego la barra no
- * existe, y para uno con baja visión un indicador que sólo cambia de color no dice nada. La barra
- * es refuerzo visual del número, nunca su reemplazo.
+ * The network address and the firmware version used to be here and left on 2026-09-08: they are
+ * diagnostics, and diagnostics now go to Supabase. A `192.168.4.1:8080` says nothing to whoever uses
+ * the app, and if the network fails the screen itself says so in words.
+ *
+ * The battery is communicated **as text**, not only as the bar: for a blind user the bar does not
+ * exist, and for a low-vision one an indicator that only changes colour says nothing. The bar is
+ * visual reinforcement of the number, never its replacement.
  */
 import { View } from 'react-native';
 
@@ -11,7 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { strings } from '@/i18n';
 import type { DeviceInfo } from './types';
 
-/** Debajo de esto se avisa explícitamente, además de teñir la barra. */
+/** Below this it is announced explicitly, on top of tinting the bar. */
 const LOW_BATTERY = 20;
 
 export function DeviceSummary({ device }: { device: DeviceInfo }) {
@@ -28,7 +32,7 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
         {t.deviceSection.toUpperCase()}
       </ThemedText>
 
-      {device.id.startsWith('simulado') && (
+      {device.id.startsWith('simulated') && (
         <ThemedText type="small" themeColor="danger">
           {t.deviceSimulated}
         </ThemedText>
@@ -56,8 +60,8 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
         </ThemedText>
         {level != null && (
           <View
-            // Refuerzo visual del número de arriba; no aporta información propia, así que se
-            // oculta del lector de pantalla para no repetir el dato.
+            // Visual reinforcement of the number above; it carries no information of its own, so it
+            // is hidden from the screen reader to avoid repeating the datum.
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
             className="mt-two h-[10px] overflow-hidden rounded-pill bg-surface-elevated">
@@ -69,17 +73,6 @@ export function DeviceSummary({ device }: { device: DeviceInfo }) {
         )}
       </View>
 
-      {device.firmwareVersion && (
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={`${t.firmwareLabel}: ${device.firmwareVersion}`}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {t.firmwareLabel}
-          </ThemedText>
-          <ThemedText type="small">{device.firmwareVersion}</ThemedText>
-        </View>
-      )}
     </View>
   );
 }

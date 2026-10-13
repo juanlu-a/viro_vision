@@ -4,14 +4,22 @@ Thesis deliverables, architecture and decision records.
 
 ## Contents
 
-- [`architecture/`](architecture/README.md) — el diagrama de modos de operación y el flujo de
-  datos por caso de uso; [`architecture/adr/`](architecture/adr/) tiene los ADRs: 0001
+- [`architecture/`](architecture/README.md) — el diagrama de modos de operación y los tres flujos
+  por caso de uso; [`architecture/adr/`](architecture/adr/) tiene los ADRs: 0001
   offline-first (enmendado), 0002 backend & auth, 0004 runtime de inferencia on-device
-  (actualizado), 0006 pipelines por caso de uso, 0007 botones físicos y modos.
+  (actualizado), 0006 pipelines por caso de uso, 0007 botones físicos y modos, 0008 proxy propio
+  para las claves de nube.
+- [`qa-modo-supermercado.md`](qa-modo-supermercado.md) — cómo probar el modo supermercado de punta
+  a punta. Los pasos 8 y 9 **son** la corrida que alimenta el dataset de evaluación de la tesis.
+- [`../documents/`](../documents/) — los documentos fuente que se versionan tal cual (el diagrama
+  de los tres casos, dibujado a mano).
 - [`supabase.md`](supabase.md) · [`ci-cd.md`](ci-cd.md) — setup del backend y de CI/CD.
 - [`REUNIONES-TUTOR.md`](REUNIONES-TUTOR.md) — registro de reuniones con el director de tesis.
 - [`dev-build-ios.md`](dev-build-ios.md) — correr la app en un iPhone físico (development build).
 - [Spike: visión local en el teléfono](spike-vision-local.md) — resultados medidos de los cuatro caminos (nube, LiteRT-LM, ExecuTorch, OCR), la recomendación y la nota de cierre (el laboratorio se retiró de la app el 2026-08-30; vive en la rama `spike/laboratorio-vision-local`).
+- [`mediciones/`](mediciones/README.md) — datos crudos y método de cada campaña de medición, un
+  archivo por campaña. El análisis y la decisión van en *Pruebas y decisiones*; acá los números que
+  los respaldan, para que la conclusión se pueda auditar y la medición repetir.
 - [Pruebas y decisiones](pruebas-y-decisiones.md) — todo lo probado con sus números, pros/contras
   y las decisiones por caso de uso; **borrador de la sección homónima del documento principal de
   la tesis**.

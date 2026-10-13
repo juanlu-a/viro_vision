@@ -1,30 +1,66 @@
 /**
- * Existe porque el firmware va a implementar ESTA MISMA máquina sobre el botón físico
- * (ADR 0007): si alguien le agrega a la app una transición que el botón no tiene —el salto
- * directo entre modos es la tentación obvia—, la app y el dispositivo pasan a contarle al
- * usuario historias distintas y no hay pantalla que lo delate. La tabla replica el diagrama
- * canónico de `docs/architecture/README.md` caso por caso; ante desacuerdo, manda el diagrama.
+ * Exists because the firmware implements THIS SAME machine on top of the physical button
+ * (ADR 0007): if the app and `hardware/raspi/virovision/modes.py` disagree on a single cell, app
+ * and device start telling the user different stories and no screen gives it away. The table
+ * replicates the canonical diagram in `docs/architecture/README.md` case by case; on disagreement,
+ * the diagram wins.
  */
-import { GESTOS, MODOS, transicionar } from './modes';
-import type { Gesto, Modo } from './modes';
+import { GESTURES, MODES, requestsReading, transition } from './modes';
+import type { Gesture, Mode } from './modes';
 
-describe('transicionar', () => {
-  const esperado: Record<Modo, Record<Gesto, Modo>> = {
-    esperando: { click: 'omnibus', dobleClick: 'supermercado', clickLargo: 'esperando' },
-    omnibus: { click: 'omnibus', dobleClick: 'omnibus', clickLargo: 'esperando' },
-    supermercado: { click: 'supermercado', dobleClick: 'supermercado', clickLargo: 'esperando' },
+describe('transition', () => {
+  const expected: Record<Mode, Record<Gesture, Mode>> = {
+    idle: { click: 'bus', doubleClick: 'supermarket', longPress: 'idle' },
+    bus: { click: 'bus', doubleClick: 'supermarket', longPress: 'idle' },
+    supermarket: { click: 'bus', doubleClick: 'supermarket', longPress: 'idle' },
   };
 
-  for (const modo of MODOS) {
-    for (const gesto of GESTOS) {
-      it(`${modo} + ${gesto} → ${esperado[modo][gesto]}`, () => {
-        expect(transicionar(modo, gesto)).toBe(esperado[modo][gesto]);
+  for (const mode of MODES) {
+    for (const gesture of GESTURES) {
+      it(`${mode} + ${gesture} → ${expected[mode][gesture]}`, () => {
+        expect(transition(mode, gesture)).toBe(expected[mode][gesture]);
       });
     }
   }
 
-  it('no permite saltar de un modo al otro sin pasar por esperando', () => {
-    expect(transicionar('omnibus', 'dobleClick')).not.toBe('supermercado');
-    expect(transicionar('supermercado', 'click')).not.toBe('omnibus');
+  // 2026-09-09 update of ADR 0007. The previous version of this test asserted the opposite: that
+  // there was NO direct jump. It is kept inverted, and not deleted, because the temptation now runs
+  // the other way — someone restoring the guard would silently bring back the behaviour that read
+  // as a broken button in the user's hand.
+  it('jumps straight between modes: a gesture names a mode, not a step', () => {
+    expect(transition('bus', 'doubleClick')).toBe('supermarket');
+    expect(transition('supermarket', 'click')).toBe('bus');
+  });
+
+  it('a long press always leaves, from any mode', () => {
+    for (const mode of MODES) expect(transition(mode, 'longPress')).toBe('idle');
+  });
+});
+
+describe('requestsReading', () => {
+  /**
+   * Exists because this is the half of the button contract that `transition` cannot express: a
+   * double click in supermarket changes NO mode and still has to take a photo. Before the
+   * 2026-10 update the capture was keyed off the mode transition, so the second double click in
+   * front of the shelf did nothing and the button read as broken.
+   */
+  it('a double click always asks for a reading', () => {
+    expect(requestsReading('doubleClick')).toBe(true);
+  });
+
+  it('a single click does not: bus mode keeps watching on its own', () => {
+    // If this ever returned true, every click would cost a photo and a cloud call.
+    expect(requestsReading('click')).toBe(false);
+  });
+
+  it('a long press does not: it is how you leave, not how you read', () => {
+    expect(requestsReading('longPress')).toBe(false);
+  });
+
+  it('asking for a reading is independent of changing mode', () => {
+    // The device mirrors this pair in `ModeMachine.requests_reading`; if the two answers ever
+    // collapsed into one, a repeated double click would go back to doing nothing.
+    expect(transition('supermarket', 'doubleClick')).toBe('supermarket');
+    expect(requestsReading('doubleClick')).toBe(true);
   });
 });

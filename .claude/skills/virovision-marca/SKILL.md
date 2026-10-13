@@ -30,7 +30,8 @@ trazo 18, extremos redondeados; pupila `r=17` en `(100,92)`.
 Variantes sobre oscuro: `#4D9BFF` / `#2BD69A` / pupila blanca. Proporción: 70 % neutros, 20 %
 Verde Lectura, 10 % Azul Sensor.
 
-Modos, tal cual el manual:
+Modos, tal cual el manual. **La app renderiza sólo el oscuro** desde el 2026-09-14 (ADR 0010); el
+claro sigue en `colors.js` y en `theme.test.ts` para el material de la tesis:
 
 | | claro | oscuro |
 |---|---|---|
