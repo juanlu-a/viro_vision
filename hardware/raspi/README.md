@@ -395,6 +395,50 @@ están espejados en `virovision/notices.py`, y `notices.test.ts` del lado de la 
 catálogos se desincronizan — un nombre que no existe no rompe nada, simplemente no suena, y eso no se
 ve en ningún log que el usuario alcance.
 
+### Qué vio la cámara: los cuadros y recortes de cada corrida
+
+> ⚠️ **Temporal, sólo para desarrollo.** Se saca antes de la versión final (decisión del equipo,
+> 2026-10-12; anotado en `docs/ROADMAP.md`, «Antes de la versión final»).
+
+Cada vez que arranca el modo ómnibus, la placa guarda en la microSD lo que hubo detrás de cada
+anuncio (`virovision/evidence.py`), para poder separar después un cartel muy chico, un recorte que
+cortó medio destino, un reflejo en los LED o un error del OCR — en el log los cuatro se ven igual:
+
+```
+/home/virovision/evidence/<AAAAMMDD-HHMMSS>/
+    t003-bus.jpg / .json      el cuadro de «se acerca un ómnibus», con todas las cajas del sensor
+    t003-r02-crop.jpg         el recorte exacto que leyó el OCR (lectura 2 del track 3), sin agrandar
+    t003-r02-frame.jpg        el cuadro entero con el ómnibus y el recorte marcados (sólo si leyó algo)
+    t003-r02.json             qué devolvió el OCR, sus scores, cuánto tardó
+    t003-decided.json         qué decidieron los votos y si se dijo o se calló como eco
+    events.jsonl              todos esos registros en orden, para quien lea la tarjeta
+```
+
+**Llegan a la app igual que la foto del modo supermercado**: la placa avisa por BLE
+(`{"t":"evidence","ref":"<corrida>/t003-r02"}`) y la app baja `GET /evidence/<ref>.json` y las fotos
+que lista. No hay listado ni páginas: sólo se sirve lo que se anunció, y sólo nombres que escribe
+`evidence.py` (el daemon corre como root). Lo que la app hace después está en `docs/supabase.md`
+(«Edge Function `evidence`»): una fila `bus.evidence` en la telemetría con lo que leyó el OCR y la
+ruta de cada foto en Storage, y la foto subida a esa ruta.
+
+**El log queda conectado con la foto** también en el journal de la placa:
+
+```
+bus: track 3 is a bus, saying so (evidence 20261012-101500/t003-bus)
+bus: track 3 read in 512 ms at 1.4 s: 115 LUIS BRAILLE (evidence 20261012-101500/t003-r02)
+bus: track 3 decided at 2.1 s after 3 reads: Bus 115, LUIS BRAILLE (evidence 20261012-101500/t003-*)
+```
+
+- Se escribe en un hilo propio con una cola corta: si la tarjeta no da abasto se descartan imágenes,
+  nunca se frena la cámara (`dropped_before` en el registro siguiente dice cuántas).
+- Tope de **500 MB** entre todas las corridas, y nada si quedan menos de 1 GB libres: al empezar
+  una corrida se borran las más viejas. Sin teléfono escuchando, la tarjeta es la única copia
+  (`rsync -av virovision@<ip>:evidence/ ./evidence/`).
+- El nombre de la carpeta es la hora de la placa, que no tiene RTC: antes de NTP puede estar
+  corrida horas.
+- **Son fotos de la calle, con gente.** Para apagarlo: `--no-evidence` en `/etc/default/virovision`;
+  `--evidence-dir` cambia la carpeta.
+
 ### Cambiar el detector sin editar dos archivos
 
 Las banderas del daemon viven en **`/etc/default/virovision`**, en la placa, y las leen tanto la

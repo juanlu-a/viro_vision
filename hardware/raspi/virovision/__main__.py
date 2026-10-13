@@ -24,6 +24,8 @@ from .bus import DEFAULT_CATALOG as BUS_DEFAULT_CATALOG
 from .bus import DEFAULT_MODEL as BUS_DEFAULT_MODEL
 from .bus import BusWatcher
 from .camera import Camera, synthetic_payload
+from .evidence import DEFAULT_DIR as EVIDENCE_DEFAULT_DIR
+from .evidence import Evidence
 from .log_relay import LogRelay
 from .notices import SYSTEM_DIR
 from .state import NetworkSnapshot, local_ip, read_status
@@ -67,6 +69,8 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--announcements", type=Path, default=BUS_DEFAULT_ANNOUNCEMENTS, help="folder with the pre-recorded .wav")
     parser.add_argument("--bus-catalog", type=Path, default=BUS_DEFAULT_CATALOG, help="CSV number,destination used to fix the OCR")
     parser.add_argument("--no-bus", action="store_true", help="do not load the detector nor watch in bus mode")
+    parser.add_argument("--evidence-dir", type=Path, default=EVIDENCE_DEFAULT_DIR, help="where bus mode keeps the frame of each bus and the crop of each OCR read")
+    parser.add_argument("--no-evidence", action="store_true", help="do not keep bus mode's frames and crops on the card")
     parser.add_argument("--no-button", action="store_true", help="do not use the physical button (modes come in over BLE only)")
     parser.add_argument("--button-gpio", type=int, default=DEFAULT_GPIO, help=f"GPIO of the mode button (default {DEFAULT_GPIO} = physical pin 29)")
     # The three button timings, on the command line because they are calibrated against a real
@@ -187,6 +191,8 @@ async def _main(args: argparse.Namespace) -> None:
             # /tmp, answered 202 and nobody ever heard it. `--no-audio` keeps that old behaviour for
             # debugging a reading without the sound.
             play=None if args.no_audio else player.play,
+            # Where the app downloads what bus mode announces over BLE (`evidence.py`).
+            evidence_dir=None if args.no_evidence else args.evidence_dir,
         )
         http.start()
 
@@ -246,6 +252,7 @@ async def _main(args: argparse.Namespace) -> None:
             catalog=args.bus_catalog,
             labels=labels,
             signs_only=signs_only,
+            evidence=None if args.no_evidence else Evidence(args.evidence_dir, emit=service.core.emit_event),
         )
         service.core.attach_bus(bus_watcher)
 

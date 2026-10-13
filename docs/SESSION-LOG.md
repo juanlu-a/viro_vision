@@ -3789,3 +3789,38 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - Rotar la API key de Roboflow, que sigue en la historia del repo de Magalí.
 - El modelo de dos clases lee peor el destino (85,7 % contra 89,3 %): la palanca siguiente es reentrenar
   el reconocedor, no el recorte.
+
+## 2026-10-12 — El modo ómnibus guarda lo que vio, y la foto llega a la telemetría unida a su log
+
+- **Pedido**: saber qué ve efectivamente la placa cuando reconoce un ómnibus y cuando el OCR devuelve
+  una línea, con **el log conectado a la foto correspondiente** para analizarlo después. El log decía
+  «115 LUIS BRAILLE» y nada de la imagen: un cartel chico, un recorte que corta medio destino, un
+  reflejo o un error del OCR se veían igual.
+- **Placa** (`hardware/raspi/virovision/evidence.py`, enganchado en `bus.py`): cada corrida del modo
+  deja una carpeta en la microSD con el cuadro del aviso «se acerca un ómnibus» (aunque la frase se
+  silencie), el recorte exacto de cada lectura, el cuadro entero cuando el OCR leyó algo, y un JSON
+  por registro (textos y scores del OCR, ms, decisión). Las líneas del journal llevan
+  `(evidence <corrida>/t003-…)`.
+  - Hilo propio con cola de 4 y descarte: el hilo de cámara no puede esperar un JPEG.
+  - Tope de 500 MB y piso de 1 GB libre: la microSD es de la que arranca la placa.
+- **A la app, como el modo supermercado** (pedido explícito: nada de una galería web en la placa).
+  Un primer intento servía una galería HTML en `/evidence/`; se descartó. Ahora la placa avisa por
+  BLE `{t:"evidence", ref}` y la app baja ese registro y sus fotos por WiFi (`services/evidence/`).
+- **A Supabase, junto a la telemetría** (elegido entre «sólo en el teléfono», «Supabase» y «las
+  dos»): la app graba en el momento una fila `bus.evidence` con lo que leyó el OCR y la ruta de
+  cada foto en Storage, y sube las fotos después a esa misma ruta (función `evidence`, bucket privado
+  `evidence`). Rutas deterministas: la fila es correcta aunque la foto suba una hora más tarde —con
+  el celular en el AP de la placa no hay internet—, y la cola en el teléfono tiene tope.
+- **Es temporal**: decisión del equipo de sacarlo para la versión final. La lista de qué sacar
+  está en `docs/ROADMAP.md` («Antes de la versión final»), y cada archivo lo dice en su cabecera.
+- **Verificado**: tests nuevos en la placa (`tests/test_evidence.py`, 174 en verde) y en la app
+  (`services/evidence/*.test.ts`, 328 en verde); lint y typecheck limpios.
+- **Desplegado en Supabase**: migración del bucket aplicada con `supabase db push` (bucket `evidence`
+  privado, sólo JPEG, 2 MB) y función `evidence` desplegada. Probada con `curl`: rechaza una ref
+  inválida y un archivo que no es JPEG, y guarda uno válido en `<phone>/<corrida>/<archivo>`; la
+  prueba se borró y el bucket quedó vacío. **No verificado todavía** en la placa ni en el teléfono.
+
+### Pendientes
+- Desplegar en la placa, build de la app, y una corrida en la parada: mirar los recortes de las
+  lecturas fallidas.
+- Antes de la versión final: sacar la evidencia entera (lista en el ROADMAP).

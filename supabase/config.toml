@@ -13,3 +13,8 @@ verify_jwt = false
 # an anon key that already travels inside the bundle. The worst that can happen here is noise in a
 # development table, and the per-batch and per-detail caps bound it.
 verify_jwt = false
+
+[functions.evidence]
+# Same criterion as `telemetry` (ADR 0008): no login in the app. TEMPORARY, development only — see the
+# function's header.
+verify_jwt = false

@@ -13,6 +13,9 @@ asyncio loop never notices. Capture and status reading are passed in as callable
     GET  /measure/<bytes>  <bytes> random bytes, to measure the download without a camera
     GET  /photos/latest    captures now and returns the JPEG (1024 px, q70); 503 without a camera
     POST /audio            stores the body (MP3/WAV) to play it; 202 with the size
+    GET  /evidence/<run>/<file>  one record (.json) or picture (.jpg) of bus mode, after the device
+                           announced it over BLE [TEMPORARY, removed before the final version:
+                           see evidence.py]
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import ThreadingMixIn
 from typing import Callable, Optional
 
+from . import evidence
 from .camera import CameraNotReady
 from .core import MEASURE_MAX_BYTES
 
@@ -102,6 +106,7 @@ class HttpServer:
         capture: Optional[SyncCapture],
         port: int = DEFAULT_PORT,
         play: Optional[Callable[[str], None]] = None,
+        evidence_dir: Optional[str] = None,
     ) -> None:
         server = self
 
@@ -160,8 +165,22 @@ class HttpServer:
                         return
                     log.info("photo of %d bytes captured in %d ms", len(jpeg), (time.monotonic() - t0) * 1000)
                     self._respond(200, jpeg, "image/jpeg")
+                elif path.startswith("/evidence/"):
+                    self._evidence(path)
                 else:
                     self._json(404, {"error": "not found"})
+
+            def _evidence(self, path: str) -> None:
+                """One file the device announced (`{"t": "evidence"}`), and only names `evidence.py`
+                could have written (`find_file`). No listing: the app asks for what it was told about."""
+                root = server._evidence_dir
+                parts = path[len("/evidence/") :].split("/")
+                found = evidence.find_file(root, *parts) if root is not None and len(parts) == 2 else None
+                if found is None:
+                    self._json(404, {"error": "not found"})
+                    return
+                kind = "image/jpeg" if found.suffix == ".jpg" else "application/json; charset=utf-8"
+                self._respond(200, found.read_bytes(), kind)
 
             def do_POST(self):  # noqa: N802
                 path = self.path.split("?", 1)[0]
@@ -205,6 +224,7 @@ class HttpServer:
         self._synthetic_payload = synthetic_payload
         self._capture = capture
         self._play = play
+        self._evidence_dir = evidence_dir
         self._server = _QuietServer(("0.0.0.0", port), Handler)
         self._server.daemon_threads = True
         self._thread: Optional[threading.Thread] = None

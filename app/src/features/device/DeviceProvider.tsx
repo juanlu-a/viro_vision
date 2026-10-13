@@ -33,6 +33,7 @@ import {
 } from '@/services/ble/bleClient';
 import { encodeBase64 } from '@/services/ble/base64';
 import { downloadDevicePhoto, type DevicePhoto } from '@/services/camera';
+import { handleEvidence } from '@/services/evidence';
 import { errorDetail, record } from '@/services/telemetry';
 import { deviceUrl, type DeviceAddress } from '@/services/wifi/deviceHttp';
 import { reachDeviceNetwork } from '@/services/wifi/join';
@@ -110,6 +111,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const syncedNetwork = useRef<{ ap: boolean; ip: string | null; ok: boolean; running: boolean }>({ ap: false, ip: null, ok: false, running: false });
   // The last `status` recorded, so the table does not fill with identical heartbeats.
   const statusFingerprint = useRef<string | null>(null);
+  /**
+   * Where bus mode's pictures can be pulled from right now: the address once the WiFi with the device
+   * is ready, null otherwise. A ref, because the BLE subscriptions are made once at mount and would
+   * otherwise see the address of that moment forever. TEMPORARY, with the rest of `services/evidence`.
+   */
+  const evidenceAddress = useRef<DeviceAddress | null>(null);
   /**
    * Whether the user has already been told the network is ready, for the network it is ready ON.
    *
@@ -391,6 +398,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         record('device.warmingUp');
         void notify('busWarmingUp');
       }),
+      // Development instrumentation (TEMPORARY): bus mode kept a picture of what it saw. Pulled and
+      // uploaded off to the side; nothing the user waits on goes through here.
+      client.onEvidence((ref) => void handleEvidence(evidenceAddress.current, ref)),
       client.onDeviceError((message) => {
         // The device has no screen, so the table is the only place anyone finds out that something
         // failed on it (bringing the AP up, the camera). Only the table: since 2026-10-06 the user
@@ -473,6 +483,10 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const photoAvailable = connection.status === 'connected' && wifi === 'ready' && address !== null;
+
+  useEffect(() => {
+    evidenceAddress.current = photoAvailable ? address : null;
+  }, [photoAvailable, address]);
 
   const downloadPhoto = useCallback(
     async (options?: { timeoutMs?: number }) => {
