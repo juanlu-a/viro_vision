@@ -113,6 +113,8 @@ Herramientas que se usan mientras se ajusta el sistema y **no van en la versión
     `bus.py`, `tests/test_evidence.py` y la sección del README. Borrar `/home/virovision/evidence`.
   - App: `src/services/evidence/`, `onEvidence` en `services/ble/`, el `evidenceAddress` de
     `DeviceProvider.tsx`, los tipos `bus.evidence*` de la telemetría y el grupo en `eslint.config.js`.
+    Y la pantalla (2026-10-13): `features/device/BusShots.tsx`, su uso en `app/(tabs)/index.tsx` y
+    las claves `busShot*` de `i18n/es.ts`.
   - Supabase: la función `evidence` (y su bloque en `config.toml`), y vaciar y borrar el bucket
     `evidence` con una migración nueva.
 

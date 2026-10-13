@@ -3824,3 +3824,43 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - Desplegar en la placa, build de la app, y una corrida en la parada: mirar los recortes de las
   lecturas fallidas.
 - Antes de la versión final: sacar la evidencia entera (lista en el ROADMAP).
+
+## 2026-10-13 — Release a producción (#115) y la evidencia desplegada en la placa
+
+- **Release `staging → main` (#115)**: 66 commits desde el release del 2026-08-31, evidencia del
+  modo ómnibus incluida. Se mandó al link público porque es la forma de tenerlo en el celular: el
+  grupo interno de TestFlight no tiene link para compartir. Que la evidencia esté en producción
+  es, a sabiendas, temporal (lista para sacarla en `docs/ROADMAP.md`).
+- **Daemon de `staging` desplegado en la placa** (Zero 2 W): se le bajó el AP por BLE
+  (`tools/ap.py`), apareció en `Jack_2.4` como 192.168.1.45, y se copiaron los `.py` por `scp`
+  (228 706 bytes de los dos lados), con copia del anterior en `virovision.old-<fecha>`. El unit
+  instalado y el OpenCV headless ya estaban al día. Arrancó con el modo ómnibus listo; al reiniciar
+  el daemon levanta el AP otra vez y la placa sale de la WiFi de casa, como se espera.
+- **Paquete de ómnibus actualizado** a la rama única de Magalí, `feat/bus-line-reader becd2f0`
+  (0.3.0; antes `feat/complete-reading-from-catalog 8d9b33f`, del 2026-10-07), con
+  `FIELD=1 scripts/deploy_pi.sh`: sin `FIELD=1` el script reinicia el daemon, el AP sube y la espera
+  por SSH se corta. Antes de arrancar se verificó en la placa que todo lo que el daemon importa de
+  `bus_banner` existe con las mismas firmas; el journal dice `bus mode ready` sin advertencias.
+
+### Pendientes
+- Instalar el build de TestFlight (el primero de la versión pasa por Beta App Review) y hacer una
+  corrida en la parada; mirar en Storage los recortes de las lecturas fallidas.
+
+## 2026-10-13 — Las fotos del modo ómnibus, también en la pantalla del teléfono
+
+- **Qué faltaba**: el pedido era que fuera «igual que el modo supermercado», y supermercado
+  muestra en Inicio la foto detrás de la lectura. La evidencia del 2026-10-12 copió sólo el
+  transporte (aviso por BLE, la app baja por WiFi) y mandaba las fotos directo a Supabase, sin
+  mostrarlas. Error de lectura del pedido, corregido acá.
+- **Qué se ve ahora**: en modo ómnibus, Inicio lista los últimos 10 ómnibus detectados, el más nuevo
+  arriba. Por cada uno: la hora de la placa, qué se decidió (dicho, o callado por repetido), la foto
+  en la que se detectó con las cajas dibujadas, y cada recorte del cartel que leyó el OCR con el
+  texto que devolvió («no devolvió texto» si nada).
+  - `services/evidence/gallery.ts` (puro, con tests): agrupa los registros por ómnibus
+    (`<corrida>/t003`). Un ómnibus que ya está en pantalla no salta arriba cuando le llegan lecturas.
+  - `service.ts` escribe las fotos en `cache/evidence-shown/`, aparte de la cola de subida, borra
+    las del ómnibus que sale de la lista y vacía la carpeta al arrancar.
+  - `features/device/BusShots.tsx`: el texto antes que cada imagen, como en Inicio, y cada imagen
+    con su etiqueta para el lector de pantalla.
+- **Temporal**, como el resto de la evidencia: agregado a la lista del ROADMAP.
+- Verificado: lint, typecheck y 332 tests en verde. **Falta un build** para verlo en el teléfono.
