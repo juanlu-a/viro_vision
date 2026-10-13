@@ -3836,10 +3836,12 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
   (228 706 bytes de los dos lados), con copia del anterior en `virovision.old-<fecha>`. El unit
   instalado y el OpenCV headless ya estaban al día. Arrancó con el modo ómnibus listo; al reiniciar
   el daemon levanta el AP otra vez y la placa sale de la WiFi de casa, como se espera.
-- El paquete de ómnibus de la placa sigue siendo `feat/complete-reading-from-catalog 8d9b33f`
-  (2026-10-07), no la rama única `feat/bus-line-reader` de Magalí: no se tocó.
+- **Paquete de ómnibus actualizado** a la rama única de Magalí, `feat/bus-line-reader becd2f0`
+  (0.3.0; antes `feat/complete-reading-from-catalog 8d9b33f`, del 2026-10-07), con
+  `FIELD=1 scripts/deploy_pi.sh`: sin `FIELD=1` el script reinicia el daemon, el AP sube y la espera
+  por SSH se corta. Antes de arrancar se verificó en la placa que todo lo que el daemon importa de
+  `bus_banner` existe con las mismas firmas; el journal dice `bus mode ready` sin advertencias.
 
 ### Pendientes
 - Instalar el build de TestFlight (el primero de la versión pasa por Beta App Review) y hacer una
   corrida en la parada; mirar en Storage los recortes de las lecturas fallidas.
-- Decidir si se actualiza el paquete de ómnibus de la placa a `feat/bus-line-reader`.
