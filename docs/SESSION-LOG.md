@@ -3824,3 +3824,22 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 - Desplegar en la placa, build de la app, y una corrida en la parada: mirar los recortes de las
   lecturas fallidas.
 - Antes de la versión final: sacar la evidencia entera (lista en el ROADMAP).
+
+## 2026-10-13 — Release a producción (#115) y la evidencia desplegada en la placa
+
+- **Release `staging → main` (#115)**: 66 commits desde el release del 2026-08-31, evidencia del
+  modo ómnibus incluida. Se mandó al link público porque es la forma de tenerlo en el celular: el
+  grupo interno de TestFlight no tiene link para compartir. Que la evidencia esté en producción
+  es, a sabiendas, temporal (lista para sacarla en `docs/ROADMAP.md`).
+- **Daemon de `staging` desplegado en la placa** (Zero 2 W): se le bajó el AP por BLE
+  (`tools/ap.py`), apareció en `Jack_2.4` como 192.168.1.45, y se copiaron los `.py` por `scp`
+  (228 706 bytes de los dos lados), con copia del anterior en `virovision.old-<fecha>`. El unit
+  instalado y el OpenCV headless ya estaban al día. Arrancó con el modo ómnibus listo; al reiniciar
+  el daemon levanta el AP otra vez y la placa sale de la WiFi de casa, como se espera.
+- El paquete de ómnibus de la placa sigue siendo `feat/complete-reading-from-catalog 8d9b33f`
+  (2026-10-07), no la rama única `feat/bus-line-reader` de Magalí: no se tocó.
+
+### Pendientes
+- Instalar el build de TestFlight (el primero de la versión pasa por Beta App Review) y hacer una
+  corrida en la parada; mirar en Storage los recortes de las lecturas fallidas.
+- Decidir si se actualiza el paquete de ómnibus de la placa a `feat/bus-line-reader`.
