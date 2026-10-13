@@ -71,6 +71,18 @@ export const es = {
     detailField: 'Detalle',
     destinationField: 'Destino',
     fieldUnread: 'sin leer',
+    // Bus mode's pictures: TEMPORARY, development only (`services/evidence`), removed with them.
+    busShotsLabel: 'Ómnibus detectados',
+    busShotsEmpty: 'Todavía no se detectó ningún ómnibus. Las fotos llegan cuando el teléfono está en la red del dispositivo.',
+    busShotTitle: 'Ómnibus',
+    busShotAt: 'a las',
+    busShotFrame: 'Foto en la que se detectó el ómnibus.',
+    busShotCrop: 'Cartel que leyó el OCR, intento',
+    busShotOcr: 'OCR',
+    busShotOcrNothing: 'no devolvió texto',
+    busShotDecided: 'Dijo',
+    busShotSilenced: 'Decidió, sin decirlo por repetido',
+    busShotUndecided: 'Sin decisión todavía',
   },
   home: {
     title: 'ViroVision',

@@ -3845,3 +3845,22 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 ### Pendientes
 - Instalar el build de TestFlight (el primero de la versión pasa por Beta App Review) y hacer una
   corrida en la parada; mirar en Storage los recortes de las lecturas fallidas.
+
+## 2026-10-13 — Las fotos del modo ómnibus, también en la pantalla del teléfono
+
+- **Qué faltaba**: el pedido era que fuera «igual que el modo supermercado», y supermercado
+  muestra en Inicio la foto detrás de la lectura. La evidencia del 2026-10-12 copió sólo el
+  transporte (aviso por BLE, la app baja por WiFi) y mandaba las fotos directo a Supabase, sin
+  mostrarlas. Error de lectura del pedido, corregido acá.
+- **Qué se ve ahora**: en modo ómnibus, Inicio lista los últimos 10 ómnibus detectados, el más nuevo
+  arriba. Por cada uno: la hora de la placa, qué se decidió (dicho, o callado por repetido), la foto
+  en la que se detectó con las cajas dibujadas, y cada recorte del cartel que leyó el OCR con el
+  texto que devolvió («no devolvió texto» si nada).
+  - `services/evidence/gallery.ts` (puro, con tests): agrupa los registros por ómnibus
+    (`<corrida>/t003`). Un ómnibus que ya está en pantalla no salta arriba cuando le llegan lecturas.
+  - `service.ts` escribe las fotos en `cache/evidence-shown/`, aparte de la cola de subida, borra
+    las del ómnibus que sale de la lista y vacía la carpeta al arrancar.
+  - `features/device/BusShots.tsx`: el texto antes que cada imagen, como en Inicio, y cada imagen
+    con su etiqueta para el lector de pantalla.
+- **Temporal**, como el resto de la evidencia: agregado a la lista del ROADMAP.
+- Verificado: lint, typecheck y 332 tests en verde. **Falta un build** para verlo en el teléfono.

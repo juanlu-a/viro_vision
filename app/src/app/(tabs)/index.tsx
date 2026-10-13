@@ -28,6 +28,7 @@ import { Screen } from '@/components/screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { Radius } from '@/constants/theme';
+import { BusShots } from '@/features/device/BusShots';
 import type { Mode } from '@/features/reader/modes';
 import { busLineRows, productRows } from '@/features/reader/result';
 import { useReader } from '@/features/reader/useReader';
@@ -162,6 +163,10 @@ export default function HomeScreen() {
             />
           </View>
         )}
+
+        {/* Bus mode's counterpart of the photo above: the device reads on its own, so what it saw
+            comes in per bus. TEMPORARY, development only, removed with `services/evidence`. */}
+        {inBus && <BusShots />}
       </Card>
 
     </Screen>

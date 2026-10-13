@@ -3,4 +3,5 @@
  *
  * Pure barrel: the single import surface (`@/services/evidence`).
  */
-export { handleEvidence } from './service';
+export { gallery, handleEvidence } from './service';
+export type { BusShot, ReadShot } from './gallery';
