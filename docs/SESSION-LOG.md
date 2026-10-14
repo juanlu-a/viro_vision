@@ -3864,3 +3864,28 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
     con su etiqueta para el lector de pantalla.
 - **Temporal**, como el resto de la evidencia: agregado a la lista del ROADMAP.
 - Verificado: lint, typecheck y 332 tests en verde. **Falta un build** para verlo en el teléfono.
+
+## 2026-10-14 — Carcasa VIA Clara v0.9: dos mitades con cierre a presión, sin tornillos ni tapa de cámara
+
+- **Punto de partida**: la especificación final de la carcasa (pegada en la sesión) sobre el modelo
+  **VIA Clara v0.8** (OpenSCAD, llegó por mail; estaba en `~/Downloads`). Se versionó en
+  `hardware/case-via-clara/` tal cual (`via_clara_v0_8.scad`) y la v0.9 se escribió al lado.
+- **Qué hace la v0.9**: cierre con 6 pestañas a presión, labio de alineación y 2 pernos (cero
+  tornillos); la cámara queda dentro de las dos mitades, sujeta por nervios en los bordes del PCB, con
+  una sola abertura frontal; los separadores metálicos se termofijan en almohadillas con collar
+  **antes** de que entren las placas; ventana para la llave de la UPS HAT, que la tapa de la v0.8
+  tapaba; dos botones (comando/volumen) con cajón para pulsador SMD; alojamiento óseo a 14 + 0,2/lado.
+- **Errores de la v0.8 que salieron al modelarla**: no había lugar para los pulsadores; la llave y la
+  carga quedaban bajo la tapa; una ventana de 29 × 23 en la cara externa no daba acceso a nada; la
+  cavidad perforaba la piel atrás; el brazo óseo se metía 0,6 mm en su zócalo; y el lente estaba a
+  12,5 del borde cuando el product brief dice 14,4.
+- **Verificación**: `export.sh` interseca cada pieza con las maquetas del hardware y con las otras
+  piezas. Las 6 verificaciones dan vacío, pero **contra maquetas**: las medidas marcadas `MEASURE`
+  (sobre todo el lente de la cámara y el alto del conjunto Pi + HAT) hay que tomarlas con calibre
+  antes de imprimir. Es exactamente lo que hizo fallar la v1.
+- Rama `feat/case-v0-9-snap-fit`.
+
+**Pendiente**: medir las placas reales (tabla del README de la carcasa); imprimir primero la nariz
+para probar la cámara y las pestañas delanteras; elegir la orientación definitiva en el laminador (las
+caras externas son curvas y piden soportes de árbol); decidir si la rama vieja `feat/carcasa-modelo-3d`
+(v1 de OpenSCAD) se archiva.
