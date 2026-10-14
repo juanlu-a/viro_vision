@@ -5,10 +5,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 SCAD=via_clara_v0_9.scad
 OS=(openscad -q --backend=manifold --export-format=binstl)
-mkdir -p stl img
+rm -rf stl img && mkdir -p stl img
 
 parts=(print_left:01_left_half print_right:02_right_half print_bone:03_bone_arm
-       print_buttons:04_buttons_command_volume assembly:00_assembly_check)
+       print_button:04_mode_button print_slider:05_power_slider assembly:00_assembly_check)
 for p in "${parts[@]}"; do
   part=${p%%:*}; name=${p#*:}
   "${OS[@]}" -D "PART=\"$part\"" -D 'SHOW_HW=false' -o "stl/${name}_v0_9.stl" "$SCAD" &
@@ -29,7 +29,7 @@ done
 wait
 
 fail=0
-for c in halves left_hw right_hw caps bone drawers_stack; do
+for c in halves left_hw right_hw pads_heads button slider bone drawer_pi; do
   out=$(mktemp -t viaclara).stl
   log=$(openscad --backend=manifold --export-format=binstl -D "PART=\"check_$c\"" -o "$out" "$SCAD" 2>&1 || true)
   if [[ "$log" == *"top level object is empty"* ]]; then
