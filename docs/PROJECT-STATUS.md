@@ -312,8 +312,10 @@ Pick a track (see the skill for pillar detail):
   de frames) y la cámara pasó a tener un vigilante que la reabre tras 12 s sin un frame — **sin ponerle
   plazo a `capture_request`**, que es lo que la trabó para todo, foto de supermercado incluida.
   La batería se lee del INA219 del HAT desde el 2026-10-06 (`battery.py`) y llega a la app por `status`.
-  Siguen: DAC I2S, medir el consumo real, la app mostrando
-  la lectura de ómnibus, y la carcasa.
+  Siguen: DAC I2S, medir el consumo real y la app mostrando la lectura de ómnibus. La **carcasa**
+  vigente es la VIA Clara v0.9 (`hardware/case-via-clara/`, desde 2026-10-15): dos mitades a presión
+  sobre el conjunto real HAT + batería + Pi, revisada con varios modelos; los STL para imprimir están
+  en el Drive (`Tesis: ViroVision / modelo_3d`). Falta medir con calibre e imprimir la primera.
 
 **Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core
 value prop, and exercises the recognition/audio domain already scaffolded.
@@ -348,7 +350,7 @@ redescubra:
 - **Telemetría muda desde el 2026-09-10**, sin explicación. Es lo primero que conviene entender
   antes de diagnosticar nada más en el teléfono.
 - **Ramas viejas con trabajo real sin PR**: `feat/carcasa-modelo-3d` (modelo OpenSCAD v1 y boceto
-  v2, 38 archivos) y `feat/volume-button` (segundo botón de volumen + un «ADR 0010» que hoy choca
+  v2, 38 archivos; ya reemplazado por la v0.9 de `hardware/case-via-clara/`, se puede archivar) y `feat/volume-button` (segundo botón de volumen + un «ADR 0010» que hoy choca
   con el 0010 de modo oscuro que ya está en `staging`; habría que renumerarlo). Ninguna de las dos
   está en `staging`. Las demás ramas locales o tienen PR mergeado (squash: `git branch --merged`
   no las ve) o están cerradas como viejas.

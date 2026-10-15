@@ -3864,3 +3864,55 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
     con su etiqueta para el lector de pantalla.
 - **Temporal**, como el resto de la evidencia: agregado a la lista del ROADMAP.
 - Verificado: lint, typecheck y 332 tests en verde. **Falta un build** para verlo en el teléfono.
+
+## 2026-10-14 — Carcasa VIA Clara v0.9: dos mitades a presión, sobre el conjunto real de placas
+
+- **Punto de partida**: la especificación final de la carcasa (pegada en la sesión) sobre el modelo
+  **VIA Clara v0.8** (OpenSCAD, llegó por mail; estaba en `~/Downloads`). Se versionó tal cual en
+  `hardware/case-via-clara/via_clara_v0_8.scad`, y la v0.9 se escribió al lado.
+- **Correcciones del usuario sobre la primera v0.9**: un solo botón (modos); huecos para la microSD, la
+  llave de la batería y la carga; las almohadillas para termofundir; y, sobre todo, **usar las medidas
+  reales**: la HAT ya viene unida a su batería y la Pi tiene el header soldado.
+- **Lo que mostraron las fuentes** (plano de la Zero 2 W, product brief de la AI Camera, fotos de
+  Waveshare): la batería va **del lado de los pogo pins, entre la HAT y la Pi**, y los pogo pins tocan
+  las colas de los pines 1–6 del header. Eso pone la llave de la HAT adelante, contra la cámara, y la
+  microSD y el micro USB de carga atrás. El conjunto mide ≈ 23 mm (27 con las almohadillas y la
+  luz), contra los 16,5 que suponía la v0.8, y el cuerpo pasó a 31,2 de ancho. El lente está a 14,4 del borde (la v0.8 usaba 12,5).
+- **Revisión multi-modelo** (`tackle-review`: Opus, Sonnet y Haiku; Codex no corrió porque la cuenta
+  de ChatGPT no habilita ningún modelo en la CLI). Cambios de la primera vuelta:
+  - las trabas pasaron a ser **vigas en el plano de la cama** con gancho y 0,4 de enganche real (antes
+    flexionaban a través de las capas y enganchaban 0,15);
+  - la cámara quedó con **topes en sus cuatro bordes** (antes la ubicaba el barril del lente);
+  - la nariz creció 6 mm y quedó **reservado el volumen del flex**, que antes no tenía por dónde pasar;
+  - el **cajón del pulsador** ya no bloquea la entrada;
+  - la **corredera** es un solo sólido, recorre la palanca entera e imprime acostada;
+  - las **colas del header** quedaron modeladas sobre la batería.
+  Segunda vuelta: la corredera se monta **antes** de la HAT (la palanca cae en la horquilla); las vigas
+  se imprimen atadas por un puente de 0,4 que se corta después; la traba delantera de abajo se sacó
+  (ahí apoya el flex); la tecla y el pulsador entran por un canal y se verifica el camino de armado.
+  Tercera vuelta (con Codex, que volvió a andar: la CLI que trae la app era vieja, 0.142.5; con
+  `npx @openai/codex@0.162.1` funciona con la cuenta de ChatGPT): conectores de la Pi modelados con su
+  voladizo; nervios de aplastamiento sólo arriba y abajo; el puente de las vigas cruza la ranura del
+  extremo, para que se pueda cortar; el cuerpo pasa a 37,6 de alto (≥ 1,1 de piel sobre las vigas, las ranuras y los labios); un
+  punto en relieve marca el ON de la corredera; `export.sh` ya no da por buena una verificación que
+  falla con un error de OpenSCAD.
+- **Después de la revisión**, con una foto del conjunto: el usuario confirmó que los separadores de
+  bronce asoman bajo la HAT, y que la microSD es sólo para el equipo. Las almohadillas pasaron a recibir
+  esos separadores (el conjunto entra entero, sin desarmar, y el collar queda 0,7 por debajo de la
+  placa) y la microSD quedó adentro, sin agujero. Se evaluó dar vuelta el conjunto para que la llave
+  quede atrás, accesible directo, pero la carga (diaria) quedaría mirando a la cámara: se mantuvo la
+  cámara del lado del CSI y la corredera para la llave.
+- **Verificación**: `export.sh` comprueba que cada pieza sea un solo sólido y corre 14 verificaciones
+  de interferencia, incluidas la corredera en ON y en OFF, el volumen del flex y los caminos de armado. Todas pasan, pero
+  **contra maquetas**: hay que medir con calibre lo marcado `MEASURE` antes de imprimir. Es lo que hizo
+  fallar la v1.
+- **Guía con flechas** (`via_clara_v0_9_guide.scad` → `img/guide/`): cinco vistas que dicen para qué es
+  cada ranura, agujero y pieza; la regenera `export.sh`.
+- **Los STL salen del repo**: van al Drive, en `Tesis: ViroVision / modelo_3d`, una carpeta por versión
+  (la de v0.9 ya está creada). El repo guarda el `.scad` y `export.sh`, que los regeneran.
+- Rama `feat/case-v0-9-snap-fit`.
+
+**Pendiente**: medir (`BOARD_GAP`, la palanca de la llave, los separadores que asoman bajo la HAT,
+el voladizo de los conectores de la Pi, el pulsador, el transductor); imprimir primero la parte trasera y la nariz
+como prueba; confirmar que la perilla de la llave se alcanza con los lentes puestos; decidir si la rama
+vieja `feat/carcasa-modelo-3d` (v1) se archiva.
