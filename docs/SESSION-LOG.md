@@ -3916,3 +3916,32 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 el voladizo de los conectores de la Pi, el pulsador, el transductor); imprimir primero la parte trasera y la nariz
 como prueba; confirmar que la perilla de la llave se alcanza con los lentes puestos; decidir si la rama
 vieja `feat/carcasa-modelo-3d` (v1) se archiva.
+
+## 2026-10-17 — Carcasa v0.10: lo que mostró la primera impresión de la v0.9
+
+La v0.9 se imprimió (todo menos el brazo del auricular) y "funcionó casi perfecto". Las correcciones
+del usuario y cómo quedaron en `hardware/case-via-clara/via_clara_v0_10.scad`:
+
+- **Separadores del lado de la Pi.** Los separadores hexagonales quedaron sobre la Pi, junto al header,
+  y bajo la HAT sólo hay cabezas de tornillos Phillips (así toda la altura queda de un lado). El
+  conjunto ahora se termofija a la **mitad derecha**: las almohadillas pasaron ahí y reciben esos
+  separadores. Del lado de la HAT alcanza con 2,1 mm de luz.
+- **microSD.** Hubo que cortar el extremo trasero con una Dremel. Ahora hay lugar para 3,5 mm de tarjeta
+  afuera del borde de la Pi + 1,0 de luz (`SD_CARD_OUT`, a medir).
+- **Paredes.** Pasaron de 2,2 a 1,6 en los costados y de 2,7 a 2,4 arriba y abajo. El cuerpo quedó en
+  92,9 × 28,7 × 36,6 (antes 91,9 × 31,4 × 37,6).
+- **Cámara girada 90°.** La imagen salía girada respecto de la vista del usuario. El conector queda ahora
+  en el costado que mira a la Pi, y el flex va derecho al CSI sin retorcerse. Si sale cabeza abajo, se
+  corrige con una rotación de 180° por software.
+- **Soporte cuadrado del lente.** Es más grande que en el plano y no entraba: hubo que poner la cámara
+  detrás de los nervios. Ahora tiene lugar (`AI_CAM_HOLDER`, a medir).
+- Como el flex ya no apoya en el piso de la nariz, la traba delantera recupera su par de abajo (6 trabas)
+  y la perilla de la corredera crece a 9,1 mm de ancho.
+- Nueva verificación `stack_insert` (el conjunto bajando a las almohadillas). Las 15 verificaciones y
+  las de cada pieza pasan.
+
+**Pendiente**: medir los separadores sobre la Pi (`HEX_H`, `HEX_AF`), las cabezas bajo la HAT, cuánto
+sobresale la microSD y el soporte del lente, y con eso imprimir primero la nariz. Subir los STL a la
+carpeta `modelo_3d` del Drive de ViroVision: quedó pendiente porque el Chrome conectado no tenía esa
+cuenta.
+

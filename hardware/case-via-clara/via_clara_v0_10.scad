@@ -1,22 +1,22 @@
-// VIA Clara v0.9 — two-half snap-fit case for Raspberry Pi Zero 2 W + Waveshare UPS HAT (C) with its
+// VIA Clara v0.10 — two-half snap-fit case for Raspberry Pi Zero 2 W + Waveshare UPS HAT (C) with its
 // 803040 battery + Raspberry Pi AI Camera (IMX500) + bone-conduction transducer.
 //
-// Changes from v0.8 (see README.md for the reasoning):
-//   - no external screws: the halves close with in-plane snap beams + an alignment lip + two pins;
-//   - no separate camera cap: the camera chamber is split between both halves, the PCB sits in an
-//     edge slot with stops on all four edges (no pegs through its holes), one front lens opening;
-//   - the screws under the UPS HAT are heat-staked into chassis pads before the boards go in
-//     (no plastic pins through the Raspberry Pi holes, no heat on the boards);
-//   - real stack: HAT, battery and pogo pins under the Pi, soldered male header on top;
-//   - openings at the real connector positions: microSD and charging micro USB at the rear, the UPS
-//     switch (front end of the HAT) through a printed slider on the head-side face;
-//   - one mode button with its switch drawer; bone transducer pocket at 14 mm + fit clearance.
+// Changes from v0.9, after the first print (see README.md):
+//   - the brass hex standoffs stand above the Pi (same side as the header) and only Phillips screw heads
+//     sit under the HAT: the stack is now heat-staked to the RIGHT half, by those hex standoffs;
+//   - real room for the microSD card at the rear (the v0.9 print had to be cut);
+//   - thinner walls (1.6 on the sides, 2.4 top and bottom where the snap beams live) and a cavity that
+//     follows the stack: 28.7 x 36.6 instead of 31.4 x 37.6;
+//   - camera turned 90 degrees in its plane so the picture matches the wearer's view: the FPC connector
+//     sits on the +Y edge (Pi side) and the flex runs straight to the CSI without a twist;
+//   - room in front of the PCB for the camera's square lens holder, and a bottom twin for the front snap
+//     now that the flex no longer lies on the chamber floor; a wider power slider knob.
 //
 // Units: mm. Frame: X along the temple (front = -X, camera end), Y across (left half / head side
 // is Y < 0, right half / outer side is Y > 0, parting plane Y = 0), Z up.
 // Sources: Raspberry Pi Zero 2 W mechanical drawing, AI Camera product brief (Sept. 2024, page 4),
-// Waveshare UPS HAT (C) wiki photos (positions scaled from the 65 x 30 board outline).
-// Values tagged MEASURE are not in any drawing and must be checked with a caliper.
+// Waveshare UPS HAT (C) wiki photos, and the v0.9 test print. Values tagged MEASURE must be checked
+// with a caliper.
 
 $fn = $preview ? 40 : 64;
 PART = is_undef(PART) ? "assembly" : PART;
@@ -32,27 +32,28 @@ STACK_REAR_X = PI_CX + PI_L / 2;     //  35.5: Pi microSD + HAT micro USB end
 PI_HOLE_X = 29.0;                    // 58 x 23 hole pattern, shared by the Pi and the HAT
 PI_HOLE_Z = 11.5;
 
-// Pads under the HAT: round socket for the screw head + reflowable collar
-// The brass standoffs of the stack stick out below the HAT: those stubs drop into hex sockets in the
-// pads with the whole stack assembled (nothing is taken apart), and a plastic collar is melted onto
-// each stub. The collar stays PAD_AIR below the HAT, so the iron touches plastic and brass, not the board.
-PAD_D = 8.0;
-STUB_AF = 5.0;                   // MEASURE: across flats of the brass standoff under the HAT
-STUB_LEN = 3.0;                  // MEASURE: how far it sticks out below the HAT
-PAD_FLOOR = 0.6;                 // plastic under the stub tip
-PAD_AIR = 0.7;                   // gap between the collar and the HAT bottom
+// Under the HAT only the Phillips screw heads stick out.
+SCREW_HEAD_D = 4.5;              // MEASURE
+SCREW_HEAD_H = 1.8;              // MEASURE
+UNDER_CLEAR = 0.3;
+
+// Above the Pi the brass hex standoffs stand next to the header: they drop into hex sockets in pads on
+// the right half, and a plastic collar is melted onto each one. The collar stays well above the Pi, so
+// the iron touches plastic and brass, not the board.
+HEX_AF = 5.0;                    // MEASURE: across flats of the hex standoff above the Pi
+HEX_H = 6.0;                     // MEASURE: how far it stands above the Pi's top face
+HEX_ENGAGE = 1.8;                // how much of it goes into the socket
+PAD_D = 7.0;                     // clears the header band and the mini HDMI
 COLLAR_H = 0.8;
-SOCKET_AF = STUB_AF + 0.2;       // sliding fit; the melted collar is what holds
-SOCKET_DEPTH = STUB_LEN - PAD_AIR - COLLAR_H;           // 1.5 of stub inside the socket, 0.8 in the collar
-COLLAR_ID = SOCKET_AF / cos(30) + 0.1;                  // just clears the hex corners, melted inward onto it
-COLLAR_OD = PAD_D;
+SOCKET_AF = HEX_AF + 0.2;        // sliding fit; the melted collar is what holds
+COLLAR_ID = SOCKET_AF / cos(30) + 0.1;
 
 // Stack heights along Y (head side -> outer side)
 HAT_PCB = 1.6;
 HAT_UNDER = 0.9;                 // tallest part under the HAT (Waveshare STEP model)
 BAT = [40, 30, 8];               // 803040, on the pogo-pin side of the HAT
 HEADER_TAIL = 3.0;               // solder tails of the male header under the Pi
-BOARD_GAP = BAT[2] + HEADER_TAIL + 0.3;   // MEASURE: HAT top face to Pi bottom face (11.3)
+BOARD_GAP = BAT[2] + HEADER_TAIL + 0.3;   // HAT top face to Pi bottom face (11.3; fitted in the v0.9 print)
 PI_PCB = 1.4;
 PI_PARTS = 3.2;                  // connectors on the Pi top side
 HEADER_H = 8.5;                  // male header above the Pi PCB (2.5 plastic + 6 pin)
@@ -64,20 +65,25 @@ PI_PORTS = [[12.4, 11.2], [41.4, 8.0], [54.0, 8.0]];   // [centre from the micro
 PI_PORT_OVERHANG = 0.8;          // MEASURE: how far the connectors stand past the board edge
 
 // ---------- Cavity and walls: the stack sets the width ----------
-WALL = 2.2;
-CAV_HY = (PAD_FLOOR + STUB_LEN + HAT_PCB + BOARD_GAP + PI_PCB + HEADER_H + HEADER_CLEAR) / 2;   // 13.5
-CAV_HZ = 15.9;                   // 30 mm boards + 0.9
+WALL = 1.6;                      // side walls
+WALL_TB = 2.4;                   // top and bottom walls: they hold the snap beams
+UNDER_HAT = max(SCREW_HEAD_H, HAT_UNDER) + UNDER_CLEAR;
+ABOVE_PI = max(HEADER_H, HEX_H) + HEADER_CLEAR;
+CAV_HY = (UNDER_HAT + HAT_PCB + BOARD_GAP + PI_PCB + ABOVE_PI) / 2;   // 12.75
+CAV_HZ = 15.9;                   // 30 mm boards + the port overhang + 0.1
 CAV_L = 67.2;
 LEFT_FACE = -(CAV_HY + WALL);    // head side
 RIGHT_FACE = CAV_HY + WALL;      // outer side
-OUT_W = 2 * (CAV_HY + WALL);     // 31.2
+OUT_W = 2 * (CAV_HY + WALL);     // 28.7
+OUT_H = 2 * (CAV_HZ + WALL_TB);  // 36.6
 
-HAT_BOTTOM_Y = -CAV_HY + PAD_FLOOR + STUB_LEN;
-PAD_TOP_Y = HAT_BOTTOM_Y - PAD_AIR - COLLAR_H;          // socket mouth, collar on top of it
+HAT_BOTTOM_Y = -CAV_HY + UNDER_HAT;
 HAT_TOP_Y = HAT_BOTTOM_Y + HAT_PCB;
 PI_BOTTOM_Y = HAT_TOP_Y + BOARD_GAP;
 PI_TOP_Y = PI_BOTTOM_Y + PI_PCB;
 HEADER_TOP_Y = PI_TOP_Y + HEADER_H;
+HEX_TIP_Y = PI_TOP_Y + HEX_H;
+PAD_MOUTH_Y = HEX_TIP_Y - HEX_ENGAGE;                   // socket mouth; the collar hangs below it
 
 // UPS HAT (C) parts in the HAT frame, scaled from the Waveshare photo: x from the switch end;
 // case z = (distance from the edge opposite the pogo pins) - 15.
@@ -97,57 +103,63 @@ JST_Z = [-15.2, -10.1];
 JST_H = 6.0;
 
 // ---------- Raspberry Pi AI Camera (product brief, Sept. 2024, page 4) ----------
-AI_CAM_W = 25.0;                 // Y
-AI_CAM_H = 23.862;               // Z, FPC connector on the bottom edge
+// Turned 90 degrees from v0.9 so the image matches the wearer's view: the 23.862 side (the one with the
+// FPC connector at its end) runs along Y, the 25 side along Z, and the connector edge faces +Y.
+// If the picture comes out upside down, it is a 180 degree software flip (libcamera transform).
+AI_CAM_W = 25.0;                 // along Z
+AI_CAM_H = 23.862;               // along Y; FPC connector on the +Y edge
 AI_CAM_PCB_T = 1.12;
-AI_CAM_LENS_FROM_TOP = 14.4;     // lens centred across the width, level with the lower hole row
+AI_CAM_LENS_FROM_TOP = 14.4;     // from the edge opposite the connector; centred across the 25 side
 AI_CAM_BARREL_D = 5.75;
 AI_CAM_BARREL_REACH = 6.98;
-AI_CAM_TIER = 10.8;              // second optical tier, square
-AI_CAM_TIER_REACH = 3.875;
+// The square lens holder between the PCB and the barrel. The v0.9 print showed the drawing's numbers
+// fall short (the holder did not fit), so the defaults carry margin.
+AI_CAM_HOLDER = [12.0, 4.6];     // MEASURE: side of the square holder, and how far it stands off the PCB front
 AI_CAM_BLOCK_W = 12.8;
-AI_CAM_BLOCK_Z = [2.4, 19.5];    // optical block, measured from the bottom edge
+AI_CAM_BLOCK_FROM_CONN = [2.4, 19.5];   // optical block, measured from the connector edge
 AI_CAM_BLOCK_REACH = 2.75;
-AI_CAM_CONN_W = 19.61;
-AI_CAM_CONN_H = 5.71;
+AI_CAM_CONN_W = 19.61;           // along Z
+AI_CAM_CONN_H = 5.71;            // along Y, from the connector edge
 AI_CAM_CONN_REACH = 3.8;
 
-NOSE_X = -50.0;                  // 6 mm longer than v0.8: room for the camera flex to turn
+CAM_Y0 = -0.4;                   // board centre in Y: leaves 1.4 past the connector edge for the flex
+CAM_EDGE_Y = CAM_Y0 + AI_CAM_H / 2;                  // connector edge
+LENS_Y = CAM_EDGE_Y - (AI_CAM_H - AI_CAM_LENS_FROM_TOP);
+LENS_Z = 0;
+
+NOSE_X = -50.0;
 CAM_FRONT_X = NOSE_X + 0.1 + AI_CAM_BARREL_REACH;    // barrel 0.1 inside the nose
 CAM_BACK_X = CAM_FRONT_X + AI_CAM_PCB_T;
-CAM_CONN_BACK_X = CAM_BACK_X + AI_CAM_CONN_REACH;    // -38.0: 8.5 mm to the Pi edge for the flex
-LENS_Z = AI_CAM_H / 2 - AI_CAM_LENS_FROM_TOP;        // -2.47 with the board centred on Z = 0
-LENS_HOLE_D = AI_CAM_BARREL_D + 0.85;                // clearance only: the slot locates the board
+CAM_CONN_BACK_X = CAM_BACK_X + AI_CAM_CONN_REACH;
+LENS_HOLE_D = AI_CAM_BARREL_D + 1.0;                 // clearance only: the slot locates the board
 
-CHAMBER_FRONT_X = CAM_FRONT_X - AI_CAM_TIER_REACH - 0.3;
-CHAMBER_HY = max(CAV_HY, AI_CAM_W / 2 + 0.9);
-CHAMBER_HZ = 14.6;
-CHAMBER_R = 3.5;
+CHAMBER_FRONT_X = CAM_FRONT_X - AI_CAM_HOLDER[1] - 0.4;
+CHAMBER_HY = max(CAV_HY, abs(CAM_Y0 - AI_CAM_H / 2) + 0.6);   // 12.93
+CHAMBER_HZ = 13.4;
+CHAMBER_R = 1.5;
 RIB_T = 0.65;
 RIB_GAP = 0.05;                  // board thickness clearance, each side
 RIB_OVERLAP = 0.8;               // how far the ribs cover the PCB edge
 EDGE_CLEAR = 0.15;               // slot clearance around the board edges
-CRUSH = EDGE_CLEAR + 0.05;       // crush ribs: they reach 0.05 into the board edge and centre it
+CRUSH = EDGE_CLEAR + 0.05;       // crush ribs: they reach 0.05 into the board edge
 
 // ---------- Snap fit: in-plane beams with a hook across the parting plane ----------
 // The beam lies along X inside the right-half wall and flexes in Z, so on the print bed (outer
 // face down) it bends within the layers, not across them. [hook centre X, hook width, cavity
-// half height, side of the root (+1 = root at larger X), beam length, walls (2 = top and bottom,
-// 1 = top only: the camera flex lies on the chamber floor, so the front snap has no bottom twin)]
-SNAPS = [[-39.0, 4.0, CHAMBER_HZ, 1, 6.0, 1], [-12.0, 5.0, CAV_HZ, -1, 10.0, 2], [24.0, 5.0, CAV_HZ, -1, 10.0, 2]];
-SNAP_T = 1.2;                    // beam / hook thickness (Z)
+// half height, side of the root (+1 = root at larger X), beam length, walls (2 = top and bottom)]
+SNAPS = [[-39.0, 4.0, CHAMBER_HZ, 1, 6.0, 2], [-12.0, 5.0, CAV_HZ, -1, 10.0, 2], [24.0, 5.0, CAV_HZ, -1, 10.0, 2]];
+SNAP_T = 1.0;                    // beam / hook thickness (Z)
 SNAP_DEPTH = 2.5;                // beam depth inside the right half (Y)
-SNAP_GAP = 0.4;                  // relief above the beam and at its free end
+SNAP_GAP = 0.35;                 // relief above the beam and at its free end
 SNAP_BACK_GAP = 0.7;             // relief behind the beam: room for bridge sag so it does not fuse to the wall
 SNAP_WEB = 0.4;                  // breakaway web across the end slot: the beam prints as a bridge; cut it after printing
 HOOK_LEN = 3.0;                  // hook reach past the parting plane
-BUMP_H = 0.45;
+BUMP_H = 0.4;
 SNAP_CLEAR = 0.05;               // recess roof over the hook: engagement = BUMP_H - SNAP_CLEAR
-LIP_T = 1.2;
+LIP_T = 1.0;
 LIP_CLEAR = 0.2;
 LIP_LEN = 2.5;
 LIP_SEGMENTS = [[-43.6, -42.3, CHAMBER_HZ], [-30.5, -25.0, CAV_HZ], [-8.2, 11.0, CAV_HZ], [27.8, 34.0, CAV_HZ]];
-LIP_FLOOR = [-43.6, -31.0];      // bottom-only lip where the front snap has no bottom twin
 PIN_D = 2.4;
 PIN_LEN = 2.6;
 PIN_HOLE_D = 2.75;
@@ -171,17 +183,19 @@ SW_TOP_Y = RIGHT_FACE - BUTTON_WALL - BUTTON_FLANGE_T;     // flange face
 SW_BASE_Y = SW_TOP_Y - SWITCH_HEADROOM - SWITCH_T;
 BACKING_Y = SW_BASE_Y - BACKING_T;
 
-// ---------- Rear openings ----------
-// The microSD is for the team only: it stays inside (open the case to reach it). The rear wall gets a
-// blind pocket for the end of the card, which sticks out of the Pi edge.
+// ---------- Rear ----------
+// The microSD is for the team only: it stays inside (open the case to reach it). The v0.9 print had
+// to be cut there, so the rear now leaves the card real room past the Pi edge.
 SD_ZC = -1.9;                    // card centre, ~16.9 from the header edge
-SD_CARD_OUT = 2.5;
+SD_CARD_OUT = 3.5;               // MEASURE: how far the card sticks out past the Pi edge
+SD_CLEAR = 1.0;
 CHARGE_PLUG = [11.5, 7.5];       // moulded micro USB plug: Z x Y
 
 // ---------- Power slider (HAT switch, head-side face) ----------
-// One solid with a common X range, so it prints lying flat on its -X face.
-SLIDER_X = [-34.8, -30.4];       // behind the flex rise (x -38 .. -35), over the lever
-SLIDER_PLATE_X1 = -30.15;        // the plate ends just short of the front pads (x -30)
+// One solid with a common X range, so it prints lying flat on its -X face. With the camera flex now on
+// the Pi side, the slider takes the whole space behind the camera: a 9 mm wide knob.
+SLIDER_X = [-39.5, -30.4];
+SLIDER_PLATE_X1 = -28.6;         // the plate runs on past the window, short of the HAT screw heads
 SLIDER_KNOB_Z = 4.0;
 SLIDER_KNOB_PROUD = 1.5;
 SLIDER_PLATE_T = 1.0;
@@ -214,16 +228,16 @@ TRANSDUCER_DEPTH = 7.4;
 
 // Outer shape: X, total Y width, total Z height, corner radius. Flat sides between -47 and 30.
 stations = [
-    [-50.0, OUT_W - 1.4, 31.4, 5.4],
-    [-47.0, OUT_W, 33.2, 5.8],
-    [-42.0, OUT_W, 34.6, 6.0],
-    [-31.0, OUT_W, 37.2, 6.2],
-    [-24.0, OUT_W, 37.6, 6.4],      // >= 1.1 of skin over the snap grooves and lip recesses
-    [ 30.0, OUT_W, 37.6, 6.4],
-    [ 35.0, OUT_W - 0.2, 37.2, 6.2],
-    [ 37.6, OUT_W - 0.8, 34.8, 6.0],
-    [ 39.8, OUT_W - 2.8, 30.6, 5.6],
-    [ 41.6, OUT_W - 6.8, 25.0, 5.0]
+    [-50.0, OUT_W - 1.2, 31.8, 5.0],
+    [-47.0, OUT_W, 33.0, 5.4],
+    [-42.0, OUT_W, 33.6, 5.6],
+    [-31.0, OUT_W, OUT_H - 0.4, 6.0],
+    [-24.0, OUT_W, OUT_H, 6.2],
+    [ 30.0, OUT_W, OUT_H, 6.2],
+    [ 35.0, OUT_W - 0.2, OUT_H - 0.4, 6.0],
+    [ 38.6, OUT_W - 0.8, OUT_H - 2.8, 5.8],
+    [ 40.8, OUT_W - 2.8, OUT_H - 7.0, 5.4],
+    [ 42.6, OUT_W - 6.8, OUT_H - 12.6, 4.8]
 ];
 
 // ---------- Helpers ----------
@@ -254,16 +268,16 @@ module chamber() {
 module cavity() {
     translate([PI_CX, 0, 0]) rounded_prism_x(CAV_L, 2 * CAV_HY, 2 * CAV_HZ, 2.5);
     chamber();
+    // microSD: room past the Pi's rear edge for the card at the Pi level
+    box([STACK_REAR_X - 1, PI_BOTTOM_Y - 0.3, SD_ZC - 7.5], [STACK_REAR_X + SD_CARD_OUT + SD_CLEAR, PI_TOP_Y + 3.0, SD_ZC + 7.5]);
 }
 
 module lens_opening() {
-    translate([NOSE_X - 2, 0, LENS_Z]) rotate([0, 90, 0]) cylinder(h = CHAMBER_FRONT_X - NOSE_X + 2.1, d = LENS_HOLE_D);
-    translate([NOSE_X - 0.01, 0, LENS_Z]) rotate([0, 90, 0]) cylinder(h = 1.3, d1 = LENS_HOLE_D + 2.6, d2 = LENS_HOLE_D);
+    translate([NOSE_X - 2, LENS_Y, LENS_Z]) rotate([0, 90, 0]) cylinder(h = CHAMBER_FRONT_X - NOSE_X + 2.1, d = LENS_HOLE_D);
+    translate([NOSE_X - 0.01, LENS_Y, LENS_Z]) rotate([0, 90, 0]) cylinder(h = 1.3, d1 = LENS_HOLE_D + 2.6, d2 = LENS_HOLE_D);
 }
 
 module rear_openings() {
-    // microSD: blind pocket inside the rear wall for the end of the card (no hole to the outside)
-    box([STACK_REAR_X - 0.5, PI_TOP_Y - 0.3, SD_ZC - 6.5], [STACK_REAR_X + SD_CARD_OUT + 0.6, PI_TOP_Y + 2.0, SD_ZC + 6.5]);
     // charging micro USB of the HAT: straight channel for the moulded plug
     translate([STACK_REAR_X + 5, HAT_TOP_Y + USB_H / 2, (USB_Z[0] + USB_Z[1]) / 2]) rounded_box3d([12, CHARGE_PLUG[1], CHARGE_PLUG[0]], 1.5);
 }
@@ -272,53 +286,49 @@ module rear_openings() {
 module camera_frame() {
     front0 = CAM_FRONT_X - RIB_GAP - RIB_T;
     back1 = CAM_BACK_X + RIB_GAP + RIB_T;
-    ey = AI_CAM_W / 2 - RIB_OVERLAP;
-    ez = AI_CAM_H / 2 - RIB_OVERLAP;
+    hy = AI_CAM_H / 2;
+    hz = AI_CAM_W / 2;
     intersection() {
         chamber();
         difference() {
             box([front0, -50, -50], [back1, 50, 50]);
             // the board itself, with clearance on the thickness and on the four edges
-            box([CAM_FRONT_X - RIB_GAP, -AI_CAM_W / 2 - EDGE_CLEAR, -AI_CAM_H / 2 - EDGE_CLEAR],
-                [CAM_BACK_X + RIB_GAP, AI_CAM_W / 2 + EDGE_CLEAR, AI_CAM_H / 2 + EDGE_CLEAR]);
+            box([CAM_FRONT_X - RIB_GAP, CAM_Y0 - hy - EDGE_CLEAR, -hz - EDGE_CLEAR],
+                [CAM_BACK_X + RIB_GAP, CAM_Y0 + hy + EDGE_CLEAR, hz + EDGE_CLEAR]);
             // open window: optics in front, parts behind
-            box([front0 - 1, -ey, -ez], [back1 + 1, ey, ez]);
-            // the FPC connector and the flex leave the back of the board at the bottom edge
-            box([CAM_BACK_X, -AI_CAM_CONN_W / 2 - 0.6, -50], [back1 + 1, AI_CAM_CONN_W / 2 + 0.6, -ez]);
+            box([front0 - 1, CAM_Y0 - hy + RIB_OVERLAP, -hz + RIB_OVERLAP], [back1 + 1, CAM_Y0 + hy - RIB_OVERLAP, hz - RIB_OVERLAP]);
+            // the FPC connector and the flex leave the back of the board at the +Y edge
+            box([CAM_BACK_X, CAM_EDGE_Y - AI_CAM_CONN_H - 0.5, -AI_CAM_CONN_W / 2 - 0.6], [back1 + 1, 50, AI_CAM_CONN_W / 2 + 0.6]);
         }
     }
 }
 
 // Crush ribs on the top and bottom edges of the slot, running along Y, the direction the board goes in
 // (-Y into the left half, then the right half closes the same way). Side ribs would stand across that
-// path, so in Y the board keeps the 0.15 clearance (well inside the lens hole's 0.42). At 0.05 they are
+// path, so in Y the board keeps the 0.15 clearance (well inside the lens hole's 0.6). At 0.05 they are
 // close to FDM tolerance: they take up play rather than locate precisely
 module camera_crush_ribs() {
-    x0 = CAM_FRONT_X + 0.02; x1 = CAM_BACK_X - 0.02;      // only across the board thickness, clear of the connector
-    for (y = [-AI_CAM_W / 4, AI_CAM_W / 4], s = [-1, 1])        // top and bottom edges
-        box([x0, y - 0.3, s * (AI_CAM_H / 2 + EDGE_CLEAR + 0.01)], [x1, y + 0.3, s * (AI_CAM_H / 2 + EDGE_CLEAR - CRUSH)]);
+    x0 = CAM_FRONT_X + 0.02; x1 = CAM_BACK_X - 0.02;      // only across the board thickness
+    for (y = [CAM_Y0 - AI_CAM_H / 4, CAM_Y0 + AI_CAM_H / 4], s = [-1, 1])
+        box([x0, y - 0.3, s * (AI_CAM_W / 2 + EDGE_CLEAR + 0.01)], [x1, y + 0.3, s * (AI_CAM_W / 2 + EDGE_CLEAR - CRUSH)]);
 }
 
-// The camera flex leaves the connector downward, turns back under the camera and rises to the Pi CSI
-// (Pi top side, front edge). Nothing solid may enter this volume.
+// The camera flex leaves the connector at the +Y edge, folds back along the outer wall, then steps down
+// to the Pi CSI (Pi top side, front edge) and goes in flat. Nothing solid may enter this volume.
 module flex_keepout() {
-    // the chamber corners are rounded (CHAMBER_R): the flat floor and side walls start at +/-fy
-    // route: down from the connector, back along the floor, up across its full width between the
-    // connector and the slider, a 45 deg fold, then flat into the CSI on the Pi side (Y > 0)
-    fy = CHAMBER_HY - CHAMBER_R;
-    box([CAM_BACK_X + 0.2, -fy, -CHAMBER_HZ], [STACK_FRONT_X, fy, -AI_CAM_H / 2]);
-    box([CAM_CONN_BACK_X, -fy, -CHAMBER_HZ], [SLIDER_X[0] - 0.2, fy, CHAMBER_HZ - 4]);
-    box([SLIDER_X[0] - 0.2, -1.0, -CHAMBER_HZ], [STACK_FRONT_X, fy, CHAMBER_HZ - 4]);
+    fz = AI_CAM_CONN_W / 2 - 1;
+    box([CAM_BACK_X + 0.2, CAM_EDGE_Y, -fz], [CAM_CONN_BACK_X + 1, CHAMBER_HY - 0.1, fz]);
+    box([CAM_BACK_X + 0.2, PI_TOP_Y - 0.5, -fz], [STACK_FRONT_X, CHAMBER_HY - 0.1, fz]);
 }
 
-// ---------- Pads ----------
+// ---------- Pads (right half): the hex standoffs above the Pi seat here ----------
 module pad_solid() {
-    translate([0, -CAV_HY - 0.5, 0]) rotate([-90, 0, 0]) cylinder(h = PAD_TOP_Y + CAV_HY + 0.5, d = PAD_D);
-    // reflowable collar: the iron touches this ring and the brass stub, never a board
-    translate([0, PAD_TOP_Y - 0.01, 0]) rotate([-90, 0, 0])
-        difference() { cylinder(h = COLLAR_H, d = COLLAR_OD); cylinder(h = 3, d = COLLAR_ID, center = true); }
+    translate([0, PAD_MOUTH_Y, 0]) rotate([-90, 0, 0]) cylinder(h = CAV_HY + 0.5 - PAD_MOUTH_Y, d = PAD_D);
+    // reflowable collar below the socket mouth: the iron touches this ring and the brass, never a board
+    translate([0, PAD_MOUTH_Y - COLLAR_H, 0]) rotate([-90, 0, 0])
+        difference() { cylinder(h = COLLAR_H + 0.01, d = PAD_D); cylinder(h = 3, d = COLLAR_ID, center = true); }
 }
-module pad_socket() { translate([0, PAD_TOP_Y - SOCKET_DEPTH, 0]) hex_y(SOCKET_AF, SOCKET_DEPTH + 2); }
+module pad_socket() { translate([0, PAD_MOUTH_Y - 0.01, 0]) hex_y(SOCKET_AF, HEX_ENGAGE + 0.3); }
 module pad_positions() { for (dx = [-PI_HOLE_X, PI_HOLE_X], z = [-PI_HOLE_Z, PI_HOLE_Z]) translate([PI_CX + dx, 0, z]) children(); }
 
 // ---------- Power slider: a knob on the head-side face drives the HAT switch lever ----------
@@ -371,7 +381,7 @@ module snap_hooks() {
     for (t = SNAPS) both_walls(t[5]) {
         x0 = t[0] - t[1] / 2; x1 = t[0] + t[1] / 2; hz = t[2];
         box([x0, -HOOK_LEN, hz], [x1, 0.01, hz + SNAP_T]);
-        // lead-in ramp toward the tip (~24 deg), 45 deg retention face toward the root
+        // lead-in ramp toward the tip (~22 deg), 45 deg retention face toward the root
         yb = -HOOK_LEN + 0.1;
         translate([x0, 0, hz + SNAP_T - 0.01]) rotate([90, 0, 90]) linear_extrude(height = t[1])
             polygon([[yb, 0], [yb + 1.0, BUMP_H], [yb + 1.4, BUMP_H], [yb + 1.4 + BUMP_H, 0]]);
@@ -407,7 +417,6 @@ module snap_webs() {
 module lip_band(x0, x1, hz, len) { box([x0, -len, hz], [x1, 0.01, hz + LIP_T]); }
 module lips_right() {
     for (s = LIP_SEGMENTS) both_walls() lip_band(s[0], s[1], s[2], LIP_LEN);
-    mirror([0, 0, 1]) lip_band(LIP_FLOOR[0], LIP_FLOOR[1], CHAMBER_HZ, LIP_LEN);
     for (p = PINS) translate([p[0], 0.01, p[1]]) rotate([90, 0, 0]) {
         cylinder(h = PIN_LEN - 0.5, d = PIN_D);
         translate([0, 0, PIN_LEN - 0.51]) cylinder(h = 0.5, d1 = PIN_D, d2 = PIN_D - 0.8);
@@ -415,7 +424,6 @@ module lips_right() {
 }
 module lip_recesses_left() {
     for (s = LIP_SEGMENTS) both_walls() box([s[0] - 0.3, -LIP_LEN - 0.3, s[2] - 0.01], [s[1] + 0.3, 0.01, s[2] + LIP_T + LIP_CLEAR]);
-    mirror([0, 0, 1]) box([LIP_FLOOR[0] - 0.3, -LIP_LEN - 0.3, CHAMBER_HZ - 0.01], [LIP_FLOOR[1] + 0.3, 0.01, CHAMBER_HZ + LIP_T + LIP_CLEAR]);
     for (p = PINS) translate([p[0], 0.01, p[1]]) rotate([90, 0, 0]) cylinder(h = PIN_LEN + 0.4, d = PIN_HOLE_D);
     translate([40.5, 0, -4]) rounded_box3d([6, 1.6, 5], 0.4);   // pry notch at the rear seam, clear of the pins
 }
@@ -429,16 +437,13 @@ module switch_drawer_solid() {
     box([BUTTON_X - w / 2, BACKING_Y, BUTTON_Z - SWITCH_W / 2 - 1.2], [BUTTON_X + w / 2, CAV_HY + 0.5, BAY_TOP + 0.9]);
 }
 module switch_drawer_cut() {
-    // switch bay, open toward -Z: the switch slides up into it and the wires leave downward
+    // switch bay, open toward -Z: the cap and then the switch slide up into it, the wires leave downward
     box([BUTTON_X - BAY_W / 2, SW_BASE_Y, BUTTON_Z - SWITCH_W / 2 - 3], [BUTTON_X + BAY_W / 2, SW_TOP_Y + 0.01, BAY_TOP]);
-    // entry channel in the wall below the drawer: the cap (flange first) and then the switch come up
-    // from the cavity without scraping the inner wall face
-    box([BUTTON_X - BAY_W / 2, CAV_HY - 0.01, BUTTON_Z - 16], [BUTTON_X + BAY_W / 2, SW_TOP_Y + CAP_LANE, BUTTON_Z - SWITCH_W / 2 - 2.9]);
-    // flange pocket, extended down to the bay mouth: the cap slides up the bay with its flange in
-    // this slot, then steps into its hole; the switch goes in after it and keeps it there
+    // entry channel in the wall below the drawer, only where the cap's path reaches past the inner face
+    if (SW_TOP_Y + CAP_LANE > CAV_HY)
+        box([BUTTON_X - BAY_W / 2, CAV_HY - 0.01, BUTTON_Z - 16], [BUTTON_X + BAY_W / 2, SW_TOP_Y + CAP_LANE, BUTTON_Z - SWITCH_W / 2 - 2.9]);
     translate([BUTTON_X, SW_TOP_Y - 0.01, BUTTON_Z]) rotate([-90, 0, 0]) cylinder(h = BUTTON_FLANGE_T + 0.02, d = BUTTON_FLANGE_D + 0.5);
-    // shallow lane for the head on its way up (the cap is 0.14 longer than the bay is deep); it stays
-    // shallow under the finder ring so the outer skin there keeps > 1 mm
+    // shallow lane for the head on its way up (the cap is 0.14 longer than the bay is deep)
     box([BUTTON_X - BUTTON_HEAD_D / 2 - 0.25, SW_TOP_Y - 0.01, BUTTON_Z - SWITCH_W / 2 - 3], [BUTTON_X + BUTTON_HEAD_D / 2 + 0.25, SW_TOP_Y + CAP_LANE, BUTTON_Z]);
     translate([BUTTON_X, SW_TOP_Y, BUTTON_Z]) rotate([-90, 0, 0]) cylinder(h = 10, d = BUTTON_HOLE_D);
     // finder ring around the button, to locate it by touch
@@ -452,12 +457,10 @@ module left_body() {
         union() {
             intersection() { difference() { outer_shell(); cavity(); } half_space(-1); }
             intersection() { union() { camera_frame(); camera_crush_ribs(); } half_space(-1); }
-            pad_positions() pad_solid();
             elastic_bridges();
             bone_socket_boss();
             slider_on_dot();
         }
-        pad_positions() pad_socket();
         lens_opening();
         rear_openings();
         slider_window();
@@ -473,10 +476,12 @@ module right_body() {
         union() {
             intersection() { difference() { outer_shell(); cavity(); } half_space(1); }
             intersection() { union() { camera_frame(); camera_crush_ribs(); } half_space(1); }
+            pad_positions() pad_solid();
             switch_drawer_solid();
             snap_hooks();
             lips_right();
         }
+        pad_positions() pad_socket();
         lens_opening();
         rear_openings();
         snap_reliefs();
@@ -546,7 +551,8 @@ module hw_lever(on = false) {
     zc = (on ? -1 : 1) * LEVER_TRAVEL / 2;
     box([hat_x(-LEVER_TIP), HAT_TOP_Y + LEVER_Y[0], zc - LEVER_W / 2], [hat_x(SW_BODY_X[0]), HAT_TOP_Y + LEVER_Y[1], zc + LEVER_W / 2]);
 }
-module hw_stubs() { pad_positions() translate([0, HAT_BOTTOM_Y - STUB_LEN, 0]) hex_y(STUB_AF, STUB_LEN); }
+module hw_screw_heads() { pad_positions() translate([0, HAT_BOTTOM_Y - SCREW_HEAD_H, 0]) rotate([-90, 0, 0]) cylinder(h = SCREW_HEAD_H, d = SCREW_HEAD_D); }
+module hw_hex() { pad_positions() translate([0, PI_TOP_Y, 0]) hex_y(HEX_AF, HEX_H); }
 module hw_pi() {
     box([STACK_FRONT_X, PI_BOTTOM_Y, -PI_W / 2], [STACK_REAR_X, PI_TOP_Y, PI_W / 2]);
     box([STACK_FRONT_X, PI_TOP_Y, -PI_W / 2], [STACK_REAR_X, PI_TOP_Y + PI_PARTS, HEADER_Z[0]]);
@@ -559,14 +565,15 @@ module hw_pi() {
     // standoffs between the boards
     pad_positions() translate([0, HAT_TOP_Y, 0]) hex_y(5.0, BOARD_GAP);
 }
-// squeeze trims the PCB top and bottom edges: the checks use CRUSH - EDGE_CLEAR so the crush ribs' designed
+// squeeze trims the PCB edges along Z: the checks use CRUSH - EDGE_CLEAR so the crush ribs' designed
 // 0.05 interference is not reported as a clash (everything else on the camera is checked as is)
 module hw_camera(squeeze = 0) {
-    box([CAM_FRONT_X, -AI_CAM_W / 2, -AI_CAM_H / 2 + squeeze], [CAM_BACK_X, AI_CAM_W / 2, AI_CAM_H / 2 - squeeze]);
-    box([CAM_FRONT_X - AI_CAM_BLOCK_REACH, -AI_CAM_BLOCK_W / 2, -AI_CAM_H / 2 + AI_CAM_BLOCK_Z[0]], [CAM_FRONT_X, AI_CAM_BLOCK_W / 2, -AI_CAM_H / 2 + AI_CAM_BLOCK_Z[1]]);
-    translate([CAM_FRONT_X - AI_CAM_TIER_REACH, -AI_CAM_TIER / 2, LENS_Z - AI_CAM_TIER / 2]) cube([AI_CAM_TIER_REACH, AI_CAM_TIER, AI_CAM_TIER]);
-    translate([CAM_FRONT_X, 0, LENS_Z]) rotate([0, -90, 0]) cylinder(h = AI_CAM_BARREL_REACH, d = AI_CAM_BARREL_D);
-    box([CAM_BACK_X, -AI_CAM_CONN_W / 2, -AI_CAM_H / 2], [CAM_CONN_BACK_X, AI_CAM_CONN_W / 2, -AI_CAM_H / 2 + AI_CAM_CONN_H]);
+    hy = AI_CAM_H / 2;
+    box([CAM_FRONT_X, CAM_Y0 - hy, -AI_CAM_W / 2 + squeeze], [CAM_BACK_X, CAM_Y0 + hy, AI_CAM_W / 2 - squeeze]);
+    box([CAM_FRONT_X - AI_CAM_BLOCK_REACH, CAM_EDGE_Y - AI_CAM_BLOCK_FROM_CONN[1], -AI_CAM_BLOCK_W / 2], [CAM_FRONT_X, CAM_EDGE_Y - AI_CAM_BLOCK_FROM_CONN[0], AI_CAM_BLOCK_W / 2]);
+    translate([CAM_FRONT_X - AI_CAM_HOLDER[1], LENS_Y - AI_CAM_HOLDER[0] / 2, LENS_Z - AI_CAM_HOLDER[0] / 2]) cube([AI_CAM_HOLDER[1], AI_CAM_HOLDER[0], AI_CAM_HOLDER[0]]);
+    translate([CAM_FRONT_X, LENS_Y, LENS_Z]) rotate([0, -90, 0]) cylinder(h = AI_CAM_BARREL_REACH, d = AI_CAM_BARREL_D);
+    box([CAM_BACK_X, CAM_EDGE_Y - AI_CAM_CONN_H, -AI_CAM_CONN_W / 2], [CAM_CONN_BACK_X, CAM_EDGE_Y, AI_CAM_CONN_W / 2]);
 }
 module hw_switch() {
     box([BUTTON_X - SWITCH_W / 2 - SWITCH_LEGS, SW_BASE_Y, BUTTON_Z - SWITCH_W / 2], [BUTTON_X + SWITCH_W / 2 + SWITCH_LEGS, SW_BASE_Y + SWITCH_T, BUTTON_Z + SWITCH_W / 2]);
@@ -577,13 +584,14 @@ module hw_transducer() {
 module hardware() {
     color([.15, .35, .8]) hw_hat();
     color("red") hw_lever();
-    color("goldenrod") hw_stubs();
+    color("silver") hw_screw_heads();
+    color("goldenrod") hw_hex();
     color([.1, .55, .2]) hw_pi();
     color([.2, .2, .25]) hw_camera();
     color("white") hw_switch();
     color("orange") hw_transducer();
 }
-module hw_all() { hw_hat(); hw_lever(); hw_pi(); hw_camera(CRUSH - EDGE_CLEAR + 0.02); hw_switch(); }
+module hw_all() { hw_hat(); hw_lever(); hw_pi(); hw_camera(CRUSH - EDGE_CLEAR + 0.02); hw_switch(); hw_screw_heads(); }
 
 module assembly() {
     color("#2c2c2c") translate([0, -EXPLODE, 0]) left_body();
@@ -610,24 +618,27 @@ module print_bone() { translate([0, 0, BONE_PRINT_Z]) rotate([-90, 0, 0]) bone_a
 // ---------- Interference checks: every one of these must render EMPTY (or zero-volume contact) ----------
 module check(name) {
     if (name == "halves") intersection() { left_body(); right_body(); }
-    else if (name == "left_hw") intersection() { left_body(); hw_all(); }
-    else if (name == "right_hw") intersection() { right_body(); union() { hw_all(); hw_stubs(); } }
-    else if (name == "pads_stubs") intersection() { left_body(); hw_stubs(); }
+    else if (name == "left_hw") intersection() { left_body(); union() { hw_all(); hw_hex(); } }
+    else if (name == "right_hw") intersection() { right_body(); hw_all(); }
+    else if (name == "pads_hex") intersection() { right_body(); hw_hex(); }
     else if (name == "button") intersection() { button_cap_placed(); union() { left_body(); right_body(); hw_switch(); hw_pi(); } }
-    else if (name == "slider_off") intersection() { power_slider(SLIDER_S); union() { left_body(); right_body(); hw_hat(); hw_lever(false); hw_camera(); hw_pi(); } }
-    else if (name == "slider_on") intersection() { power_slider(-SLIDER_S); union() { left_body(); right_body(); hw_hat(); hw_lever(true); hw_camera(); hw_pi(); } }
-    else if (name == "flex") intersection() { flex_keepout(); union() { left_body(); right_body(); power_slider(SLIDER_S); power_slider(-SLIDER_S); hw_hat(); hw_lever(); hw_lever(true); } }
+    else if (name == "slider_off") intersection() { power_slider(SLIDER_S); union() { left_body(); right_body(); hw_hat(); hw_lever(false); hw_camera(); hw_pi(); hw_screw_heads(); } }
+    else if (name == "slider_on") intersection() { power_slider(-SLIDER_S); union() { left_body(); right_body(); hw_hat(); hw_lever(true); hw_camera(); hw_pi(); hw_screw_heads(); } }
+    else if (name == "flex") intersection() { flex_keepout(); union() { left_body(); right_body(); power_slider(SLIDER_S); power_slider(-SLIDER_S); hw_hat(); hw_lever(); hw_lever(true); hw_hex(); } }
     else if (name == "hw_self") intersection() { hw_hat(); hw_pi(); }
     else if (name == "bone") intersection() { bone_arm(); union() { left_body(); hw_transducer(); } }
-    else if (name == "drawer_pi") intersection() { switch_drawer_solid(); hw_pi(); }
+    else if (name == "drawer_pi") intersection() { switch_drawer_solid(); union() { hw_pi(); hw_hex(); } }
     // assembly paths, not just the final positions. The cap goes up low in the bay (flange against the
     // backing), then steps out into its hole: those two legs are the whole path
     else if (name == "cap_insert") intersection() { right_body(); union() {
         for (dz = [-12 : 0.5 : 0]) translate([BUTTON_X, SW_BASE_Y + 0.02, BUTTON_Z + dz]) button_cap();
         for (dy = [SW_BASE_Y + 0.02 - SW_TOP_Y : 0.1 : 0]) translate([BUTTON_X, SW_TOP_Y + dy, BUTTON_Z]) button_cap(); } }
     else if (name == "switch_insert") intersection() { union() { right_body(); button_cap_placed(); } hull() for (dz = [-12, 0]) translate([0, 0, dz]) hw_switch(); }
-    // the HAT goes in after the slider: its lever drops into the fork moving -Y
+    // the stack sits in the right half; the left half closes onto it moving +Y and the fork takes the
+    // lever: relative to the slider, the lever comes in from +Y
     else if (name == "lever_insert") intersection() { power_slider(SLIDER_S); hull() for (dy = [0, 8]) translate([0, dy, 0]) hw_lever(false); }
+    // the stack goes into the right half moving +Y (Pi side first): the hex standoffs into the pads
+    else if (name == "stack_insert") intersection() { right_body(); pad_positions() hull() for (dy = [-6, 0]) translate([0, PI_TOP_Y + dy, 0]) hex_y(HEX_AF, HEX_H); }
     else assert(false, str("unknown check: ", name));
 }
 

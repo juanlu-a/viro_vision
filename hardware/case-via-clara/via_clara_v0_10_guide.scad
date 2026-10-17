@@ -1,14 +1,14 @@
-// VIA Clara v0.9 — annotated assembly guide: arrows and labels saying what each part, slot and hole
+// VIA Clara v0.10 — annotated assembly guide: arrows and labels saying what each part, slot and hole
 // is for. Renders to images (see export.sh); it is not a printable part.
 // Labels are in Spanish because people read them; the code is in English (ADR 0009).
 //
 // VIEW = outer | head | left_inside | right_inside | exploded
 // Render with an orthographic projection and the eye along view_dir(VIEW), for example:
-//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_9_guide.scad
+//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_10_guide.scad
 
 // Always render with -D 'PART="none"' (export.sh does): the model's own dispatch must draw nothing.
 // Setting PART here would not work, because the included file reassigns it.
-include <via_clara_v0_9.scad>
+include <via_clara_v0_10.scad>
 
 VIEW = "head";                   // set with -D
 // export.sh renders the parts once to meshes in the model frame and passes their folder here: preview
@@ -142,27 +142,26 @@ function items(v) =
         [TRANSDUCER_CENTER + [0, -4, 0], "Transductor óseo (14 mm)"],
         [[-2, LEFT_FACE, 12], "Cara que apoya en la patilla"]] :
     v == "left_inside" ? [
-        [[PI_CX - PI_HOLE_X, PAD_TOP_Y + 0.8, PI_HOLE_Z], "Almohadilla: separador de bronce (x4)"],
-        [[PI_CX + PI_HOLE_X, PAD_TOP_Y + 0.8, -PI_HOLE_Z], "Collar que se derrite con el soldador"],
-        [[CAM_FRONT_X - 0.4, -AI_CAM_W / 2, 9], "Ranura del PCB de la cámara"],
-        [[-36.5, -4, -13.8], "Recorrido libre del flex"],
+        [[CAM_FRONT_X - 0.4, CAM_Y0 - AI_CAM_H / 2, 9], "Ranura del PCB de la cámara"],
         [[sxk, -CHAMBER_HY + 1, SLIDER_KNOB_C + SLIDER_S - 5], "Corredera: agarra la palanca de la llave"],
         [[29, -CAV_HY, -0.5], "Paso del cable del auricular"],
-        [[STACK_REAR_X + 1.5, PI_TOP_Y + 0.5, SD_ZC], "Hueco interno de la microSD"],
         [[STACK_REAR_X + 3, HAT_TOP_Y + 1.5, -6.5], "Canal de carga"],
-        [[-12, -2, CAV_HZ + 1.2], "Ranura donde engancha la traba"],
-        [[38.6, -1.5, 12.5], "Agujero del perno"]] :
+        [[-12, -2, CAV_HZ + 1.0], "Ranura donde engancha la traba"],
+        [[38.6, -1.5, 12.5], "Agujero del perno"],
+        [[0, -CAV_HY, -6], "Lado de la HAT: sólo cabezas de tornillo"]] :
     v == "right_inside" ? [
-        [[snap_root(t) + 4, 1.2, t[2] + 0.6], "Viga de la traba (flexiona)"],
+        [[PI_CX - PI_HOLE_X, PAD_MOUTH_Y - 0.4, PI_HOLE_Z], "Almohadilla: separador hexagonal (x4)"],
+        [[PI_CX + PI_HOLE_X, PAD_MOUTH_Y - 0.4, -PI_HOLE_Z], "Collar que se derrite con el soldador"],
+        [[snap_root(t) + 4, 1.2, t[2] + 0.5], "Viga de la traba (flexiona)"],
         [[t[0], -HOOK_LEN + 0.5, t[2] + SNAP_T + 0.3], "Gancho de la traba"],
-        [[snap_free(t) + 0.4, SNAP_DEPTH + 0.3, t[2] + 0.6], "Puente a cortar tras imprimir"],
+        [[snap_free(t) + 0.4, SNAP_DEPTH + 0.3, t[2] + 0.5], "Puente a cortar tras imprimir"],
         [[BUTTON_X, BACKING_Y, BUTTON_Z], "Cajón del pulsador"],
-        [[BUTTON_X, CAV_HY, BUTTON_Z - 11], "Canal: suben tecla y pulsador"],
         [[-38.5, 1, 0], "Nervios de la cámara"],
-        [[38.6, -2.6, -12.5], "Perno de alineación"],
-        [[0, -1.2, -CAV_HZ - 0.6], "Labio de alineación"]] :
+        [[-36, CHAMBER_HY - 1, 0], "Recorrido del flex (lado de la Pi)"],
+        [[STACK_REAR_X + 2.5, PI_TOP_Y + 1, SD_ZC], "Lugar para la microSD"],
+        [[38.6, -2.6, -12.5], "Perno de alineación"]] :
     [
-        [[-42.4, 0, 12], "AI Camera"],
+        [[-42.4, CAM_Y0, 12], "AI Camera (conector hacia la Pi)"],
         [[hat_x(26), HAT_TOP_Y + 4, 15], "UPS HAT + batería"],
         [[STACK_REAR_X - 20, PI_TOP_Y, 15], "Raspberry Pi Zero 2 W"],
         [[sxk, -16 - 9, SLIDER_KNOB_C + 4], "Corredera (pieza 05)"],
