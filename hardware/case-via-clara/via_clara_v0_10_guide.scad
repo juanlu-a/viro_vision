@@ -155,7 +155,7 @@ function items(v) =
         [[snap_root(t) + 4, 1.2, t[2] + 0.5], "Viga de la traba (flexiona)"],
         [[t[0], -HOOK_LEN + 0.5, t[2] + SNAP_T + 0.3], "Gancho de la traba"],
         [[snap_free(t) + 0.4, SNAP_DEPTH + 0.3, t[2] + 0.5], "Puente a cortar tras imprimir"],
-        [[BUTTON_X, BACKING_Y, BUTTON_Z], "Cajón del pulsador"],
+        [[BUTTON_X, SW_BASE_Y + 1, BUTTON_Z + 3.4], "Bolsillo del pulsador (entra desde adentro)"],
         [[-38.5, 1, 0], "Nervios de la cámara"],
         [[-36, CHAMBER_HY - 1, 0], "Recorrido del flex (lado de la Pi)"],
         [[STACK_REAR_X + 2.5, PI_TOP_Y + 1, SD_ZC], "Lugar para la microSD"],

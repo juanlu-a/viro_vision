@@ -55,7 +55,8 @@ BAT = [40, 30, 8];               // 803040, on the pogo-pin side of the HAT
 HEADER_TAIL = 3.0;               // solder tails of the male header under the Pi
 BOARD_GAP = BAT[2] + HEADER_TAIL + 0.3;   // HAT top face to Pi bottom face (11.3; fitted in the v0.9 print)
 PI_PCB = 1.4;
-PI_PARTS = 3.2;                  // connectors on the Pi top side
+PI_PARTS = 3.2;                  // tall connectors on the Pi top side (mini HDMI, micro USB)
+PI_PARTS_LOW = 1.6;              // MEASURE: everything else on the Pi top (the RP3A0 chip, passives)
 HEADER_H = 8.5;                  // male header above the Pi PCB (2.5 plastic + 6 pin)
 HEADER_CLEAR = 0.6;
 HEADER_Z = [9.0, 14.0];          // header band: top long edge (pin 1 at the microSD end)
@@ -172,16 +173,20 @@ BUTTON_WALL = 1.4;
 BUTTON_HOLE_D = 5.4;
 BUTTON_HEAD_D = 5.0;
 BUTTON_PROUD = 0.8;
-BUTTON_FLANGE_D = 7.0;
 BUTTON_FLANGE_T = 0.6;
-SWITCH_W = 6.0;                  // 6 x 6 x 2.5 SMD tact switch, legs on the +/-X sides
-SWITCH_T = 2.5;                  // MEASURE: total height including the actuator
-SWITCH_LEGS = 1.2;
-SWITCH_HEADROOM = 0.15;          // lets the actuator slide under the flange on insertion
-BACKING_T = 0.8;
-SW_TOP_Y = RIGHT_FACE - BUTTON_WALL - BUTTON_FLANGE_T;     // flange face
-SW_BASE_Y = SW_TOP_Y - SWITCH_HEADROOM - SWITCH_T;
-BACKING_Y = SW_BASE_Y - BACKING_T;
+// 6 x 6 through-hole tact switch with 4 legs (two rows along X, pitch 6.5 x 4.5). It drops into a
+// pocket open toward the inside of the right half, on top of the cap; a drop of hot glue holds it.
+SWITCH_W = 6.0;                  // body, square
+SWITCH_BODY_T = 3.5;
+SWITCH_T = 5.0;                  // MEASURE: total height with the actuator (4.3 or 5.0 are common)
+SWITCH_ACT_D = 3.5;
+SWITCH_LEG_SPAN = 7.0;           // legs reach this far across X where they leave the body
+SWITCH_LEG_CUT = 1.5;            // legs trimmed to this before soldering the wires (the Pi is below)
+SW_TOP_Y = RIGHT_FACE - BUTTON_WALL - BUTTON_FLANGE_T;     // flange face = actuator tip
+SW_BASE_Y = SW_TOP_Y - SWITCH_T - 0.1;
+POCKET = [SWITCH_LEG_SPAN + 0.2, SWITCH_W + 0.15];        // X (leg side, loose) x Z (snug on the body)
+SLEEVE_T = 1.0;
+BUTTON_FLANGE = [POCKET[0] - 0.3, POCKET[1] - 0.25];      // rectangular: it has to drop through the pocket
 
 // ---------- Rear ----------
 // The microSD is for the team only: it stays inside (open the case to reach it). The v0.9 print had
@@ -428,23 +433,15 @@ module lip_recesses_left() {
     translate([40.5, 0, -4]) rounded_box3d([6, 1.6, 5], 0.4);   // pry notch at the rear seam, clear of the pins
 }
 
-// ---------- Button drawer (right half) ----------
-BAY_W = SWITCH_W + 2 * SWITCH_LEGS + 0.2;   // snug: friction plus a drop of glue holds the switch
-BAY_TOP = BUTTON_Z + BUTTON_FLANGE_D / 2 + 0.25;   // the cap's flange travels up the bay
-CAP_LANE = 0.3;                  // extra depth for the cap's head while it slides up
+// ---------- Button pocket (right half) ----------
+// A sleeve around a pocket open toward the cavity: the cap drops in first (head through its hole,
+// flange against the wall), then the switch on top of it.
 module switch_drawer_solid() {
-    w = BAY_W + 2.0;                 // 1.0 side walls: the snug fit depends on them
-    box([BUTTON_X - w / 2, BACKING_Y, BUTTON_Z - SWITCH_W / 2 - 1.2], [BUTTON_X + w / 2, CAV_HY + 0.5, BAY_TOP + 0.9]);
+    box([BUTTON_X - POCKET[0] / 2 - SLEEVE_T, SW_BASE_Y + 0.5, BUTTON_Z - POCKET[1] / 2 - SLEEVE_T],
+        [BUTTON_X + POCKET[0] / 2 + SLEEVE_T, CAV_HY + 0.5, BUTTON_Z + POCKET[1] / 2 + SLEEVE_T]);
 }
 module switch_drawer_cut() {
-    // switch bay, open toward -Z: the cap and then the switch slide up into it, the wires leave downward
-    box([BUTTON_X - BAY_W / 2, SW_BASE_Y, BUTTON_Z - SWITCH_W / 2 - 3], [BUTTON_X + BAY_W / 2, SW_TOP_Y + 0.01, BAY_TOP]);
-    // entry channel in the wall below the drawer, only where the cap's path reaches past the inner face
-    if (SW_TOP_Y + CAP_LANE > CAV_HY)
-        box([BUTTON_X - BAY_W / 2, CAV_HY - 0.01, BUTTON_Z - 16], [BUTTON_X + BAY_W / 2, SW_TOP_Y + CAP_LANE, BUTTON_Z - SWITCH_W / 2 - 2.9]);
-    translate([BUTTON_X, SW_TOP_Y - 0.01, BUTTON_Z]) rotate([-90, 0, 0]) cylinder(h = BUTTON_FLANGE_T + 0.02, d = BUTTON_FLANGE_D + 0.5);
-    // shallow lane for the head on its way up (the cap is 0.14 longer than the bay is deep)
-    box([BUTTON_X - BUTTON_HEAD_D / 2 - 0.25, SW_TOP_Y - 0.01, BUTTON_Z - SWITCH_W / 2 - 3], [BUTTON_X + BUTTON_HEAD_D / 2 + 0.25, SW_TOP_Y + CAP_LANE, BUTTON_Z]);
+    box([BUTTON_X - POCKET[0] / 2, SW_BASE_Y - 1, BUTTON_Z - POCKET[1] / 2], [BUTTON_X + POCKET[0] / 2, SW_TOP_Y + BUTTON_FLANGE_T + 0.05, BUTTON_Z + POCKET[1] / 2]);
     translate([BUTTON_X, SW_TOP_Y, BUTTON_Z]) rotate([-90, 0, 0]) cylinder(h = 10, d = BUTTON_HOLE_D);
     // finder ring around the button, to locate it by touch
     translate([BUTTON_X, RIGHT_FACE - 0.6, BUTTON_Z]) rotate([-90, 0, 0])
@@ -496,7 +493,7 @@ module button_cap() {
     head_l = BUTTON_WALL + BUTTON_PROUD;
     difference() {
         union() {
-            rotate([-90, 0, 0]) cylinder(h = BUTTON_FLANGE_T, d = BUTTON_FLANGE_D);
+            translate([-BUTTON_FLANGE[0] / 2, 0, -BUTTON_FLANGE[1] / 2]) cube([BUTTON_FLANGE[0], BUTTON_FLANGE_T, BUTTON_FLANGE[1]]);
             translate([0, BUTTON_FLANGE_T - 0.01, 0]) rotate([-90, 0, 0]) cylinder(h = head_l, d = BUTTON_HEAD_D);
         }
         translate([0, BUTTON_FLANGE_T + head_l - 0.5, 0]) rotate([-90, 0, 0])
@@ -555,7 +552,7 @@ module hw_screw_heads() { pad_positions() translate([0, HAT_BOTTOM_Y - SCREW_HEA
 module hw_hex() { pad_positions() translate([0, PI_TOP_Y, 0]) hex_y(HEX_AF, HEX_H); }
 module hw_pi() {
     box([STACK_FRONT_X, PI_BOTTOM_Y, -PI_W / 2], [STACK_REAR_X, PI_TOP_Y, PI_W / 2]);
-    box([STACK_FRONT_X, PI_TOP_Y, -PI_W / 2], [STACK_REAR_X, PI_TOP_Y + PI_PARTS, HEADER_Z[0]]);
+    box([STACK_FRONT_X, PI_TOP_Y, -PI_W / 2], [STACK_REAR_X, PI_TOP_Y + PI_PARTS_LOW, HEADER_Z[0]]);
     // male header above, solder tails below
     box([STACK_REAR_X - 57.9, PI_TOP_Y, HEADER_Z[0]], [STACK_REAR_X - 7.1, HEADER_TOP_Y, HEADER_Z[1]]);
     box([STACK_REAR_X - 57.9, PI_BOTTOM_Y - HEADER_TAIL, HEADER_Z[0]], [STACK_REAR_X - 7.1, PI_BOTTOM_Y, HEADER_Z[1]]);
@@ -576,7 +573,11 @@ module hw_camera(squeeze = 0) {
     box([CAM_BACK_X, CAM_EDGE_Y - AI_CAM_CONN_H, -AI_CAM_CONN_W / 2], [CAM_CONN_BACK_X, CAM_EDGE_Y, AI_CAM_CONN_W / 2]);
 }
 module hw_switch() {
-    box([BUTTON_X - SWITCH_W / 2 - SWITCH_LEGS, SW_BASE_Y, BUTTON_Z - SWITCH_W / 2], [BUTTON_X + SWITCH_W / 2 + SWITCH_LEGS, SW_BASE_Y + SWITCH_T, BUTTON_Z + SWITCH_W / 2]);
+    box([BUTTON_X - SWITCH_W / 2, SW_BASE_Y, BUTTON_Z - SWITCH_W / 2], [BUTTON_X + SWITCH_W / 2, SW_BASE_Y + SWITCH_BODY_T, BUTTON_Z + SWITCH_W / 2]);
+    translate([BUTTON_X, SW_BASE_Y + SWITCH_BODY_T - 0.01, BUTTON_Z]) rotate([-90, 0, 0]) cylinder(h = SWITCH_T - SWITCH_BODY_T + 0.01, d = SWITCH_ACT_D);
+    // legs leave the body at the X sides and go down, trimmed
+    for (sx = [-1, 1], sz = [-1, 1]) box([BUTTON_X + sx * (SWITCH_LEG_SPAN / 2 - 0.7), SW_BASE_Y - SWITCH_LEG_CUT, BUTTON_Z + sz * 2.25 - 0.35],
+                                         [BUTTON_X + sx * SWITCH_LEG_SPAN / 2, SW_BASE_Y + 0.6, BUTTON_Z + sz * 2.25 + 0.35]);
 }
 module hw_transducer() {
     translate([TRANSDUCER_CENTER[0], TRANSDUCER_CENTER[1] - 2.2, TRANSDUCER_CENTER[2]]) cube([TRANSDUCER_SIZE, 6, TRANSDUCER_SIZE], center = true);
@@ -627,13 +628,12 @@ module check(name) {
     else if (name == "flex") intersection() { flex_keepout(); union() { left_body(); right_body(); power_slider(SLIDER_S); power_slider(-SLIDER_S); hw_hat(); hw_lever(); hw_lever(true); hw_hex(); } }
     else if (name == "hw_self") intersection() { hw_hat(); hw_pi(); }
     else if (name == "bone") intersection() { bone_arm(); union() { left_body(); hw_transducer(); } }
-    else if (name == "drawer_pi") intersection() { switch_drawer_solid(); union() { hw_pi(); hw_hex(); } }
+    else if (name == "drawer_pi") intersection() { union() { switch_drawer_solid(); hw_switch(); } union() { hw_pi(); hw_hex(); } }
     // assembly paths, not just the final positions. The cap goes up low in the bay (flange against the
     // backing), then steps out into its hole: those two legs are the whole path
-    else if (name == "cap_insert") intersection() { right_body(); union() {
-        for (dz = [-12 : 0.5 : 0]) translate([BUTTON_X, SW_BASE_Y + 0.02, BUTTON_Z + dz]) button_cap();
-        for (dy = [SW_BASE_Y + 0.02 - SW_TOP_Y : 0.1 : 0]) translate([BUTTON_X, SW_TOP_Y + dy, BUTTON_Z]) button_cap(); } }
-    else if (name == "switch_insert") intersection() { union() { right_body(); button_cap_placed(); } hull() for (dz = [-12, 0]) translate([0, 0, dz]) hw_switch(); }
+    // the cap, then the switch, go straight into the pocket from the cavity (moving +Y)
+    else if (name == "cap_insert") intersection() { right_body(); union() for (dy = [-8 : 0.5 : 0]) translate([BUTTON_X, SW_TOP_Y + dy, BUTTON_Z]) button_cap(); }
+    else if (name == "switch_insert") intersection() { union() { right_body(); button_cap_placed(); } union() for (dy = [-8 : 0.5 : 0]) translate([0, dy, 0]) hw_switch(); }
     // the stack sits in the right half; the left half closes onto it moving +Y and the fork takes the
     // lever: relative to the slider, the lever comes in from +Y
     else if (name == "lever_insert") intersection() { power_slider(SLIDER_S); hull() for (dy = [0, 8]) translate([0, dy, 0]) hw_lever(false); }

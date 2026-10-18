@@ -3937,6 +3937,10 @@ del usuario y cómo quedaron en `hardware/case-via-clara/via_clara_v0_10.scad`:
   detrás de los nervios. Ahora tiene lugar (`AI_CAM_HOLDER`, a medir).
 - Como el flex ya no apoya en el piso de la nariz, la traba delantera recupera su par de abajo (6 trabas)
   y la perilla de la corredera crece a 9,1 mm de ancho.
+- **Botón.** El pulsador real es un 6 × 6 de 4 patas, de ~5 mm de alto, y no pasaba (el cajón estaba
+  pensado para un SMD de 2,5 que entraba deslizando desde abajo). Ahora va en un bolsillo abierto hacia
+  adentro: la tecla, con brida rectangular, y el pulsador entran derecho, y una gota de pegamento lo
+  fija. Las patas se recortan a 1,5 mm. La cara de la Pi se modela más baja en el centro (`PI_PARTS_LOW`).
 - Nueva verificación `stack_insert` (el conjunto bajando a las almohadillas). Las 15 verificaciones y
   las de cada pieza pasan.
 

@@ -21,6 +21,7 @@ cabeza, el ancho total es 32,5. Las medidas no cuentan el brazo del auricular.
 | Hubo que cortar el extremo trasero con una Dremel: la microSD no entraba | Atrás hay un **lugar para la tarjeta** a la altura de la Pi: 3,5 de tarjeta afuera del borde (`SD_CARD_OUT`, medir) + 1,0 de luz |
 | Paredes demasiado gruesas | Costados de **1,6** (antes 2,2), arriba y abajo de **2,4** (antes 2,7; ahí viven las vigas de las trabas). La cavidad sigue al conjunto real. Las mitades llevan entre 14 y 22 % menos plástico |
 | La cámara quedaba con la imagen girada 90° respecto de lo que ve el usuario | La cámara **gira 90° en su plano**: el conector del flex queda en el costado, hacia la Pi, y no abajo. Además el flex va derecho al CSI, sin retorcerse. Si la imagen sale cabeza abajo, se corrige por software (rotación de 180° en libcamera) |
+| El pulsador real (6 × 6 de 4 patas, ~5 mm de alto) y la tecla no pasaban por el cajón, pensado para un SMD de 2,5 que entraba deslizando desde abajo | El pulsador va en un **bolsillo abierto hacia adentro** de la mitad derecha: primero se apoya la tecla, que tiene una brida rectangular que pasa por el bolsillo, y después el pulsador encima. Los dos entran derecho, sin deslizar. El bolsillo ajusta sobre el cuerpo del pulsador y deja lugar a las patas, y una gota de pegamento caliente lo fija |
 | El soporte cuadrado del lente no entraba en el espacio frente a la cámara, y hubo que poner la cámara detrás de los nervios | Frente al PCB hay **lugar para el soporte cuadrado**: 12,0 de lado y 4,6 de alto por defecto (`AI_CAM_HOLDER`, medir). El agujero del lente es más grande (Ø 6,75) |
 
 Además, como el flex ya no apoya en el piso de la nariz:
@@ -42,7 +43,8 @@ va primero:
 | `BOARD_GAP` | de la cara superior de la HAT a la cara inferior de la Pi | 11,3 | en la v0.9 entró bien |
 | `LEVER_Y`, `LEVER_TRAVEL`, `SW_BODY_H` | altura de la palanca sobre la HAT, su recorrido y el alto de la carcasa de la llave | 2–5 / 3,3 / 7 | la horquilla no agarra la palanca o no la lleva hasta el final |
 | `PI_PORT_OVERHANG` | cuánto sobresalen el mini HDMI y los micro USB del borde de la Pi | 0,8 | si es más de 0,9, tocan la pared de abajo |
-| `SWITCH_T` | alto total del pulsador con el actuador | 2,5 | el botón queda flojo o siempre apretado |
+| `SWITCH_T` | alto total del pulsador de 6 × 6, con el actuador (los hay de 4,3 y de 5,0) | 5,0 | el botón queda flojo o siempre apretado |
+| `PI_PARTS_LOW` | lo más alto de la cara de la Pi debajo del botón (el chip del centro) | 1,6 | las patas recortadas del pulsador quedan a 0,5 de la Pi |
 | `TRANSDUCER_SIZE` | el transductor óseo | 14,0 | — |
 
 Antes de imprimir la carcasa entera, conviene imprimir sólo la **nariz** (cortar en x < −25 en el
@@ -110,7 +112,7 @@ menores, la carcasa se achica sola.
 | Interruptor accesible | **corredera impresa** (pieza 05): una perilla de **9,1 × 4 mm**, 1,5 en relieve, con tres estrías y un **punto en relieve que marca el lado ON**. Asoma por una ventana adelante en la cara cabeza, y una horquilla toma la palanca de la llave de punta a punta: ON abajo, OFF arriba |
 | Carga | canal en la pared trasera a la altura del micro USB de la HAT, para la ficha moldeada |
 | microSD | **queda adentro**: es sólo para el equipo, y para sacarla se abre la carcasa. Atrás tiene lugar de sobra |
-| Un solo botón | **botón de modos** en la cara externa, con un **anillo en bajorrelieve** para encontrarlo al tacto. La tecla y el pulsador SMD 6 × 6 × 2,5 suben por el cajón desde adentro; una gota de pegamento fija el pulsador |
+| Un solo botón | **botón de modos** en la cara externa, con un **anillo en bajorrelieve** para encontrarlo al tacto. La tecla y el pulsador de 6 × 6 de 4 patas entran derecho desde adentro en su bolsillo (verificaciones `cap_insert` y `switch_insert`); una gota de pegamento caliente fija el pulsador |
 | Auricular óseo, 14 mm | 14 nominales + 0,2 de holgura por lado. El brazo es pieza aparte y sigue a la cara cabeza |
 | Canal para el elástico | **dos puentes** en la cara cabeza, para un elástico plano de 6 mm |
 
@@ -118,9 +120,11 @@ menores, la carcasa se achica sola.
 
 Ahora el conjunto va en la **mitad derecha** (la externa). Hay que poner primero el botón, que queda debajo de la Pi.
 
-1. **Botón.** En la mitad derecha, apoyada sobre su cara externa, subir la tecla por el cajón, con la
-   brida hacia adentro, y empujarla hasta que la cabeza salga por su agujero. Después subir el pulsador
-   hasta el fondo del cajón y fijarlo con una gota de pegamento. Soldar sus cables al GPIO de la Pi.
+1. **Botón.** Cortar las cuatro patas del pulsador a ~1,5 mm y soldarle los cables saliendo **de costado**,
+   no hacia abajo, porque debajo está la Pi. En la mitad derecha, apoyada sobre su cara externa, dejar
+   caer la tecla en su bolsillo, con la cabeza hacia el agujero, y después el pulsador encima, con el
+   actuador hacia la tecla y las patas a los costados largos del bolsillo. Fijarlo con una gota de
+   pegamento caliente en los bordes. Los cables van al GPIO de la Pi.
 2. **Electrónica.** Bajar el conjunto HAT + batería + Pi entero, **con la Pi hacia abajo**, sobre la
    mitad derecha. Los cuatro separadores hexagonales entran en las almohadillas (verificación
    `stack_insert`).
