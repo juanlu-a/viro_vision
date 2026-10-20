@@ -388,6 +388,13 @@ Banderas: `--bus-model`, `--bus-labels`, `--announcements`, `--bus-catalog`, y `
 apagar el modo. `--announcements` gobierna las dos carpetas: los clips de ómnibus salen de la raíz y
 los de sistema de su subcarpeta `system/`.
 
+**Zoom sobre el cartel** (2026-10-19, ADR 0006): en modo ómnibus el ISP recorta el sensor alrededor
+del cartel detectado, para que el OCR reciba píxeles reales y no un borrón reescalado. El detector sigue
+viendo el campo completo. `--no-bus-zoom` lo apaga, para comparar. `--bus-full-res` pone el sensor en
+4056×3040: zoom de hasta 4x en lugar de ~2x, con menos cuadros por segundo y más memoria. El journal
+dice el modo del sensor al arrancar la cámara (`camera ready: … (mode 2028x1520)`), el zoom máximo al
+entrar al modo (`zoom on the sign up to …`) y el zoom vigente en cada latido (`… zoom 1.9x`).
+
 Los avisos de sistema se generan **acá** y no junto a los de ómnibus a propósito: los de ómnibus
 salen del catálogo de la STM y cambian cuando cambia el catálogo; éstos salen de las cadenas de la
 app (`app/src/features/audio/notices.ts`) y cambian cuando cambia la app. Los nombres de archivo

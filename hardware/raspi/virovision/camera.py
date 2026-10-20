@@ -23,6 +23,10 @@ JPEG_QUALITY = 70
 WATCH_FPS = 15.0
 """Frames per second asked of the sensor in bus mode. The IMX500 runs yolo11n at about that rate, and
 asking for more only adds frames the Pi drops."""
+FULL_RES_BUFFERS = 4
+"""Buffers when the sensor runs at full resolution (`full_res=True`). Each raw one is ~15 MB instead of
+~4 MB, and eight of them is a quarter of a 512 MB board; the frame loop holds one at a time and copies
+what it keeps, so four are enough."""
 # A normal capture takes 200-500 ms; 8 s is "something jammed", not "it is slow". The app waits 20.
 CAPTURE_TIMEOUT_S = 8.0
 CLOSE_TIMEOUT_S = 10.0
@@ -47,8 +51,18 @@ class CameraNotReady(RuntimeError):
 
 
 class Camera:
-    def __init__(self, long_side: int = MAX_LONG_SIDE, quality: int = JPEG_QUALITY, model: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        long_side: int = MAX_LONG_SIDE,
+        quality: int = JPEG_QUALITY,
+        model: Optional[Path] = None,
+        full_res: bool = False,
+    ) -> None:
         self._long_side = long_side
+        # Run the sensor in its 4056x3040 mode instead of the 2x2-binned one picamera2 picks for a
+        # 1024 px stream. Only bus mode's zoom gains from it (up to 4x of real detail instead of 2x),
+        # and it costs frame rate and memory, so it is a flag to measure in the field (2026-10-19).
+        self._full_res = full_res
         self._quality = quality
         self._model = model
         self._picam = None
@@ -107,20 +121,23 @@ class Camera:
                 # One preview configuration serves both uses: bus mode reads its frames and their
                 # metadata, and `capture_jpeg` still encodes the same main stream for the phone.
                 # RGB888 leaves the channels in BGR memory order, which is what OpenCV expects.
+                extra = {"raw": {"size": (width, height)}} if self._full_res else {}
                 picam.configure(
                     picam.create_preview_configuration(
                         main={"size": size, "format": "RGB888"},
                         controls={"FrameRate": WATCH_FPS},
-                        buffer_count=8,
+                        buffer_count=FULL_RES_BUFFERS if self._full_res else 8,
+                        **extra,
                     )
                 )
             picam.options["quality"] = self._quality
             picam.start()
             self._picam = picam
             log.info(
-                "camera ready: sensor %dx%d → %dx%d, JPEG q%d%s",
+                "camera ready: sensor %dx%d (mode %s) → %dx%d, JPEG q%d%s",
                 width,
                 height,
+                "x".join(str(v) for v in picam.camera_configuration().get("raw", {}).get("size", ("?",))),
                 *size,
                 self._quality,
                 ", detector in the sensor" if self._imx500 is not None else "",
@@ -182,6 +199,32 @@ class Camera:
         which is the frame the banner gets cropped from. The ISP crop and scale live in the metadata,
         so this cannot be done with a plain multiplication."""
         return self._imx500.convert_inference_coords(coords, metadata, self._picam)
+
+    def zoom_bounds(self) -> Optional[tuple]:
+        """(full crop, smallest useful crop size, frame size) for bus mode's zoom (`zoom.py`), or None
+        without a camera. The full crop is `ScalerCropMaximum`: what the frame shows with no zoom. The
+        smallest useful crop is where one frame pixel is one pixel of the sensor mode: the binned mode
+        has half the sensor's pixels, so it allows half the zoom of the full one."""
+        picam = self._picam
+        if picam is None:
+            return None
+        config = picam.camera_configuration()
+        frame_w, frame_h = config["main"]["size"]
+        raw_w, raw_h = config["raw"]["size"]
+        sensor_w, sensor_h = picam.sensor_resolution
+        full = tuple(int(v) for v in picam.camera_properties["ScalerCropMaximum"])
+        return full, (frame_w * sensor_w / raw_w, frame_h * sensor_h / raw_h), (frame_w, frame_h)
+
+    def set_zoom(self, crop: Optional[tuple]) -> None:
+        """Asks the ISP for this crop of the sensor (None: no zoom). It takes effect a couple of frames
+        later; each frame's metadata says which crop it really has. The detector in the sensor is not
+        affected: its input region is a separate control."""
+        picam = self._picam
+        if picam is None:
+            return
+        if crop is None:
+            crop = tuple(picam.camera_properties["ScalerCropMaximum"])
+        picam.set_controls({"ScalerCrop": tuple(int(v) for v in crop)})
 
     def capture_jpeg(self, timeout_s: float = CAPTURE_TIMEOUT_S) -> bytes:
         """Blocking (~200-500 ms on the Zero 2 W): call it from an executor.

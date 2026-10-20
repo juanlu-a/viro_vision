@@ -69,6 +69,12 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--announcements", type=Path, default=BUS_DEFAULT_ANNOUNCEMENTS, help="folder with the pre-recorded .wav")
     parser.add_argument("--bus-catalog", type=Path, default=BUS_DEFAULT_CATALOG, help="CSV number,destination used to fix the OCR")
     parser.add_argument("--no-bus", action="store_true", help="do not load the detector nor watch in bus mode")
+    parser.add_argument("--no-bus-zoom", action="store_true", help="bus mode reads the sign from the whole view, without zooming on it")
+    parser.add_argument(
+        "--bus-full-res",
+        action="store_true",
+        help="run the sensor at 4056x3040 so bus mode can zoom up to 4x instead of 2x (fewer frames per second, more memory)",
+    )
     parser.add_argument("--evidence-dir", type=Path, default=EVIDENCE_DEFAULT_DIR, help="where bus mode keeps the frame of each bus and the crop of each OCR read")
     parser.add_argument("--no-evidence", action="store_true", help="do not keep bus mode's frames and crops on the card")
     parser.add_argument("--no-button", action="store_true", help="do not use the physical button (modes come in over BLE only)")
@@ -117,7 +123,7 @@ async def _main(args: argparse.Namespace) -> None:
     relay = LogRelay()
     logging.getLogger().addHandler(relay)
 
-    camera = Camera(model=None if args.no_bus else args.bus_model)
+    camera = Camera(model=None if args.no_bus else args.bus_model, full_res=args.bus_full_res and not args.no_bus)
     # The camera is NOT started here: it starts in the background once the board is advertising
     # (`_bring_camera_up`, below). Loading the detector into the IMX500 takes about a minute after a
     # boot, and while it ran here the board was invisible to every phone; any hang in it left the board
@@ -253,6 +259,7 @@ async def _main(args: argparse.Namespace) -> None:
             labels=labels,
             signs_only=signs_only,
             evidence=None if args.no_evidence else Evidence(args.evidence_dir, emit=service.core.emit_event),
+            zoom=not args.no_bus_zoom,
         )
         service.core.attach_bus(bus_watcher)
 

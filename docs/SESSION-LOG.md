@@ -3916,3 +3916,35 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 el voladizo de los conectores de la Pi, el pulsador, el transductor); imprimir primero la parte trasera y la nariz
 como prueba; confirmar que la perilla de la llave se alcanza con los lentes puestos; decidir si la rama
 vieja `feat/carcasa-modelo-3d` (v1) se archiva.
+
+## 2026-10-19 — Zoom digital sobre el cartel en modo ómnibus
+
+- **Prueba de campo del modo ómnibus** (el usuario): con buena toma el cartel se detecta y el catálogo
+  corrige bien, y el supermercado anda perfecto. El problema es la distancia. El ómnibus se detecta de
+  lejos, pero el cartel o no aparece o sale borroso, y sólo se lee con el ómnibus prácticamente encima.
+  Eso es tarde si no para en la parada. Las mejores lecturas fueron con el ómnibus quieto en un semáforo.
+- **Diagnóstico en el código**: el stream de donde sale el recorte es de 1024 px sobre un sensor de
+  4056; el OCR recibe un cartel de pocos píxeles que `bus_banner.crop` sólo reescala. En el fuente de
+  picamera2 se confirmó que la zona de entrada del detector del IMX500 es un control propio
+  (`set_inference_roi_abs`, fijado al sensor entero), separado del `ScalerCrop` del ISP, y que
+  `convert_inference_coords` usa el `ScalerCrop` de cada frame.
+- **Decisión** (ADR 0006, actualización 2026-10-19): zoom digital **dinámico** con `ScalerCrop`,
+  centrado en el cartel más ancho, hasta que el cartel mide ~64 px de alto y nunca más de la mitad del
+  ancho del frame; se sostiene 1,5 s si el detector pierde el cartel y después vuelve a 1x. El usuario
+  aceptó perder campo de visión ("si se mira hacia donde viene el ómnibus el campo ya es muy amplio")
+  mientras no agregue una latencia palpable.
+- **Implementación** (rama `feat/bus-dynamic-zoom`, sólo en ViroVision; el repo de Magalí no se toca):
+  `virovision/zoom.py` (geometría pura y controlador), `Camera.zoom_bounds`/`set_zoom` y la opción
+  `--bus-full-res`. En `bus.py` el tracker recibe las cajas en el **campo completo** y el `Watcher`
+  recibe un `ZoomedFrame`. El lector traduce la caja al frame con zoom; si el zoom cortó el cartel, no
+  lee y no descuenta el intento. El umbral de altura del cartel se ajusta al zoom de cada frame.
+  `--no-bus-zoom` apaga el zoom para comparar. Tests: `test_zoom.py`, más casos en `test_bus.py` y
+  `test_camera.py` (192 pasan).
+- Detalle que destapó un test: el frame real es de 1024×**766**, no 768. La geometría usa escalas
+  separadas en x e y, así que no la afecta.
+
+**Pendiente**: probar en la placa. Verificar que `ScalerCrop` no altere la inferencia y medir cuántos
+frames tarda en aplicarse el recorte. Verificar `ScalerCropMaximum` en el modo agrupado. Medir la
+memoria y los cuadros por segundo con `--bus-full-res`. En la calle, comparar con y sin zoom la
+distancia a la que se anuncia la línea. Si el cuello resulta ser el detector, que no ve el cartel de
+lejos, encarar la fase 2: mover también la zona de entrada del detector.

@@ -9,6 +9,7 @@ daemon sees when `bus_banner` is not installed.
 """
 
 import asyncio
+import dataclasses
 import inspect
 import json
 import types
@@ -849,3 +850,172 @@ def test_a_frame_released_after_stop_is_not_processed(monkeypatch):
     watcher._watcher = FakeWatcher()
     watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
     assert released == [1] and processed == []
+
+
+IMAGE = types.SimpleNamespace(shape=(768, 1024, 3))
+"""All of a frame the zoom looks at: its shape. numpy is not in the Mac's environment."""
+
+
+class ZoomingCamera:
+    """A camera whose ISP crop follows `set_zoom` from the next frame on, like the real one (a bit
+    sooner: the real one takes a couple of frames)."""
+
+    FULL = (0, 0, 4056, 3040)
+
+    def __init__(self, frames, sign):
+        self.sensor = types.SimpleNamespace(get_outputs=lambda metadata: metadata, get_input_size=lambda: (640, 640))
+        self.crop = self.FULL
+        self.zooms: list = []
+        self.mapped_with: list = []
+        self._frames = frames
+        self._sign = sign  # normalized (y1, x1, y2, x2): where the sensor sees the sign
+        self.on_last_frame = lambda: None
+
+    def zoom_bounds(self):
+        return self.FULL, (2048, 1536), (1024, 768)
+
+    def set_zoom(self, crop):
+        self.zooms.append(crop)
+        self.crop = crop if crop is not None else self.FULL
+
+    def capture_request(self):
+        if self._frames == 0:
+            self.on_last_frame()
+            raise RuntimeError("closed by stop")
+        self._frames -= 1
+        crop = self.crop
+
+        class Request:
+            def get_metadata(self):
+                return {"ScalerCrop": crop, "sign": True}
+
+            def make_array(self, name):
+                return IMAGE
+
+            def release(self):
+                pass
+
+        return Request()
+
+    def to_stream(self, coords, metadata):
+        """`convert_inference_coords` with no zoom: the full view."""
+        self.mapped_with.append(metadata["ScalerCrop"])
+        y1, x1, y2, x2 = coords
+        return (x1 * 1024, y1 * 768, (x2 - x1) * 1024, (y2 - y1) * 768)
+
+
+def _fake_pipeline_with_signs(monkeypatch, sign):
+    """`bus_banner` faked: the sensor reports one sign at `sign` (normalized y1, x1, y2, x2)."""
+
+    @dataclasses.dataclass(frozen=True)
+    class Box:
+        x1: float
+        y1: float
+        x2: float
+        y2: float
+        width = property(lambda self: self.x2 - self.x1)
+        height = property(lambda self: self.y2 - self.y1)
+        area = property(lambda self: self.width * self.height)
+        aspect = property(lambda self: self.width / self.height)
+
+        def clip(self, width, height):
+            return Box(max(0, self.x1), max(0, self.y1), min(width, self.x2), min(height, self.y2))
+
+    def detections_from_tensors(outputs, labels, *, to_stream, **kwargs):
+        x, y, w, h = to_stream(*sign)
+        return [types.SimpleNamespace(label="bus_sign", box=Box(x, y, x + w, y + h), conf=0.9)]
+
+    imx500 = types.ModuleType("bus_banner.imx500")
+    imx500.detections_from_tensors = detections_from_tensors
+    monkeypatch.setitem(sys.modules, "bus_banner", types.ModuleType("bus_banner"))
+    monkeypatch.setitem(sys.modules, "bus_banner.imx500", imx500)
+    return Box
+
+
+def test_bus_mode_zooms_on_the_sign_and_reads_it_from_the_zoomed_frame(monkeypatch):
+    """Field test of 2026-10-19: the sign was ~9 px tall in the 1024 px frame until the bus was almost
+    in front of the user. The tracker keeps seeing the whole view —its boxes do not jump when the zoom
+    moves— and only the crop handed to the OCR is translated into the zoomed frame."""
+    from virovision.bus import MIN_BANNER_HEIGHT_PX, ZoomedFrame
+
+    sign = (0.40, 0.50, 0.4130, 0.55)  # ~10 px tall at 768, a bus far away
+    _fake_pipeline_with_signs(monkeypatch, sign)
+    camera = ZoomingCamera(frames=3, sign=sign)
+    seen: list = []
+
+    class FakeWatcher:
+        tracker = types.SimpleNamespace(tracks=[])
+        min_banner_height_px = MIN_BANNER_HEIGHT_PX
+
+        def process(self, frame, detections, frame_number):
+            seen.append((frame, detections[0].box, self.min_banner_height_px))
+            return []
+
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None)
+    camera.on_last_frame = watcher._stop.set
+    watcher._watcher = FakeWatcher()
+    watcher._settings = {"labels": ["bus_sign"], "normalize": False, "order": None}
+    watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
+
+    assert camera.zooms and camera.zooms[0][2] == 2048, "zoomed on the sign, as far as the binned mode goes"
+    assert set(camera.mapped_with) == {ZoomingCamera.FULL}, "the tracker's boxes always come in the full view"
+    (_, before, threshold_before), (zoomed, after, threshold_after) = seen[0], seen[1]
+    assert before == after, "the zoom moved and the tracker did not notice"
+    assert isinstance(zoomed, ZoomedFrame) and zoomed.view.zoom > 1.9
+    assert threshold_after < threshold_before, "a sign is judged by its height in the zoomed frame"
+
+    # The reader, handed that frame: the job carries the plain array and the box where it is in it.
+    track = types.SimpleNamespace(id=1, read_attempts=1)
+    watcher._watcher.tracker.tracks = [track]
+    watcher._watcher.reading_track = 1
+    watcher._queue_read(zoomed, after, None)
+    image, banner, _, track_id, _ = watcher._jobs.get_nowait()
+    assert image is zoomed.image and track_id == 1
+    assert abs(banner.height - after.height * zoomed.view.zoom) < 0.5, "read from real pixels, not upscaled ones"
+
+
+def test_a_sign_the_zoom_cut_is_not_read_and_costs_no_attempt(monkeypatch):
+    from virovision.bus import SKIPPED, ZoomedFrame
+    from virovision.zoom import View
+
+    Box = _fake_pipeline_with_signs(monkeypatch, (0, 0, 0, 0))
+    watcher = BusWatcher(ZoomingCamera(frames=0, sign=None), lambda files: None, lambda event: None)
+    track = types.SimpleNamespace(id=7, read_attempts=3)
+    submitted = []
+    watcher._watcher = types.SimpleNamespace(
+        tracker=types.SimpleNamespace(tracks=[track]),
+        reading_track=7,
+        submit_reading=lambda *args: submitted.append(args),
+    )
+    view = View((2028, 0, 2028, 1520), ZoomingCamera.FULL, (1024, 768))  # the right upper quarter
+    frame = ZoomedFrame(IMAGE, view)
+
+    assert watcher._queue_read(frame, Box(480, 100, 560, 120), None) is None  # half of it is left of the crop
+    assert watcher._jobs.empty(), "no OCR on half a sign"
+    assert track.read_attempts == 2, "the attempt the watcher counted never happened"
+    assert watcher._results.get_nowait() == (7, SKIPPED, 0, None)
+
+    watcher._results.put((7, SKIPPED, 0, None))
+    watcher._drain_results(10, watcher._results, watcher._watcher)
+    assert submitted == [(7, None, 10)], "the track is free for the next frame"
+
+
+def test_leaving_bus_mode_undoes_the_zoom():
+    """The camera is shared with supermarket mode: its next photo must show the whole view."""
+    camera = ZoomingCamera(frames=0, sign=None)
+    camera.crop = (2028, 0, 2028, 1520)
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None)
+    watcher.running = True
+    watcher.stop()
+    assert camera.zooms == [None] and camera.crop == ZoomingCamera.FULL
+
+
+def test_bus_mode_can_be_told_not_to_zoom(monkeypatch):
+    _fake_pipeline_with_signs(monkeypatch, (0.40, 0.50, 0.4130, 0.55))
+    camera = ZoomingCamera(frames=2, sign=None)
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None, zoom=False)
+    camera.on_last_frame = watcher._stop.set
+    watcher._watcher = types.SimpleNamespace(tracker=types.SimpleNamespace(tracks=[]), process=lambda *a: [])
+    watcher._settings = {"labels": ["bus_sign"], "normalize": False, "order": None}
+    watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
+    assert camera.zooms == []
