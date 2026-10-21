@@ -5,7 +5,7 @@
 # Exits non-zero if any export fails or any check does not pass.
 set -euo pipefail
 cd "$(dirname "$0")"
-SCAD=via_clara_v0_10.scad
+SCAD=via_clara_v0_11.scad
 OS=(openscad -q --backend=manifold)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -18,7 +18,7 @@ join() { local f=0; for p in "${pids[@]}"; do wait "$p" || f=1; done; pids=(); r
 parts=(print_left:01_left_half print_right:02_right_half print_bone:03_bone_arm
        print_button:04_mode_button print_slider:05_power_slider assembly:00_assembly_check)
 for p in "${parts[@]}"; do
-  run "${OS[@]}" --export-format=binstl -D "PART=\"${p%%:*}\"" -D 'SHOW_HW=false' -o "stl/${p#*:}_v0_10.stl" "$SCAD"
+  run "${OS[@]}" --export-format=binstl -D "PART=\"${p%%:*}\"" -D 'SHOW_HW=false' -o "stl/${p#*:}_v0_11.stl" "$SCAD"
 done
 join || { echo "STL export failed"; exit 1; }
 
@@ -53,7 +53,7 @@ for g in "${guide_views[@]}"; do
   IFS=, read -r dx dy dz <<<"$dir"
   eye=$(python3 -I -c "import math;d=[$dx,$dy,$dz];n=math.sqrt(sum(c*c for c in d));print(','.join(f'{$cx+$scale*d[0]/n:.2f}' if i==0 else f'{$scale*d[1]/n:.2f}' if i==1 else f'{-2+$scale*d[2]/n:.2f}' for i in range(3)))")
   run openscad -q -D 'PART="none"' -D "VIEW=\"$view\"" -D "CENTER_X=$cx" -D "MESH_DIR=\"$tmp/mesh\"" --projection=o --camera="$eye,$cx,0,-2" \
-    --imgsize=1800,1000 --colorscheme=Tomorrow -o "img/guide/$view.png" via_clara_v0_10_guide.scad
+    --imgsize=1800,1000 --colorscheme=Tomorrow -o "img/guide/$view.png" via_clara_v0_11_guide.scad
 done
 join || { echo "guide render failed"; exit 1; }
 
@@ -82,9 +82,9 @@ else:
 fail=0
 for p in "${parts[@]}"; do
   [[ ${p%%:*} == assembly ]] && continue
-  n=$(python3 -I -c "$stl_py" parts "stl/${p#*:}_v0_10.stl")
+  n=$(python3 -I -c "$stl_py" parts "stl/${p#*:}_v0_11.stl")
   if [[ "$n" == "1" ]]; then echo "ok    ${p#*:} is one solid"; else echo "FAIL  ${p#*:}: $n separate solids"; fail=1; fi
-  z=$(python3 -I -c "$stl_py" zmin "stl/${p#*:}_v0_10.stl")
+  z=$(python3 -I -c "$stl_py" zmin "stl/${p#*:}_v0_11.stl")
   if [[ "$z" =~ ^-?0\.0[0-4][0-9]$ ]]; then echo "ok    ${p#*:} sits on the bed"; else echo "FAIL  ${p#*:}: lowest point at z = $z"; fail=1; fi
 done
 

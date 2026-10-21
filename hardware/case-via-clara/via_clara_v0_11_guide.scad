@@ -1,14 +1,14 @@
-// VIA Clara v0.10 — annotated assembly guide: arrows and labels saying what each part, slot and hole
+// VIA Clara v0.11 — annotated assembly guide: arrows and labels saying what each part, slot and hole
 // is for. Renders to images (see export.sh); it is not a printable part.
 // Labels are in Spanish because people read them; the code is in English (ADR 0009).
 //
 // VIEW = outer | head | left_inside | right_inside | exploded
 // Render with an orthographic projection and the eye along view_dir(VIEW), for example:
-//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_10_guide.scad
+//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_11_guide.scad
 
 // Always render with -D 'PART="none"' (export.sh does): the model's own dispatch must draw nothing.
 // Setting PART here would not work, because the included file reassigns it.
-include <via_clara_v0_10.scad>
+include <via_clara_v0_11.scad>
 
 VIEW = "head";                   // set with -D
 // export.sh renders the parts once to meshes in the model frame and passes their folder here: preview
@@ -129,6 +129,7 @@ function items(v) =
         [[BUTTON_X + 5.2, RIGHT_FACE - 0.3, BUTTON_Z - 1.5], "Anillo para encontrar el botón"],
         [[STACK_REAR_X + 6, HAT_TOP_Y + 1.5, (USB_Z[0] + USB_Z[1]) / 2], "Carga (micro USB)"],
         [[40.5, 0, -4], "Ranura para abrir"],
+        [[STACK_REAR_X + 4.5, PI_TOP_Y + 1, SD_ZC], "microSD: entra y sale por acá"],
         [[-20, 0, 18.6], "Junta entre mitades"],
         [[NOSE_X + 1, 8, LENS_Z + 6], "Nariz: cámara adentro"],
         [TRANSDUCER_CENTER + [0, 0, 8], "Brazo del auricular"]] :
@@ -147,8 +148,8 @@ function items(v) =
         [[29, -CAV_HY, -0.5], "Paso del cable del auricular"],
         [[STACK_REAR_X + 3, HAT_TOP_Y + 1.5, -6.5], "Canal de carga"],
         [[-12, -2, CAV_HZ + 1.0], "Ranura donde engancha la traba"],
-        [[38.6, -1.5, 12.5], "Agujero del perno"],
-        [[0, -CAV_HY, -6], "Lado de la HAT: sólo cabezas de tornillo"]] :
+        [[0, -CAV_HY, -6], "Lado de la HAT: sólo cabezas de tornillo"],
+        [[STACK_REAR_X + 3, -2, 12], "Extremo trasero hueco"]] :
     v == "right_inside" ? [
         [[PI_CX - PI_HOLE_X, PAD_MOUTH_Y - 0.4, PI_HOLE_Z], "Almohadilla: separador hexagonal (x4)"],
         [[PI_CX + PI_HOLE_X, PAD_MOUTH_Y - 0.4, -PI_HOLE_Z], "Collar que se derrite con el soldador"],
@@ -158,8 +159,7 @@ function items(v) =
         [[BUTTON_X, SW_BASE_Y + 1, BUTTON_Z + 3.4], "Bolsillo del pulsador (entra desde adentro)"],
         [[-38.5, 1, 0], "Nervios de la cámara"],
         [[-36, CHAMBER_HY - 1, 0], "Recorrido del flex (lado de la Pi)"],
-        [[STACK_REAR_X + 2.5, PI_TOP_Y + 1, SD_ZC], "Lugar para la microSD"],
-        [[38.6, -2.6, -12.5], "Perno de alineación"]] :
+        [[STACK_REAR_X + 4, PI_TOP_Y + 1, SD_ZC], "microSD: entra y sale por atrás"]] :
     [
         [[-42.4, CAM_Y0, 12], "AI Camera (conector hacia la Pi)"],
         [[hat_x(26), HAT_TOP_Y + 4, 15], "UPS HAT + batería"],

@@ -3949,3 +3949,26 @@ sobresale la microSD y el soporte del lente, y con eso imprimir primero la nariz
 carpeta `modelo_3d` del Drive de ViroVision: quedó pendiente porque el Chrome conectado no tenía esa
 cuenta.
 
+## 2026-10-21 — Carcasa v0.11: lo que mostró la impresión de la v0.10
+
+La v0.10 impresa salió mal ("espantoso"). Lo que falló y cómo quedó en `via_clara_v0_11.scad`:
+
+- **Ventana de la llave demasiado larga.** El usuario quería que calzara justo con el switch: ahora mide
+  4,2 × 7,4, frente a la palanca, y la perilla de la corredera 3,8 × 3.
+- **Las guías de la cámara no se podían imprimir** (nervios de 0,65 y de aplastamiento de 0,6, aun con
+  la calidad al máximo). Ahora son nervios de 1,2 con 0,3 de luz, sin nervios de aplastamiento.
+- **El botón chocaba con el disipador** de la Pi (14 × 14 × 5, el usuario lo quiere mantener). El botón
+  pasó a x −14, y el disipador entró al modelo y a las verificaciones.
+- **La microSD estaba en espejo** (el slot no está centrado en el borde de la Pi). Se corrigió de lado, y
+  el espacio ahora se abre por el extremo trasero para sacar y poner la tarjeta.
+- **El brazo del auricular no entraba**: su tubo arrancaba 0,6 adentro del zócalo y los topes de la
+  ficha trababan. Se corrió el tubo, se sacaron los topes y la ficha tiene 0,35 de luz por lado.
+- **Seguía grande y con relleno en los extremos.** La nariz quedó 5,3 mm más corta (la cámara se acercó
+  a la Pi, con 3,2 mm para que el flex baje al CSI) y 2 mm más baja; el extremo trasero es una cáscara de
+  1,6. El cuerpo quedó en 86,2 × 28,7 × 36,6.
+- Error mío del proceso: mandé a imprimir la v0.10 con medidas supuestas sin confirmar. Las verificaciones
+  pasaban contra maquetas, pero las maquetas no tenían el disipador ni el pulsador real.
+
+**Pendiente**: confirmar las medidas de la tabla del README (separadores sobre la Pi, disipador,
+microSD, soporte del lente, pulsador) antes de imprimir; imprimir primero la nariz como prueba.
+

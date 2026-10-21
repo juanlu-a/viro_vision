@@ -1,19 +1,31 @@
-# Carcasa VIA Clara v0.10 — dos mitades con cierre a presión
+# Carcasa VIA Clara v0.11 — dos mitades con cierre a presión
 
-Modelo paramétrico en **OpenSCAD** (`via_clara_v0_10.scad`) para la Raspberry Pi Zero 2 W con el header
+Modelo paramétrico en **OpenSCAD** (`via_clara_v0_11.scad`) para la Raspberry Pi Zero 2 W con el header
 soldado, la Waveshare UPS HAT (C) unida a su batería 803040, la Raspberry Pi AI Camera y el auricular
-de conducción ósea, montado sobre la patilla de los lentes. Es la v0.9 corregida con lo que mostró su
-primera impresión (2026-10-17). La v0.8 (`via_clara_v0_8.scad`) se conserva como referencia.
+de conducción ósea, montado sobre la patilla de los lentes. Es la tercera versión impresa: corrige lo que
+mostraron las impresiones de la v0.9 (2026-10-17) y de la v0.10 (2026-10-21). La v0.8 (`via_clara_v0_8.scad`) se conserva como referencia.
 Para regenerar todo, correr `./export.sh`: arma los STL, las imágenes y las verificaciones, y sale con
 error si algo falla.
 
 ![Explotada, con las placas y la cámara](img/exploded_with_hardware.png)
 
-**Medidas exteriores: 92,9 × 28,7 × 36,6 mm** (largo × ancho × alto) del cuerpo. La v0.9 medía
-91,9 × 31,4 × 37,6. Con los puentes del elástico y el zócalo del brazo, que sobresalen 3,8 de la cara
-cabeza, el ancho total es 32,5. Las medidas no cuentan el brazo del auricular.
+**Medidas exteriores: 86,2 × 28,7 × 36,6 mm** (largo × ancho × alto) del cuerpo; la nariz baja a 31,6
+de alto. La v0.10 medía 92,9 × 28,7 × 36,6, y la v0.9, 91,9 × 31,4 × 37,6. Con los puentes del elástico
+y el zócalo del brazo, que sobresalen 3,8 de la cara cabeza, el ancho total es 32,5. Las medidas no
+cuentan el brazo del auricular.
 
-## Qué cambió después de imprimir la v0.9
+## Qué cambió después de imprimir la v0.10
+
+| Lo que pasó en la impresión | v0.11 |
+|---|---|
+| La ventana de la llave de encendido era demasiado larga | La ventana tiene **el tamaño de la llave**: 4,2 × 7,4 mm, justo frente a la palanca (la parte que asoma de la palanca mide 3,9 y recorre 3,3). La perilla de la corredera (pieza 05) mide 3,8 × 3. La corredera sigue haciendo falta: la palanca queda ~7 mm hacia adentro de la cara |
+| Las guías de la cámara eran tan finas que la impresora no las podía reproducir | Nervios de **1,2 mm** (tres líneas de extrusión), 1,0 sobre el borde del PCB y 0,3 de luz. Sin nervios de aplastamiento |
+| El botón chocaba con el disipador de la Raspberry | El botón pasó a **x −14**, adelante, lejos del chip del medio. El disipador (14 × 14 × 5) está en el modelo y en las verificaciones |
+| La ranura de la microSD estaba en espejo | Se pasó al lado correcto, y ahora **se abre por el extremo trasero**: la tarjeta entra y sale con la carcasa cerrada |
+| El brazo del auricular no entraba: su tubo chocaba con el zócalo | El tubo arranca 0,4 mm afuera del zócalo, la ficha tiene 0,35 de luz por lado y no tiene los topes que trababan |
+| Seguía siendo grande y con mucho relleno en los extremos | La cámara se acercó a la Pi y la nariz quedó **5,3 mm más corta** y 2 mm más baja (y el extremo trasero, 1,4 más corto). El extremo trasero, que era casi macizo, ahora es una cáscara de 1,6. Sin los pernos traseros: alinean los labios |
+
+## Lo que cambió en la v0.10
 
 | Lo que pasó en la impresión | v0.10 |
 |---|---|
@@ -27,7 +39,7 @@ cabeza, el ancho total es 32,5. Las medidas no cuentan el brazo del auricular.
 Además, como el flex ya no apoya en el piso de la nariz:
 
 - la traba delantera **vuelve a tener par abajo**: son 6 trabas;
-- la corredera ocupa todo el lugar detrás de la cámara y su perilla pasa de 4,4 a **9,1 mm de ancho**, mucho más fácil de encontrar al tacto.
+- la corredera ocupa todo el lugar detrás de la cámara y su perilla pasó de 4,4 a 9,1 mm de ancho (en la v0.11 se achicó otra vez, al tamaño de la llave).
 
 ## Antes de imprimir: medir con calibre
 
@@ -36,9 +48,10 @@ va primero:
 
 | Parámetro | Qué medir | Valor | Si está mal |
 |---|---|---|---|
+| `HEATSINK`, `HEATSINK_C` | el disipador de la Pi: tamaño y alto, y dónde está su centro | 14 × 14 × 5, a 25 del extremo de la microSD | el botón vuelve a chocar con él |
 | `HEX_H`, `HEX_AF` | los separadores hexagonales que asoman **sobre la Pi**: cuánto sobresalen de la cara de la Pi, y entre caras | 6,0 / 5,0 | no entran en la almohadilla o quedan flojos; si sobresalen más que el header (8,5), la carcasa se ensancha sola |
 | `SCREW_HEAD_H`, `SCREW_HEAD_D` | las cabezas de los tornillos bajo la HAT | 1,8 / 4,5 | tocan la pared del lado de la cabeza |
-| `SD_CARD_OUT` | cuánto sobresale la microSD del borde de la Pi (o cuánto se cortó con la Dremel) | 3,5 | la tarjeta vuelve a chocar atrás |
+| `SD_CARD_OUT`, `SD_ZC` | cuánto sobresale la microSD del borde de la Pi, y dónde está su centro | 3,5 / 1,9 | la ranura trasera no queda frente a la tarjeta |
 | `AI_CAM_HOLDER` | el soporte cuadrado del lente: lado, y cuánto sobresale de la cara del PCB | 12,0 / 4,6 | la cámara no llega a su ranura |
 | `BOARD_GAP` | de la cara superior de la HAT a la cara inferior de la Pi | 11,3 | en la v0.9 entró bien |
 | `LEVER_Y`, `LEVER_TRAVEL`, `SW_BODY_H` | altura de la palanca sobre la HAT, su recorrido y el alto de la carcasa de la llave | 2–5 / 3,3 / 7 | la horquilla no agarra la palanca o no la lleva hasta el final |
@@ -61,7 +74,7 @@ subcarpeta por versión. El repo guarda lo que los genera (`.scad` y `export.sh`
 ## Guía con flechas
 
 `img/guide/` tiene cinco vistas con flechas que dicen para qué es cada ranura, agujero y pieza. Las
-genera `export.sh` a partir de `via_clara_v0_10_guide.scad`:
+genera `export.sh` a partir de `via_clara_v0_11_guide.scad`:
 
 | Vista | Qué muestra |
 |---|---|
@@ -105,14 +118,14 @@ menores, la carcasa se achica sola.
 
 | Especificación | v0.10 |
 |---|---|
-| Sin tornillos, cierre por click | **6 trabas a presión**, 3 arriba y 3 abajo. Cada una es una **viga** de 6 a 10 mm que corre a lo largo de la junta, dentro de la pared de la mitad derecha. En la punta lleva un **gancho** que cruza la junta y cae en una ranura de la mitad izquierda: para abrir o cerrar, la viga flexiona ~0,35 mm, dentro del plano de la cama. Cada viga se imprime atada por un **puente en la ranura de su extremo, que hay que cortar después de imprimir**. Además hay un labio de alineación en el resto de la junta, 2 pernos atrás y una ranura para abrir con la uña |
-| Sin tapa de cámara | la cámara queda **dentro de las dos mitades**: el PCB entra en una **ranura** con nervios adelante y atrás, 0,15 de luz en los bordes y cuatro nervios de aplastamiento arriba y abajo. **Una sola abertura frontal**, centrada en el lente |
+| Sin tornillos, cierre por click | **6 trabas a presión**, 3 arriba y 3 abajo. Cada una es una **viga** de 6 a 10 mm que corre a lo largo de la junta, dentro de la pared de la mitad derecha. En la punta lleva un **gancho** que cruza la junta y cae en una ranura de la mitad izquierda: para abrir o cerrar, la viga flexiona ~0,35 mm, dentro del plano de la cama. Cada viga se imprime atada por un **puente en la ranura de su extremo, que hay que cortar después de imprimir**. Además hay un labio de alineación en el resto de la junta y una ranura atrás para abrir con la uña |
+| Sin tapa de cámara | la cámara queda **dentro de las dos mitades**: el PCB entra en una **ranura** con nervios de 1,2 adelante y atrás, que cubren 1,0 del borde, con 0,3 de luz. **Una sola abertura frontal**, centrada en el lente |
 | Flex de la cámara | sale del conector por el costado de la cámara que mira a la Pi, corre pegado a la pared externa y baja al CSI. Ese recorrido está reservado (verificación `flex`) |
 | Sin pines a través de la Raspberry | **4 almohadillas en la mitad derecha** reciben los separadores hexagonales que asoman sobre la Pi, y un **collar de plástico** se refunde sobre cada uno con el soldador. El collar queda a 3,4 mm de la Pi |
-| Interruptor accesible | **corredera impresa** (pieza 05): una perilla de **9,1 × 4 mm**, 1,5 en relieve, con tres estrías y un **punto en relieve que marca el lado ON**. Asoma por una ventana adelante en la cara cabeza, y una horquilla toma la palanca de la llave de punta a punta: ON abajo, OFF arriba |
+| Interruptor accesible | **corredera impresa** (pieza 05): una perilla de **3,8 × 3 mm** en una ventana del tamaño de la llave, 1,5 en relieve, con tres estrías y un **punto en relieve que marca el lado ON**. Asoma por una ventana adelante en la cara cabeza, y una horquilla toma la palanca de la llave de punta a punta: ON abajo, OFF arriba |
 | Carga | canal en la pared trasera a la altura del micro USB de la HAT, para la ficha moldeada |
-| microSD | **queda adentro**: es sólo para el equipo, y para sacarla se abre la carcasa. Atrás tiene lugar de sobra |
-| Un solo botón | **botón de modos** en la cara externa, con un **anillo en bajorrelieve** para encontrarlo al tacto. La tecla y el pulsador de 6 × 6 de 4 patas entran derecho desde adentro en su bolsillo (verificaciones `cap_insert` y `switch_insert`); una gota de pegamento caliente fija el pulsador |
+| microSD | **entra y sale por una ranura en el extremo trasero**, con la carcasa cerrada |
+| Un solo botón | **botón de modos** en la cara externa, adelante (x −14), lejos del disipador, con un **anillo en bajorrelieve** para encontrarlo al tacto. La tecla y el pulsador de 6 × 6 de 4 patas entran derecho desde adentro en su bolsillo (verificaciones `cap_insert` y `switch_insert`); una gota de pegamento caliente fija el pulsador |
 | Auricular óseo, 14 mm | 14 nominales + 0,2 de holgura por lado. El brazo es pieza aparte y sigue a la cara cabeza |
 | Canal para el elástico | **dos puentes** en la cara cabeza, para un elástico plano de 6 mm |
 
@@ -138,9 +151,9 @@ Ahora el conjunto va en la **mitad derecha** (la externa). Hay que poner primero
    cabeza, con la horquilla hacia adentro. Dejarla **arriba del todo (OFF)**, y la llave de la HAT
    también en **OFF**.
 6. **Auricular.** Pasar el cable por el puerto de la mitad izquierda y el canal del brazo, y enchufar
-   el brazo en su zócalo.
+   el brazo en su zócalo. Si queda flojo, una gota de pegamento.
 7. **Cerrar.** Bajar la mitad izquierda sobre la derecha. La palanca de la llave entra en la horquilla
-   de la corredera (verificación `lever_insert`) y los pernos traseros guían. Apretar hasta escuchar las
+   de la corredera (verificación `lever_insert`) y los labios guían. Apretar hasta escuchar las
    seis trabas. Para abrir: uña o moneda en la ranura trasera.
 
 ## Impresión
@@ -150,19 +163,19 @@ PETG si es posible (aguanta mejor las aperturas repetidas); PLA también sirve. 
 
 | STL | Orientación | Soportes |
 |---|---|---|
-| `01_left_half_v0_10.stl` | cara cabeza abajo; apoya en las caras planas del zócalo del brazo y de los dos puentes del elástico | sí, bajo la cara cabeza; bloquearlos dentro de la cavidad |
-| `02_right_half_v0_10.stl` | cara externa abajo, plana; las trabas y las almohadillas crecen hacia arriba | sólo bajo el ahusado trasero y la punta de la nariz. Después de imprimir, **cortar los 6 puentes** de las vigas de las trabas, contra la punta de cada viga |
-| `03_bone_arm_v0_10.stl` | acostado | de árbol |
-| `04_mode_button_v0_10.stl` | parado sobre la brida | no |
-| `05_power_slider_v0_10.stl` | acostado sobre su cara lateral plana | no |
-| `00_assembly_check_v0_10.stl` | — | **no se imprime**: el conjunto cerrado, para revisar en el laminador |
+| `01_left_half_v0_11.stl` | cara cabeza abajo; apoya en las caras planas del zócalo del brazo y de los dos puentes del elástico | sí, bajo la cara cabeza; bloquearlos dentro de la cavidad |
+| `02_right_half_v0_11.stl` | cara externa abajo, plana; las trabas y las almohadillas crecen hacia arriba | sólo bajo el ahusado trasero y la punta de la nariz. Después de imprimir, **cortar los 6 puentes** de las vigas de las trabas, contra la punta de cada viga |
+| `03_bone_arm_v0_11.stl` | acostado | de árbol |
+| `04_mode_button_v0_11.stl` | parado sobre la brida | no |
+| `05_power_slider_v0_11.stl` | acostado sobre su cara lateral plana | no |
+| `00_assembly_check_v0_11.stl` | — | **no se imprime**: el conjunto cerrado, para revisar en el laminador |
 
 ## Archivos y verificaciones
 
 ```
-via_clara_v0_10.scad         el modelo. PART = assembly | left | right | bone | button | slider |
+via_clara_v0_11.scad         el modelo. PART = assembly | left | right | bone | button | slider |
                              print_* | hardware | check_*;  SHOW_HW y EXPLODE para la vista armada
-via_clara_v0_10_guide.scad   la guía con flechas (img/guide/); no se imprime
+via_clara_v0_11_guide.scad   la guía con flechas (img/guide/); no se imprime
 via_clara_v0_8.scad          la versión de partida, sin tocar, como referencia
 export.sh                    regenera stl/ e img/ y corre las verificaciones
 ```
