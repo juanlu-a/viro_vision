@@ -1019,3 +1019,22 @@ def test_bus_mode_can_be_told_not_to_zoom(monkeypatch):
     watcher._settings = {"labels": ["bus_sign"], "normalize": False, "order": None}
     watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
     assert camera.zooms == []
+
+
+def test_the_sign_is_read_with_the_box_the_detector_drew():
+    """2026-10-21: with the detector retrained on the V100 the team reads the YOLO box as is, with no
+    margin added in code. The pipeline's defaults (18 % on the left) were tuned for the first model,
+    and they kept being applied because nobody passed anything else."""
+    from virovision.bus import SIGN_MARGINS, pipeline_options
+
+    class Pipeline:
+        def __init__(self, detector, ocr, catalog=None, enhance=False, margins=None):
+            pass
+
+    class OldPipeline:
+        def __init__(self, detector, ocr, catalog=None, enhance=False):
+            pass
+
+    assert SIGN_MARGINS == (0.0, 0.0, 0.0)
+    assert pipeline_options(Pipeline) == {"margins": SIGN_MARGINS}
+    assert pipeline_options(OldPipeline) == {}, "an older wheel still builds, with its own margins"

@@ -3948,3 +3948,22 @@ frames tarda en aplicarse el recorte. Verificar `ScalerCropMaximum` en el modo a
 memoria y los cuadros por segundo con `--bus-full-res`. En la calle, comparar con y sin zoom la
 distancia a la que se anuncia la línea. Si el cuello resulta ser el detector, que no ve el cartel de
 lejos, encarar la fase 2: mover también la zona de entrada del detector.
+
+## 2026-10-21 — El cartel se lee con el box del YOLO, sin márgenes
+
+- **Pregunta de los compañeros**: el recorte que muestra la app ¿es el box del YOLO tal cual? No lo era.
+  El daemon armaba el `Pipeline` sin `margins`, así que se aplicaban los valores por defecto de
+  `bus_banner.crop.expand_banner`: 18 % a la izquierda, 6 % a la derecha y 6 % arriba y abajo. La
+  imagen que muestra la app es ese recorte expandido, el mismo que leyó el OCR.
+- **Decisión del equipo** (el usuario): con el detector reentrenado en la V100 (unas 500 fotos, no las
+  ~140 del primer fine-tune que cita el ADR 0006) el box se usa tal cual, sin colchón en el código.
+  Ahora `bus.py` le pasa `margins=SIGN_MARGINS = (0, 0, 0)` al `Pipeline`. Los márgenes dependen del
+  modelo que dibujó el box (lo dice el propio `Pipeline`), y el modelo se elige en ViroVision
+  (`--bus-model`), así que el valor vive acá: el repo de Magalí no cambia. Si la wheel instalada no
+  acepta `margins`, el daemon arranca igual con los márgenes de fábrica y lo avisa en el journal.
+- Commit en la misma rama `feat/bus-dynamic-zoom`.
+
+**Pendiente**: el riesgo conocido de quitar el margen izquierdo es perder el primer dígito (pasó con el
+primer modelo, 2026-09-15: "15" por "115"). Revisarlo en la próxima prueba de campo y, si hace falta,
+con `bus-banner evaluate` sobre las 117 imágenes con margen cero. Seguir con la prueba del zoom contra
+un video, que quedó a medias el 2026-10-19 porque se perdió la placa.

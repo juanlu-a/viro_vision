@@ -50,6 +50,13 @@ MIN_CONFIDENCE = 0.3
 CONFIRM_SECONDS = 0.6
 VOTES_NEEDED = 2
 MIN_BANNER_HEIGHT_PX = 22
+SIGN_MARGINS = (0.0, 0.0, 0.0)
+"""(left, right, vertical) margins the pipeline adds around the sign box before the OCR, as fractions
+of the box. All zero: the YOLO box exactly as the sensor draws it. The pipeline's defaults (18 % / 6 % /
+6 %, `bus_banner.crop.expand_banner`) were tuned for the first sign model, whose boxes hugged the LEDs
+and cut the first digit; the detector retrained on the V100 frames the whole sign, and the team's
+decision (2026-10-21) is to read its box as is. Margins belong to the model that drew the box
+(`Pipeline`'s own docstring), and the model is chosen here (`--bus-model`), so this is where they live."""
 ENGINE_RETRY_S = 60.0
 """After the OCR engine fails to build (`OcrEngineFailed`), how long bus mode refuses to try again."""
 FRAME_SILENCE_S = 12.0
@@ -245,6 +252,16 @@ def is_available() -> bool:
         return all(find_spec(name) is not None for name in ("bus_banner", "rapidocr", "onnxruntime"))
     except (ImportError, ValueError):  # a half-imported module with no spec, a broken parent package
         return False
+
+
+def pipeline_options(pipeline_class) -> dict:
+    """What `Pipeline` is built with beyond its detector, OCR and catalog. Looked up in its signature
+    because the daemon runs against whatever `bus_banner` wheel was deployed: one without `margins`
+    still starts, with its own margins, and says so in the journal."""
+    if "margins" in inspect.signature(pipeline_class).parameters:
+        return {"margins": SIGN_MARGINS}
+    log.warning("bus_banner cannot take crop margins: the sign is read with its built-in ones")
+    return {}
 
 
 class BusWatcher:
@@ -540,7 +557,7 @@ class BusWatcher:
                     self.close()
                     raise RuntimeError("bus mode is closing")
                 # The detector is the sensor's, so the pipeline needs none of its own.
-                self._pipeline = Pipeline(NullDetector(), self._ocr, catalog)
+                self._pipeline = Pipeline(NullDetector(), self._ocr, catalog, **pipeline_options(Pipeline))
             self._settings = network_settings(self._camera.sensor.network_intrinsics, labels=self._labels)
             fps = self._settings["fps"]
             tracker = Tracker(max_missed=max(1, round(0.5 * fps)), memory=max(1, round(5 * fps)))
