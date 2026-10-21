@@ -148,11 +148,11 @@ function items(v) =
         [[29, -CAV_HY, -0.5], "Paso del cable del auricular"],
         [[STACK_REAR_X + 3, HAT_TOP_Y + 1.5, -6.5], "Canal de carga"],
         [[-12, -2, CAV_HZ + 1.0], "Ranura donde engancha la traba"],
-        [[0, -CAV_HY, -6], "Lado de la HAT: sólo cabezas de tornillo"],
+        [[PI_CX - PI_HOLE_X, -CAV_HY + 0.2, -PI_HOLE_Z], "Poste que aprieta la cabeza del tornillo (x4)"],
         [[STACK_REAR_X + 3, -2, 12], "Extremo trasero hueco"]] :
     v == "right_inside" ? [
-        [[PI_CX - PI_HOLE_X, PAD_MOUTH_Y - 0.4, PI_HOLE_Z], "Almohadilla: separador hexagonal (x4)"],
-        [[PI_CX + PI_HOLE_X, PAD_MOUTH_Y - 0.4, -PI_HOLE_Z], "Collar que se derrite con el soldador"],
+        [[PI_CX - PI_HOLE_X, PAD_MOUTH_Y + 0.5, PI_HOLE_Z], "Poste: ubica el hexágono de la Pi (x4)"],
+        [[BUTTON_X, SW_BASE_Y - LID_T, BUTTON_Z], "Tapita del pulsador (pieza 06)"],
         [[snap_root(t) + 4, 1.2, t[2] + 0.5], "Viga de la traba (flexiona)"],
         [[t[0], -HOOK_LEN + 0.5, t[2] + SNAP_T + 0.3], "Gancho de la traba"],
         [[snap_free(t) + 0.4, SNAP_DEPTH + 0.3, t[2] + 0.5], "Puente a cortar tras imprimir"],

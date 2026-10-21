@@ -16,7 +16,7 @@ run() { "$@" & pids+=($!); }
 join() { local f=0; for p in "${pids[@]}"; do wait "$p" || f=1; done; pids=(); return $f; }
 
 parts=(print_left:01_left_half print_right:02_right_half print_bone:03_bone_arm
-       print_button:04_mode_button print_slider:05_power_slider assembly:00_assembly_check)
+       print_button:04_mode_button print_slider:05_power_slider print_lid:06_button_lid assembly:00_assembly_check)
 for p in "${parts[@]}"; do
   run "${OS[@]}" --export-format=binstl -D "PART=\"${p%%:*}\"" -D 'SHOW_HW=false' -o "stl/${p#*:}_v0_11.stl" "$SCAD"
 done
@@ -89,7 +89,7 @@ for p in "${parts[@]}"; do
 done
 
 for c in halves left_hw right_hw pads_hex button slider_off slider_on flex hw_self bone drawer_pi \
-         cap_insert switch_insert lever_insert stack_insert; do
+         cap_insert switch_insert lid_insert lever_insert stack_insert clamp; do
   out="$tmp/$c.stl"
   rc=0; log=$(openscad --backend=manifold --export-format=binstl -D "PART=\"check_$c\"" -o "$out" "$SCAD" 2>&1) || rc=$?
   if [[ "$log" == *ERROR* || "$log" == *WARNING* ]] || { (( rc != 0 )) && [[ "$log" != *"top level object is empty"* ]]; }; then
