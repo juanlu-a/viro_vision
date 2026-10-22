@@ -3916,3 +3916,76 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
 el voladizo de los conectores de la Pi, el pulsador, el transductor); imprimir primero la parte trasera y la nariz
 como prueba; confirmar que la perilla de la llave se alcanza con los lentes puestos; decidir si la rama
 vieja `feat/carcasa-modelo-3d` (v1) se archiva.
+
+## 2026-10-19 — Zoom digital sobre el cartel en modo ómnibus
+
+- **Prueba de campo del modo ómnibus** (el usuario): con buena toma el cartel se detecta y el catálogo
+  corrige bien, y el supermercado anda perfecto. El problema es la distancia. El ómnibus se detecta de
+  lejos, pero el cartel o no aparece o sale borroso, y sólo se lee con el ómnibus prácticamente encima.
+  Eso es tarde si no para en la parada. Las mejores lecturas fueron con el ómnibus quieto en un semáforo.
+- **Diagnóstico en el código**: el stream de donde sale el recorte es de 1024 px sobre un sensor de
+  4056; el OCR recibe un cartel de pocos píxeles que `bus_banner.crop` sólo reescala. En el fuente de
+  picamera2 se confirmó que la zona de entrada del detector del IMX500 es un control propio
+  (`set_inference_roi_abs`, fijado al sensor entero), separado del `ScalerCrop` del ISP, y que
+  `convert_inference_coords` usa el `ScalerCrop` de cada frame.
+- **Decisión** (ADR 0006, actualización 2026-10-19): zoom digital **dinámico** con `ScalerCrop`,
+  centrado en el cartel más ancho, hasta que el cartel mide ~64 px de alto y nunca más de la mitad del
+  ancho del frame; se sostiene 1,5 s si el detector pierde el cartel y después vuelve a 1x. El usuario
+  aceptó perder campo de visión ("si se mira hacia donde viene el ómnibus el campo ya es muy amplio")
+  mientras no agregue una latencia palpable.
+- **Implementación** (rama `feat/bus-dynamic-zoom`, sólo en ViroVision; el repo de Magalí no se toca):
+  `virovision/zoom.py` (geometría pura y controlador), `Camera.zoom_bounds`/`set_zoom` y la opción
+  `--bus-full-res`. En `bus.py` el tracker recibe las cajas en el **campo completo** y el `Watcher`
+  recibe un `ZoomedFrame`. El lector traduce la caja al frame con zoom; si el zoom cortó el cartel, no
+  lee y no descuenta el intento. El umbral de altura del cartel se ajusta al zoom de cada frame.
+  `--no-bus-zoom` apaga el zoom para comparar. Tests: `test_zoom.py`, más casos en `test_bus.py` y
+  `test_camera.py` (192 pasan).
+- Detalle que destapó un test: el frame real es de 1024×**766**, no 768. La geometría usa escalas
+  separadas en x e y, así que no la afecta.
+
+**Pendiente**: probar en la placa. Verificar que `ScalerCrop` no altere la inferencia y medir cuántos
+frames tarda en aplicarse el recorte. Verificar `ScalerCropMaximum` en el modo agrupado. Medir la
+memoria y los cuadros por segundo con `--bus-full-res`. En la calle, comparar con y sin zoom la
+distancia a la que se anuncia la línea. Si el cuello resulta ser el detector, que no ve el cartel de
+lejos, encarar la fase 2: mover también la zona de entrada del detector.
+
+## 2026-10-21 — El cartel se lee con el box del YOLO, sin márgenes
+
+- **Pregunta de los compañeros**: el recorte que muestra la app ¿es el box del YOLO tal cual? No lo era.
+  El daemon armaba el `Pipeline` sin `margins`, así que se aplicaban los valores por defecto de
+  `bus_banner.crop.expand_banner`: 18 % a la izquierda, 6 % a la derecha y 6 % arriba y abajo. La
+  imagen que muestra la app es ese recorte expandido, el mismo que leyó el OCR.
+- **Decisión del equipo** (el usuario): con el detector reentrenado en la V100 (unas 500 fotos, no las
+  ~140 del primer fine-tune que cita el ADR 0006) el box se usa tal cual, sin colchón en el código.
+  Ahora `bus.py` le pasa `margins=SIGN_MARGINS = (0, 0, 0)` al `Pipeline`. Los márgenes dependen del
+  modelo que dibujó el box (lo dice el propio `Pipeline`), y el modelo se elige en ViroVision
+  (`--bus-model`), así que el valor vive acá: el repo de Magalí no cambia. Si la wheel instalada no
+  acepta `margins`, el daemon arranca igual con los márgenes de fábrica y lo avisa en el journal.
+- Commit en la misma rama `feat/bus-dynamic-zoom`.
+
+**Pendiente**: el riesgo conocido de quitar el margen izquierdo es perder el primer dígito (pasó con el
+primer modelo, 2026-09-15: "15" por "115"). Revisarlo en la próxima prueba de campo y, si hace falta,
+con `bus-banner evaluate` sobre las 117 imágenes con margen cero. Seguir con la prueba del zoom contra
+un video, que quedó a medias el 2026-10-19 porque se perdió la placa.
+
+## 2026-10-22 — Zoom del modo ómnibus probado en la placa
+
+- **Desplegados en la placa** (Zero 2 W) el zoom y el box sin márgenes, por SSH sobre `Jack_2.4`. El AP
+  se baja por BLE con `tools/ap.py`. Ojo: cada reinicio del daemon lo vuelve a levantar, y hay que
+  bajarlo de nuevo. El modo ómnibus se pone por BLE con `{"cmd": "mode", "value": 1}` en `control`.
+- **Prueba contra `video2.MP4`** (el 115 del repo de Magalí) en la pantalla de la laptop: zoom 2.0x
+  con el cartel en cuadro, detecciones en 68 a 76 frames de cada 75 a 15 fps, y vuelta a 1x al perderlo.
+  Un cartel de ~10 px de alto, que sin zoom no se habría leído nunca (el mínimo es 22 px), se anunció a
+  los 7,6 s, después de tres lecturas ilegibles. Uno más cercano se anunció a 1,0 s. En las imágenes de
+  evidencia el recorte se ajusta al LED sin margen, y el "1" de 115 entró completo.
+- **`--bus-full-res` (4x) no sirve en la Zero 2 W**: 10 fps, 65 MB libres, y la cámara se trabó con el
+  primer ómnibus (`Camera frontend has timed out`), lo que terminó en un reinicio del daemon. Se sacó de
+  `/etc/default/virovision`; la opción queda en el código para otra placa, con la advertencia en la
+  ayuda, en el README y en el ADR 0006.
+- De paso: se borraron los worktrees `viro_vision-zoom` y `viro_vision-review`, y se volvió a crear el
+  del zoom para estos documentos. `viro_vision-case` se dejó porque tiene trabajo sin commitear de otra
+  sesión.
+
+**Pendiente**: la prueba en la calle, con y sin zoom (`--no-bus-zoom`). Medir a qué distancia se anuncia
+la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, encarar la fase 2:
+mover también su zona de entrada. Abrir el PR a `staging`.

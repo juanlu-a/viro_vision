@@ -362,3 +362,49 @@ lectura por foto queda como caso particular (un frame). Esto no contradice el "n
 de ADR 0007: el reconocimiento sigue atado a un modo explícito; dentro del modo ómnibus, vigilar es la
 función. Costo a medir: consumo de cámara + sensor durante el modo (UPS HAT), con apagado automático
 tras un tiempo sin ómnibus.
+
+## Actualización 2026-10-19 — zoom digital sobre el cartel (fase 1, a medir en la calle)
+
+**Qué mostró la prueba de campo.** El modo ómnibus lee bien cuando la toma es buena (con el ómnibus
+detenido en un semáforo, de frente), y el catálogo corrige bien. Pero el cartel sólo se vuelve legible
+con el ómnibus prácticamente encima, y para un ómnibus que no para es tarde. El detector encuentra el
+**ómnibus** de lejos, porque es grande; el **cartel** de lejos o no se detecta, o se detecta y se lee
+borroso.
+
+**Por qué.** El stream de donde sale el recorte es de 1024 px de ancho, sobre un sensor de 4056: se
+tira 4x de resolución lineal antes del OCR. Estimado (no medido): un número de ~20 cm a 20 m ocupa
+~9 px de alto, y el reescalado del recorte (`bus_banner.crop`) agranda el borrón, no lo resuelve.
+
+**Decisión (provisoria).** Zoom digital **dinámico** en el procesador de imagen (ISP) de la Pi
+(`ScalerCrop`), apuntado al cartel que el detector ve:
+
+- La zona de entrada del detector es un control propio del IMX500 (`set_inference_roi_abs`), separado
+  del recorte del ISP: **el detector sigue viendo el campo completo** y el seguimiento no se entera del
+  zoom. Sólo el recorte que va al OCR se traduce al frame con zoom, usando el `ScalerCrop` que reporta la
+  metadata de cada frame. Todo vive en ViroVision (`virovision/zoom.py`); el repo del pipeline no cambia.
+- Se descartó el **zoom óptico** (la AI Camera tiene lente fija) y el **zoom fijo** (achica el campo
+  siempre, también cuando todavía no hay ómnibus).
+- Límite: el zoom llega hasta donde el modo del sensor tiene píxeles reales. En el modo agrupado 2x2
+  (2028×1520, el actual) eso es ~2x; con `--bus-full-res` (4056×3040) llega a 4x, a costa de cuadros
+  por segundo y memoria. Cuál conviene se decide midiendo.
+- Al salir del modo ómnibus el zoom vuelve a 1x: la cámara es la misma que saca la foto del
+  supermercado.
+
+**Lo que esta fase no resuelve.** El caso "de lejos el cartel ni se detecta" es del detector, que
+mira el campo completo a 640 px. La fase 2 sería mover también su zona de entrada hacia el ómnibus
+detectado. Tiene incógnitas propias (latencia del control, qué pasa con los otros ómnibus mientras
+tanto) y se encara sólo si la fase 1 no alcanza.
+
+**Medido el 2026-10-22, contra un video en pantalla** (`video2.MP4`, el 115 de `bus-banner-recognizer`):
+
+- El zoom de 2x funciona y **no afecta al detector**: con zoom 2.0x hubo detecciones en 68 a 76 frames
+  de cada 75, a los mismos 15 fps de siempre, y el zoom volvió a 1x al perder el cartel.
+- **Se leyeron carteles que antes no se habrían intentado**. Un cartel de ~10 px en la vista completa,
+  por debajo del mínimo de 22 px, llegó al OCR con ~25 px. Las tres primeras lecturas salieron
+  ilegibles y la cuarta anunció «115, Luis Braille» a los 7,6 s. Un ómnibus un poco más cercano se
+  anunció a 1,0 s, con una sola lectura.
+- **El modo de sensor completo (`--bus-full-res`, 4x) no entra en la Zero 2 W.** Bajó a 10 fps y dejó
+  65 MB libres de 415. La cámara se trabó con el primer ómnibus y el daemon se reinició. Queda el
+  zoom de 2x.
+- Con el box del YOLO sin márgenes (decisión del 2026-10-21) el recorte se ajusta al LED y el primer
+  dígito entró completo.
