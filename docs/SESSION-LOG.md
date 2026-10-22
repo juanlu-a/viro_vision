@@ -4082,7 +4082,7 @@ mover también su zona de entrada. Abrir el PR a `staging`.
   de WyeWorks). No se pegó el cuerpo entero, porque el Doc tiene imágenes que el equipo agregó ahí (el
   Gantt del capítulo 6 y su anexo) y se habrían perdido: `docs/tesis/sync_doc.py` compara cada sección
   del Doc con el repo y reemplaza sólo las que difieren, de abajo hacia arriba, con el `revisionId`
-  como guarda. Fueron unas 50 secciones en 26 tandas, incluidas las nuevas 7.3.5, 7.4.10 y 8.6.3 y los
+  como guarda. Fueron unas 50 secciones en 23 tandas, incluidas las nuevas 7.3.5, 7.4.10 y 8.6.3 y los
   renumerados 7.4.11, 7.4.12 y 8.6.4. Dos errores del script aparecieron en el camino y se corrigieron
   (un título que perdía su estilo cuando la sección empieza con una tabla, y un renumerado que usaba
   una posición ya corrida); el título roto de la 8.6 se reparó a mano. Verificado al final: ninguna
