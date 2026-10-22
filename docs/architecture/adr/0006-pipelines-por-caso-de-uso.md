@@ -408,3 +408,10 @@ tanto) y se encara sólo si la fase 1 no alcanza.
   zoom de 2x.
 - Con el box del YOLO sin márgenes (decisión del 2026-10-21) el recorte se ajusta al LED y el primer
   dígito entró completo.
+
+**2026-10-23 — vuelven los márgenes del recorte.** Leer el box del YOLO tal cual (decisión del
+2026-10-21) no alcanzó: en la calle se siguió perdiendo el "1" del número de línea. Vuelven los valores
+medidos sobre las 117 imágenes de evaluación: 18 % a la izquierda, donde está el número, y 6 % a la
+derecha, arriba y abajo (`SIGN_MARGINS` en `virovision/bus.py`). La app sigue mostrando exactamente el
+recorte que lee el OCR, ahora con el margen incluido. Con zoom, una lectura se descarta si el recorte
+de la Pi deja afuera el margen, no sólo el cartel.

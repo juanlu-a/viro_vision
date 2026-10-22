@@ -50,13 +50,16 @@ MIN_CONFIDENCE = 0.3
 CONFIRM_SECONDS = 0.6
 VOTES_NEEDED = 2
 MIN_BANNER_HEIGHT_PX = 22
-SIGN_MARGINS = (0.0, 0.0, 0.0)
+SIGN_MARGINS = (0.18, 0.06, 0.06)
 """(left, right, vertical) margins the pipeline adds around the sign box before the OCR, as fractions
-of the box. All zero: the YOLO box exactly as the sensor draws it. The pipeline's defaults (18 % / 6 % /
-6 %, `bus_banner.crop.expand_banner`) were tuned for the first sign model, whose boxes hugged the LEDs
-and cut the first digit; the detector retrained on the V100 frames the whole sign, and the team's
-decision (2026-10-21) is to read its box as is. Margins belong to the model that drew the box
-(`Pipeline`'s own docstring), and the model is chosen here (`--bus-model`), so this is where they live."""
+of the box. The most on the LEFT: Montevideo's line number sits at the left of the sign, and a box that
+hugs the LEDs cuts its first digit ("15" for 115, first seen on 2026-09-15).
+
+History: these are `bus_banner.crop.expand_banner`'s defaults, measured on the 117 evaluation images.
+On 2026-10-21 the team tried reading the retrained detector's box as is (all zero); in the field the
+"1" kept going missing, so on 2026-10-23 the margins came back. Margins belong to the model that drew
+the box (`Pipeline`'s own docstring), and the model is chosen here (`--bus-model`), so this is where
+they live. The app's picture of the sign is the crop the OCR read, margins included."""
 ENGINE_RETRY_S = 60.0
 """After the OCR engine fails to build (`OcrEngineFailed`), how long bus mode refuses to try again."""
 FRAME_SILENCE_S = 12.0
@@ -252,6 +255,13 @@ def is_available() -> bool:
         return all(find_spec(name) is not None for name in ("bus_banner", "rapidocr", "onnxruntime"))
     except (ImportError, ValueError):  # a half-imported module with no spec, a broken parent package
         return False
+
+
+def _with_margins(box):
+    """The sign box grown by SIGN_MARGINS, as the pipeline will crop it."""
+    left, right, vertical = SIGN_MARGINS
+    dy = box.height * vertical
+    return type(box)(box.x1 - box.width * left, box.y1 - dy, box.x2 + box.width * right, box.y2 + dy)
 
 
 def pipeline_options(pipeline_class) -> dict:
@@ -589,9 +599,11 @@ class BusWatcher:
         attempts = track.read_attempts if track is not None else 0
         image, view = _unzoomed(frame)
         if view is not None:
-            if not view.shows(banner_box if banner_box is not None else bus_box):
+            if not view.shows(_with_margins(banner_box) if banner_box is not None else bus_box):
                 # The crop moved between the detection and this frame and cut the sign: reading half of
-                # it would cost a second of OCR and an attempt for a reading that cannot be right.
+                # it would cost a second of OCR and an attempt for a reading that cannot be right. The
+                # margins count: the left one is what keeps the line's first digit, and the pipeline
+                # would clip it at the frame's edge without a word.
                 if track is not None:
                     track.read_attempts -= 1
                 results.put((track_id, SKIPPED, 0, None))

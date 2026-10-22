@@ -1021,10 +1021,10 @@ def test_bus_mode_can_be_told_not_to_zoom(monkeypatch):
     assert camera.zooms == []
 
 
-def test_the_sign_is_read_with_the_box_the_detector_drew():
-    """2026-10-21: with the detector retrained on the V100 the team reads the YOLO box as is, with no
-    margin added in code. The pipeline's defaults (18 % on the left) were tuned for the first model,
-    and they kept being applied because nobody passed anything else."""
+def test_the_sign_is_read_with_room_for_its_first_digit():
+    """2026-10-21 the team tried reading the YOLO box as is; in the field the "1" of the line kept going
+    missing, so on 2026-10-23 the margins came back, the most on the left. They are passed explicitly:
+    the pipeline's own defaults are not this repo's decision."""
     from virovision.bus import SIGN_MARGINS, pipeline_options
 
     class Pipeline:
@@ -1035,6 +1035,28 @@ def test_the_sign_is_read_with_the_box_the_detector_drew():
         def __init__(self, detector, ocr, catalog=None, enhance=False):
             pass
 
-    assert SIGN_MARGINS == (0.0, 0.0, 0.0)
+    left, right, vertical = SIGN_MARGINS
+    assert left > right > 0 and vertical > 0, "the line number is at the left of the sign"
     assert pipeline_options(Pipeline) == {"margins": SIGN_MARGINS}
     assert pipeline_options(OldPipeline) == {}, "an older wheel still builds, with its own margins"
+
+
+def test_a_sign_whose_left_margin_the_zoom_cut_is_not_read(monkeypatch):
+    """The box itself fits in the zoomed frame but its left margin does not: the pipeline would clip the
+    margin at the edge, and the margin is what keeps the first digit of the line."""
+    from virovision.bus import SKIPPED, ZoomedFrame
+    from virovision.zoom import View
+
+    Box = _fake_pipeline_with_signs(monkeypatch, (0, 0, 0, 0))
+    watcher = BusWatcher(ZoomingCamera(frames=0, sign=None), lambda files: None, lambda event: None)
+    track = types.SimpleNamespace(id=3, read_attempts=1)
+    watcher._watcher = types.SimpleNamespace(tracker=types.SimpleNamespace(tracks=[track]), reading_track=3)
+    view = View((2028, 0, 2028, 1520), ZoomingCamera.FULL, (1024, 768))  # starts at x = 512 of the full view
+    frame = ZoomedFrame(IMAGE, view)
+
+    assert view.shows(Box(520, 100, 620, 120)), "the box alone is in the frame"
+    watcher._queue_read(frame, Box(520, 100, 620, 120), None)  # 18 % of 100 px reaches x = 502
+    assert watcher._jobs.empty() and watcher._results.get_nowait() == (3, SKIPPED, 0, None)
+
+    watcher._queue_read(frame, Box(540, 100, 640, 120), None)  # its margin starts at x = 522: inside
+    assert not watcher._jobs.empty()

@@ -3989,3 +3989,16 @@ un video, que quedó a medias el 2026-10-19 porque se perdió la placa.
 **Pendiente**: la prueba en la calle, con y sin zoom (`--no-bus-zoom`). Medir a qué distancia se anuncia
 la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, encarar la fase 2:
 mover también su zona de entrada. Abrir el PR a `staging`.
+
+## 2026-10-23 — Vuelven los márgenes del cartel para el OCR
+
+- **Pedido del usuario**: el "1" del número de línea sigue siendo un problema leyendo el box del YOLO tal
+  cual (decisión del 2026-10-21). Vuelve la holgura, la mayor a la izquierda y "un poquito al resto, como
+  antes": `SIGN_MARGINS = (0.18, 0.06, 0.06)`. Son los valores por defecto de `expand_banner`, medidos
+  sobre las 117 imágenes de evaluación, pero ahora se pasan explícitamente desde ViroVision.
+- **Interacción con el zoom**: el lector descartaba una lectura sólo si el zoom cortaba el box crudo.
+  Ahora mira el box con márgenes (`_with_margins`): si el margen izquierdo cae fuera del recorte de la
+  Pi, el pipeline lo cortaría en silencio y se volvería a perder el primer dígito. Test nuevo en
+  `test_bus.py` (195 pasan).
+- La app sigue mostrando exactamente el recorte del OCR, con el margen incluido.
+- Rama `fix/bus-sign-margins`.
