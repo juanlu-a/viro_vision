@@ -60,8 +60,10 @@ class Camera:
     ) -> None:
         self._long_side = long_side
         # Run the sensor in its 4056x3040 mode instead of the 2x2-binned one picamera2 picks for a
-        # 1024 px stream. Only bus mode's zoom gains from it (up to 4x of real detail instead of 2x),
-        # and it costs frame rate and memory, so it is a flag to measure in the field (2026-10-19).
+        # 1024 px stream. Only bus mode's zoom gains from it (up to 4x of real detail instead of 2x).
+        # Measured on the Zero 2 W on 2026-10-22, it does not fit: 10 fps instead of 15, 65 MB left of
+        # 415, and the camera frontend timed out at the first bus, which ended in a daemon restart.
+        # Kept for a board with more memory, never as the default.
         self._full_res = full_res
         self._quality = quality
         self._model = model

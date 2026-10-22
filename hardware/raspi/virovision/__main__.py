@@ -73,7 +73,10 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--bus-full-res",
         action="store_true",
-        help="run the sensor at 4056x3040 so bus mode can zoom up to 4x instead of 2x (fewer frames per second, more memory)",
+        help=(
+            "run the sensor at 4056x3040 so bus mode can zoom up to 4x instead of 2x. NOT on a Zero 2 W: "
+            "there it jammed the camera at the first detection (2026-10-22)"
+        ),
     )
     parser.add_argument("--evidence-dir", type=Path, default=EVIDENCE_DEFAULT_DIR, help="where bus mode keeps the frame of each bus and the crop of each OCR read")
     parser.add_argument("--no-evidence", action="store_true", help="do not keep bus mode's frames and crops on the card")

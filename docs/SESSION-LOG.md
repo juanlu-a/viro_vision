@@ -3967,3 +3967,25 @@ lejos, encarar la fase 2: mover también la zona de entrada del detector.
 primer modelo, 2026-09-15: "15" por "115"). Revisarlo en la próxima prueba de campo y, si hace falta,
 con `bus-banner evaluate` sobre las 117 imágenes con margen cero. Seguir con la prueba del zoom contra
 un video, que quedó a medias el 2026-10-19 porque se perdió la placa.
+
+## 2026-10-22 — Zoom del modo ómnibus probado en la placa
+
+- **Desplegados en la placa** (Zero 2 W) el zoom y el box sin márgenes, por SSH sobre `Jack_2.4`. El AP
+  se baja por BLE con `tools/ap.py`. Ojo: cada reinicio del daemon lo vuelve a levantar, y hay que
+  bajarlo de nuevo. El modo ómnibus se pone por BLE con `{"cmd": "mode", "value": 1}` en `control`.
+- **Prueba contra `video2.MP4`** (el 115 del repo de Magalí) en la pantalla de la laptop: zoom 2.0x
+  con el cartel en cuadro, detecciones en 68 a 76 frames de cada 75 a 15 fps, y vuelta a 1x al perderlo.
+  Un cartel de ~10 px de alto, que sin zoom no se habría leído nunca (el mínimo es 22 px), se anunció a
+  los 7,6 s, después de tres lecturas ilegibles. Uno más cercano se anunció a 1,0 s. En las imágenes de
+  evidencia el recorte se ajusta al LED sin margen, y el "1" de 115 entró completo.
+- **`--bus-full-res` (4x) no sirve en la Zero 2 W**: 10 fps, 65 MB libres, y la cámara se trabó con el
+  primer ómnibus (`Camera frontend has timed out`), lo que terminó en un reinicio del daemon. Se sacó de
+  `/etc/default/virovision`; la opción queda en el código para otra placa, con la advertencia en la
+  ayuda, en el README y en el ADR 0006.
+- De paso: se borraron los worktrees `viro_vision-zoom` y `viro_vision-review`, y se volvió a crear el
+  del zoom para estos documentos. `viro_vision-case` se dejó porque tiene trabajo sin commitear de otra
+  sesión.
+
+**Pendiente**: la prueba en la calle, con y sin zoom (`--no-bus-zoom`). Medir a qué distancia se anuncia
+la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, encarar la fase 2:
+mover también su zona de entrada. Abrir el PR a `staging`.

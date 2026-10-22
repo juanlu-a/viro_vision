@@ -391,7 +391,10 @@ los de sistema de su subcarpeta `system/`.
 **Zoom sobre el cartel** (2026-10-19, ADR 0006): en modo ómnibus el ISP recorta el sensor alrededor
 del cartel detectado, para que el OCR reciba píxeles reales y no un borrón reescalado. El detector sigue
 viendo el campo completo. `--no-bus-zoom` lo apaga, para comparar. `--bus-full-res` pone el sensor en
-4056×3040: zoom de hasta 4x en lugar de ~2x, con menos cuadros por segundo y más memoria. El journal
+4056×3040 (zoom de hasta 4x en lugar de ~2x), pero **no sirve en la Zero 2 W**: probado el
+2026-10-22, bajó a 10 fps, dejó 65 MB libres de 415 y la cámara se trabó con el primer ómnibus
+(`Camera frontend has timed out`), lo que terminó en un reinicio del daemon. Queda para una placa con
+más memoria. El journal
 dice el modo del sensor al arrancar la cámara (`camera ready: … (mode 2028x1520)`), el zoom máximo al
 entrar al modo (`zoom on the sign up to …`) y el zoom vigente en cada latido (`… zoom 1.9x`).
 

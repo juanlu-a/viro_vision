@@ -394,3 +394,17 @@ tira 4x de resolución lineal antes del OCR. Estimado (no medido): un número de
 mira el campo completo a 640 px. La fase 2 sería mover también su zona de entrada hacia el ómnibus
 detectado. Tiene incógnitas propias (latencia del control, qué pasa con los otros ómnibus mientras
 tanto) y se encara sólo si la fase 1 no alcanza.
+
+**Medido el 2026-10-22, contra un video en pantalla** (`video2.MP4`, el 115 de `bus-banner-recognizer`):
+
+- El zoom de 2x funciona y **no afecta al detector**: con zoom 2.0x hubo detecciones en 68 a 76 frames
+  de cada 75, a los mismos 15 fps de siempre, y el zoom volvió a 1x al perder el cartel.
+- **Se leyeron carteles que antes no se habrían intentado**. Un cartel de ~10 px en la vista completa,
+  por debajo del mínimo de 22 px, llegó al OCR con ~25 px. Las tres primeras lecturas salieron
+  ilegibles y la cuarta anunció «115, Luis Braille» a los 7,6 s. Un ómnibus un poco más cercano se
+  anunció a 1,0 s, con una sola lectura.
+- **El modo de sensor completo (`--bus-full-res`, 4x) no entra en la Zero 2 W.** Bajó a 10 fps y dejó
+  65 MB libres de 415. La cámara se trabó con el primer ómnibus y el daemon se reinició. Queda el
+  zoom de 2x.
+- Con el box del YOLO sin márgenes (decisión del 2026-10-21) el recorte se ajusta al LED y el primer
+  dígito entró completo.
