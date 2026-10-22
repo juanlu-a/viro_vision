@@ -1,6 +1,6 @@
 # ADR 0002 — Backend & auth: Supabase as the online account layer
 
-- **Status:** Accepted
+- **Status:** Accepted (actualizado 2026-07-18, 2026-07-20 y 2026-10-22: email solo, login no montado)
 - **Date:** 2026-07-09
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** app, backend, auth, requirement
@@ -85,5 +85,23 @@ explicitly rejected by ADR 0001 — inference runs locally. The backend may host
   - `app/src/features/auth/` — auth session state machine + `useAuth` hook.
   - `app/src/services/supabase/` — `SupabaseAuthClient` interface + honest stub.
 - The recognition and device layers are untouched — they have no dependency on auth or the backend.
+
+## Actualización 2026-10-22: estado vigente de la capa de cuenta
+
+Las dos notas de julio siguen vigentes y se confirman contra el código:
+
+- **El único método de login es email y contraseña** de Supabase (`app/src/services/supabase/authClient.ts`:
+  `signInWithPassword`, `signUp`). No hay Google ni OAuth.
+- **El login no está montado.** `AuthProvider` (`app/src/features/auth/AuthContext.tsx`) no figura en
+  `app/src/app/_layout.tsx`; la app abre directo en las tres pestañas y Ajustes no tiene sección de
+  cuenta. El código queda archivado para una eventual sincronización opcional.
+- La sección «Implications for the current code» quedó desactualizada: el cliente de Supabase ya no
+  es un stub (existe el cliente real, detrás de `getSupabaseAuthClient()`), y `useAuth` vive en
+  `AuthContext.tsx`, no en un archivo propio.
+
+Supabase sí se usa, pero **como infraestructura y sin cuentas**: el proxy de visión (ADR 0008), la
+telemetría (tabla `events`) y la evidencia del modo ómnibus (función `evidence` y bucket privado,
+2026-10-12). Ninguna de las tres pide sesión, y la regla de frontera de este ADR se mantiene: nada del
+camino cámara → detección/OCR → anuncio las espera. Detalle en `docs/supabase.md`.
 
 See also: `.claude/skills/virovision/SKILL.md` and `references/app.md`.

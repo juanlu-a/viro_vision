@@ -1,84 +1,110 @@
-# Pillar: ML / OCR / Computer Vision
+# Pilar: ML / OCR / visión por computadora
 
-## Tasks
-1. **Object detection** — locate buses and products in the frame (bounding boxes, multiple
-   instances/classes per image).
-2. **OCR** — read the bus line's number/name from its display, and (optional) read product-label
-   text.
-3. **Prioritization logic** — when several buses are detected, decide which line to announce first
-   (position/proximity) and optionally mention others without auditory overload.
+## Tareas
+1. **Detección**: ubicar ómnibus (y su cartel) en el cuadro, con cajas, varias instancias por imagen.
+2. **OCR**: leer número y destino del cartel de LEDs del ómnibus; (opcional) texto de etiquetas.
+3. **Priorización**: con varios ómnibus, decidir cuál anunciar (posición, proximidad) sin saturar el
+   audio.
+4. **Supermercado**: identificar el alimento que tiene delante la cámara.
 
-## Models & techniques
+## Dónde vive el código
+- **Ómnibus**: repo de Magalí Dellapiazza `bus-banner-recognizer`, **todo en un PR (#7, rama
+  `feat/bus-line-reader`)**, desde el 2026-10-12. No apilar PRs ahí. Worktree local de consulta:
+  `/Users/juanlu/Documents/repositorios/bus-banner-consolidated`. Se instala en la placa como wheel
+  (`scripts/deploy_pi.sh`, que además estampa la rama y el commit en `~/models/bus-banner-version`).
+  El cableado en la placa (cámara, zoom, márgenes, parlante, BLE) vive en ViroVision:
+  `hardware/raspi/virovision/bus.py` y `zoom.py`.
+- **Supermercado**: la app, `app/src/services/vision/` (modelos en `config.ts`, prompt en
+  `providers/prompts.ts`), a través del proxy de Supabase (`supabase/functions/vision`, ADR 0008).
+- `ml/` es sólo un README que apunta a lo anterior.
 
-### Detection — pretrained, running on the Coral TPU as a preprocessor
-Single-pass detection (class + bounding box), well suited to **real-time / low-latency** and
-embedded use. Candidates: **YOLO11-nano / `yolo26` / `rfdetr-nano`** — all pretrained on **COCO**
-(80 classes, includes `bus`), so **no training is required**. Since ADR 0006 (2026-08-22) the
-detector's role is **preprocessing on the device's Coral TPU**: detect the bus → crop the banner
-strip → hand only the crop to the OCR (best case: the whole pipeline runs on the TPU). The crop is
-what removes OCR distractions (license plates, ads) and gives it large letters; the box size gives
-proximity-based prioritization for free.
+## Ómnibus: el pipeline real (ADR 0006, enmendado 2026-09-07)
 
-### OCR
-Deep-learning OCR (robust to variable lighting, non-ideal angles, diverse fonts). Central to
-ViroVision for reading **bus line numbers/names** and **product-label text**. Extra challenges to
-research: LED-display / vehicle-sign OCR, motion and lighting variability.
+Corre **entero en la placa** (Raspberry Pi Zero 2 W + Raspberry Pi AI Camera, IMX500) desde el
+2026-09-15 (#88), sin teléfono y sin red. **Es vigilancia, no foto**: la cámara queda abierta, el
+detector corre en cada frame, y se anuncia la presencia ("se acerca un ómnibus") y la línea **una vez
+por ómnibus**.
 
-### Edge AI / on-device (offline-first, hard requirement)
-Local inference is the **guaranteed fallback**, so essential recognition works **offline**. Since
-**ADR 0006** (2026-08-22) there is no single runtime — **each use case has its own pipeline**:
+1. **Detector**: YOLO11n de **cajas** (no de keypoints) con dos clases, `bus_sign` y `bus`, int8,
+   **dentro del sensor IMX500** (una sola red cabe: ocupa el 90 % de sus 8 MB). Export
+   `ultralytics format="imx"`; el `.rpk` se arma en la Pi; la placa carga `~/models/bus_sign.rpk`
+   (`bus.py:38`). El Coral TPU **salió del diseño el 2026-09-07**.
+   - Primer fine-tune: ~140 fotos (Roboflow `find-bus-sign` + cajas `bus` pseudo-etiquetadas), 40
+     épocas, en CPU, 2026-09-15 (`models/bus_2classes_yolo11n.pt`, commit `8b8a569` del PR #7).
+   - **Reentrenado en la V100 de Arnaldo Castro con unas 500 fotos** (SESSION-LOG 2026-10-21). Épocas,
+     métricas y ubicación de los pesos: **PENDIENTE** (no constan en ningún repo).
+2. **Zoom digital** (ADR 0006, actualización 2026-10-19; #121): `ScalerCrop` del ISP, dinámico,
+   centrado en el cartel más ancho, hasta ~64 px de alto de cartel, como mucho la mitad del ancho del
+   frame; se sostiene 1,5 s y vuelve a 1x. Máximo práctico 2x en la Zero 2 W (modo agrupado);
+   `--bus-full-res` (4x) no entra: 10 fps, 65 MB libres, cámara trabada (2026-10-22). El detector
+   sigue viendo el campo completo (`set_inference_roi_abs` es otro control). `--no-bus-zoom` lo apaga.
+   Campaña: `docs/mediciones/2026-10-22-zoom-omnibus.md`.
+3. **Recorte con márgenes**: `SIGN_MARGINS = (0.18, 0.06, 0.06)` (izquierda, derecha, vertical, como
+   fracción de la caja; `bus.py:53-61`), pasados explícitamente al `Pipeline`. Por qué: la caja se
+   ajusta a los LEDs, el número de línea está a la izquierda y el "1" es un trazo fino que, si el
+   borde del recorte cae encima, el OCR pierde ("15" por 115, 2026-09-15). Es el borde del recorte, no
+   el modelo. El vertical bajó de 0,12 a 0,06 el 2026-09-16 (72 combinaciones sobre 117 imágenes,
+   `scripts/tune_margins.py`). Historia: el 2026-10-21 se probó con márgenes en cero; el "1" se siguió
+   perdiendo en la calle y el 2026-10-22 volvieron (#122). Con zoom, una lectura se descarta sin
+   descontar el intento si la caja **con márgenes** queda fuera del recorte (`_with_margins`). La app
+   muestra exactamente el recorte que leyó el OCR.
+4. **OCR**: PP-OCRv5 mobile con el reconocedor `latin`, exportado a ONNX y corrido con `rapidocr` 3.x
+   en la CPU de la Pi, en un hilo aparte de la cámara (paddlepaddle no tiene wheel para Python 3.13 en
+   ARM64). Ya no CRAFT + CRNN ni ExecuTorch: esos eran del camino por el teléfono.
+5. **Lectura y catálogo STM** (`data/catalog_stm.csv`: 504 filas, 145 líneas, 257 destinos):
+   - corrige errores del OCR por similitud (`BRALLE` → `BRAILLE`);
+   - **sólo se dice lo que el catálogo conoce** (2026-10-06, cont. 5): línea inexistente o destino sin
+     coincidencia no se anuncian, para que el TTS no deletree basura;
+   - **completa la mitad que el OCR no leyó** si la confianza es menor a 0,8 (2026-10-07,
+     `COMPLETE_BELOW`, `Reading.inferred`); lo inferido no vota y nunca pisa dígitos leídos;
+   - una lectura que el catálogo confirma en ambos campos se anuncia sola; si no, dos lecturas tienen
+     que coincidir.
+6. **Anuncio**: `.wav` pregrabados por línea y destino (ADR 0003 §5), en el parlante de la placa.
+7. **Evidencia** (#114, 2026-10-12): el modo guarda frames y recortes del OCR, unidos a su fila de
+   telemetría (función Edge `evidence`, bucket privado); la app los muestra en Home (#118).
 
-- **Buses (latency rules) → fully local:** detection on the **Coral TPU** (pretrained, see above)
-  → banner crop → **OCR (CRAFT + CRNN, Spanish, ~250 MB)** on the crop, via **ExecuTorch** on the
-  phone (or on the TPU if it fits). No LLM in this path.
-- **Supermarket (complexity rules) → vision LLM in the cloud (decided 2026-08-30):** Gemini Flash
-  by default, model selectable in the app (Anthropic if the build carries a key). Hard constraint:
-  the model must be **free for the user**. Without internet or key the mode *says so* — the **local
-  fallback is still pending**: measuring **Gemma 3 1B (~700 MB, NOT the 3 GB multimodal)** *with
-  vision* on real products. Until then this is a documented, scoped exception to ADR 0001.
+## Supermercado: LLM con visión en la nube (ADR 0006, 2026-08-30)
+- Excepción explícita y acotada a ADR 0001: sin red, el modo **lo dice y no lee**. El fallback local
+  (un Gemma chico) sigue **PENDIENTE**.
+- Modelos (`MODEL_PROFILES` en `app/src/services/vision/config.ts`; ADR 0006, actualización
+  2026-09-02): **`gpt-5.6-luna` por defecto** (mediana 1668 ms) y **`qwen/qwen3.8-27b` en Groq** (846
+  ms, cuota de ~4 lecturas por minuto). Gemini salió del selector; los retirados viven en
+  `RETIRED_PROFILES`.
+- Las claves viven en el proxy de Supabase (ADR 0008); paga el proyecto, gratis para el usuario.
+- Alcance: **alimentos y productos de almacén** (2026-09-11). La canasta básica es el dataset de
+  evaluación, no el límite de lo que se contesta.
+- La foto la saca la placa y baja por WiFi (ADR 0003, 2026-09-05/08).
 
-**LiteRT-LM is no longer the primary path** (superseding what ADR 0004 originally proposed): the
-2026-08 spike showed its vision path is broken on iOS (library bug, isolated with evidence), while
-the same model works via **ExecuTorch** — but the 3 GB multimodal VLM takes ~6.4 s total, too slow
-for buses. It remains a comparison term in the report. The lab code was retired from the app on
-2026-08-30 (one runtime left: ExecuTorch for OCR) and preserved in branch
-`spike/laboratorio-vision-local`. See
-[`docs/spike-vision-local.md`](../../../../docs/spike-vision-local.md) and
-[`docs/pruebas-y-decisiones.md`](../../../../docs/pruebas-y-decisiones.md).
+## Lo que quedó atrás
+- **Coral TPU** como preprocesadora y "no hay que entrenar": superados el 2026-09-07.
+- **LiteRT-LM / Gemma vía LiteRT-LM** (ADR 0004): dejó de ser el camino primario el 2026-08-22. El
+  laboratorio del spike quedó en la rama `spike/laboratorio-vision-local`
+  ([`docs/spike-vision-local.md`](../../../../docs/spike-vision-local.md)).
+- La rama `feat/bus-banner-pipeline` y los PRs apilados #2 a #6 del repo de Magalí: reemplazados por
+  el #7.
 
-**Since ADR 0001 was amended (2026-08-10), the cloud is allowed as an *optional accelerator*** —
-never as the only path, and never for latency-critical cases. See
-[references/decisiones.md](decisiones.md).
+## Evaluación
+Métricas: **recall, precision, accuracy, F1** (definiciones por caso de uso en
+[`docs/pruebas-y-decisiones.md`](../../../../docs/pruebas-y-decisiones.md)). Campañas con método y
+datos en `docs/mediciones/`.
 
-**La pregunta de alcance de ADR 0004 quedó cerrada por ADR 0006**: el VLM multimodal no reemplaza
-a detección + OCR en el camino del teléfono (6,4 s contra fracciones de segundo, y sin coordenadas
-para priorizar). Detección + OCR es el camino primario de bondis; el VLM queda como término de
-comparación en el informe.
+- **Ómnibus, 117 imágenes** (`bus-banner evaluate`, 2026-10-12, Mac): número / destino / lectura
+  completa = 91,7 / 89,3 / 91,7 % con dos modelos (COCO + cartel); 91,7 / 85,7 / 87,5 % con el modelo
+  de dos clases del sensor. Son del primer fine-tune; el reentrenado no se evaluó (**PENDIENTE**). El
+  set es de videos de TikTok, no de la cámara de los lentes.
+- **Ómnibus en la placa**: 1,27 s del botón a la línea en la Pi 3 B+ prestada (2026-09-15); 1,6 s de
+  que el sensor ve el ómnibus a la línea en la Zero 2 W (SESSION-LOG 2026-09-22); con zoom, un cartel
+  de ~10 px anunciado a 7,6 s y uno cercano a 1,0 s (2026-10-22).
+- **Supermercado**: `docs/mediciones/2026-09-02-modelos-supermercado.md` (latencia; la precisión con
+  fotos reales de góndola sigue pendiente).
 
-## Datasets — evaluation first (ADR 0006, enmendado 2026-09-07)
-Custom **evaluation datasets** to be generated and labeled for (a) metropolitan bus lines and (b)
-food items on a supermarket shelf: expected result vs. obtained result. The **basic basket is the
-dataset**, not the scope of the mode (widened 2026-09-11). The models are pretrained,
-**with one exception since 2026-09-07: the banner detector is fine-tuned** (no pretrained `bus_sign`
-class exists; yolo11n with 2 classes on Magalí's Roboflow dataset, on the V100). The OCR stays
-pretrained and is evaluated (PaddleOCR PP-OCRv5 models, via paddlepaddle on the Mac and via ONNX on
-the device; Tesseract as baseline) on the same `gt.csv`. The metrics — **recall, precision, accuracy, F1** — are *the* way this
-project measures precision, and the instrument that closes the pending supermarket decision
-(Gemma 3 1B vs. Gemini Flash). Definitions and what each metric captures per use case:
-[`docs/pruebas-y-decisiones.md`](../../../../docs/pruebas-y-decisiones.md).
-
-## Open / pending (`PENDIENTE` in the thesis)
-- **Google Gemma** for edge — architecture, edge variants, vision performance, viability on the
-  chosen hardware, and comparison vs. MobileNet / EfficientDet / YOLO-nano.
-- **State of the art**: OCR on transport signage / LED displays; supermarket product recognition
-  (barcode vs. direct vision; existing datasets); real-time detection benchmarks on embedded HW.
-
-## Status
-Pipelines decided per use case (ADR 0006, Proposed — tutor validation pending): buses = detection
-**en el sensor IMX500** (sin Coral) → banner crop → OCR en la Pi; supermarket = vision LLM en la nube.
-**El pipeline de ómnibus existe y corre en la placa** (repo `bus-banner-recognizer` de Magalí, todo en el
-PR #7, rama `feat/bus-line-reader`, desde 2026-10-12). Sobre las 117 imágenes, medido el 2026-10-12:
-con dos modelos (COCO + cartel) número 91,7 % / destino 89,3 % / lectura completa 91,7 %; con el modelo
-de dos clases que corre en el sensor, 91,7 % / 85,7 % / 87,5 %.
-Still to be done: entrenar el modelo de 2 clases en la V100, exportar a IMX500 y medir en la placa, set
-de evaluación con fotos del dispositivo, integración en el daemon, y la decisión de supermercado.
+## Pendiente
+- Prueba en la calle con y sin zoom: distancia a la que se anuncia la línea. Si el cuello es el
+  detector, fase 2: mover su zona de entrada.
+- Épocas, métricas y pesos del reentrenamiento en la V100; evaluarlo sobre las 117 imágenes.
+- Dataset de evaluación con fotos del dispositivo (`scripts/watch_imx500.py --save-frames`).
+- Reentrenar el reconocedor del OCR (la palanca para el destino con el modelo de dos clases).
+- Fallback local del supermercado.
+- Rotar la API key de Roboflow que quedó en la historia del repo de Magalí.
+- Estado del arte (`PENDIENTE` en la tesis): OCR de carteles de transporte / LED; reconocimiento de
+  productos; detección en tiempo real en hardware embebido.

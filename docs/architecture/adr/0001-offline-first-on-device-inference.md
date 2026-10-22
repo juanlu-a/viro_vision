@@ -1,6 +1,6 @@
 # ADR 0001 — Offline-first: self-contained, on-device inference
 
-- **Status:** Accepted (amended 2026-08-10 — see "Update" below)
+- **Status:** Accepted (amended 2026-08-10, see "Update" below; actualización 2026-10-22: sin Coral, supermercado por nube)
 - **Date:** 2026-07-09
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, requirement
@@ -84,5 +84,26 @@ a cloud recognition API — reintroducing the exact internet dependency we are t
   phone** — no change needed to support either architecture.
 - The BLE layer (`app/src/services/ble/`) carries **results/control only**; it is unrelated to where
   inference runs and does not affect the offline guarantee.
+
+## Actualización 2026-10-22: el hardware real y la excepción de nube del supermercado
+
+Tres partes del texto de arriba ya no describen el sistema. Se dejan como registro y se leen así:
+
+- **El Coral TPU salió del diseño el 2026-09-07** ([ADR 0006](0006-pipelines-por-caso-de-uso.md),
+  actualización 2026-09-07). La placa es una Raspberry Pi Zero 2 W con la Raspberry Pi AI Camera
+  (Sony IMX500): el detector de ómnibus (YOLO11n de dos clases, int8) corre dentro del sensor, y la Pi
+  hace el recorte del cartel, el OCR (PP-OCRv5 mobile vía ONNX) y el anuncio. Donde el punto 2 dice
+  "RPi Zero 2 W + Coral TPU via TensorFlow Lite / OpenCV" y los costos hablan de "Coral-compilation /
+  TFLite export", hoy corresponde el export `ultralytics format="imx"` y el `.rpk` armado en la Pi. El
+  requisito de este ADR se cumple en el modo ómnibus: corre entero en la placa, sin red, desde el
+  2026-09-15 (#88).
+- **"Gemma via LiteRT-LM" dejó de ser el camino primario** el 2026-08-22
+  ([ADR 0004](0004-on-device-inference-runtime.md), actualización 2026-08-22; ADR 0006).
+- **El supermercado va por la nube desde el 2026-08-30**, como excepción explícita y acotada al punto 3
+  ("nube sin fallback local, prohibido"): ADR 0006, actualización 2026-08-30. La foto pasa por el proxy
+  propio del proyecto ([ADR 0008](0008-proxy-propio-para-claves-de-nube.md)), con `gpt-5.6-luna` por
+  defecto y `qwen/qwen3.8-27b` como segunda opción (`MODEL_PROFILES` en
+  `app/src/services/vision/config.ts`; ADR 0006, actualización 2026-09-02). Sin red, el modo lo dice y
+  no lee. El fallback local del supermercado sigue **PENDIENTE**.
 
 See also: `.claude/skills/virovision/SKILL.md` and `references/app.md`, `references/ml.md`.

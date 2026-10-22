@@ -4,8 +4,10 @@ Cómo probar el modo supermercado de punta a punta, y en qué orden. Está parti
 cada bloque**, porque buena parte se puede hacer hoy y el resto depende de cosas que sólo se hacen
 una vez (claves, proyecto de Supabase).
 
-Doble propósito: los pasos 8 y 9 **son** la corrida que alimenta el dataset de evaluación de la
-tesis (ADR 0006). No son sólo QA.
+Doble propósito: los pasos 8 y 9 alimentan el dataset de evaluación de la tesis (ADR 0006), no son
+sólo QA. El 8 se hizo el 2026-09-02 (salvo Anthropic). El 9, la corrida de comparación, **no se puede
+correr desde la app desde el 2026-09-08** (ver el aviso del paso 9): va fuera de la app, con el set
+de fotos guardado contra el proxy.
 
 > **VoiceOver encendido en todo lo que diga "con VoiceOver".** Un modo que funciona mirando la
 > pantalla y no funciona con el lector de pantalla es un modo que no funciona: la voz es la interfaz
@@ -173,8 +175,9 @@ strings ~/Library/Developer/Xcode/DerivedData/ViroVision-*/Build/Products/*/Viro
   | grep -E 'AIza|sk-|gsk_'
 ```
 
-- [ ] Con el proxy caído (borrar la función o cortar la red): se anuncia el error, **no** rompe, y el
-      modo ómnibus sigue leyendo.
+- [ ] Con el proxy caído (borrar la función o cortar la red): se dice una frase fija de
+      `app/src/i18n/es.ts` (`reader.cloudUnavailable` o `reader.cloudFailed`), nunca el texto del
+      error (ADR 0011); la app **no** rompe, y el modo ómnibus, que corre en la placa, sigue leyendo.
 
 ---
 

@@ -1,7 +1,8 @@
 # ADR 0003 — Enlace placa ↔ teléfono: BLE como plano de control, la foto se decide midiendo
 
 - **Status:** Proposed (2026-09-04) — **actualizado 2026-09-05: la medición cerró el transporte de la
-  foto: WiFi (plan B)**. Falta validar con el tutor
+  foto: WiFi (plan B)**. Falta validar con el tutor. Hardware real, audio y arranque al día en la
+  actualización 2026-10-22
 - **Date:** 2026-09-04
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** hardware, app, architecture, ble, wifi
@@ -786,6 +787,66 @@ configuración guardada para un SSID ausente no cuesta nada; iOS suelta sola una
 conexión después de la primera**. Si la tabla muestra `joined` en conexiones repetidas, iOS no está
 volviendo solo a la red guardada (por ejemplo, porque prefiere la WiFi de casa, que sí tiene
 internet) y ése sería el próximo tema — no éste.
+
+## Actualización 2026-10-22: el hardware real, el audio provisional y el arranque
+
+Esta nota pone al día lo que el cuerpo del ADR daba por supuesto sobre el hardware. No cambia la
+decisión: BLE sigue siendo el plano de control y la foto sigue yendo por WiFi.
+
+### El hardware que corre este ADR
+
+- **Placa**: Raspberry Pi **Zero 2 W**, la del ADR. Entre el 2026-09-09 y el 2026-09-18 se trabajó
+  sobre una Pi 3 B+ prestada (el CSI de la Zero anterior se rompió); desde el 2026-09-19 hay otra Zero
+  2 W, con el mismo radio BCM43438 (Bluetooth 4.2, sin Data Length Extension) sobre el que se midió la
+  actualización del 2026-09-05. Esas mediciones vuelven a valer.
+- **Cámara y acelerador**: la **Raspberry Pi AI Camera (Sony IMX500)**, no la Camera Module 3. El
+  detector corre dentro del sensor y el **Coral TPU salió del diseño** el 2026-09-07 (ADR 0006). Las
+  menciones de §1 a la Camera Module 3, al Coral y a libedgetpu, y el riesgo 4 de *Costos / riesgos*,
+  quedan sin objeto: el camino sin Linux sigue sin existir (libcamera y BlueZ), pero libedgetpu ya no
+  es parte de él. El USB de la placa quedó libre.
+- **Energía**: Waveshare UPS HAT (C) con su LiPo de 1000 mAh; el INA219 (I2C 1, 0x43) se lee desde el
+  2026-10-06 (#110) y la batería llega a la app por el campo `battery` de `status`.
+
+### §6, la salida de audio: PWM provisional y un transductor óseo
+
+El DAC I2S de §6 **no está instalado**. Lo que suena hoy sale por **PWM redirigido a GPIO**
+(`dtoverlay=audremap,pins_12_13`, `audio_pwm_mode=1`; señal en el pin 32, masa en el 34), probado
+con voz real en un auricular el 2026-09-11 (`hardware/raspi/README.md`, *Por dónde sale el sonido
+físicamente*). Es provisional por una razón eléctrica: un GPIO entrega 16 mA y un auricular de 16 a
+32 Ω pide del orden de 100 mA, así que necesita una resistencia en serie de 100 a 330 Ω o el DAC.
+
+La carcasa (VIA Clara, `hardware/case-via-clara/`) aloja un **transductor de conducción ósea de
+14 mm** sobre la patilla, que es el destino físico del audio; la etapa que lo maneje está pendiente.
+El DAC I2S (MAX98357A, GPIO 18/19/21) sigue siendo el camino previsto, y exige antes mudar el botón
+cableado en el GPIO 21. La frase «USB está ocupado por el Coral» de §6 ya no vale; el descarte de A2DP
+desde la placa, sí: el motivo era la antena compartida, no el USB.
+
+### El arranque: anunciar primero (2026-10-05/06)
+
+El 2026-10-05 la placa no aparecía ni por BLE ni por WiFi: un bloqueo rfkill guardado por
+`systemd-rfkill` dejaba al daemon en bucle sin anunciar nunca. El arreglo y el repaso que siguió
+cambiaron el orden de arranque (#106, #107, #108, #109, #111):
+
+- **`ExecStartPre` levanta el rfkill del Bluetooth** por sysfs en cada arranque del servicio (#106).
+- **La placa anuncia antes de la cámara y del AP** (#107): la cámara arranca en segundo plano y el AP
+  después; mientras tanto una foto contesta 503 y el modo ómnibus dice «preparando la lectura». La
+  app, además, deja de esperar más de 5 s entre reintentos.
+- **dnsmasq sin ping check** (#108): la oferta DHCP al teléfono pasó de 3,0 s a 5 ms; unirse al AP la
+  primera vez pasó de 11,7 s a 10,4 s, y lo que queda es de iOS y ocurre una vez por teléfono.
+- **El OCR en su propio proceso y OpenCV headless** (#109): el event loop que le contesta a BlueZ ya
+  no se congela 13 a 17 s después de que la cámara está lista.
+- **La unidad depende sólo de `bluetooth.target`**, cloud-init está deshabilitado y `modo-red.sh`
+  sólo trabaja si algo cambió (#111).
+
+Medido en la placa desde el kernel: **anuncio 27,0 s → 16,2 s; AP ~29 s → 21,7 s; cámara 31,4 s →
+21,3 s; OCR 44,0 s → 33,6 s** (`docs/SESSION-LOG.md`, 2026-10-06 cont. 3). Con eso, la «señal de
+listo» que §1 proponía antes de pensar en Buildroot es el propio anuncio BLE: el teléfono se conecta
+0,3 s después de que la placa empieza a anunciar.
+
+### Índice de las decisiones de la app sobre este enlace
+
+Para quien llegue por número de PR: la **cola de operaciones GATT** es la actualización del
+2026-09-17 (#94) y **una voz por vez** (`hush`) es la del 2026-09-18 (#97). Las dos siguen vigentes.
 
 ## Ver también
 

@@ -1,6 +1,6 @@
 # ADR 0006 — Pipelines por caso de uso: bondis local, supermercado nube o LLM chico
 
-- **Status:** Proposed — a validar con el tutor (enmendado 2026-09-07: el detector se fine-tunea y corre en el sensor IMX500, sin Coral)
+- **Status:** Proposed, a validar con el tutor (enmendado 2026-09-07: el detector se fine-tunea y corre en el sensor IMX500, sin Coral; 2026-10-19: zoom digital sobre el cartel, medido en la placa el 2026-10-22; 2026-10-22: márgenes del cartel, reentrenamiento en la V100 y catálogo)
 - **Date:** 2026-08-22 (reunión de equipo del 2026-08-21)
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, architecture
@@ -42,6 +42,9 @@ que además reduce lo que viaja por el canal app↔dispositivo.
 Esto **redefine el rol de la Coral TPU**: pasa de "correr los modelos completos" (como la
 describen los docs previos) a **preprocesadora del camino de bondis** — detección y recorte, con
 el OCR en la TPU o en el celular según lo que dé el hardware.
+
+*(Superado el 2026-09-07: el Coral salió del diseño. La detección corre dentro del sensor IMX500 y el
+recorte y el OCR, en la Pi. Ver la actualización 2026-09-07.)*
 
 ### Supermercado → LLM con visión: nube o modelo local chico (pendiente)
 
@@ -95,7 +98,8 @@ roadmap cambia de "entrenar" a "evaluar".
 
 - Dos pipelines para mantener y evaluar en vez de uno.
 - El rendimiento real de YOLO/detección **sobre la Coral TPU de la RPi Zero 2 W** no está medido
-  todavía — el spike midió el teléfono. Es el riesgo técnico principal del camino de bondis.
+  todavía: el spike midió el teléfono. Es el riesgo técnico principal del camino de bondis.
+  *(Superado el 2026-09-07: sin Coral, el riesgo pasó a ser el int8 en el IMX500.)*
 - La decisión de supermercado queda abierta; hasta cerrarla conviven dos candidatos en el plan.
 
 ## Actualización 2026-08-30 — supermercado va a la nube; el fallback local queda pendiente
@@ -210,7 +214,7 @@ escuchó el producto. El linter lo fuerza: `features/audio/` tiene prohibido imp
 **El camino de ómnibus queda en stand by.** Los dos casos del diagrama (modelo parcial o completo
 sobre la Raspi) quedan dibujados y versionados, sin implementar: elegir entre ellos exige tener el
 hardware para medirlos, y hasta entonces la app sostiene el camino local (OCR sobre la foto) que
-los dos comparten.
+los dos comparten. *(Superado: el modo ómnibus corre entero en la placa desde el 2026-09-15.)*
 
 ## Actualización 2026-09-02 — medido contra las APIs reales; el selector queda en dos modelos
 
@@ -270,7 +274,8 @@ Sigue **sin verificar** `claude-haiku-4-5`: requiere tarjeta y no hay clave.
 - Un solo runtime nativo en el binario (ExecuTorch, OCR); el pendiente "cuál queda" se cerró el
   2026-08-30.
 - `ml/` deja de planificar entrenamiento: su trabajo pasa a ser el dataset de evaluación y el
-  export del detector a la TPU.
+  export del detector a la TPU. *(Superado el 2026-09-07: no hay TPU, el detector sí se entrena y se
+  exporta al IMX500, y ese trabajo vive en el repo `bus-banner-recognizer`, no en `ml/`.)*
 
 ## Actualización 2026-09-08 — La entrada del flujo es la placa, y sólo la placa
 
@@ -318,13 +323,6 @@ dejaba el agujero abierto:
 2. el fallback ahora distingue prosa de basura con una regla simple: **la prosa no parsea como
    JSON**. `null`, `{}`, `[]` y un objeto sobrante parsean, y ninguno es una lectura.
 
-## Ver también
-
-[`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md) (el registro completo de lo
-probado), [`docs/spike-vision-local.md`](../../spike-vision-local.md) (las mediciones),
-[ADR 0007](0007-botones-fisicos-modos-de-operacion.md) (los modos que activan cada pipeline) y el
-diagrama de modos en [`docs/architecture/README.md`](../README.md).
-
 ## Actualización 2026-09-07 — el detector del banner se fine-tunea y corre en el sensor IMX500, sin Coral
 
 Dos cosas cambian respecto del texto de arriba, y una se confirma.
@@ -345,14 +343,18 @@ cartel no existe clase preentrenada, y Magalí ya fine-tuneó yolo11n con 140 fo
 **dos clases** (`bus_sign` + `bus`, las cajas de ómnibus pseudo-etiquetadas con YOLO11x y revisadas a
 mano), entrenado en la V100 de Arnaldo Castro. "Nada se entrena" queda vigente para el **OCR**: se
 evalúa (RapidOCR / PaddleOCR / Tesseract sobre el mismo `gt.csv`) y sólo se fine-tunearía si las
-métricas lo exigen.
+métricas lo exigen. *(Superado: el modelo de dos clases se entrenó primero en CPU con esas ~140 fotos
+el 2026-09-15 y después se reentrenó en la V100 con unas 500; el OCR elegido es PP-OCRv5 mobile con
+el reconocedor `latin`. Ver la actualización 2026-10-22.)*
 
 **Se confirma el recorte como frontera del OCR.** Medido el 2026-09-07 sobre 117 imágenes: con el
 recorte del banner RapidOCR acierta el número en el 87,5 % y el destino en el 73 %; con 25 % de margen
 vertical perdía el primer dígito, con 12 % no. El catálogo finito de líneas de STM (503 pares desde
 datos abiertos) corrige el destino por similitud y da la lista de anuncios a pregrabar (ADR 0003).
 Código, métricas y scripts: repo `bus-banner-recognizer`, rama `feat/bus-banner-pipeline` (desde el
-2026-10-12, PR #7, rama `feat/bus-line-reader`).
+2026-10-12, PR #7, rama `feat/bus-line-reader`). *(Superado: el margen vertical bajó al 6 % el
+2026-09-16, las cifras vigentes son las del 2026-10-12, el catálogo tiene 504 filas y la rama
+`feat/bus-banner-pipeline` ya no es la de referencia. Ver la actualización 2026-10-22.)*
 
 **El modo ómnibus es vigilancia continua, no una foto.** El usuario no ve venir el ómnibus: al activar
 el modo (ADR 0007) la cámara queda abierta y el detector corre en cada frame dentro del sensor; una capa
@@ -363,7 +365,7 @@ de ADR 0007: el reconocimiento sigue atado a un modo explícito; dentro del modo
 función. Costo a medir: consumo de cámara + sensor durante el modo (UPS HAT), con apagado automático
 tras un tiempo sin ómnibus.
 
-## Actualización 2026-10-19 — zoom digital sobre el cartel (fase 1, a medir en la calle)
+## Actualización 2026-10-19: zoom digital sobre el cartel (fase 1, medida en la placa el 2026-10-22)
 
 **Qué mostró la prueba de campo.** El modo ómnibus lee bien cuando la toma es buena (con el ómnibus
 detenido en un semáforo, de frente), y el catálogo corrige bien. Pero el cartel sólo se vuelve legible
@@ -409,9 +411,97 @@ tanto) y se encara sólo si la fase 1 no alcanza.
 - Con el box del YOLO sin márgenes (decisión del 2026-10-21) el recorte se ajusta al LED y el primer
   dígito entró completo.
 
-**2026-10-23 — vuelven los márgenes del recorte.** Leer el box del YOLO tal cual (decisión del
+**2026-10-22: vuelven los márgenes del recorte.** Leer el box del YOLO tal cual (decisión del
 2026-10-21) no alcanzó: en la calle se siguió perdiendo el "1" del número de línea. Vuelven los valores
 medidos sobre las 117 imágenes de evaluación: 18 % a la izquierda, donde está el número, y 6 % a la
 derecha, arriba y abajo (`SIGN_MARGINS` en `virovision/bus.py`). La app sigue mostrando exactamente el
 recorte que lee el OCR, ahora con el margen incluido. Con zoom, una lectura se descarta si el recorte
 de la Pi deja afuera el margen, no sólo el cartel.
+
+## Actualización 2026-10-22: márgenes del cartel, reentrenamiento en la V100 y catálogo
+
+**Por qué el recorte lleva márgenes, y por qué importa el "1".** El detector del sensor es un YOLO11n
+de **cajas** (bounding boxes), no de keypoints: devuelve un rectángulo por objeto, y el entrenamiento
+le enseña a ajustarlo a los LEDs del cartel. En Montevideo el número de línea está a la izquierda del
+cartel, y el "1" es un trazo vertical fino. Si el borde izquierdo del recorte cae sobre él, el
+detector de texto del OCR lo pierde o lo confunde con el borde de la imagen: en la placa, el
+2026-09-15, se leyó dos veces "15" por 115. El problema no es el modelo sino el borde del recorte, y
+por eso se resuelve dejando aire alrededor de la caja: `SIGN_MARGINS = (0.18, 0.06, 0.06)`
+(izquierda, derecha y vertical, como fracción de la caja; `hardware/raspi/virovision/bus.py:53-61`).
+La izquierda triplica a la derecha porque ahí está el número.
+
+**El margen vertical es 0,06 y no 0,12.** Bajó el 2026-09-16, después de barrer 72 combinaciones sobre
+las 117 imágenes de evaluación (`scripts/tune_margins.py`; docstring de `expand_banner` en
+`bus_banner/crop.py:64-85`, repo `bus-banner-recognizer`). Es el único de los tres márgenes con una
+señal que sobrevive al ruido, y es monótona: promediada sobre el resto de la grilla, la lectura
+completa da 0,819 / 0,812 / 0,810 / 0,770 para 0,06 / 0,12 / 0,18 / 0,24. Más aire arriba y abajo
+hace que el reconocedor gaste su altura fija de entrada (48 px en PP-OCR) en carrocería en vez de en
+letras. Con el modelo de dos clases, la lectura completa pasó de 79,2 % a 83,3 % (README de
+`bus-banner-recognizer`, "Results"). Los márgenes laterales se dejaron a propósito: no mostraron
+tendencia, y con 56 imágenes con destino una sola imagen vale 1,8 puntos, así que elegir la mejor
+celda de la grilla habría sido ajustarse al set de evaluación.
+
+**La prueba sin márgenes, y la vuelta.** El 2026-10-21 el equipo probó leer la caja del detector
+reentrenado tal cual (márgenes en cero), con la idea de que un modelo mejor entrenado ya no
+necesitaba colchón. Contra un video en pantalla, el 2026-10-22, el "1" de 115 entró completo; en la
+calle se siguió perdiendo, y el mismo 2026-10-22 volvieron los valores medidos (#122). La diferencia
+con antes es dónde viven: ViroVision se los pasa explícitamente al `Pipeline` (`pipeline_options` en
+`bus.py`), porque los márgenes dependen del modelo que dibuja la caja y el modelo se elige en
+ViroVision (`--bus-model`). Una wheel de `bus_banner` que no acepte `margins` arranca igual, con los
+suyos de fábrica, y lo avisa en el journal. Con zoom, una lectura se descarta sin descontar el
+intento si la caja **con márgenes** cae fuera del recorte del ISP (`_with_margins`, `bus.py:260`):
+de lo contrario el pipeline cortaría el margen izquierdo en el borde del frame sin avisar, y se
+volvería a perder el primer dígito. La app muestra exactamente el recorte que leyó el OCR, margen
+incluido.
+
+**El detector, reentrenado en la V100.** El primer fine-tune del modelo de dos clases (`bus_sign`,
+`bus`) se hizo el 2026-09-15 con unas 140 fotos, 40 épocas, en CPU (`models/bus_2classes_yolo11n.pt`,
+commit `8b8a569` del PR #7 de `bus-banner-recognizer`). Después se reentrenó en el servidor V100 de
+Arnaldo Castro con unas 500 fotos (SESSION-LOG 2026-10-21). La placa carga el detector desde
+`/home/virovision/models/bus_sign.rpk` (`bus.py:38`). Épocas, métricas de validación y ubicación de
+los pesos de ese reentrenamiento: **PENDIENTE** (no constan en ningún repo).
+
+**Cifras vigentes (2026-10-12).** Sobre las 117 imágenes, en la Mac, con el código del PR #7: con dos
+modelos (COCO + cartel), número 91,7 %, destino 89,3 % y lectura completa 91,7 %; con el modelo de dos
+clases que corre en el sensor, 91,7 %, 85,7 % y 87,5 % (README de `bus-banner-recognizer`, "Results";
+SESSION-LOG 2026-10-12). Una sola imagen, el 109 de noche, mueve el número unos dos puntos según la
+versión de onnxruntime y OpenCV. El OCR es PP-OCRv5 mobile con el reconocedor `latin`, vía ONNX
+(`rapidocr` 3.x): pasar de PP-OCRv4 a PP-OCRv5 llevó la lectura completa de 75,0 % a 85,4 %, y el
+reconocedor `latin` en vez del `ch` llevó el número de 79,2 % a 91,7 % (mismo README). Son cifras del
+primer fine-tune: el detector reentrenado no se evaluó sobre las 117 imágenes (**PENDIENTE**).
+
+**Dos reglas del catálogo.** El catálogo de la STM (`data/catalog_stm.csv`, armado desde los datos
+abiertos de la Intendencia) tiene 504 filas: 502 pares línea-destino entre 145 líneas, más dos
+carteles sin línea (`COCHE ESCUELA`, `FUERA DE SERVICIO`); 257 destinos distintos. Además de corregir
+errores del OCR por similitud, decide dos cosas:
+
+1. **Sólo se dice lo que el catálogo conoce** (SESSION-LOG 2026-10-06, cont. 5). Una línea que no
+   existe no se anuncia, y un destino sin coincidencia no se dice (queda en el texto crudo): el TTS no
+   puede hacer otra cosa con `U2 NOEVR` que deletrearlo. El destino pasó de 76,8 % a 89,3 %.
+2. **Completa la mitad del cartel que el OCR no leyó** (SESSION-LOG 2026-10-07). Si la confianza del
+   OCR es menor a 0,8 (`COMPLETE_BELOW`, `bus_banner/catalog.py`), un destino que sirve una sola
+   línea da esa línea (116 de los 257 destinos) y una línea con un solo terminal da ese destino. Lo
+   inferido queda marcado en `Reading.inferred`, no vota y nunca pisa dígitos que el OCR sí leyó.
+
+Y una lectura que el catálogo confirma en ambos campos se anuncia sola, sin esperar una segunda que
+coincida (README de `bus-banner-recognizer`, "The bus mode is a live camera", paso 3).
+
+**Qué queda superado de este ADR**, marcado también en el lugar:
+
+- Las menciones a la Coral TPU (decisión original, costos y riesgos, implicaciones): superadas el
+  2026-09-07.
+- Las ~140 fotos y "entrenado en la V100" como objetivo (actualización 2026-09-07): el estado vigente
+  es el reentrenamiento con unas 500 fotos.
+- El OCR "RapidOCR / PaddleOCR / Tesseract" con 87,5 % y 73 %, el margen vertical del 12 % y los "503
+  pares" (actualización 2026-09-07): vigentes PP-OCRv5 `latin`, 0,06, las cifras del 2026-10-12 y 504
+  filas.
+- La rama `feat/bus-banner-pipeline`: el código vive en el PR #7, rama `feat/bus-line-reader`.
+- "El camino de ómnibus queda en stand by" (actualización 2026-09-01): corre entero en la placa desde el
+  2026-09-15.
+
+## Ver también
+
+[`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md) (el registro completo de lo
+probado), [`docs/spike-vision-local.md`](../../spike-vision-local.md) (las mediciones),
+[ADR 0007](0007-botones-fisicos-modos-de-operacion.md) (los modos que activan cada pipeline) y el
+diagrama de modos en [`docs/architecture/README.md`](../README.md).

@@ -43,6 +43,14 @@ cambio), precisión de activaciones y decodificado restringido. Es reportable co
 
 ## Recomendación para discutir con el equipo
 
+> **Superado por el ADR 0006 (2026-09-07).** La recomendación de abajo se adoptó en su forma
+> (detección, recorte del banner, OCR) pero no en sus piezas: el detector no corre en el teléfono ni
+> en un Coral sino **dentro del sensor IMX500** de la AI Camera, y **sí se entrena** (YOLO11n de dos
+> clases, `bus_sign` y `bus`), porque COCO no trae una clase para el cartel. El OCR tampoco es CRAFT +
+> CRNN sobre ExecuTorch: es PP-OCRv5 mobile (`latin`) vía ONNX, en la Pi. El modo ómnibus corre entero
+> en la placa desde el 2026-09-15. Estado vigente en la
+> [actualización 2026-10-22 del ADR 0006](architecture/adr/0006-pipelines-por-caso-de-uso.md).
+
 **Pipeline detección → recorte del banner → OCR, con modelos preentrenados de ExecuTorch:**
 
 1. Detector chico (`rfdetr-nano` / `yolo26`): COCO ya trae la clase "bus" — **no hay que entrenar**.
@@ -70,7 +78,8 @@ draft "[NO MERGEAR]" #33; el índice y la receta para revivirlo están en
 ## Pendientes
 
 - Reportar el bug de visión a `react-native-litert-lm` con el caso reproducible (desde la rama).
-- ~~Decidir runtime único~~ → resuelto el 2026-08-30: queda ExecuTorch (OCR).
+- ~~Decidir runtime único~~ → resuelto el 2026-08-30: queda ExecuTorch (OCR). Superado por el ADR 0006
+  (2026-09-07): el OCR del modo ómnibus corre en la placa, no en el teléfono.
 - Anotado: el mínimo de iOS subió a **17.0** (lo exige el podspec de ExecuTorch).
 - La cuenta paga de Apple quedó **desacoplada de esto**: sirve para distribuir la app al equipo,
   no hace falta para la visión local.

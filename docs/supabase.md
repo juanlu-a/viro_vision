@@ -1,50 +1,45 @@
-# Supabase backend & email auth
+# Supabase: backend, capa de cuenta y funciones
 
-The online account layer (ADR 0002). Login uses **Supabase email + password** (Supabase native auth —
-no Google, no OAuth). On sign-in the session is persisted by AsyncStorage, so the user stays signed in
-across restarts and while offline.
+Supabase cumple hoy dos papeles distintos, y conviene no mezclarlos:
 
-The app code is wired and env-gated: with no `EXPO_PUBLIC_SUPABASE_*` vars it falls back to an
-offline-safe stub (Settings shows "login not configured yet"); with them set, real email sign-in /
-sign-up works. End-to-end login can only be tested against a real Supabase project.
+1. **Infraestructura sin cuentas**, en uso: tres Edge Functions (`vision`, `telemetry`, `evidence`),
+   la tabla `events` y el bucket privado `evidence`. Ninguna pide login (ADR 0008).
+2. **La capa de cuenta** (ADR 0002), **archivada**: auth por **email y contraseña** de Supabase (sin
+   Google ni OAuth), con la sesión persistida en AsyncStorage. El código existe, pero **el login no
+   está montado**: `AuthProvider` no figura en `app/src/app/_layout.tsx`, la app abre directo en las
+   pestañas y Ajustes no tiene sección de cuenta (ADR 0002, actualizaciones del 2026-07-18 y del
+   2026-07-20).
 
-## App wiring (already in the repo)
+## La capa de cuenta en el código (archivada)
 
-- `app/src/services/supabase/config.ts` — reads `EXPO_PUBLIC_SUPABASE_URL` / `_ANON_KEY`.
-- `app/src/services/supabase/supabase.ts` — memoized supabase-js client (AsyncStorage session,
-  `detectSessionInUrl: false`, url polyfill).
-- `app/src/services/supabase/authClient.ts` — email auth (`signInWithPassword` / `signUp`).
-- `app/src/services/supabase/client.ts` — `getSupabaseAuthClient()` returns the real client when
-  configured, else the stub.
-- Consumed by `features/auth/useAuth.ts` (`signIn` / `signUp` / `signOut`), surfaced in the Settings
-  screen's Account section (email + password form).
+- `app/src/services/supabase/config.ts`: lee `EXPO_PUBLIC_SUPABASE_URL` y `_ANON_KEY`.
+- `app/src/services/supabase/supabase.ts`: cliente supabase-js memoizado (sesión en AsyncStorage,
+  `detectSessionInUrl: false`, polyfill de URL).
+- `app/src/services/supabase/authClient.ts`: auth por email (`signInWithPassword`, `signUp`).
+- `app/src/services/supabase/client.ts`: `getSupabaseAuthClient()` devuelve el cliente real si hay
+  configuración, y si no un sustituto que lo dice en lugar de fingir.
+- `app/src/features/auth/AuthContext.tsx`: `AuthProvider` y `useAuth` (`signIn`, `signUp`,
+  `signOut`). Ninguna pantalla lo consume.
 
-## One-time setup
+Si el login vuelve, la puesta en marcha es corta: habilitar *Authentication → Providers → Email*
+(viene encendido), decidir si se exige confirmar el correo (*Confirm email*; sin confirmación,
+`signUp` devuelve la sesión al instante), cargar los dos `EXPO_PUBLIC_SUPABASE_*` en `app/.env`
+(plantilla en `app/.env.example`) y en los secrets de los workflows que compilan, porque las
+`EXPO_PUBLIC_*` se incrustan en el bundle al compilar. No hace falta Google Cloud Console, cliente
+OAuth ni URL de redirección. Y montar `AuthProvider`, que es la decisión que hoy está tomada en
+contra.
 
-1. **Create the Supabase project** (supabase.com) → copy the **Project URL** and **anon public key**
-   (Settings → API).
-2. **Enable Email auth:** Supabase → *Authentication → Providers → Email* (on by default).
-3. **Email confirmation:** decide whether to require it (*Authentication → Sign In / Providers →
-   Confirm email*). For quick testing, turn it **off** so `signUp` returns a session immediately; for
-   production, keep it **on** (then `signUp` returns no session until the user confirms — the app shows
-   "revisa tu correo para confirmarla").
-4. **Local env:** copy `app/.env.example` → `app/.env` and fill both `EXPO_PUBLIC_SUPABASE_*` values.
-5. **CI/EAS:** `EXPO_PUBLIC_*` vars are inlined at build time, so add them where builds run — e.g. an
-   `env` block per profile in `eas.json`, or EAS environment variables — for EAS builds/updates that
-   should ship with the backend configured.
+## Regla de frontera
 
-> No Google Cloud Console, OAuth client, or redirect-URL configuration is needed — email auth only.
+La capa de cuenta es sólo eso. Nada en el camino cámara → detección/OCR → anuncio puede depender de
+ella (ADR 0001). Perder conectividad nunca puede romper el reconocimiento.
 
-## Boundary rule
-
-Supabase is the account layer only. Nothing on the camera → detection/OCR → announcement path may
-depend on it (ADR 0001). Losing connectivity must never break recognition or a persisted session.
-
-**Ojo con la Edge Function de abajo, que parece la excepción y no lo es.** El proxy de visión usa la
-*infraestructura* de Supabase, no la cuenta: no hay sesión, ni usuario, ni tabla — es una función
-HTTP que da la casualidad de estar hospedada en el mismo proveedor. La regla de arriba sigue vigente
-tal como está escrita. Y el camino que el proxy toca es el de **supermercado**, que ya dependía de
-internet por decisión explícita (ADR 0006); el de ómnibus corre local y no lo atraviesa.
+**Ojo con las Edge Functions de abajo, que parecen la excepción y no lo son.** Usan la
+*infraestructura* de Supabase, no la cuenta: no hay sesión ni usuario. El proxy de visión está en el
+camino de **supermercado**, que ya dependía de internet por decisión explícita (ADR 0006); el modo
+ómnibus corre entero en la placa (#88) y no lo atraviesa. La telemetría y la evidencia son
+instrumentación: el analizador estático impide importarlas desde el camino que lee y anuncia
+(`app/eslint.config.js`).
 
 ---
 

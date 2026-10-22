@@ -1,6 +1,6 @@
 # ADR 0004 — Runtime de inferencia on-device (Gemma vía LiteRT-LM)
 
-- **Status:** Proposed — a discutir con el tutor
+- **Status:** Proposed, a discutir con el tutor (superado en lo central por ADR 0006; actualización 2026-10-22)
 - **Date:** 2026-08-11
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, requirement
@@ -205,3 +205,20 @@ en el informe.
 
 El estado sigue **Proposed**: la validación con el tutor está pendiente, igual que la de ADR 0006
 y [ADR 0007](0007-botones-fisicos-modos-de-operacion.md).
+
+## Actualización 2026-10-22: sin Coral, y el supermercado en la nube
+
+Dos afirmaciones de la actualización 2026-08-22 quedaron superadas:
+
+- **La Coral TPU como preprocesadora de bondis.** Salió del diseño el 2026-09-07
+  ([ADR 0006](0006-pipelines-por-caso-de-uso.md), actualización 2026-09-07): la detección corre dentro
+  del sensor IMX500 de la Raspberry Pi AI Camera, y la Pi Zero 2 W hace el recorte del cartel y el OCR
+  (PP-OCRv5 mobile vía ONNX, con `rapidocr`). Ningún runtime de los que evalúa este ADR participa del
+  camino de ómnibus, que corre entero en la placa desde el 2026-09-15.
+- **Supermercado "Gemma 3 1B local o Gemini Flash en la nube, pendiente".** Se resolvió el 2026-08-30 a
+  favor de la nube (ADR 0006, actualización 2026-08-30), a través del proxy propio del proyecto
+  ([ADR 0008](0008-proxy-propio-para-claves-de-nube.md)). Los modelos vigentes son `gpt-5.6-luna` por
+  defecto y `qwen/qwen3.8-27b` (`MODEL_PROFILES` en `app/src/services/vision/config.ts`; ADR 0006,
+  actualización 2026-09-02). La gratuidad se mantiene para el usuario: paga el proyecto (ADR 0006,
+  actualización 2026-09-01). Un Gemma chico sobre ExecuTorch como fallback local sigue **PENDIENTE** de
+  medir.

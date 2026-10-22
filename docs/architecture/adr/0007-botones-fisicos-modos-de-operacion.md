@@ -188,6 +188,30 @@ veces.
 > cambie» describe la implementación que el PR #80 reemplazó al sacar el pipeline de React. Hoy hay
 > un solo punto de entrada (`requestReading(source)`) y el origen viaja como parámetro.
 
+## Actualización 2026-10-22: el hardware existe, el click en ómnibus repite, y el pulsador de la carcasa
+
+**El hardware ya no está «sin empezar».** Lo que *Costos / riesgos* e *Implicaciones para el código
+actual* daban como futuro está hecho: el botón está cableado en GPIO 5 (pin físico 29, masa en el 30)
+desde el 2026-09-07 (`hardware/raspi/virovision/button.py`), la máquina de estados vive en
+`modes.py`, y `app/src/features/device/gatt.ts` dejó de ser un stub: modela la característica `mode`
+y los eventos `mode` y `read`. El selector de camino de Inicio sigue existiendo como versión de
+desarrollo; con la placa conectada, el modo lo fija el botón y la app lo refleja.
+
+**Un click estando en modo ómnibus repite el último anuncio** (#88, 2026-09-15;
+`hardware/raspi/virovision/core.py:213-216`, `bus.repeat_last`). La decisión original reservaba el
+click corto dentro de un modo «para disparar una lectura», y la actualización del 2026-09-09 hizo que
+un gesto nombre un modo; en ómnibus no hay nada que disparar, porque el modo vigila solo. El caso que
+cubre es el del usuario que no llegó a escuchar la línea: repetirla es lo único útil que puede pedir.
+No es una lectura nueva: no se anuncia otro ómnibus ni se reinicia la vigilancia.
+
+**El pulsador de la carcasa es un SMD de 4 × 4 × 1 mm**, no el tact switch de 6 × 6 que cita la
+tabla del 2026-09-13. La carcasa VIA Clara (desde la v0.11, 2026-10-21) lo aloja en un bolsillo de la
+mitad externa, con una tecla impresa pegada sobre su actuador (que mide menos de 1 mm) y una tapita
+detrás que lo respalda; el botón queda adelante, en x −14, con un anillo en bajorrelieve para
+encontrarlo al tacto. Los tiempos del antirrebote se calibraron con el pulsador de 6 × 6 soldado a la
+placa de desarrollo: **hay que repetir la verificación de los treinta gestos con el SMD montado en la
+carcasa** (pendiente), porque cambian el recorrido y el rebote mecánico.
+
 ## Ver también
 
 [ADR 0006](0006-pipelines-por-caso-de-uso.md), el diagrama de modos en

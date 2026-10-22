@@ -189,7 +189,19 @@ cd app
 npx expo run:android   # requiere Android Studio + SDK
 ```
 
-o un APK por EAS, que no requiere toolchain local ni cuenta paga.
+Para instalar la app en un Android sin tienda (Google Play está apagado, `PLAY_ENABLED`) se usa un
+`.apk` universal firmado:
+
+- **Desde CI**: cada push a `staging` con cambios en `app/` deja el `.apk` como artefacto del run de
+  `.github/workflows/android-apk.yml` (#79), y el mismo workflow se puede lanzar a mano desde
+  cualquier rama para repartir un build que todavía no se mergeó.
+- **En local**: `bash scripts/apk.sh` desde `app/`, con `APK_KEYSTORE` y `APK_KEYSTORE_PASSWORD` para
+  firmar con la clave de subida (sin keystore firma con la clave de debug de la plantilla, que sirve
+  para una demo).
+
+Un `.apk` firmado con la clave del equipo y uno instalado desde Play tienen firmas distintas: el día
+que la app se publique en la tienda, hay que desinstalar el `.apk` antes. Detalle en
+[`ci-cd.md`](ci-cd.md) y [`android-play.md`](android-play.md).
 
 ## Problemas conocidos
 

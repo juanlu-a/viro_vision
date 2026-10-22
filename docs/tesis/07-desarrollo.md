@@ -55,7 +55,7 @@ en modo supermercado, porque el usuario que repite el gesto está pidiendo que s
 
 El sistema **nunca emite audio no solicitado**. Los dos modos difieren en qué significa "solicitado":
 en supermercado, el usuario pide una lectura puntual; en ómnibus, el modo mismo es la solicitud, y
-mientras esté activo el dispositivo vigila y anuncia lo que aparece (§7.4.6).
+mientras esté activo el dispositivo vigila y anuncia lo que aparece (§7.4.9).
 
 ### 7.1.3 Los tres flujos de reconocimiento
 
@@ -223,7 +223,9 @@ gasto configurado en la consola de cada proveedor.
 nada) y es también el que más probablemente se use sin cobertura, en una parada a la intemperie. El
 ADR 0001 lo mantiene como camino local por defecto.
 
-**Evidencia.** Medido sobre la placa, con el ciclo completo disparado por el botón físico:
+**Evidencia.** Medido el 2026-09-15 sobre una Raspberry Pi 3 B+ prestada (la Zero 2 W tenía el
+conector de la cámara roto), con la misma cámara y el ciclo completo disparado por el botón físico
+(`docs/mediciones/2026-09-15-omnibus-en-placa.md`):
 
 | Etapa | Tiempo desde el gesto |
 |---|---|
@@ -234,13 +236,21 @@ ADR 0001 lo mantiene como camino local por defecto.
 
 Lecturas posteriores en régimen: 971 ms, 1001 ms y 1006 ms.
 
+En la Raspberry Pi Zero 2 W, la placa definitiva, el 2026-09-22 y contra el mismo video del 115, la
+línea se anunció **1,6 s** después de que el sensor vio el ómnibus, tras dos lecturas de OCR de 932 y
+583 ms, con 75 cuadros cada 5 s y detecciones en el 95 % de ellos (`docs/SESSION-LOG.md`,
+2026-09-22). Las dos cifras no se miden desde el mismo punto: la de la Pi 3 B+ cuenta desde el botón,
+la de la Zero 2 W desde que el sensor ve el ómnibus.
+
 **Conclusión operativa: el costo es el OCR.** La detección ocurre dentro del sensor de la cámara, no
 consume CPU de la placa y no aparece en el presupuesto de tiempo: el sensor entrega cajas
 delimitadoras a 15 cuadros por segundo mientras el procesador hace otra cosa.
 
-**Costo de arranque.** Desde el encendido del servicio, el dispositivo responde a una consulta de
-salud a los **7 segundos** y el modo ómnibus queda operativo a los **47 segundos**; los 40 segundos
-intermedios son la carga de los modelos de OCR. Un reinicio del servicio sin apagar la placa reduce
+**Costo de arranque.** En la Pi 3 B+ (2026-09-15), desde el encendido del servicio, el dispositivo
+responde a una consulta de salud a los **7 segundos** y el modo ómnibus queda operativo a los **47
+segundos**; los 40 segundos intermedios son la carga de los modelos de OCR. En la Zero 2 W, después
+de reordenar el arranque, la placa anuncia por BLE a los 16,2 s, la cámara está lista a los 21,3 s y el
+OCR a los 33,6 s, contados desde el kernel (`docs/SESSION-LOG.md`, 2026-10-06, cont. 3). Un reinicio del servicio sin apagar la placa reduce
 el total a unos 24 segundos. Por eso los modelos se cargan al arrancar y no al apretar el botón: un
 botón que contesta un minuto más tarde es, a los efectos del usuario, un botón roto.
 
@@ -254,12 +264,23 @@ sensor**. La conversión del modelo entrenado arroja una ocupación de **7,12 MB
 disponibles en el chip (90 %)**, con verificación explícita de que el modelo entra. El sensor procesa
 a **15 cuadros por segundo sin consumir CPU ni memoria de la placa**.
 
-**Decisión.** El Coral sale del diseño. La consecuencia es doble: se elimina un componente, su costo
-y su consumo, y se libera el único puerto USB de la placa. El camino TensorFlow Lite se abandona en
-favor de ONNX y del formato propio del sensor.
+**Decisión.** El Coral sale del diseño (ADR 0006, enmienda del 7 de septiembre de 2026). La
+consecuencia es doble: se elimina un componente, su costo y su consumo, y se libera el único puerto USB
+de la placa. El camino TensorFlow Lite se abandona en favor de ONNX y del formato propio del sensor.
+La decisión se tomó y se mantuvo sobre la placa definitiva, la Raspberry Pi Zero 2 W: el detector no
+usa memoria ni procesador de la placa, que en este modelo dispone de unos 415 MB de memoria útil, y
+eso deja la CPU entera para el recorte y el reconocimiento de texto.
+
+**Un segundo uso del procesador de imagen.** El sensor no sólo detecta: el procesador de imagen de la
+placa puede recortar la zona del sensor que se entrega como imagen sin alterar lo que ve el detector,
+que sigue observando el campo completo. Sobre esa propiedad se construyó en octubre un **zoom digital
+sobre el cartel** (ADR 0006, actualización del 19 de octubre de 2026), que en la Zero 2 W llega hasta
+2x; el modo de máxima resolución, que permitiría 4x, se descartó en esta placa porque redujo la tasa a
+10 cuadros por segundo, dejó 65 MB de memoria libres y bloqueó la cámara (prueba del 22 de octubre de
+2026).
 
 **Consecuencia no deseada, documentada.** La ocupación del 90 % del chip implica que **sólo cabe un
-modelo**, lo que condiciona directamente la elección del detector (§7.4.3).
+modelo**, lo que condiciona directamente la elección del detector (§7.4.4).
 
 ### 7.2.6 Calibración de la interacción física
 
@@ -319,27 +340,34 @@ aplicación destinada a personas que no la ven. Esa información no se perdió: 
 
 | Función | Componente | Estado |
 |---|---|---|
-| Cómputo | Raspberry Pi Zero 2 W | **Sustituida temporalmente** por una Pi 3 B+ prestada |
+| Cómputo | Raspberry Pi Zero 2 W | En uso (desde el 19 de septiembre de 2026, ver abajo) |
 | Visión | Raspberry Pi AI Camera (sensor Sony IMX500, 12 MP, inferencia en el sensor) | Integrada |
-| Entrada | Pulsador táctil en GPIO 5 | Integrado y verificado |
-| Audio | Salida PWM por GPIO (provisoria) → conversor digital-analógico I2S | **Pendiente** el conversor definitivo |
-| Alimentación | Waveshare UPS HAT (C) + batería LiPo | Adquirida, sin integrar |
-| Carcasa | Impresión 3D sobre la patilla | **Pendiente** |
+| Entrada | Pulsador en GPIO 5; en la carcasa, pulsador SMD de 4 × 4 × 1 mm con tecla impresa | Integrado y verificado; el de la carcasa, pendiente de verificar |
+| Audio | Salida PWM por GPIO (provisoria) hacia un transductor de conducción ósea de 14 mm; destino: conversor digital-analógico I2S | **Pendiente** la etapa definitiva |
+| Alimentación | Waveshare UPS HAT (C) + batería LiPo 803040 de 1000 mAh | Integrada; el nivel de batería llega a la aplicación (§7.3.3) |
+| Carcasa | VIA Clara, dos mitades a presión impresas en 3D sobre la patilla | v0.9 integrada al repositorio; v0.12 en desarrollo (§7.3.5) |
 
-**Sobre la placa en uso.** El conector de cámara de la Raspberry Pi Zero 2 W se dañó durante el
-desarrollo y el trabajo continuó sobre una Raspberry Pi 3 B+ prestada. Es una sustitución
-funcionalmente adecuada (mismo sistema operativo, misma interfaz de cámara) pero **con un
-controlador de radio distinto**, lo que invalida la comparabilidad de cualquier medición de
-Bluetooth realizada sobre ella. Este informe declara explícitamente esa limitación en cada medición
-afectada.
+**Sobre la placa en uso.** El conector de cámara de la primera Raspberry Pi Zero 2 W se dañó durante
+el desarrollo, y entre el 9 y el 18 de septiembre de 2026 el trabajo continuó sobre una Raspberry Pi
+3 B+ prestada. Era una sustitución funcionalmente adecuada (mismo sistema operativo, misma interfaz de
+cámara) pero **con un controlador de radio distinto**. Desde el 19 de septiembre el dispositivo vuelve
+a ser una Zero 2 W, con el mismo controlador de radio (BCM43438, Bluetooth 4.2 sin extensión de
+longitud de datos) sobre el que se midió el enlace en §7.2.1, de modo que esas mediciones vuelven a
+ser representativas. La placa actual no tiene puerto Ethernet y su WiFi opera sólo en 2,4 GHz. Las
+cifras tomadas sobre la Pi 3 B+ se identifican como tales donde aparecen; en particular, el costo de
+arranque en frío del modo ómnibus de §7.2.4 (47 segundos) es de esa placa, y las cifras vigentes de
+la Zero 2 W están en §7.3.2.
 
 **Sobre el audio.** La salida actual es audio por modulación de ancho de pulso redirigida a pines de
-propósito general, suficiente para verificar el camino completo pero no para uso real. La limitación
-es eléctrica y está documentada: un pin de propósito general entrega **16 mA**, mientras que un
-auricular de 16 a 32 ohmios demanda del orden de **100 mA continuos**, seis veces el límite. El
-destino es un conversor digital-analógico I2S, cuya integración exige además reubicar el pulsador,
-que hoy ocupa uno de los pines necesarios. El volumen se limita al 90 % y no al 100 % porque la
-salida PWM satura en el extremo superior, y la distorsión es peor que un volumen menor.
+propósito general (señal en el pin físico 32, masa en el 34), suficiente para verificar el camino
+completo, con voz audible en un auricular, pero no para uso real. La limitación es eléctrica y está
+documentada: un pin de propósito general entrega **16 mA**, mientras que un auricular de 16 a 32
+ohmios demanda del orden de **100 mA continuos**, seis veces el límite. La carcasa aloja un
+**transductor de conducción ósea de 14 mm**, que es el destino físico del sonido; la etapa que lo
+maneje está pendiente. El destino electrónico es un conversor digital-analógico I2S, cuya integración
+exige además reubicar el pulsador, que hoy ocupa uno de los pines necesarios. El volumen se limita al
+90 % y no al 100 % porque la salida PWM satura en el extremo superior, y la distorsión es peor que un
+volumen menor.
 
 **Sobre el enfoque.** El sensor tiene **enfoque manual**. Las primeras capturas salieron
 desenfocadas; el procedimiento quedó documentado como paso obligatorio de puesta en marcha, con una
@@ -348,8 +376,10 @@ situado a 10-20 metros.
 
 ### 7.3.2 El daemon
 
-El software del dispositivo es un servicio en Python de **4421 líneas** repartidas en 16 módulos,
-con **86 pruebas automatizadas**. Su diseño separa un **núcleo independiente del transporte** (que
+El software del dispositivo es un servicio en Python de **4915 líneas** repartidas en 22 archivos
+(21 módulos y el archivo de paquete), con **195 pruebas automatizadas** que pasan y 2 que se omiten
+fuera de la placa, en 18 archivos de prueba (recuento del 22 de octubre de 2026 sobre
+`hardware/raspi/`). Su diseño separa un **núcleo independiente del transporte** (que
 conoce los comandos, los modos y las transferencias) de los adaptadores que lo conectan al mundo: el
 adaptador BLE sobre BlueZ, el servidor HTTP, la cámara y el audio.
 
@@ -357,10 +387,36 @@ Esa separación habilitó una herramienta de desarrollo decisiva: un **emulador*
 núcleo sobre la pila Bluetooth de macOS, lo que permite desarrollar y probar la aplicación móvil
 contra un dispositivo simulado, sin depender de la disponibilidad física de la placa.
 
-El servicio expone además un pequeño servidor HTTP en el punto de acceso propio, con cuatro rutas:
-consulta de salud, generación de datos de prueba, captura y entrega de la última fotografía
-(1024 píxeles de lado mayor, calidad 70; aproximadamente 35 KB en 200 a 235 ms incluyendo la
-captura) y recepción de audio para su reproducción.
+El servicio expone además un pequeño servidor HTTP en el punto de acceso propio, con cinco rutas
+(`http_server.py`): consulta de salud, generación de datos de prueba, captura y entrega de la última
+fotografía (1024 píxeles de lado mayor, calidad 70; aproximadamente 35 KB en 200 a 235 ms incluyendo
+la captura), recepción de audio para su reproducción y entrega de la evidencia del modo ómnibus (cada
+cuadro y cada recorte que leyó el reconocedor de texto, sólo después de que el dispositivo los anunció
+por BLE). Esta última ruta es temporal: el equipo decidió retirarla antes de la versión final, porque
+se trata de fotografías de la vía pública con personas.
+
+**Secuencia de arranque.** El 5 de octubre de 2026 el dispositivo dejó de ser visible por completo:
+un bloqueo de software del Bluetooth, guardado por el sistema y restituido en cada arranque, dejaba al
+servicio reiniciándose sin anunciar nunca. El arreglo llevó a revisar el arranque entero con una regla
+única, **anunciar primero**: el teléfono sólo puede encontrar el dispositivo cuando éste anuncia, y
+todo lo que se interponga antes lo vuelve invisible. El servicio levanta el bloqueo antes de
+arrancar, depende sólo de la pila Bluetooth (ya no espera a la red), registra el perfil y anuncia, y
+recién después inicia la cámara y el punto de acceso. Se eliminaron además los componentes del
+sistema que sólo servían en el primer arranque, la comprobación previa del servidor DHCP (3,0 s por
+cada unión del teléfono) y una importación de la biblioteca de visión que congelaba el servicio 13
+segundos; el reconocedor de texto se carga en un proceso aparte. Medido sobre la Zero 2 W desde el
+inicio del núcleo:
+
+| Hito | Antes | Después |
+|---|---|---|
+| El dispositivo anuncia por BLE | 27,0 s | **16,2 s** |
+| Punto de acceso disponible | ~29 s | 21,7 s |
+| Cámara con el detector lista | 31,4 s | 21,3 s |
+| Reconocedor de texto listo (modo ómnibus operativo) | 44,0 s | **33,6 s** |
+
+Fuente: bitácora del proyecto, 6 de octubre de 2026. Con el arranque nuevo el teléfono se conectó
+0,3 s después del primer anuncio. Un modo ómnibus pedido antes de que el reconocedor esté listo no
+queda en silencio: el dispositivo dice «preparando la lectura» y empieza a vigilar solo cuando puede.
 
 **Configuración.** Las banderas de ejecución viven en un archivo de configuración del sistema, fuera
 del paquete del servicio, de modo que sobreviven tanto a las actualizaciones como al cambio entre los
@@ -378,19 +434,25 @@ El presupuesto energético está estimado a partir de mediciones de terceros sob
 
 | Estado | Consumo estimado |
 |---|---|
-| Espera (BLE anunciando, sin video) | 0,5 – 0,6 W |
-| Activo (cámara, punto de acceso y detección en el sensor) | 2 – 3 W, pico ~0,6 A |
+| Espera (BLE anunciando, sin video) | 0,5 a 0,6 W |
+| Activo (cámara, punto de acceso y detección en el sensor) | 2 a 3 W, pico ~0,6 A |
 
 | Celda | Dimensiones | Autonomía estimada |
 |---|---|---|
-| LiPo 2000 mAh | 50 × 34 × 10 mm, ~36 g | 3 – 4 h |
-| LiPo 1000 mAh (incluida con el módulo) | 40 × 30 × 8 mm, ~20 g | 1,5 – 2 h |
+| LiPo 1000 mAh (incluida con el módulo; la que aloja la carcasa) | 40 × 30 × 8 mm, ~20 g | 1,5 a 2 h |
+| LiPo 2000 mAh (mejora posible) | 50 × 34 × 10 mm, ~36 g | 3 a 4 h |
 
-**Estado real: el consumo no está medido.** Falta instrumentar la línea de alimentación con un
-medidor en serie y leer el monitor de corriente que incorpora el módulo de alimentación; en
-consecuencia, el campo de batería de la telemetría del dispositivo se reporta como nulo. Poder
-anunciar el nivel de batería por voz es, en este proyecto, un requisito de accesibilidad y no una
-comodidad: el usuario no puede consultar un indicador luminoso.
+**La batería está integrada y se lee** desde el 6 de octubre de 2026. El módulo de alimentación
+incorpora un monitor INA219, que el dispositivo lee por I2C (bus 1, dirección 0x43, confirmada
+escaneando el bus). Se lee sólo la tensión de la celda; el porcentaje se obtiene de la curva de
+descarga de una batería LiPo y se suaviza para que no oscile con la carga. El valor viaja en el estado
+del dispositivo por BLE y la aplicación lo presenta en la pestaña del dispositivo. Poder anunciar el
+nivel de batería por voz es, en este proyecto, un requisito de accesibilidad y no una comodidad: el
+usuario no puede consultar un indicador luminoso.
+
+**Estado real: el consumo no está medido.** Falta instrumentar la línea de alimentación con un medidor
+en serie para reemplazar las estimaciones de terceros de la tabla por mediciones propias y, con ellas,
+la autonomía real.
 
 ### 7.3.4 Los dos modos de operación del dispositivo
 
@@ -437,6 +499,92 @@ Como vía intermedia, el proyecto incorporó una herramienta que **apaga el punt
 del enlace de control**, tras lo cual la placa vuelve sola a la red conocida y el acceso remoto queda
 disponible sin abrir el dispositivo ni manipular la tarjeta. Medido sobre la placa: **cinco segundos
 de punta a punta**.
+
+### 7.3.5 La carcasa
+
+**Requisitos.** La carcasa tiene que alojar el conjunto real de componentes sobre la patilla de unos
+lentes, cerrar sin tornillos (para abrirse y cerrarse durante el desarrollo sin herramientas),
+proteger el flex de la cámara, dejar accesibles la llave de encendido, la carga y la tarjeta de
+memoria, y presentar **un único botón localizable al tacto**. Es un componente de accesibilidad y no
+sólo de protección: quien la usa no puede ver dónde está el botón ni de qué lado está el encendido.
+
+**El modelo.** Se diseñó como un modelo paramétrico en OpenSCAD (proyecto «VIA Clara», en
+`hardware/case-via-clara/`), en el que cada medida del exterior se deriva de las del conjunto
+interior: si una medida real resulta menor que la supuesta, la carcasa se achica sola. El conjunto,
+de la cara que apoya en la cabeza a la externa, es: las cabezas de los tornillos bajo el módulo de
+alimentación, el módulo, la batería de 40 × 30 × 8 mm (del lado de los contactos de resorte que
+alimentan la placa), la Raspberry Pi Zero 2 W y, sobre ella, el conector de pines soldado (8,5 mm) y
+los separadores hexagonales. Adelante quedan el conector de la cámara y la llave de encendido;
+atrás, la tarjeta microSD y el conector de carga. El cuerpo son **dos mitades** unidas por **trabas a
+presión**: cada traba es una viga que corre a lo largo de la junta, dentro de la pared, y flexiona en
+el plano de la cama de impresión y no a través de las capas, que es donde una pieza impresa se rompe.
+Cada viga se imprime atada por un puente fino que se corta después de imprimir. Completan el cuerpo
+una corredera impresa que lleva la palanca de la llave de encendido hasta una ventana de la cara
+cabeza, con un punto en relieve que marca el lado de encendido; un brazo que sostiene el transductor
+de conducción ósea de 14 mm contra la cabeza; dos puentes para un elástico plano de 6 mm; y el botón,
+rodeado por un anillo en bajorrelieve.
+
+**Una iteración guiada por la impresión.** Las verificaciones del modelo se hacen contra maquetas
+de los componentes, y cada impresión mostró algo que las maquetas no tenían. La tabla resume la
+secuencia (bitácora del proyecto, 14, 17, 21 y 22 de octubre de 2026):
+
+| Versión | Cuerpo (mm) | Lo que mostró la impresión | Cambio en la versión siguiente |
+|---|---|---|---|
+| v0.8 | (modelo de partida) | sin imprimir; suponía un conjunto de 16,5 mm de espesor, frente a los ≈ 23 reales | v0.9 se rehízo sobre el conjunto real |
+| v0.9 | 91,9 × 31,4 × 37,6 | impresa el 17 de octubre, encajó casi todo. Los separadores estaban del lado de la placa y no del módulo; la microSD no entraba (hubo que cortar el extremo); paredes de más; imagen girada 90°; el soporte del lente era mayor que en el plano | conjunto fijado a la mitad externa; paredes de 1,6 mm; cámara girada 90° en su plano, con el flex directo al conector |
+| v0.10 | 92,9 × 28,7 × 36,6 | impresa el 21 de octubre, falló: guías de la cámara demasiado finas para la impresora (0,6 a 0,65 mm), botón contra el disipador de la placa, ranura de la microSD en espejo, brazo del auricular que no entraba, pernos traseros que se rompían | medidas reales tomadas con calibre; guías de 1,2 mm; botón alejado del disipador; microSD accesible con la carcasa cerrada; trabas traseras en lugar de pernos |
+| v0.11 | 83,4 × 28,5 × 37,2 | impresa el 22 de octubre en dos variantes (cámara integrada y con tapa aparte). La de tapa exigía demasiados ajustes; en la integrada el lente no entraba y las trabas delanteras, fundidas sobre las guías de la cámara, no flexionaban y se partieron | se descarta la variante con tapa; 5,0 mm entre la guía delantera y el frente; trabas delanteras detrás de las guías, con luz debajo |
+| **v0.12** | **85,8 × 28,5 × 37,2** | en desarrollo, sin imprimir completa | (vigente) |
+
+Tres hallazgos de esa secuencia cambiaron el diseño y no sólo una medida. **Los separadores
+hexagonales asoman sólo 1,2 mm sobre la placa**, demasiado poco para fijarlos por calor sin calentar
+la placa: desde la v0.11 el conjunto no se fija, lo sostiene la carcasa cerrada (alojamientos holgados
+en una mitad, la pared de la otra apoyada en las cabezas de los tornillos), y se retira sin esfuerzo.
+**El pulsador real de la carcasa es un SMD de 4 × 4 × 1 mm**, con un actuador de menos de 1 mm: lleva
+una tecla impresa pegada encima y una tapa trasera que lo respalda en cada pulsación. Y **las piezas
+finas no se imprimen**: un nervio de 0,65 mm no se reproduce aun con la máxima calidad, de modo que
+ningún detalle funcional baja de tres líneas de extrusión (1,2 mm).
+
+**Cotas de la v0.12** (`via_clara_v0_12.scad`): cuerpo de 85,8 × 28,5 × 37,2 mm (largo, ancho y alto),
+con la nariz que aloja la cámara de 32,2 mm de alto; ~32,2 mm de ancho total con los puentes del
+elástico y el zócalo del brazo, sin contar el brazo. Paredes de 1,6 mm a los costados y de 2,7 mm
+arriba y abajo, donde viven las vigas de las trabas; ocho trabas; ventana de la llave de 5,2 × 7,4 mm;
+agujero del lente de 9,4 mm de diámetro; alojamientos de los separadores redondos, de 3,4 mm de
+diámetro y 1,5 de profundidad (los hexagonales de la v0.11 salieron cerrados por los perímetros de la
+impresión). Seis piezas imprimibles (las dos mitades, el brazo del auricular, la tecla, la corredera y
+la tapa del pulsador), más un modelo del conjunto cerrado que no se imprime y sirve para revisarlo en
+el programa de laminado. Para la v0.12 se agregaron piezas de
+prueba: la nariz cortada (en dos anchos de ranura para la cámara, a comparar) y la pared con los
+alojamientos de los separadores, de modo de validar lo nuevo sin imprimir la carcasa entera.
+
+**Verificación.** Un guion (`export.sh`) regenera las piezas, las imágenes y una guía con flechas
+que indica para qué es cada ranura, y comprueba que cada pieza imprimible sea un único sólido apoyado
+en la cama. Corre además **18 verificaciones de interferencia** entre volúmenes: las mitades entre
+sí; cada mitad contra placas, batería, llave, cámara, pulsador, tornillos y separadores; la corredera
+en sus dos posiciones; el recorrido del flex; el brazo; y los **caminos de armado**, no sólo la
+posición final (la tecla y el pulsador entrando a su alojamiento, el conjunto bajando a sus apoyos, la
+palanca entrando en la corredera, la cámara entrando en su ranura). Cada verificación tiene que dar un
+volumen vacío o un contacto de volumen cero, y el guion falla si alguna no lo da. Su valor está acotado
+por las maquetas: una verificación contra una medida supuesta no dice nada de la pieza real, y fue
+exactamente eso lo que hizo fallar la v0.10.
+
+**Revisión.** El equipo sometió el modelo 3D al flujo de revisión multi-modelo tackle-ticket, en el
+que revisores basados en distintos modelos (Opus, Sonnet, Haiku y Codex) examinan el mismo cambio por
+separado y sus hallazgos se consolidan y corrigen en rondas sucesivas. En la v0.9 (14 de octubre de
+2026, tres rondas) la revisión llevó las trabas al plano de la cama, reservó el volumen del flex de la
+cámara, que no tenía por dónde pasar, y agregó las verificaciones de los caminos de armado; en la
+v0.11 (21 de octubre, tres rondas) encontró que los apoyos que debían sujetar el conjunto no lo
+tocaban, que el lente no pasaba por el plano de la junta y que la tapa del botón no dejaba lugar a los
+cables.
+
+**Pendiente.** Imprimir y evaluar las piezas de prueba de la v0.12; medir con calibre los valores que
+el modelo marca como supuestos (las cabezas de los tornillos, lo que asoma la microSD, la palanca de
+la llave, el voladizo de los conectores de la placa, el pulsador con sus patas, el transductor y el
+rigidizador del flex de la cámara); imprimir la carcasa completa; y verificar con ella los tiempos del
+botón (§7.2.6), que se calibraron con otro pulsador. Las versiones v0.10 a v0.12 se desarrollan en una
+rama propia que todavía no se integró a la rama principal de desarrollo, donde está la v0.9. Los
+archivos de impresión no se versionan en el repositorio: se publican en la carpeta compartida del
+proyecto, una por versión, y se regeneran desde el modelo.
 
 ## 7.4 El pipeline de reconocimiento de líneas de ómnibus
 
@@ -489,11 +637,15 @@ Dellapiazza en la plataforma Roboflow, versión 6 del conjunto `find-bus-sign`:
 | Aumentación en el export | Ninguna |
 | Licencia | Dominio público |
 
-**Conjunto de dos clases.** Para la variante de un único modelo (§7.4.3) se requería además la clase
+**Conjunto de dos clases.** Para la variante de un único modelo (§7.4.4) se requería además la clase
 `bus`. Etiquetar a mano 140 imágenes adicionales por segunda vez era evitable: las cajas de ómnibus
 se generaron mediante **pseudo-etiquetado** con un modelo YOLO11x preentrenado sobre COCO (que ya
 contiene la categoría `bus`) y **se revisaron manualmente una por una**. Se conservó la misma
 partición.
+
+**Ampliación para el reentrenamiento.** Para reentrenar el detector de dos clases en la GPU (§7.4.3)
+el conjunto se amplió a **unas 500 fotografías** (`docs/SESSION-LOG.md`, 2026-10-21). Su composición,
+su partición y su procedencia no constan en ningún repositorio: **PENDIENTE** de documentar.
 
 **Conjunto de evaluación del pipeline.** Un conjunto propio, independiente del de entrenamiento,
 anotado con la verdad de terreno de lo que el sistema debe decir:
@@ -517,9 +669,12 @@ evaluación con fotografías tomadas por el propio dispositivo es la tarea de ma
 del pilar.
 
 **Catálogo de líneas.** Se construyó a partir de los datos abiertos del Sistema de Transporte
-Metropolitano de la Intendencia de Montevideo: **503 pares** de número y destino, con **145 números
-de línea** y **256 destinos** distintos. Cumple dos funciones: reparar la salida del OCR por
-similitud (§7.4.7) y generar el repertorio de anuncios pregrabados.
+Metropolitano de la Intendencia de Montevideo (`data/catalog_stm.csv`, recontado el 2026-10-22):
+**504 filas**, de las cuales **502 son pares** de número y destino entre **145 números de línea** y
+**255 destinos**, más dos carteles sin línea (`COCHE ESCUELA` y `FUERA DE SERVICIO`); 257 destinos
+distintos en total. Cumple tres funciones: reparar la salida del OCR por similitud, decidir qué se
+puede decir y completar la mitad del cartel que no se leyó (§7.4.8), y generar el repertorio de
+anuncios pregrabados.
 
 ### 7.4.3 El entrenamiento del detector
 
@@ -543,16 +698,16 @@ su justificación, de modo que sean citables y reproducibles:
 | `degrees` / `shear` / `perspective` | 5,0 / 2,0 / 0,0005 | Modelan el ángulo de captura desde la vereda |
 | `mixup` | 0,05 | |
 
-**Estado real del entrenamiento, declarado con precisión.** Las dos corridas efectivamente
-ejecutadas (el detector de una clase y el de dos clases) se entrenaron con una configuración más
-conservadora: **40 épocas, lote de 16, sobre CPU**. La configuración de 120 épocas documentada arriba
-es la que el script define y **todavía no se ejecutó**.
+**Estado real del entrenamiento, declarado con precisión.** Las dos primeras corridas (el detector
+de una clase y el de dos clases, este último el 2026-09-15) se entrenaron con una configuración más
+conservadora: **40 épocas, lote de 16, sobre CPU**, con las 140 imágenes de §7.4.2.
 
-El proyecto cuenta con acceso a un servidor con GPU NVIDIA Tesla V100 facilitado por Arnaldo Castro
-S.A., **cuyo acceso ya está disponible y aún no se utilizó**. Completar el entrenamiento en esa GPU,
-con la configuración completa, es trabajo inmediato de la etapa final y no un resultado ya obtenido.
-Las métricas que se reportan a continuación corresponden, por lo tanto, a los modelos entrenados en
-CPU con 40 épocas, y deben leerse como un **piso** y no como el techo de lo alcanzable.
+Después, el detector de dos clases se **reentrenó en el servidor con GPU NVIDIA Tesla V100**
+facilitado por Arnaldo Castro S.A., con **unas 500 fotografías** (`docs/SESSION-LOG.md`, 2026-10-21).
+Las épocas y la configuración efectivamente usadas, las métricas de validación y la ubicación de los
+pesos de ese reentrenamiento **no constan en ningún repositorio: PENDIENTE**. Las métricas que se
+reportan a continuación (§7.4.4 y §7.4.5) corresponden, por lo tanto, a los modelos entrenados en CPU
+con 40 épocas, y deben leerse como un **piso** y no como el techo de lo alcanzable.
 
 ### 7.4.4 La decisión del detector de dos clases
 
@@ -567,7 +722,22 @@ contra una métrica.
 - **Una etapa:** un único YOLO11n ajustado sobre **dos clases** (`bus_sign` y `bus`). Un modelo, una
   inferencia.
 
-**Comparación sobre las 117 imágenes de evaluación:**
+**Comparación vigente sobre las 117 imágenes de evaluación** (2026-10-12, en la estación de trabajo,
+con el código del PR #7 de `bus-banner-recognizer`: reconocedor `latin` y reglas del catálogo de
+§7.4.8; README de ese repositorio, sección "Results"):
+
+| Detector | Número | Destino | Lectura completa | Detección (mediana) |
+|---|---|---|---|---|
+| Dos etapas | 91,7 % | **89,3 %** | **91,7 %** | 35 ms |
+| Una etapa (dos clases) | 91,7 % | 85,7 % | 87,5 % | **18 ms** |
+
+Una sola imagen, el cartel nocturno de la línea 109, mueve el número unos dos puntos: según un píxel
+de recorte se lee `109` o `10`, y el resultado cambia entre versiones de onnxruntime y OpenCV. Son
+cifras del primer modelo entrenado en CPU; el detector reentrenado en la V100 (§7.4.3) no se evaluó
+sobre este conjunto (**PENDIENTE**).
+
+**Comparación anterior, del ajuste de márgenes** (septiembre de 2026, antes de las reglas del
+catálogo), que muestra el efecto del margen vertical (§7.4.6):
 
 | Detector | Margen vertical | Número | Destino | Lectura completa | Detección (mediana) |
 |---|---|---|---|---|---|
@@ -576,10 +746,12 @@ contra una métrica.
 | Una etapa (dos clases) | 0,12 | 85,4 % | 69,6 % | 79,2 % | 21 ms |
 | Una etapa (dos clases) | **0,06** | **89,6 %** | 71,4 % | 83,3 % | **21 ms** |
 
-**Lectura de la tabla.** El esquema de dos etapas lee mejor: aventaja al de una etapa en **4,2 puntos
-de lectura completa** y en **5,4 puntos de destino**. El ajuste de los márgenes de recorte (§7.4.5)
-cerró aproximadamente la mitad de la brecha en lectura completa, pero no cerró nada de la diferencia
-en destino.
+**Lectura de las tablas.** El esquema de dos etapas lee mejor: en la medición vigente aventaja al de
+una etapa en **4,2 puntos de lectura completa** y en **3,6 puntos de destino**, con el número igualado.
+En la anterior, el ajuste de los márgenes de recorte (§7.4.6) había cerrado aproximadamente la mitad
+de la brecha en lectura completa, pero nada de la diferencia en destino. Los fallos restantes del
+destino son del reconocedor, que convierte el texto de matriz de LEDs en ruido, y no de letras que
+quedan fuera del recorte.
 
 **Y sin embargo se eligió el de una clase única de dos categorías.** La razón es que **el sensor sólo
 admite un modelo cargado**: la ocupación del chip llega al 90 % con uno solo (§7.2.5), y el segundo
@@ -628,6 +800,14 @@ relevante del pilar de ML**, y está declarado como tal en el documento de decis
 
 ### 7.4.6 Ajuste de la geometría del recorte
 
+**Por qué el recorte necesita márgenes.** El detector es un modelo de **cajas delimitadoras**, no de
+puntos clave: devuelve un rectángulo por objeto, y el entrenamiento le enseña a ajustarlo a los LEDs
+del cartel. En los carteles de Montevideo el número de línea está a la izquierda, y el "1" es un trazo
+vertical fino. Si el borde izquierdo del recorte cae sobre él, el detector de texto interno del OCR lo
+pierde o lo confunde con el borde de la imagen: en la placa, el 2026-09-15, se leyó dos veces `15`
+donde el cartel decía `115` (§7.4.11). El problema no es el modelo sino el borde del recorte, y se
+resuelve dejando aire alrededor de la caja.
+
 El recorte se expande alrededor de la caja del cartel con tres márgenes relativos independientes:
 izquierdo, derecho y vertical. Se evaluó una grilla de **72 combinaciones** sobre las 117 imágenes de
 evaluación.
@@ -639,7 +819,8 @@ evaluación.
 | Lectura completa | **0,819** | 0,812 | 0,810 | 0,770 |
 
 Un margen vertical generoso incorpora el marco del cartel y las filas de LEDs vecinas, y el
-reconocedor las interpreta como trazos. El valor se redujo de 0,12 a 0,06.
+reconocedor, que redimensiona cada línea a una altura fija de 48 píxeles, gasta esa altura en
+carrocería en vez de en letras. El valor se redujo de 0,12 a 0,06 el 2026-09-16.
 
 **Los márgenes laterales son asimétricos**: 0,18 a la izquierda y 0,06 a la derecha, es decir, el
 izquierdo es **tres veces** el derecho. El fundamento es específico del dominio: **en los carteles de
@@ -650,6 +831,20 @@ evaluación, a diferencia del vertical. La razón quedó escrita en el repositor
 tienen destino esperado, **una sola imagen vale 1,8 puntos porcentuales**, de modo que optimizar
 sobre esa grilla sería ajustar al conjunto de evaluación y no al problema. Sólo se adoptó el cambio
 del margen vertical porque su efecto sobrevive al ruido y es monótono en toda la grilla.
+
+**Los valores vigentes y dónde viven.** `SIGN_MARGINS = (0.18, 0.06, 0.06)` (izquierdo, derecho y
+vertical, como fracción de la caja; `hardware/raspi/virovision/bus.py:53-61`). Son los valores por
+defecto del pipeline, pero el dispositivo se los pasa explícitamente: los márgenes dependen del
+modelo que dibuja la caja, y el modelo se elige en el dispositivo (`--bus-model`).
+
+**Una prueba sin márgenes, y la vuelta.** El 2026-10-21 el equipo probó leer la caja del detector
+reentrenado tal cual, con los tres márgenes en cero, bajo la hipótesis de que un detector mejor
+entrenado ya no necesitaba colchón. Contra un video en pantalla el "1" entró completo, pero en la
+calle se siguió perdiendo, y el 2026-10-22 los márgenes volvieron a los valores medidos (PR #122 de
+ViroVision). Con el zoom digital (§7.4.10), una lectura se descarta, sin descontarla de los intentos,
+si la caja **con márgenes** queda fuera del recorte del procesador de imagen: de lo contrario el
+margen izquierdo se cortaría en el borde del cuadro sin aviso y el primer dígito volvería a perderse.
+La aplicación muestra exactamente el recorte que leyó el OCR, margen incluido.
 
 ### 7.4.7 La lectura: comparación de motores de OCR
 
@@ -684,9 +879,30 @@ depende de la configuración y no del modelo:
 ### 7.4.8 Interpretación y reparación contra el catálogo
 
 La salida del OCR se interpreta buscando un número de dos a cuatro dígitos como línea y el texto
-alfabético como destino, y luego **se repara contra el catálogo de 503 pares** por similitud. Este
-paso no es cosmético: corrige errores sistemáticos del reconocedor. En la primera corrida real sobre
-la placa, el registro muestra la entrada `15 LUIS BRALLE` y la salida `115, LUIS BRAILLE`.
+alfabético como destino, y luego **se valida contra el catálogo** de la STM (§7.4.2: 504 filas, 145
+líneas). El catálogo cumple tres funciones.
+
+**Repara por similitud.** Corrige errores sistemáticos del reconocedor. En la primera corrida real
+sobre la placa, el registro muestra la entrada `15 LUIS BRALLE` y la salida `115, LUIS BRAILLE`. La
+coincidencia tolera dígitos por letras y espacios perdidos (`MEMID0ZAE` y `ME MDOZA E` son MENDOZA),
+con resguardos contra elegir un destino real pero equivocado: un mínimo de cuatro letras y un margen
+de 0,05 sobre el mejor lugar distinto; las variantes ortográficas del mismo lugar en los datos
+abiertos no compiten entre sí.
+
+**Decide qué se puede decir.** Desde el 2026-10-06 **sólo se dice lo que el catálogo conoce**: una
+línea que no existe no se anuncia, y un destino que no coincide con ninguno no se dice. La regla salió
+de una prueba en la placa en la que el sistema anunciaba "Bus 1" a partir de lecturas basura (`1M12`)
+y deletreaba destinos ilegibles (`U2 NOEVR`), lo único que una voz sintética puede hacer con ese
+texto. Para quien no ve, "línea 330" sola es una respuesta honesta; un destino deletreado no lo es.
+Medido sobre las 117 imágenes, el destino pasó de **76,8 % a 89,3 %** (`docs/SESSION-LOG.md`,
+2026-10-06, cont. 5).
+
+**Completa la mitad que no se leyó.** Desde el 2026-10-07, cuando la confianza del OCR es menor a
+**0,8**, el catálogo completa la mitad del cartel que falta, sólo si no es ambigua: un destino que
+sirve **una sola línea** da esa línea (116 de los 257 destinos) y una línea con **un solo terminal**
+da ese destino. Lo inferido queda marcado aparte de lo leído (`Reading.inferred`), **no vota** (la
+misma lectura dudosa volvería cuadro a cuadro y se daría la razón a sí misma) y nunca reemplaza
+dígitos que el OCR sí leyó (`docs/SESSION-LOG.md`, 2026-10-07; `bus_banner/catalog.py`).
 
 ### 7.4.9 El modo vigilancia
 
@@ -700,7 +916,9 @@ La lógica de anuncio:
 1. Una caja de ómnibus aparece y **persiste** durante un número de cuadros proporcional a la tasa de
    captura → se confirma la presencia y se anuncia que *se acerca un ómnibus*.
 2. Cuando el cartel alcanza una altura legible (**22 píxeles**) se recorta y se lee.
-3. Cuando **dos lecturas coinciden** en el número, se anuncia la línea y el destino.
+3. Una lectura que el catálogo **confirma en ambos campos** se anuncia de inmediato; si no, se
+   espera a que **dos lecturas coincidan**. Media lectura (sólo número o sólo destino) espera algunas
+   lecturas más a que aparezca la otra mitad.
 4. **Cada ómnibus se anuncia una sola vez.**
 
 Un seguidor de objetos mantiene la identidad de cada vehículo entre cuadros y estima, comparando el
@@ -708,9 +926,49 @@ Un seguidor de objetos mantiene la identidad de cada vehículo entre cuadros y e
 
 **El silencio también es parte del diseño.** Hay dos temporizadores de supresión: 15 segundos para
 el anuncio de presencia y 10 segundos para una misma línea recién anunciada. Se incorporaron a raíz
-de un defecto observado en la primera corrida real (§7.4.10).
+de un defecto observado en la primera corrida real (§7.4.11).
 
-### 7.4.10 Defectos detectados en la primera ejecución sobre el dispositivo
+**Evidencia de cada lectura.** Desde el 2026-10-12 (#114) el modo guarda el cuadro y el recorte exacto
+que leyó el OCR, unidos a la fila de telemetría de esa lectura, en un almacenamiento privado del
+servidor; la aplicación los muestra en su pantalla de inicio (#118). Sirven para auditar en la
+estación de trabajo qué vio el sistema cuando dijo, o no dijo, una línea, y son la materia prima del
+conjunto de evaluación con fotografías del propio dispositivo (§7.4.2).
+
+### 7.4.10 Zoom digital sobre el cartel
+
+**Problema.** En una prueba de campo del 2026-10-19 el ómnibus se detectó de lejos, pero el cartel
+sólo se volvió legible con el vehículo prácticamente encima, demasiado tarde para uno que no se
+detiene. La causa es la resolución: el cuadro del que sale el recorte tiene 1024 píxeles de ancho
+(1024×766) sobre un sensor de 4056, y un número a 20 m ocupa del orden de 9 píxeles de alto
+(estimación, no medición). El reescalado del recorte agranda el borrón, no lo resuelve.
+
+**Decisión** (ADR 0006, actualización 2026-10-19). Un **zoom digital dinámico** en el procesador de
+imagen de la placa (`ScalerCrop`), centrado en el cartel más ancho que ve el detector, hasta que el
+cartel mide unos 64 píxeles de alto (más no sirve: el reconocedor redimensiona a 48) y sin que ocupe
+más de la mitad del ancho del cuadro, para dejar margen al movimiento de la cabeza. Si el detector
+pierde el cartel, el zoom se sostiene 1,5 s y vuelve a 1x. El detector del sensor **sigue viendo el
+campo completo**, porque su zona de entrada es un control propio del IMX500, separado del recorte
+del procesador de imagen; el seguimiento trabaja en ese campo completo y sólo la caja que va al OCR
+se traduce al cuadro ampliado (`hardware/raspi/virovision/zoom.py`). Se descartaron el zoom óptico
+(la cámara tiene lente fija) y el zoom fijo (que achicaría el campo también cuando no hay ómnibus).
+
+**Medición en la placa** (2026-10-22, Zero 2 W, contra un video del 115 en pantalla;
+`docs/mediciones/2026-10-22-zoom-omnibus.md`):
+
+| Qué | Resultado |
+|---|---|
+| Zoom con el cartel en cuadro | 2,0x |
+| Cuadros con detecciones, por latido de 5 s | entre 68 y 76, a 15 cuadros por segundo |
+| Cartel lejano (~10 px de alto; el mínimo sin zoom es 22 px) | anunciado a los **7,6 s**, tras tres lecturas ilegibles |
+| Cartel más cercano | anunciado a **1,0 s**, con una lectura |
+| Modo de sensor completo (hasta 4x) | 10 cuadros por segundo, 65 MB libres de 415, la cámara se trabó: **no entra en la Zero 2 W** |
+
+En el modo de sensor agrupado que usa la placa, el techo práctico es 2x. **Pendiente**: la prueba en
+la calle, con y sin zoom, midiendo a qué distancia se anuncia la línea. Si el cuello resulta ser el
+detector, que de lejos no encuentra el cartel, la segunda fase consiste en mover también su zona de
+entrada hacia el ómnibus detectado.
+
+### 7.4.11 Defectos detectados en la primera ejecución sobre el dispositivo
 
 La primera ejecución del pipeline completo sobre la placa reveló cinco defectos que ninguna prueba
 sobre la estación de trabajo había expuesto. Se documentan porque son, en conjunto, el mejor
@@ -719,9 +977,9 @@ argumento a favor de la regla metodológica de §5.2.2:
 1. **Un ómnibus, dos anuncios.** El anuncio salió duplicado en un segundo para un mismo vehículo: se
    movió la cámara, el seguidor perdió la pista y el vehículo volvió a entrar como uno nuevo. El
    seguidor por sí solo no alcanza; se agregó la supresión temporal por línea.
-2. **El primer dígito se pierde.** El OCR leía `15` donde el cartel decía `115`, porque el primer
-   dígito se funde visualmente con el ícono de accesibilidad para silla de ruedas que precede al
-   número. Tres remedios simultáneos: margen izquierdo tres veces el derecho, medio voto para líneas
+2. **El primer dígito se pierde.** El OCR leía `15` donde el cartel decía `115`: el borde izquierdo
+   de la caja caía sobre el "1", un trazo fino que además queda pegado al ícono de accesibilidad para
+   silla de ruedas que precede al número (§7.4.6). Tres remedios simultáneos: margen izquierdo tres veces el derecho, medio voto para líneas
    fuera del catálogo, y reparación por similitud.
 3. **El OCR no puede correr en el hilo de la cámara.** La biblioteca de captura da el sensor por
    perdido si nadie consume cuadros durante aproximadamente un segundo, y una pasada de OCR tarda
@@ -734,7 +992,7 @@ argumento a favor de la regla metodológica de §5.2.2:
    detección de texto dentro del OCR, cuesta 2 a 3 segundos sobre la placa; se restringió a los
    casos en que la primera pasada no devolvió ni número ni destino.
 
-### 7.4.11 Los anuncios pregrabados
+### 7.4.12 Los anuncios pregrabados
 
 El dispositivo **no sintetiza voz**: reproduce archivos de audio pregrabados almacenados en su
 tarjeta de memoria. Son **386 archivos** (los números de línea, 239 destinos y algunos genéricos)
@@ -820,7 +1078,8 @@ pendiente declarado.
 | React | 19 |
 | TypeScript | modo estricto |
 
-La aplicación tiene **118 archivos de código y 10 827 líneas**, organizados en cuatro capas con una
+Al 2026-10-22, el código de la aplicación (`app/src`) suma **133 archivos y 12 976 líneas**: 97
+archivos y 9 185 líneas de código, y 36 archivos y 3 791 líneas de pruebas. Está organizado en cuatro capas con una
 regla de dependencia unidireccional: componentes de interfaz → funcionalidades (con estado de React)
 → servicios (infraestructura, sin React) → tipos compartidos. Los textos visibles viven en un único
 módulo de internacionalización, con claves en inglés y valores en español.
@@ -887,7 +1146,8 @@ disponible** de que el sistema despertó correctamente: se escucha, o no se escu
 consola de desarrollo puede aportar esa información cuando el teléfono está bloqueado en un bolsillo.
 
 **Enrutamiento.** Dos funciones puras deciden por dónde sale cada sonido: una para las lecturas y
-otra para los avisos de sistema. Son dos y no una porque **un aviso no necesita síntesis**: los
+otra para los avisos de sistema. La elección del usuario (teléfono o dispositivo) vale para todo lo
+que suena: las lecturas de los dos modos, los avisos y la prueba de audio. Son dos y no una porque **un aviso no necesita síntesis**: los
 avisos son archivos pregrabados que residen en la tarjeta del dispositivo, de modo que pueden decirse
 sin internet, sin WiFi y sin credenciales. Unificar ambas decisiones haría que todo aviso relativo a
 la red cayera al teléfono precisamente en el momento en que al usuario se le indicó que todo sale por
@@ -903,6 +1163,23 @@ bucle infinito detectado en la placa (el dispositivo respondía a un comando des
 la aplicación convertía todo error del dispositivo en un aviso, y el aviso volvía al dispositivo como
 otro comando). La regla que quedó es **el dispositivo no informa sus propias fallas**.
 
+**Una voz por vez.** Cada salida sabía interrumpirse a sí misma y ninguna sabía interrumpir a la
+otra: con la salida cambiada a mitad de una frase, el teléfono y el dispositivo hablaban encimados.
+La regla adoptada es que **quien empieza a hablar calla al otro**: antes de hablar, el teléfono le
+envía al dispositivo una orden de silencio, y antes de enviarle un aviso detiene su propia voz. Se
+aplica en los dos puntos de entrega, el de las lecturas y el de los avisos, y no en cada llamador
+(ADR 0003, actualización del 2026-09-18).
+
+**La frase del ómnibus.** La lectura que llega del dispositivo se dice con su destino cuando lo hay,
+porque el destino es lo que distingue dos ómnibus de la misma línea. Sin número se dice sólo el
+destino, y sin ninguno de los dos se dice que se acerca un ómnibus: un anuncio vacío es el único
+resultado que una interfaz de voz no puede tener (`app/src/features/recognition/format.ts`).
+
+**Los errores no se dicen.** Desde el ADR 0011 (2026-10-06), el texto de un error nunca llega a la
+pantalla ni a la voz: se registra en la telemetría (§7.8.3), y la persona escucha una frase fija, en
+lenguaje llano, que indica qué hacer. Callar del todo no es una opción: para quien no ve la pantalla,
+el silencio después de apretar el botón es indistinguible de un dispositivo roto.
+
 ### 7.6.4 Vinculación y gestión del enlace
 
 La aplicación gestiona la conexión sin intervención del usuario. Se conecta al arrancar, reconecta
@@ -915,6 +1192,17 @@ Varias optimizaciones del módulo están documentadas junto al defecto que las m
 telemetría repetida para no registrar cada notificación de estado idéntica, no reiniciar la
 verificación de red en cada latido (lo que cancelaba la anterior y hacía que la red nunca alcanzara
 el estado listo), y no anunciar dos veces la misma disponibilidad.
+
+**Una operación Bluetooth por vez.** Con la salida en el dispositivo, la aplicación dejó de poder
+unirse a la red WiFi: el anuncio de conexión, una escritura lanzada sin esperar, coincidía con la
+lectura de las credenciales de la red, y la lectura volvía vacía. En lugar de reordenar esa línea,
+el cliente Bluetooth pasó a **encolar todas sus operaciones en el orden en que se piden**
+(`app/src/services/ble/serialize.ts`), porque la misma forma existía en otros puntos del código y
+la clase de defecto no lanza ni registra nada.
+
+La pestaña del dispositivo muestra su nombre y, desde el 2026-10-06, **el nivel de batería en
+texto**, leído del monitor de corriente de la fuente (§7.3.3) y con un aviso explícito por debajo del
+20 % (`app/src/features/device/DeviceSummary.tsx`): para un usuario ciego una barra no existe.
 
 ### 7.6.5 Configuración
 
@@ -985,15 +1273,28 @@ pantalla debe llegar primero a lo que se puede leer. La imagen no cumple una fun
 sino de verificación para usuarios con resto visual o para un acompañante: es lo único que distingue
 *«el modelo se equivocó»* de *«la fotografía era del techo»*.
 
+El modo ómnibus no tenía equivalente, porque el dispositivo lee solo y por Bluetooth sólo llegaba el
+resultado. Desde el 2026-10-12 el dispositivo guarda, por cada ómnibus, el cuadro en que lo detectó y
+cada recorte del cartel que pasó al OCR, y la aplicación los baja por WiFi (§8.6.3). Desde el 2026-10-13, la
+pantalla de inicio en modo ómnibus los muestra por ómnibus: el cuadro, y debajo de cada lectura su
+texto y el recorte. Ese recorte es **exactamente el que leyó el OCR, margen incluido**, de modo que
+la imagen explica la lectura: si el «1» de una línea quedó afuera o pegado al borde, se ve. Como el
+resto del camino de evidencia, es una herramienta de desarrollo y se retira antes de la versión
+final (`app/src/features/device/BusShots.tsx`).
+
 ## 7.8 Verificación
 
 ### 7.8.1 Cobertura de pruebas automatizadas
 
 | Componente | Pruebas | Alcance |
 |---|---|---|
-| Aplicación móvil | **282** en 30 suites | Políticas puras, contratos de frontera, contraste, orden de ejecución |
-| Daemon del dispositivo | **86** | Núcleo independiente del transporte, gestos del botón, modos |
-| Pipeline de ómnibus | **65** | Geometría del recorte, interpretación, catálogo, evaluación |
+| Aplicación móvil | **332** en 36 suites | Políticas puras, contratos de frontera, contraste, orden de ejecución |
+| Daemon del dispositivo | **195** (y 2 omitidas) | Núcleo independiente del transporte, gestos del botón, modos, modo ómnibus, zoom, batería, evidencia |
+| Pipeline de ómnibus | **96** | Geometría del recorte, detector, seguimiento, interpretación, catálogo |
+
+Cifras al 2026-10-22, obtenidas corriendo cada suite: `npx jest` en `app/`, `pytest` en
+`hardware/raspi/` y en el repositorio `bus-banner-recognizer` (rama `feat/bus-line-reader`, commit
+`becd2f0`).
 
 Las pruebas que mejor representan la orientación del proyecto son cuatro:
 

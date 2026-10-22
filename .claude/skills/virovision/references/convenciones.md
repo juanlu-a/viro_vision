@@ -44,7 +44,7 @@ ya sin la caducidad de 7 días.
 
 | carpeta | qué va | nombres |
 |---|---|---|
-| `app/` | rutas de Expo Router. `(tabs)/` son pestañas; `dev/` son rutas sueltas de desarrollo | según Router |
+| `app/` | rutas de Expo Router. `(tabs)/` son las tres pestañas; no hay rutas sueltas de desarrollo | según Router |
 | `components/` | primitivos reutilizables, sin dominio | kebab-case: `accessible-button.tsx` |
 | `features/` | dominio: hooks, providers, lógica | PascalCase componentes/providers, camelCase hooks |
 | `services/` | frontera con el mundo exterior (red, BLE, storage) | camelCase |
@@ -194,6 +194,18 @@ Trampas ya pisadas, que no hay que repetir:
   decorativo.
 - CI (`.github/workflows/ci.yml`) corre lint + typecheck + test y un bundle de verificación, con
   `working-directory: ./app`.
+
+### Revisión multi-modelo antes del PR (`tackle-ticket`)
+
+Los cambios de peso pasan por el flujo **`tackle-ticket`** (o `tackle-review` si no hay ticket)
+antes de abrir el PR. Hay dos casos: código que toca el enlace, el daemon o el pipeline, y
+documentación extensa. Lo mismo vale para el **modelo 3D de la carcasa**, cada vez que cambia la
+geometría (así se revisó la v0.9 el 2026-10-14). Cuatro revisores leen el diff en paralelo y sólo
+reportan: Opus, Sonnet, Haiku y Codex. Codex se corre con `npx @openai/codex@0.162.1`, porque la CLI
+que trae la app es vieja para la cuenta. Los hallazgos se deduplican, se corrigen los críticos y los
+mayores, y se vuelve a revisar hasta que una vuelta salga limpia. Sirve como revisión de código y
+como búsqueda de fallas. En la documentación, además, encuentra lo que el texto contradice del
+código o lo que dejó de mencionar. Si Codex no corre, se dice en el PR.
 
 ### Verificar que un merge no perdió nada
 

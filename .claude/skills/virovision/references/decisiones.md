@@ -27,7 +27,7 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena) y 2026-09-20 (conectarse rápido y sin volver a pedir permiso)**
+### ADR 0003: Enlace placa ↔ teléfono · **Proposed (2026-09-04); actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena), 2026-09-20 (conectarse rápido y sin volver a pedir permiso) y 2026-10-22 (placa real, cola GATT, una voz por vez, arranque en 16 s)**
 
 Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
 dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
@@ -114,6 +114,18 @@ configuración de la red al desconectar; olvidarla es lo que trae el cartel de v
 olvida nunca. `wifi.ready` lleva `via: 'already' | 'joined'`: después de la primera conexión tiene
 que decir `already` siempre.
 
+**Qué cambió hasta el 2026-10-22** (nota de actualización en el ADR):
+- **Hardware real**: Raspberry Pi Zero 2 W (volvió el 2026-09-19, después de la Pi 3 B+ prestada, así
+  que las mediciones BLE originales vuelven a valer) + AI Camera (IMX500) + Waveshare UPS HAT (C). Sin
+  Coral, así que `libedgetpu` y el "USB ocupado" desaparecen.
+- **Audio en la placa**: salida PWM por `audremap`, provisional, en lugar del DAC I2S; la carcasa
+  prevé un transductor de conducción ósea.
+- **Cola de operaciones GATT** (#94): la app serializa lecturas, escrituras y suscripciones.
+- **Una voz por vez** (#97): ningún sonido se encima, venga de la salida que venga.
+- **Arranque** (2026-10-05/06): se levanta el bloqueo de `rfkill` antes de cada arranque del daemon;
+  la placa anuncia por BLE antes de abrir la cámara y el AP; dnsmasq sin ping. Anuncia a los 16,2 s,
+  la cámara está lista a los 21,3 s y el OCR a los 33,6 s.
+
 ### ADR 0004 — Runtime de inferencia on-device · **Proposed — actualizado 2026-08-22: se resuelve por caso de uso**
 
 Proponía **Gemma vía LiteRT-LM**. El spike lo midió: el camino de visión de LiteRT-LM **no funciona
@@ -136,7 +148,7 @@ comparación en el informe.
 
 Buena parte ya está implementada (tokens, `theme.test.ts`, tipografía de marca); falta escribirla.
 
-### ADR 0006 — Pipelines por caso de uso · **Proposed (2026-08-22) — a validar con tutor; actualizado 2026-08-30 y 2026-09-01**
+### ADR 0006: Pipelines por caso de uso · **Proposed (2026-08-22), a validar con tutor; actualizado 2026-08-30, 2026-09-01, 2026-09-07, 2026-10-19 (zoom) y 2026-10-22 (márgenes, V100 y catálogo)**
 
 **Qué cambió**: deja de haber un runtime único (lo que buscaba ADR 0004). Cada caso de uso tiene su
 pipeline. **Bondis = local** (la latencia manda): detección **preentrenada en la Coral TPU** del
@@ -182,6 +194,21 @@ placa**. Se retiran de Inicio la cámara del teléfono y la fototeca (y `expo-im
 permisos). Lo que se pierde y hay que tener presente: la fototeca era el insumo del **dataset de
 evaluación** —la misma foto contra varios modelos—, y esa corrida pasa a hacerse fuera de la app.
 
+**Qué cambió del 2026-10-06 al 2026-10-22** (actualizaciones en el ADR):
+- **Catálogo STM** (2026-10-06/07): sólo se dice una línea o un destino que el catálogo conoce, y el
+  catálogo completa la mitad del cartel que el OCR no leyó (`Reading.inferred`).
+- **Evidencia** (2026-10-12): la placa guarda el cuadro y el recorte de cada lectura, unidos a su fila
+  de telemetría; temporal, se saca antes de la entrega.
+- **Zoom digital** (2026-10-19, probado en la placa el 2026-10-22): `ScalerCrop` del ISP, dinámico,
+  hasta 2x sobre el cartel; el detector sigue viendo el campo completo. `--bus-full-res` (4x) traba la
+  cámara de la Zero 2 W y no se usa. Falta la prueba en la calle con y sin zoom.
+- **Márgenes del cartel** (2026-10-21 → 2026-10-22): se probó leer el box del YOLO tal cual y en la
+  calle se perdía el "1" del número de línea; volvieron `SIGN_MARGINS = (0.18, 0.06, 0.06)`, ahora
+  pasados desde ViroVision. El detector es de cajas, no de keypoints: el problema es que el borde
+  izquierdo del recorte cae sobre el trazo fino del "1", que está a la izquierda del cartel.
+- **Reentrenamiento en la V100** con ~500 fotos (el primer fine-tune fue de ~140). Épocas, métricas y
+  ubicación de los pesos: pendientes de documentar.
+
 ### ADR 0006, act. 2026-09-11 — El alcance es **alimentos**, no la canasta básica
 
 **Qué cambió**: probado con la placa, el modelo identifica **cualquier alimento** (yerba suelta
@@ -205,6 +232,10 @@ reconocimiento funciona por **modos explícitos** activados con el botón del di
 audio no solicitado. Desde *esperando*: 1 click = modo ómnibus (pipeline local), 2 clicks = modo
 supermercado (pipeline LLM), click largo = volver a esperando. Cada transición se anuncia por
 audio. Diagrama canónico en `docs/architecture/README.md`.
+
+**Qué cambió hasta el 2026-10-22**: el hardware existe y el botón está calibrado (2026-09-13).
+**Un click en modo ómnibus repite el último anuncio** (#88, 2026-09-16), en lugar de no hacer nada.
+La carcasa usa un pulsador SMD de 4×4×1 mm con tecla pegada (no el tact switch de 6×6).
 
 ### ADR 0008 — Proxy propio para las claves de nube · **Accepted (2026-09-01)**
 

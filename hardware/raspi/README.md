@@ -1,13 +1,17 @@
 # Daemon de la placa (Raspberry Pi Zero 2 W)
 
-Un solo proceso Python que hace de **periférico BLE** (servidor GATT sobre BlueZ), captura con la
-Camera Module 3 y lleva la máquina de modos de [ADR 0007](../../docs/architecture/adr/0007-botones-fisicos-modos-de-operacion.md).
-Hoy su trabajo principal es **el spike del [ADR 0003](../../docs/architecture/adr/0003-enlace-placa-telefono.md)**:
-medir cuánto tarda una foto de ~53 KB en llegar al teléfono por BLE, para decidir si hace falta WiFi.
+Un solo proceso Python que hace de **periférico BLE** (servidor GATT sobre BlueZ), sirve la foto y
+la evidencia por **HTTP** sobre su propio punto de acceso, captura con la **Raspberry Pi AI Camera
+(IMX500)**, corre el **modo ómnibus entero en la placa** (detector dentro del sensor, OCR en la CPU,
+anuncios pregrabados) y lleva la máquina de modos de [ADR 0007](../../docs/architecture/adr/0007-botones-fisicos-modos-de-operacion.md).
+El spike de transporte del [ADR 0003](../../docs/architecture/adr/0003-enlace-placa-telefono.md) se
+cerró el 2026-09-05: la foto va por WiFi.
 
 Software mínimo a propósito: Raspberry Pi OS **Lite** 64-bit (Bookworm), BlueZ que ya viene, un venv,
-un servicio de systemd. No hay camino sin Linux: la cámara necesita libcamera, el Coral libedgetpu, el
-BLE BlueZ.
+un servicio de systemd. No hay camino sin Linux: la cámara necesita libcamera y el BLE, BlueZ. La placa
+es una **Raspberry Pi Zero 2 W** (de vuelta desde el 2026-09-19; entre el 2026-09-09 y el 2026-09-18
+se trabajó sobre una Pi 3 B+ prestada, y algunas cifras viejas son de ella): 415 MB de RAM útiles,
+sin Ethernet, WiFi sólo de 2,4 GHz.
 
 
 > **Antes de tocar la placa** leé `.claude/skills/virovision/references/placa-acceso.md`: cómo entrar por cable o
@@ -36,7 +40,7 @@ bluetoothctl show | grep -i powered   # Powered: yes
 ```
 
 Desde el iPhone, antes de tocar la app: **nRF Connect** o **LightBlue** (gratis) ven un periférico
-`ViroVision` con un servicio `4380c500-…` y cinco características. Si eso se ve, la placa está bien.
+`ViroVision` con un servicio `4380c500-…` y seis características. Si eso se ve, la placa está bien.
 
 ## Cómo arranca la microSD que está en uso (y por qué no se parece a `setup.sh`)
 
@@ -150,7 +154,48 @@ sudo rm -f /boot/firmware/SIN-AP && sudo systemctl reboot
 **Por qué nada de esto usa cloud-init como corresponde.** En esta imagen cloud-init lee
 `network-config` y **no lo aplica** (`No network config applied. Neither a new instance nor
 datasource network update allowed`; falta el módulo `cc_netplan_nm_patch`), así que el WiFi hay que
-escribirlo a mano como keyfile de NetworkManager. Todo el andamiaje de arriba existe por eso.
+escribirlo a mano como keyfile de NetworkManager. Todo el andamiaje de arriba existe por eso. Y desde
+el 2026-10-06 cloud-init **está deshabilitado** (`/etc/cloud/cloud-init.disabled`, lo crea `setup.sh`):
+sólo servía en el primer arranque de una tarjeta recién grabada y costaba 6,1 s en cada arranque.
+
+## La secuencia de arranque (2026-10-05/06)
+
+La regla es **anunciar primero**: el teléfono sólo puede encontrar la placa cuando anuncia por BLE, y
+todo lo que se interponga antes la deja invisible. Así quedó, en orden (#106, #107, #108, #109, #111):
+
+1. **`virovision-modo-red.service`** corre `modo-red.sh` (ver [`boot/`](boot/README.md)): 0,27 s si
+   nada cambió, ~2,2 s al cambiar de modo (antes 3,5 s en cada arranque).
+2. **`virovision.service`** depende sólo de `bluetooth.target`: ya no espera a NetworkManager ni a
+   `network-online.target` (`virovision.service:1-9`), que costaban 6,6 s.
+3. **`ExecStartPre`** levanta cualquier bloqueo rfkill del Bluetooth por sysfs (el binario `rfkill` no
+   viene en Raspberry Pi OS Lite) y fija por `debugfs` el intervalo de conexión (7,5 a 15 ms) y el de
+   anuncio (100 a 152,5 ms). El 2026-10-05 un bloqueo guardado por `systemd-rfkill` dejó al daemon en
+   bucle sin anunciar nunca; si `set_powered` igual falla, el daemon sale con un mensaje que nombra
+   rfkill.
+4. **El daemon registra el GATT y anuncia.** Recién después arranca la cámara en segundo plano
+   (`_bring_camera_up`) y levanta el AP (`AccessPoint.wait_for_network_manager` sondea cada 0,5 s en
+   vez de reintentar a ciegas). Mientras tanto una foto contesta 503 y el modo ómnibus dice «preparando
+   la lectura» y arranca solo cuando la cámara está.
+5. **El OCR se arma en su propio proceso** (`ocr_worker.py`), con OpenCV headless: el `python3-opencv`
+   de Debian tardaba 13 s en importarse y, con las sesiones de onnxruntime, congelaba el event loop que
+   le contesta a BlueZ.
+6. **dnsmasq sin ping check** (`no-ping` en `dnsmasq-shared.d`, `setup.sh`): la oferta DHCP al
+   teléfono sale en 5 ms y no en 3,0 s.
+
+Medido en la placa (Zero 2 W) el 2026-10-06, desde el kernel (`docs/SESSION-LOG.md`, 2026-10-06
+cont. 3):
+
+| Hito | Antes | Ahora |
+|---|---|---|
+| Anuncio BLE | 27,0 s | **16,2 s** |
+| AP arriba | ~29 s | 21,7 s |
+| Cámara con el detector lista | 31,4 s | 21,3 s |
+| OCR listo (modo ómnibus operativo) | 44,0 s | **33,6 s** |
+| Arranque total (`systemd-analyze`) | 27,0 s | ~21 s |
+
+El journal es **persistente** desde el 2026-09-23 (`Storage=persistent`, `setup.sh`): un arranque que
+falló se puede leer después con `journalctl -b -1`. Los tiempos se leen con
+`journalctl -b -o short-monotonic`, que valen aunque la placa no tenga reloj.
 
 ## Emular la placa desde la Mac (sin hardware)
 
@@ -168,8 +213,8 @@ python3.11 -m venv .venv-mac && .venv-mac/bin/pip install -r requirements-mac.tx
 La primera vez macOS pide permiso de Bluetooth para la terminal (Privacidad y seguridad → Bluetooth).
 Con el emulador corriendo, el iPhone ve «ViroVision» igual que vería la placa; la app se conecta con
 *Buscar dispositivo* y *Medir transferencia* funciona de punta a punta. `--name ViroVision-Mac` si
-la placa real está cerca y querés distinguirlas. Sin cámara: el comando `foto` responde con error, y
-`medir` manda bytes sintéticos.
+la placa real está cerca y querés distinguirlas. Sin cámara: el comando `photo` responde con error, y
+`measure` manda bytes sintéticos.
 
 ## Correr a mano (depurar)
 
@@ -203,7 +248,14 @@ Comandos de `control`:
 | `{"cmd":"photo"}` | captura con la cámara (1024 px lado mayor, JPEG q70: lo mismo que la app manda a la nube) y la transfiere igual |
 | `{"cmd":"mode","value":2}` | cambia de modo (equivale al botón) |
 | `{"cmd":"status"}` | fuerza una notificación de `status` |
-| `{"cmd":"ap","value":true,"minutes":10}` | enciende el punto de acceso por tiempo acotado (tope 60); `value:false` lo apaga |
+| `{"cmd":"ap","value":true,"minutes":10}` | enciende el punto de acceso por tiempo acotado (default 10, tope 60; `core.py:52-53`); `value:false` lo apaga. Manual: el AP ya queda prendido desde el arranque |
+| `{"cmd":"audio","target":"device"}` | dónde quiere escuchar el usuario: `device` (default) o `phone`. Lo manda la app con el ajuste de Ajustes; el modo ómnibus lo respeta |
+| `{"cmd":"say","clip":"<aviso>"}` | reproduce un aviso de sistema pregrabado (`notices.py`); un nombre fuera del catálogo cerrado responde `unknown notice`, y uno que falta en la SD, `missing notice` |
+| `{"cmd":"hush"}` | corta lo que esté sonando en la placa: el teléfono lo manda antes de hablar (una voz por vez, ADR 0003, act. 2026-09-18, #97). Sin respuesta |
+| `{"cmd":"restart_camera"}` | cierra y reabre la cámara con el mismo `Camera.restart()` del watchdog. Gancho de prueba (2026-10-06), no función de producto; `tools/restart_camera.py` lo manda desde la Mac |
+
+Un comando desconocido o con campos inválidos no tira el daemon: contesta un evento `error` que la
+app dice en voz alta (`core.py:229-306`).
 
 Cada transferencia va envuelta en dos eventos: `{"t":"start","id":1,"kind":"measurement","bytes":53000,"chunks":298,"chunk":182}`
 y `{"t":"end","id":1,...,"device_ms":N}`. **`device_ms` no es la medición**: es cuánto tardó la placa
@@ -217,16 +269,21 @@ Los otros eventos que viajan por `event`:
 | `{"t":"mode","value":N}` | el modo cambió (por el botón o por BLE) |
 | `{"t":"read","mode":N}` | **el botón pide una lectura AHORA** (ADR 0007, act. 2026-10) |
 | `{"t":"ap","on":…,"minutes":…}` | el AP se encendió o se apagó |
+| `{"t":"warming"}` | modo ómnibus pedido con la cámara o el OCR todavía arrancando: «preparando la lectura» (`bus.py:879`) |
+| `{"t":"bus"}` | modo ómnibus: se acerca un ómnibus, antes de saber la línea (`bus.py:892`) |
+| `{"t":"result","event":{…}}` | modo ómnibus: la línea y el destino leídos (`primary.kind = "bus_line"`, `label`, `detail`, `confidence`; forma en `bus_banner/types.py`) |
+| `{"t":"evidence","ref":"<corrida>/t003-r02"}` | hay un registro nuevo de evidencia para bajar por HTTP (`evidence.py:303`; temporal, ver más abajo) |
+| `{"t":"log","lvl":…,"src":…,"msg":…}` | una advertencia o un error del journal, para la telemetría de la app (`log_relay.py`, 2026-10-06), con límite por minuto |
 | `{"t":"error","msg":…}` | algo le falló a la placa y la app lo dice en voz alta |
 
 **`read` es un evento aparte y no un `mode` repetido**, a propósito: la app ignora un `mode` que
-nombra el modo en el que ya está —como debe, o cada latido hablaría—, así que un re-anuncio se
+nombra el modo en el que ya está (como debe, o cada latido hablaría), así que un re-anuncio se
 perdería en silencio; y si no se perdiera, haría decir «Modo supermercado activado» otra vez a quien
 está leyendo tres productos seguidos. La placa **no** saca la foto por su cuenta: viaja la intención,
 y la app la busca por HTTP (ADR 0003).
 
 **El campo `mode` de `read` no es decorativo: la app lo aplica antes de leer.** El doble click que
-además cambia de modo manda dos cosas, y en el teléfono no llegan a la misma velocidad — `read` se
+además cambia de modo manda dos cosas, y en el teléfono no llegan a la misma velocidad: `read` se
 sirve sincrónicamente y el modo viaja por el estado de React. Hasta el 2026-09-13 la lectura ganaba
 siempre y se juzgaba contra el modo anterior: desde *esperando* se descartaba en silencio, y por eso
 el doble click prendía supermercado sin sacar la foto.
@@ -243,6 +300,10 @@ puerto en la característica `status` (`ip`, `port`, `ap`). La app siempre tira;
 | `GET /measure/<bytes>` | `<bytes>` aleatorios (hasta 5 MB), para medir la descarga sin cámara |
 | `GET /photos/latest` | captura ahora y devuelve el JPEG (1024 px, q70); 503 sin cámara |
 | `POST /audio` | guarda el MP3/WAV en `/tmp/virovision-audio/` **y lo reproduce** por el parlante; 202 con el tamaño. Con `X-Encoding: base64` decodifica el cuerpo (así lo manda la app: `fetch` de RN no envía bytes) |
+| `GET /evidence/<corrida>/<archivo>` | un registro (`.json`) o una foto (`.jpg`) del modo ómnibus, sólo si la placa lo anunció por BLE. **Temporal**: se saca antes de la versión final (ver *Qué vio la cámara*) |
+
+Son cinco rutas (`http_server.py:12-19`). Con la cámara arrancando, `/photos/latest` contesta **503**
+(`CameraNotReady`), no un 500 que parezca un crash.
 
 Dos modos de red, y el que importa es el segundo:
 
@@ -250,14 +311,16 @@ Dos modos de red, y el que importa es el segundo:
    la IP que informa `status`. Sirve para desarrollar y medir.
 2. **Sin WiFi de infraestructura** (la calle, el supermercado): la placa levanta su **punto de acceso**
    `ViroVision` (clave `virovision2026`, IP `10.42.0.1`) con NetworkManager, y el teléfono se une. El
-   teléfono conserva internet por datos (en iOS hay que verificarlo: es el spike que queda). La placa
-   tiene una sola radio: con el AP arriba deja su red anterior y **se pierde el SSH**; por eso el AP
-   se enciende siempre **por tiempo acotado** (default 10 min, tope 60) y vuelve solo a la red
-   conocida. **El AP sigue al modo**: se enciende al entrar a ómnibus o supermercado (20 min de tope,
-   renovados en cada cambio) y se apaga al volver a esperando. Comando manual:
-   `{"cmd":"ap","valor":true,"minutos":10}` por `control`; `{"cmd":"ap","valor":false}` lo baja antes.
-   Evento `{"t":"ap","on":…,"minutes":…}`, `status.ap`, y `status` vuelve a notificarse con la
-   IP nueva (10.42.0.1) para que la app sepa de dónde bajar la foto.
+   teléfono conserva internet por datos (verificado el 2026-09-05). La placa tiene una sola radio:
+   con el AP arriba deja su red anterior y **se pierde el SSH** por la red de casa. **El AP queda
+   siempre prendido** mientras la placa está encendida (desde el 2026-09-07, ADR 0003): `__main__` lo
+   levanta al arrancar, después de anunciar por BLE, y el cambio de modo **no lo toca**
+   (`core.py:427-431`). Esperar 20 s a que subiera el AP y se uniera el teléfono en cada cambio de modo
+   era inaceptable para el usuario; el costo es batería. Comando manual, para desarrollo:
+   `{"cmd":"ap","value":true,"minutes":10}` por `control` lo enciende por tiempo acotado (tope 60) y
+   `{"cmd":"ap","value":false}` lo baja (es lo que hace `tools/ap.py`). Evento
+   `{"t":"ap","on":…,"minutes":…}`, `status.ap`, y `status` vuelve a notificarse con la IP nueva
+   (10.42.0.1) para que la app sepa de dónde bajar la foto. Un reinicio del daemon lo vuelve a levantar.
    **El AP es una red sólo local**: `setup.sh` deja un drop-in de dnsmasq sin puerta de enlace ni DNS
    (opciones DHCP 3 y 6). Con el default de NetworkManager el iPhone quedaba sin internet; así
    conserva su ruta por datos móviles (medido el 2026-09-05).
@@ -366,7 +429,8 @@ anuncios pregrabados. Sin teléfono y sin internet. **1,27 s** desde el click ha
 
 - **El OCR no puede correr en el hilo de la cámara.** libcamera da el sensor por muerto tras ~1 s sin
   consumir frames, y el OCR tarda ~1 s. Va en un hilo aparte con una cola; el hilo de la cámara sólo
-  copia el frame cuando hay algo para leer, que es lo caro en una Pi 3 B+.
+  copia el frame cuando hay algo para leer, que es lo caro en la Zero 2 W. El OCR además corre en su
+  propio proceso (`ocr_worker.py`, ver *Paquetes*).
 - **Un ómnibus es un anuncio.** Una línea recién anunciada queda 10 s en silencio
   (`SAME_LINE_SILENCE_S`), porque cualquier cosa que corte el track del ómnibus lo devuelve como uno
   nuevo y quien no ve no puede distinguir «lo repitió» de «llegó otro».
@@ -379,9 +443,9 @@ Pesan demasiado para el repo. Los dos se reconstruyen desde `bus-banner-recogniz
 
 | En la placa | Qué es | Cómo se rehace |
 |---|---|---|
-| `/home/virovision/models/bus_sign.rpk` | el detector de carteles, int8, para el sensor | `imx500-package -i packerOut.zip -o out/` sobre `models/bus_sign_v6_yolo11n_imx_model/packerOut.zip`, que sí está en el repo (LFS) |
+| `/home/virovision/models/*.rpk` | el detector, int8, para el sensor. `bus_sign.rpk` es el default del código (el de una clase); el que corre es el de dos clases (`bus`, `bus_sign`), elegido con `--bus-model` en `/etc/default/virovision`. Reentrenado en la V100 con ~500 fotos (2026-10-21) | `imx500-package -i packerOut.zip -o out/` sobre el `packerOut.zip` del export `format="imx"` (el de una clase, `models/bus_sign_v6_yolo11n_imx_model/`, está en el repo, LFS). Dónde quedaron los pesos del reentrenamiento: **PENDIENTE** (no constan en ningún repo) |
 | `/home/virovision/announcements/` | 386 `.wav`: números de línea y destinos de la STM, más `bus.wav` y `no_number.wav` | `scripts/make_announcements.py`, en `bus-banner-recognizer` |
-| `/home/virovision/announcements/system/` | 10 `.wav` (~820 KB): los avisos de sistema — conexión, red, modo, ajuste — y el chirp del botón | `python3 tools/make_system_announcements.py` **en este repo**, y `scp -r announcements/system virovision.local:~/announcements/` |
+| `/home/virovision/announcements/system/` | 7 `.wav`: los 6 avisos de sistema de `notices.py` (modos, «preparando la lectura», salida en el dispositivo, prueba de audio) y el chirp del botón. Los de conexión y red los dice el teléfono desde el 2026-09-17 | `python3 tools/make_system_announcements.py` **en este repo**, y `scp -r announcements/system virovision.local:~/announcements/` |
 | `/home/virovision/models/catalog_stm.csv` | el catálogo de líneas y destinos de Montevideo, que repara lecturas del OCR | `scripts/build_catalog.py` |
 
 Banderas: `--bus-model`, `--bus-labels`, `--announcements`, `--bus-catalog`, y `--no-bus` para
@@ -394,15 +458,43 @@ viendo el campo completo. `--no-bus-zoom` lo apaga, para comparar. `--bus-full-r
 4056×3040 (zoom de hasta 4x en lugar de ~2x), pero **no sirve en la Zero 2 W**: probado el
 2026-10-22, bajó a 10 fps, dejó 65 MB libres de 415 y la cámara se trabó con el primer ómnibus
 (`Camera frontend has timed out`), lo que terminó en un reinicio del daemon. Queda para una placa con
-más memoria. El journal
+más memoria. Por eso `/etc/default/virovision` ya no la lleva (2026-10-22). El journal
 dice el modo del sensor al arrancar la cámara (`camera ready: … (mode 2028x1520)`), el zoom máximo al
 entrar al modo (`zoom on the sign up to …`) y el zoom vigente en cada latido (`… zoom 1.9x`).
+
+Cómo decide el zoom (`virovision/zoom.py`): `ScalerCrop` del ISP, dinámico, centrado en el cartel más
+ancho, hasta que el cartel mide ~64 px de alto (`TARGET_SIGN_HEIGHT_PX`), con un máximo de 2x en el
+modo de sensor 2028×1520 que usa la Zero 2 W (`MAX_ZOOM = 4.0` sólo se alcanza con `--bus-full-res`) y
+sin que el cartel pase de la mitad del ancho del frame; si se pierde el cartel lo sostiene 1,5 s
+(`HOLD_S`) y vuelve a 1x. El frame es de 1024×766. El detector del IMX500 sigue viendo
+el campo completo (su zona de entrada, `set_inference_roi_abs`, es un control aparte). Probado en la
+placa el 2026-10-22 contra un video del 115 en pantalla: 2,0x, detecciones en 68 a 76 de cada 75
+frames a 15 fps; un cartel de ~10 px de alto (sin zoom el mínimo es 22 px, `MIN_BANNER_HEIGHT_PX`) se
+anunció a los 7,6 s, y uno más cercano a 1,0 s. Pendiente: la prueba en la calle, con y sin zoom.
+
+**Márgenes del cartel** (`SIGN_MARGINS = (0.18, 0.06, 0.06)`, `bus.py:53-61`): izquierda, derecha y
+vertical, como fracción del box, que el pipeline agrega alrededor del cartel antes del OCR. El detector
+es de cajas y el box se ajusta a los LEDs; en Montevideo el número de línea va a la izquierda del
+cartel y el «1» es un trazo vertical fino: si el borde izquierdo del recorte cae sobre él, el OCR lo
+pierde o lo confunde con el borde («15» por 115, en la placa el 2026-09-15). Por eso el margen mayor va
+a la izquierda. El vertical bajó de 0,12 a 0,06 el 2026-09-16, tras barrer 72 combinaciones sobre las
+117 imágenes de evaluación (`bus_banner/crop.py`, `scripts/tune_margins.py` en `bus-banner-recognizer`):
+más aire arriba y abajo gasta la altura fija de entrada del reconocedor en carrocería. El 2026-10-21 el
+equipo probó leer el box tal cual (márgenes 0) con el detector reentrenado; en la calle se seguía
+perdiendo el «1», y el 2026-10-22 (#122) volvieron los márgenes, ahora pasados explícitamente desde
+ViroVision, que es donde se elige el modelo (`--bus-model`). Una wheel de `bus_banner` sin el parámetro
+`margins` arranca igual, con los suyos, y lo avisa en el journal.
+
+**El zoom respeta los márgenes**: con zoom, una lectura se descarta (sin descontar el intento) si el box
+**con márgenes** cae fuera del recorte del ISP (`_with_margins`, `bus.py:260` y `:602`), porque el
+pipeline lo cortaría en el borde sin avisar y se volvería a perder el primer dígito. La app muestra
+exactamente el recorte que leyó el OCR, margen incluido.
 
 Los avisos de sistema se generan **acá** y no junto a los de ómnibus a propósito: los de ómnibus
 salen del catálogo de la STM y cambian cuando cambia el catálogo; éstos salen de las cadenas de la
 app (`app/src/features/audio/notices.ts`) y cambian cuando cambia la app. Los nombres de archivo
 están espejados en `virovision/notices.py`, y `notices.test.ts` del lado de la app falla si los dos
-catálogos se desincronizan — un nombre que no existe no rompe nada, simplemente no suena, y eso no se
+catálogos se desincronizan: un nombre que no existe no rompe nada, simplemente no suena, y eso no se
 ve en ningún log que el usuario alcance.
 
 ### Qué vio la cámara: los cuadros y recortes de cada corrida
@@ -458,9 +550,24 @@ producto, que es cuando nadie puede entrar a arreglarlo.
 
 ```sh
 # en la placa
-sudo nano /etc/default/virovision      # VIROVISION_ARGS=--bus-model … --bus-labels …
+sudo nano /etc/default/virovision
 sudo systemctl restart virovision
 ```
+
+Qué tiene hoy (2026-10-22), sin credenciales porque no lleva ninguna: una sola variable,
+
+```sh
+VIROVISION_ARGS="--bus-model /home/virovision/models/<detector de dos clases>.rpk --bus-labels <clases en el orden del modelo>"
+```
+
+con el detector de dos clases y sus etiquetas, y **sin `--bus-full-res`**, que se sacó el 2026-10-22
+porque traba la cámara en la Zero 2 W (ver *Zoom sobre el cartel*). Todo lo demás va con los defaults
+del código: zoom prendido, evidencia prendida, catálogo y anuncios en `/home/virovision/`. El nombre
+exacto del `.rpk` y el orden de las etiquetas se leen en la placa con `cat /etc/default/virovision`
+(la placa no estaba alcanzable al escribir esto: **PENDIENTE** copiarlos acá). La unidad base y el
+drop-in de `modo-red.sh` usan la misma línea (`EnvironmentFile=-/etc/default/virovision` y
+`$VIROVISION_ARGS`); hasta el 2026-09-20 la unidad del repo no la tenía, y un despliegue de la unidad
+habría borrado el detector en silencio.
 
 **`--bus-labels` no es decorativo.** De ahí sale si el detector encuentra ómnibus o sólo carteles:
 con un modelo de una clase cada cartel hace de ómnibus para que el seguimiento tenga algo que
@@ -483,7 +590,7 @@ El headless tarda 0,7 s. Se comprueba con
 `/usr/lib/python3/dist-packages`.
 
 **El OCR corre en su propio proceso** (`virovision/ocr_worker.py`, mismo 2026-10-06): armar los
-modelos de onnxruntime también retiene el GIL, 10–20 s. En el journal se ve como
+modelos de onnxruntime también retiene el GIL, de 10 a 20 s. En el journal se ve como
 `OCR running in its own process (pid N)`.
 
 Dos trampas que ya costaron una tarde:
@@ -623,10 +730,14 @@ sólo lo hace en la instalación inicial.
   anterior al 2026-09-13. Ver la sección de arriba.
 - **La app dice «no se encontró el dispositivo» y la placa parece bien**: mirar `central connected`
   en el journal. Si hay una central conectada, la placa no está anunciando **a propósito** y el
-  teléfono que la tiene tomada no es necesariamente el que está buscando — desde el build del
+  teléfono que la tiene tomada no es necesariamente el que está buscando; desde el build del
   2026-09-13 la app mira primero lo que ya está conectado al sistema, justamente por esto.
-- Sin cámara detectada: `libcamera-hello --list-cameras`; en Bookworm la Camera Module 3 va sin
-  tocar `config.txt`. El daemon sigue igual sin cámara, sólo `foto` falla.
+- Sin cámara detectada: `rpicam-hello --list-cameras`; en Bookworm la AI Camera va sin tocar
+  `config.txt` (necesita `imx500-all`, que instala `setup.sh`). Si dice «No cameras available!» y el
+  kernel ni la sondea, es físico: cinta o conector (2026-10-05). El daemon sigue igual sin cámara, sólo
+  `photo` falla y el modo ómnibus queda inerte.
+- **`Camera frontend has timed out`**: la cámara dejó de entregar frames. El watchdog la reabre a los
+  12 s sin frames (`FRAME_SILENCE_S`); `{"cmd":"restart_camera"}` prueba ese camino a propósito.
 - `pip` se queja de *externally-managed-environment*: es que no se activó el venv; `setup.sh` instala
   siempre dentro de `.venv`.
 
@@ -634,20 +745,29 @@ sólo lo hace en la instalación inicial.
 
 ```sh
 cd hardware/raspi && pip install -r requirements-dev.txt && python3 -m pytest
+# o, con el venv de la Mac: .venv-mac/bin/python -m pytest -q
 ```
 
-Sólo lo puro: el partido en chunks, la máquina de modos y el núcleo de comandos (que es el mismo
-código en la placa y en el emulador). Lo que habla con BlueZ se prueba en la placa; lo que habla con
-CoreBluetooth, arrancando el emulador.
+Al 2026-10-22: **195 pasan y 2 se saltean**, en 18 archivos `tests/test_*.py`. El daemon son 22
+archivos en `virovision/` (4915 líneas). Se prueba lo que no necesita hardware: el partido en chunks,
+la máquina de modos, el núcleo de comandos (que es el mismo código en la placa y en el emulador), el
+botón, el audio, la batería, el AP, el servidor HTTP, el modo ómnibus contra motores de OCR falsos, el
+zoom, la evidencia y el proceso del OCR. Lo que habla con BlueZ se prueba en la placa; lo que habla
+con CoreBluetooth, arrancando el emulador.
 
 ## Qué falta (en orden)
 
-1. **El transductor definitivo.** El camino de audio ya está (`audio.py` + `audremap`), lo que falta
-   es por dónde sale: un piezo verifica pero no sirve para voz; un parlante de 8-32 Ω necesita
-   resistencia; el destino es el **DAC I2S** (MAX98357A, pines 18/19/21). Y los **anuncios
-   pregrabados** de modo y de líneas de ómnibus en la SD (ADR 0003), que hoy no existen: la placa
-   sólo reproduce lo que le manda el teléfono.
-2. Pipeline de ómnibus en placa (Coral): detección → recorte → OCR.
-3. Si la medición lo pide: AP WiFi con NetworkManager + servidor HTTP (`GET /fotos/{id}`, `POST /audio`).
-4. Calibrar los tiempos del botón con el usuario (ver *Botón físico*): los actuales son una primera
-   estimación, no una medición.
+1. **La prueba del modo ómnibus en la calle**, con y sin zoom (`--no-bus-zoom`): a qué distancia se
+   anuncia la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, la fase
+   2 es mover también su zona de entrada (`set_inference_roi_abs`).
+2. **El transductor definitivo.** El camino de audio está (`audio.py` + `audremap`, y 386 anuncios de
+   ómnibus más los avisos de sistema en la SD), pero la salida PWM es provisional: un piezo verifica
+   pero no sirve para voz, un auricular de 16-32 Ω necesita una resistencia en serie de 100-330 Ω, y la
+   carcasa aloja un transductor de conducción ósea de 14 mm que necesita una etapa que lo maneje. El
+   DAC I2S (MAX98357A, GPIO 18/19/21) sigue siendo el destino, y exige mudar antes el botón cableado
+   en el GPIO 21.
+3. **Medir el consumo real** con un medidor USB en línea, y con eso la autonomía.
+4. Copiar acá el contenido exacto de `/etc/default/virovision` (ver *Cambiar el detector*).
+5. Calibrar los tiempos del botón con usuarios ciegos (ver *Botón físico*): los actuales son una
+   primera calibración hecha por personas videntes.
+6. Sacar la evidencia del modo ómnibus antes de la versión final (decisión del 2026-10-12).

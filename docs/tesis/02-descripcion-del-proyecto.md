@@ -85,6 +85,8 @@ Como soporte de la planificación y seguimiento del proyecto, el equipo mantiene
 
 Entre los principales hitos planificados se encuentran: la compra y validación del hardware (cámara, microprocesador y auricular) junto con el modelado 3D de la carcasa; la generación de los datasets y el entrenamiento del modelo de reconocimiento de líneas de ómnibus y productos; y el desarrollo e integración de la aplicación móvil, incluyendo las pruebas de accesibilidad con lectores de pantalla nativos y de usabilidad con usuarios ciegos. El cronograma proyecta la finalización del desarrollo hacia mediados de noviembre de 2026, dejando un margen de aproximadamente dos semanas antes de la fecha límite (30 de noviembre) para integración final, corrección de errores y pruebas de conjunto.
 
+Al 22 de octubre de 2026, el modelado 3D de la carcasa lleva tres versiones impresas y una cuarta en desarrollo (v0.12), ajustada con las medidas reales que mostraron esas impresiones; el detalle está en §7.3.5.
+
 ## 2.4 Antecedentes y contexto
 
 La discapacidad visual representa una de las condiciones que más impacta en la autonomía cotidiana de las personas. Según la Organización Mundial de la Salud (OMS), en 2023 al menos 2.200 millones de personas en el mundo tienen alguna forma de deficiencia visual, de las cuales al menos 1.000 millones podrían haberse prevenido o aún no han recibido tratamiento. La ceguera y la baja visión limitan severamente la capacidad de las personas para desenvolverse de forma independiente en entornos urbanos y domésticos.

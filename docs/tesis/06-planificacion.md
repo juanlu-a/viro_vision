@@ -120,10 +120,17 @@ La etapa final, en ejecución al momento de redactar este informe, comprende:
 - **Construcción del conjunto de evaluación del modo supermercado**, con fotografías tomadas por el
   propio dispositivo.
 - **Medición del costo de la cuantización INT8** del detector, hoy no cuantificado.
-- **Entrenamiento del detector en la GPU** puesta a disposición por Arnaldo Castro. El acceso al
-  servidor ya está disponible; los entrenamientos realizados hasta la fecha corrieron en CPU.
-- **Cierre del hardware**: conversor digital-analógico I2S para el audio, lectura del monitor de
-  batería, medición del consumo real y diseño e impresión de la carcasa.
+- **Entrenamiento del detector en la GPU** puesta a disposición por Arnaldo Castro. Realizado en
+  octubre, con unas 500 fotografías (el primer ajuste fino, en CPU, había usado unas 140). Sus
+  métricas quedan `[PENDIENTE]` de documentar (§7.4).
+- **Alcance de lectura del cartel**: zoom digital del procesador de imagen sobre el cartel (19 de
+  octubre, probado en la placa el 22) y ajuste de los márgenes del recorte (21 y 22 de octubre).
+  Falta la prueba en la calle con y sin zoom.
+- **Cierre del hardware**: la lectura del monitor de batería quedó integrada el 6 de octubre y el
+  arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en
+  OpenSCAD y se iteró sobre impresiones de prueba (versión 0.9 impresa el 17 de octubre, 0.10 el 21,
+  0.11 el 22, y la 0.12 en diseño; §7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un
+  transductor de conducción ósea previsto) y la medición del consumo real.
 - **Pruebas de usabilidad con usuarios ciegos** y ajuste de los tiempos de interacción.
 - **Documentación final**, presentación y demostración.
 - Dos semanas de reserva antes del 30 de noviembre para integración, corrección y pruebas conjuntas.
@@ -134,8 +141,8 @@ La etapa final, en ejecución al momento de redactar este informe, comprende:
 |---|---|---|
 | El enlace inalámbrico no alcanza para mover la imagen | **Materializado** | Medido antes de depender de él; rediseño a dos planos (§7.2) |
 | La inferencia multimodal local no es viable en el teléfono | **Materializado** | Spike de dos días; se adoptó un pipeline por caso de uso |
-| Rotura del hardware de desarrollo | **Materializado** | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada, dejando constancia de que las mediciones de radio no son transferibles |
+| Rotura del hardware de desarrollo | **Materializado** | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada (Raspberry Pi 3 B+), dejando constancia de que las mediciones de radio no son transferibles. El 19 de septiembre se volvió a la Raspberry Pi Zero 2 W, y con ella vuelven a valer las mediciones de radio originales |
 | Dependencia de servicios de nube con cuota gratuita | Vigente | Proxy propio que permite rotar o cortar una clave sin publicar una versión; tope de gasto configurado en cada proveedor |
 | Pausa automática del proyecto de backend por inactividad | **Materializado** | Documentado como riesgo operativo; requiere actividad periódica |
 | La precisión del detector cuantizado es desconocida | Vigente | Receta de validación preparada; medición pendiente (§7.4) |
-| Evaluación realizada sobre video y no sobre la calle | Vigente | Prioridad de la etapa 4 |
+| Evaluación realizada sobre video y no sobre la calle | Vigente | Prioridad de la etapa 4; la primera prueba de campo (19 de octubre) mostró que el cartel sólo se leía con el ómnibus muy cerca, lo que motivó el zoom digital |
