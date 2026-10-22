@@ -76,6 +76,24 @@ En el Doc, para reemplazar una sección:
   seguidos se llevan también la carátula y el índice. Ante la duda, *Archivo → Historial de
   versiones*, que guarda todo.
 
+### Publicar por la API, sección por sección (desde el 2026-10-22)
+
+Con el conector de Google Docs, `sync_doc.py` reemplaza en el Doc **sólo las secciones que cambiaron**,
+de abajo hacia arriba, sin tocar la carátula, el índice, las imágenes que el equipo agregó en el Doc
+ni los comentarios de las secciones que no cambian. El ciclo es:
+
+1. Leer el Doc con `read_doc` y quedarse con el objeto `content` (`jq '.content'`).
+2. `python3 sync_doc.py doc.json batch.json --max-chars 25000` arma la tanda siguiente; con
+   `--report` lista qué secciones difieren.
+3. Mandar `batch.json` con `update_doc`, **siempre con su `writeControl`**: si alguien editó el Doc
+   en el medio, Google rechaza la tanda entera y se vuelve al paso 1.
+4. Repetir hasta que el script diga `ops=0`. Al final, actualizar el índice a mano (la API no lo
+   refresca).
+
+El script salta a propósito las secciones donde el Doc está mejor que el repo (hoy, 2.3 y 12.2.3:
+ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
+abajo: traer primero al repo lo que se haya editado directo en el Doc.
+
 ## Trabajar en paralelo
 
 Docs resuelve solo la edición simultánea, así que varias personas pueden escribir a la vez en

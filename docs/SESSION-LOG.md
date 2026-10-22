@@ -4078,3 +4078,17 @@ mover también su zona de entrada. Abrir el PR a `staging`.
   No se trajo la fórmula de exactitud del Doc (`VP/Total`, le falta VN) ni los conteos viejos del
   capítulo 7. Quedan dos comentarios abiertos de Francisco en el Doc: la nota de edición y el
   entregable 12 (el manual, quizá un audio en la app).
+- **La tesis, publicada en el Google Doc por la API** (conector de Google Docs, aprobado por el admin
+  de WyeWorks). No se pegó el cuerpo entero, porque el Doc tiene imágenes que el equipo agregó ahí (el
+  Gantt del capítulo 6 y su anexo) y se habrían perdido: `docs/tesis/sync_doc.py` compara cada sección
+  del Doc con el repo y reemplaza sólo las que difieren, de abajo hacia arriba, con el `revisionId`
+  como guarda. Fueron unas 50 secciones en 26 tandas, incluidas las nuevas 7.3.5, 7.4.10 y 8.6.3 y los
+  renumerados 7.4.11, 7.4.12 y 8.6.4. Dos errores del script aparecieron en el camino y se corrigieron
+  (un título que perdía su estilo cuando la sección empieza con una tabla, y un renumerado que usaba
+  una posición ya corrida); el título roto de la 8.6 se reparó a mano. Verificado al final: ninguna
+  sección difiere, las tres imágenes siguen y los títulos están en orden.
+- **Quedaron sin tocar, a propósito**: la 2.3 (en el repo la tabla tiene asteriscos de negrita mal
+  formados, y ahí está anclado un comentario de Francisco) y la 12.2.3 (en el repo hay emojis con la
+  codificación rota y faltan las comillas; además, un integrante del equipo estaba editando esa sección
+  en el Doc durante la sesión). Hay que traer esas dos al repo desde el Doc.
+- Pendiente en el Doc: actualizar el índice (la API no lo refresca).
