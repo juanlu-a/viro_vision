@@ -1,21 +1,21 @@
-# ADR 0002 — Backend & auth: Supabase as the online account layer
+# ADR 0002: Backend & auth: Supabase as the online account layer
 
 - **Status:** Accepted (actualizado 2026-07-18, 2026-07-20 y 2026-10-22: email solo, login no montado)
 - **Date:** 2026-07-09
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** app, backend, auth, requirement
-- **Relates to:** [ADR 0001 — Offline-first](0001-offline-first-on-device-inference.md)
+- **Relates to:** [ADR 0001: Offline-first](0001-offline-first-on-device-inference.md)
 
-> **Update (2026-07-18):** the login method is **email + password** (Supabase native auth) — the
+> **Update (2026-07-18):** the login method is **email + password** (Supabase native auth); the
 > earlier draft of this ADR specified Google OAuth (web redirect); that has been dropped. Everything
 > else (Supabase as the online account layer, strictly separated from the offline core) stands.
 
-> **Update (2026-07-20) — app ships WITHOUT login.** After discussion with the team + tutor: the core
+> **Update (2026-07-20): app ships WITHOUT login.** After discussion with the team + tutor: the core
 > is offline-first (on-device model + BLE), so accounts add no value and only friction (App Store
 > obligations; an accessibility barrier). Apple does not require a login (Guideline 5.1.1 discourages
-> forcing registration when it isn't core). The app now **opens directly to the tabs — no gate, no
+> forcing registration when it isn't core). The app now **opens directly to the tabs: no gate, no
 > login screen.** This account layer (Supabase email auth + `AuthProvider`) is **archived, not
-> deleted** — kept for a possible future *optional* sync, not wired into navigation. If login ever
+> deleted**, kept for a possible future *optional* sync, not wired into navigation. If login ever
 > returns it stays email + password (never Google/OAuth).
 
 ## Context
@@ -26,7 +26,7 @@ and a way to distribute **model-file updates**. All of these require the interne
 At the same time, ADR 0001 makes offline recognition a hard requirement. So we need a backend for the
 account features **without** letting it creep onto the essential recognition path. A recurring
 misconception to guard against: "the backend/API should host the model." For **inference**, that is
-explicitly rejected by ADR 0001 — inference runs locally. The backend may host the model **file**
+explicitly rejected by ADR 0001: inference runs locally. The backend may host the model **file**
 (for OTA download + local caching), but never serve inference for the essential path.
 
 ## Decision
@@ -40,14 +40,14 @@ explicitly rejected by ADR 0001 — inference runs locally. The backend may host
    - **Boundary rule:** *nothing on the camera → detection/OCR → announcement path may `await` a
      network call.* Auth/sync live in their own modules and always degrade gracefully.
 
-2. **Supabase provides** Auth (email + password — no Google/OAuth), Postgres (with Row Level Security per user), and
+2. **Supabase provides** Auth (email + password, no Google/OAuth), Postgres (with Row Level Security per user), and
    Storage (model files / assets). Realtime and Edge Functions are available but not required.
 
 3. **Session persistence / offline login.** The Supabase session is persisted in device secure
    storage. App access is gated on the **presence of a stored session**, not on a live network call.
    Token auto-refresh failing while offline **must not sign the user out**; the session is refreshed
    silently once connectivity returns. Only an explicit `signOut()` (or a refresh token expired after
-   a very long offline period) ends the session — matching normal app behavior.
+   a very long offline period) ends the session, matching normal app behavior.
 
 4. **Model files, not inference.** If served from the backend, models are **downloaded once and
    cached**, then run locally. The recognition path never depends on Supabase.
@@ -75,16 +75,16 @@ explicitly rejected by ADR 0001 — inference runs locally. The backend may host
   since account data is non-essential; if offline edits that sync are needed later, add a local-first
   layer (SQLite / WatermelonDB / Legend-State / PowerSync).
 - Requires care so no essential code path awaits Supabase (enforced by the boundary rule above).
-- Email auth keeps setup minimal: no Google Cloud OAuth client, no redirect/deep-link config — just
+- Email auth keeps setup minimal: no Google Cloud OAuth client, no redirect/deep-link config: just
   enable Email auth in Supabase (and decide whether email confirmation is required).
 - Config via env: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (see `app/.env.example`).
 
 ## Implications for the current code
 
 - New app layers (scaffolded as typed **stubs**, no live wiring yet, mirroring the BLE/audio stubs):
-  - `app/src/features/auth/` — auth session state machine + `useAuth` hook.
-  - `app/src/services/supabase/` — `SupabaseAuthClient` interface + honest stub.
-- The recognition and device layers are untouched — they have no dependency on auth or the backend.
+  - `app/src/features/auth/`: auth session state machine + `useAuth` hook.
+  - `app/src/services/supabase/`: `SupabaseAuthClient` interface + honest stub.
+- The recognition and device layers are untouched: they have no dependency on auth or the backend.
 
 ## Actualización 2026-10-22: estado vigente de la capa de cuenta
 

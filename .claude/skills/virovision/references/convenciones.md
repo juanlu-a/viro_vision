@@ -16,7 +16,7 @@ npm test           # jest
 ```
 
 Alias `@/*` → `./src/*`, declarado en `tsconfig.json` y **espejado en `moduleNameMapper` de
-`jest.config.js`** — si agregás un alias, va en los dos lados o los tests dejan de resolver.
+`jest.config.js`**: si agregás un alias, va en los dos lados o los tests dejan de resolver.
 
 > ⚠️ **`app/AGENTS.md` manda: verificá la API contra
 > <https://docs.expo.dev/versions/v57.0.0/> antes de escribir código de Expo.** Expo cambia rápido y
@@ -52,12 +52,12 @@ ya sin la caducidad de 7 días.
 
 ## Dos formas de servicio, y cuándo usar cada una
 
-**(a) Interfaz + stub offline-safe + selector** — `services/supabase/`, `services/ble/`.
+**(a) Interfaz + stub offline-safe + selector**: `services/supabase/`, `services/ble/`.
 Cuando el servicio puede no estar configurado o no existir todavía. Un selector devuelve la
 implementación real o un stub que falla con un error tipado ("no configurado", "no implementado").
 **Degrada a un estado rotulado, nunca rompe ni finge.**
 
-**(b) Barrel + estrategia de proveedor** — `services/vision/`.
+**(b) Barrel + estrategia de proveedor**: `services/vision/`.
 Cuando hay varias implementaciones intercambiables. `types.ts` define el contrato neutro,
 `providers/` lo implementa, el motor no sabe con quién habla. `index.ts` es un barrel puro: es la
 única superficie de import (`@/services/vision`).
@@ -80,10 +80,10 @@ falta.
 Un módulo que **no debe ser llamado desde cierto camino** lleva un comentario que lo dice, cita el
 ADR y explica la consecuencia. Dos vivos:
 
-- `services/vision/recognizeProduct.ts` — *REGLA DE FRONTERA (ADR 0001 + ADR 0006)*: la nube sólo
+- `services/vision/recognizeProduct.ts`: *REGLA DE FRONTERA (ADR 0001 + ADR 0006)*: la nube sólo
   desde el modo supermercado; nunca desde el camino de ómnibus, que corre local. El linter lo fuerza
   (`eslint.config.js`).
-- `services/supabase/client.ts` — *BOUNDARY RULE (ADR 0001 + 0002)*: la cuenta online no puede estar
+- `services/supabase/client.ts`: *BOUNDARY RULE (ADR 0001 + 0002)*: la cuenta online no puede estar
   en el camino de reconocimiento.
 
 Cualquier módulo nuevo que sea instrumentación, o que dependa de la red, lleva uno.
@@ -96,7 +96,7 @@ Una clase por modo de falla, con un código SCREAMING_SNAKE en `super()` y `this
 `BleNotImplementedError`.
 
 El motivo es que la UI decide qué mensaje mostrar **por el tipo**, no parseando strings. Cuando un
-error transporta un dato accionable (cuánto esperar, qué status), va como campo de la clase — y
+error transporta un dato accionable (cuánto esperar, qué status), va como campo de la clase, y
 **alguien tiene que leerlo**: hubo un bug real donde `VISION_STREAM_ERROR` mostraba su propio nombre
 y el detalle quedaba en un campo que nadie miraba.
 
@@ -124,7 +124,7 @@ no le importa al usuario, igual le importa a quien lee la tabla `events`.
   `process.env` mide dónde corre, no qué hace el código. La suite se ejecuta en **dos entornos
   distintos**: el CI de PRs corre sin secrets, y los workflows de publicación corren con todos en
   el `env` del job. Un test de `services/audio/synthesis.ts` que asumía "no hay proxy configurado"
-  pasaba en local —jest no carga `.env`— y **rompió el build de TestFlight** el 2026-09-02. Pasá la
+  pasaba en local (jest no carga `.env`) y **rompió el build de TestFlight** el 2026-09-02. Pasá la
   URL del proxy, la clave y cualquier bandera como parámetro con default, como ya hacen
   `resolveTransport` y el limitador de cuota, y cubrí los dos caminos en vez de asumir uno.
 
@@ -137,12 +137,12 @@ solo lugar. Los componentes importan `strings` de `@/i18n`.
 ## Idioma
 
 **Todo el código va en inglés** desde el 2026-09-09 (ADR 0009): identificadores, nombres de archivo,
-comentarios, mensajes de test, ramas y commits. También las fronteras — el protocolo BLE, los
+comentarios, mensajes de test, ramas y commits. También las fronteras: el protocolo BLE, los
 endpoints HTTP de la placa, los flags del daemon y el esquema de Supabase.
 
 **Lo que sigue en español es lo que una persona lee o escucha**: los *valores* de `src/i18n/es.ts`
 (las claves son inglesas), las etiquetas de los modelos del selector, el prompt del modo supermercado
-—porque su respuesta se lee en voz alta— y **toda la documentación**: `docs/`, los ADRs, esta skill y
+(porque su respuesta se lee en voz alta) y **toda la documentación**: `docs/`, los ADRs, esta skill y
 la tesis. Los nombres propios de marca (Azul Profundo, Verde Lectura) tampoco se traducen.
 
 Si encontrás un identificador en español, es un resto: renombralo al tocarlo.
@@ -161,7 +161,7 @@ No es una capa que se agrega al final; es el criterio de diseño. Mínimos:
 Trampas ya pisadas, que no hay que repetir:
 
 - **`accessibilityLiveRegion` es sólo Android.** En iOS hay que llamar
-  `AccessibilityInfo.announceForAccessibility` — sin eso, VoiceOver no anunciaba *ningún* mensaje de
+  `AccessibilityInfo.announceForAccessibility`; sin eso, VoiceOver no anunciaba *ningún* mensaje de
   estado en una pantalla que es, entera, una máquina de estados.
 - `numberOfLines={1}` recorta etiquetas cuando el usuario agranda el tipo del sistema.
 - Si un botón cambia de identidad (Medir ↔ Cancelar), el foco de VoiceOver se pierde: un solo botón
@@ -183,14 +183,14 @@ Trampas ya pisadas, que no hay que repetir:
   `feat/telemetria-supabase` ya los tenía, con su migración, desde el 07/09. Si el nombre de una
   rama se parece a lo que vas a hacer, mirala (`git log --oneline origin/<rama> -3`) antes.
 - **Conventional Commits con scope**, asunto en inglés desde el 2026-09-09 (ADR 0009): `fix(vision):`,
-  `feat(brand):`, `docs:`. El cuerpo explica **el razonamiento**, no el diff — se lee dentro de seis
+  `feat(brand):`, `docs:`. El cuerpo explica **el razonamiento**, no el diff: se lee dentro de seis
   meses. Los 71 commits anteriores están en español y se dejan como están.
 - **Nunca agregues un trailer de co-autoría de IA.** Los commits son del autor humano.
 - **Una rama por cambio, desde un `staging` al día. Sin apilar PRs.** La lección viene de los PRs
   #1–#4. Si hay dos temas, son dos ramas en secuencia: se mergea la primera, se actualiza
   `staging`, se crea la segunda.
 - Nombres: `feat/…`, `fix/…`, `docs/…`, `spike/…`, kebab-case.
-- El PR usa `.github/pull_request_template.md`, **incluido el checkbox de accesibilidad** — no es
+- El PR usa `.github/pull_request_template.md`, **incluido el checkbox de accesibilidad**, no es
   decorativo.
 - CI (`.github/workflows/ci.yml`) corre lint + typecheck + test y un bundle de verificación, con
   `working-directory: ./app`.
@@ -220,7 +220,7 @@ git diff origin/staging <rama-vieja>   # vacío = todo el contenido está en sta
 
 | Evento | Efecto |
 |---|---|
-| merge a `staging` (cambios en `app/`) | build de TestFlight al grupo **interno** *Equipo ViroVision* (devs, sin revisión, minutos), un `.apk` de sideload como artefacto del run (workflow `android-apk.yml`, mientras Play esté apagado) y — cuando `PLAY_ENABLED=true` — `.aab` a *internal testing* de Google Play |
+| merge a `staging` (cambios en `app/`) | build de TestFlight al grupo **interno** *Equipo ViroVision* (devs, sin revisión, minutos), un `.apk` de sideload como artefacto del run (workflow `android-apk.yml`, mientras Play esté apagado) y (cuando `PLAY_ENABLED=true`) `.aab` a *internal testing* de Google Play |
 | PR `staging → main` mergeado (= release) | build al grupo **externo** *Testers ViroVision*, link público <https://testflight.apple.com/join/jbE7GDqV> (Beta App Review del 1.er build de cada versión) |
 | *Actions → TestFlight / Google Play / Android APK → Run workflow* | publicar cualquier rama al destino que se elija; el `.apk` se baja del run y se manda por donde sea |
 
@@ -242,5 +242,5 @@ se **revierte en `staging` con un PR de revert** antes del release.
 | esta skill | cuando cambia **cómo se trabaja**, no cuando cambia el código |
 
 Los diagramas de flujo/estados van en **mermaid** (GitHub los renderiza y se versionan como
-texto), con el diagrama canónico en `docs/architecture/README.md` — los demás documentos lo
+texto), con el diagrama canónico en `docs/architecture/README.md`; los demás documentos lo
 linkean, nunca lo duplican.

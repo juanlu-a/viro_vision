@@ -15,7 +15,7 @@ de fotos guardado contra el proxy.
 
 ---
 
-## Bloque A — sin nada nuevo (la clave de Gemini que ya está)
+## Bloque A: sin nada nuevo (la clave de Gemini que ya está)
 
 Necesita **rebuild nativo**: cambiaron los permisos en `app.json`, y eso no entra por Fast Refresh.
 
@@ -28,7 +28,7 @@ npx expo run:ios --device "iPhone de Juan"
 
 - [ ] Inicio → **Activar modo supermercado**. Se anuncia por voz.
 - [ ] La línea *Dispositivo* de arriba llega a **listo, con su red**. Hasta que llegue, **Leer con el
-      dispositivo** está deshabilitado — es lo esperado, no una falla.
+      dispositivo** está deshabilitado: es lo esperado, no una falla.
 - [ ] **Leer con el dispositivo** con un producto real frente a la cámara de la placa → se anuncia
       **tipo, marca y detalle** ("arroz Saman, Blue Patna 1 kg").
 - [ ] En pantalla aparece *Última lectura* con sus campos, y **nada más**: ni tiempo, ni modelo, ni
@@ -61,7 +61,7 @@ npx expo run:ios --device "iPhone de Juan"
 - [ ] Elegir otro modelo en Ajustes y volver a Inicio: la lectura siguiente tiene que salir por **ese**
       modelo. Ya no se muestra en pantalla, así que se confirma en los logs de Supabase. Es lo que el
       Provider garantiza y lo que dos hooks separados romperían.
-- [ ] El botón principal **muta** entre "Leer con el dispositivo" y "Leyendo…" — no se intercambia por
+- [ ] El botón principal **muta** entre "Leer con el dispositivo" y "Leyendo…"; no se intercambia por
       otro botón. Si el foco se pierde al leer, eso es la trampa ya documentada.
 - [ ] Agrandar el tipo del sistema (Ajustes → Pantalla y brillo → Tamaño del texto) y confirmar que
       ninguna etiqueta queda recortada.
@@ -84,7 +84,7 @@ npx expo run:ios --device "iPhone de Juan"
 
 ---
 
-## Bloque B — con las claves de OpenAI y Groq
+## Bloque B: con las claves de OpenAI y Groq
 
 Las claves van a `app/.env` (ver `app/.env.example`). **Nunca a un commit ni a un chat.**
 
@@ -109,7 +109,7 @@ Las claves van a `app/.env` (ver `app/.env.example`). **Nunca a un commit ni a u
 
 Los proveedores de OpenAI y Groq están escritos **contra los docs, no contra la API real**. Esta base
 tiene el estándar contrario a propósito: el de Gemini está verificado contra la API, y por eso
-encontró que el discriminador es `event_type` y no `type` — algo que los docs no dicen y que descarta
+encontró que el discriminador es `event_type` y no `type`, algo que los docs no dicen y que descarta
 todos los eventos **en silencio**. Esto es lo que hay que confirmar:
 
 - [ ] **`gpt-5.6-luna` responde y devuelve los tres campos.** Si vuelve vacío pero sin error, el
@@ -134,7 +134,7 @@ todos los eventos **en silencio**. Esto es lo que hay que confirmar:
 - [ ] Elegir **10 alimentos** reales y sacarles foto **una sola vez** cada uno. La canasta básica
       sigue siendo el dataset de referencia (act. del ADR 0006, 2026-09-11), pero el modo ya no se
       limita a ella: conviene incluir algo **suelto o a granel** (yerba, fruta) y algo **sin envase**.
-- [ ] Para cada foto, correrla contra **los cuatro modelos** con la MISMA imagen — si cada modelo
+- [ ] Para cada foto, correrla contra **los cuatro modelos** con la MISMA imagen: si cada modelo
       viera una foto distinta, la comparación mediría fotos, no modelos.
 - [ ] Anotar por corrida: modelo, tiempo, y si acertó `tipo`, `marca` y `detalle` **por separado**.
       Separados y no como un acierto único: el tipo decide si el producto sirve y la marca sólo cuál
@@ -144,7 +144,7 @@ todos los eventos **en silencio**. Esto es lo que hay que confirmar:
 
 ---
 
-## Bloque C — con el proxy desplegado
+## Bloque C: con el proxy desplegado
 
 Pasos previos en [`supabase.md`](supabase.md). Resumen: crear el proyecto, `supabase secrets set` por
 proveedor, `supabase functions deploy vision`, y `EXPO_PUBLIC_VISION_PROXY_URL` en `app/.env`.
@@ -181,7 +181,7 @@ strings ~/Library/Developer/Xcode/DerivedData/ViroVision-*/Build/Products/*/Viro
 
 ---
 
-## Bloque D — el archivo de audio (apagado por defecto)
+## Bloque D: el archivo de audio (apagado por defecto)
 
 `EXPO_PUBLIC_AUDIO_FILE_ENABLED=1` en `app/.env`, más clave de OpenAI o proxy. Está apagado a
 propósito: hoy nada consume el archivo, y prenderlo es pagar una llamada por cada lectura.
@@ -198,7 +198,7 @@ propósito: hoy nada consume el archivo, y prenderlo es pagar una llamada por ca
 
 ---
 
-## Bloque E — con la pantalla bloqueada (el caso real del producto) ✅ *(pasado el 2026-09-11)*
+## Bloque E: con la pantalla bloqueada (el caso real del producto) ✅ *(pasado el 2026-09-11)*
 
 Es **el** bloque: el usuario lleva el teléfono bloqueado en el bolsillo y opera con el botón de la
 placa. El 2026-09-10 esto no funcionaba y nadie lo había probado así. Ver la actualización de
@@ -207,7 +207,7 @@ placa. El 2026-09-10 esto no funcionaba y nadie lo había probado así. Ver la a
 > **Pasado con el build `202609110048`** contra la placa real: la lectura sale y se escucha con la
 > pantalla bloqueada, varias seguidas sin desbloquear, con VoiceOver vivo, y también después de un
 > rato largo bloqueado. Se conserva entero como receta: hay que volver a correrlo ante cualquier
-> cambio en la sesión de audio, en `readingService.ts` o en el cliente BLE — y los pasos 15 y 16 son
+> cambio en la sesión de audio, en `readingService.ts` o en el cliente BLE, y los pasos 15 y 16 son
 > los que diagnostican si alguna vez vuelve a fallar.
 
 Necesita **rebuild nativo** (cambió `app.json`) y el proyecto de Supabase con telemetría, porque
@@ -230,7 +230,7 @@ npx expo run:ios --device "iPhone de Juan"
 
 ### 14. La corrida
 
-- [ ] Botón de bloqueo. **Esperar 30 s** — probar enseguida no prueba nada, iOS todavía no suspendió.
+- [ ] Botón de bloqueo. **Esperar 30 s**: probar enseguida no prueba nada, iOS todavía no suspendió.
 - [ ] **Dos clicks** en el botón físico, con el teléfono guardado y la pantalla apagada.
 - [ ] **Se escucha el chirp de inmediato** (< 0,5 s). Éste es el corte más importante de todo el
       bloque: si suena, la app despertó y la sesión de audio anda, y lo que falle después es el
@@ -260,7 +260,7 @@ npx expo run:ios --device "iPhone de Juan"
       bloquear.** Si cambió, **iOS terminó la app** y hace falta `restoreStateIdentifier` (ADR 0003,
       pendiente anotado). Si no hay ninguna fila **y** el `session` cambió: mismo caso. Si no hay
       ninguna fila y el `session` es el mismo, la app estuvo suspendida y CoreBluetooth no la
-      despertó — buscar un `ble.lost`.
+      despertó: buscar un `ble.lost`.
 
 ### 16. Las variantes que hay que correr al menos una vez
 
@@ -274,7 +274,7 @@ npx expo run:ios --device "iPhone de Juan"
 
 ---
 
-## Bloque F — la lectura sonando en la placa (el ajuste «dónde se escucha»)
+## Bloque F: la lectura sonando en la placa (el ajuste «dónde se escucha»)
 
 Desde el 2026-09-11 la lectura de supermercado puede salir por el **parlante de la placa** en vez del
 teléfono, y se elige en **Ajustes → Dónde se escucha**. Razonamiento en la actualización del
@@ -335,11 +335,11 @@ pantalla bloqueada iOS sólo deja correr a la app mientras el keep-alive suena.
   Que el `.mp3` llegue al **parlante de la placa** no se puede probar todavía: falta el DAC I2S. Todo
   el audio de hoy, incluido el del bloque E, sale por el parlante del teléfono.
 - **El fallback local de supermercado.** Sigue pendiente (Gemma 3 1B con visión). Hoy, sin internet,
-  el modo avisa y no lee — excepción acotada y documentada a ADR 0001.
+  el modo avisa y no lee: excepción acotada y documentada a ADR 0001.
 
 ---
 
-## Bloque G — el alcance nuevo y lo no reconocible (act. del ADR 0006, 2026-09-11)
+## Bloque G: el alcance nuevo y lo no reconocible (act. del ADR 0006, 2026-09-11)
 
 Desde el 2026-09-11 el modo **no se limita a la canasta básica**: identifica alimentos en general. La
 canasta queda como dataset de evaluación, no como límite.

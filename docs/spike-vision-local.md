@@ -1,4 +1,4 @@
-# Spike — visión local en el teléfono (2026-08-12/13)
+# Spike: visión local en el teléfono (2026-08-12/13)
 
 **Pregunta:** ¿puede el teléfono leer el cartel del ómnibus sin depender de la nube?
 (ADR 0004 propone Gemma local; ADR 0001 permite la nube sólo como acelerador opcional.)
@@ -12,9 +12,9 @@ podrían venir del experimento y no del modelo. Todo corre desde la pantalla de 
 
 | Camino | Qué usa | Resultado |
 |---|---|---|
-| **Nube** (Gemini) | `services/vision/` — API con streaming SSE | ✅ Funciona. TTFT < 1 s. Necesita internet; cuota de 20 req/min por modelo en el tier gratuito |
+| **Nube** (Gemini) | `services/vision/`, API con streaming SSE | ✅ Funciona. TTFT < 1 s. Necesita internet; cuota de 20 req/min por modelo en el tier gratuito |
 | **LiteRT-LM** (runtime de Google, sucesor de TFLite) | `react-native-litert-lm@0.6.0` + Gemma | ⚠️ **Texto sí**: Gemma 3 1B genera (910 ms, 13,4 tok/s); Gemma 4 E2B (2,5 GB) carga. **Visión no**: falla al crear la conversación con 3 modelos (756 MB–2,5 GB), en cualquier backend, contexto y precisión |
-| **ExecuTorch** (runtime de PyTorch; en iOS corre sobre MLX, el stack de Apple) | `react-native-executorch@0.9.3` + Gemma 4 E2B multimodal (3 GB) | ✅ **La visión funciona**: carga en ~4 s y lee bien el cartel. Pero TTFT ~5,6 s / total ~6,4 s — lento para un ómnibus acercándose |
+| **ExecuTorch** (runtime de PyTorch; en iOS corre sobre MLX, el stack de Apple) | `react-native-executorch@0.9.3` + Gemma 4 E2B multimodal (3 GB) | ✅ **La visión funciona**: carga en ~4 s y lee bien el cartel. Pero TTFT ~5,6 s / total ~6,4 s, lento para un ómnibus acercándose |
 | **OCR local** (mismo ExecuTorch) | Detector CRAFT + reconocedor CRNN en **español**, ~250 MB | ✅ Rápido y liviano. Devuelve texto **+ posición + confianza**. La precisión mejora mucho con buen encuadre o recorte |
 
 ## La conclusión clave
@@ -53,7 +53,7 @@ cambio), precisión de activaciones y decodificado restringido. Es reportable co
 
 **Pipeline detección → recorte del banner → OCR, con modelos preentrenados de ExecuTorch:**
 
-1. Detector chico (`rfdetr-nano` / `yolo26`): COCO ya trae la clase "bus" — **no hay que entrenar**.
+1. Detector chico (`rfdetr-nano` / `yolo26`): COCO ya trae la clase "bus": **no hay que entrenar**.
 2. El banner es geométricamente predecible: franja superior de la caja del ómnibus.
 3. El recorte reescalado pasa por el OCR: letras grandes, precisión alta.
 4. Caja más grande = ómnibus más cercano → la priorización que la tesis exige, gratis.
@@ -62,7 +62,7 @@ Es la arquitectura que la tesis describía (detección + OCR) **sin pagar el ent
 local queda como término de comparación en el informe; la nube como acelerador opcional (ADR 0001).
 
 La pregunta de alcance del ADR 0004 (¿Gemma multimodal reemplaza a YOLO+OCR?) ahora tiene evidencia:
-**hoy, en este hardware, no** — 6,4 s contra fracciones de segundo, y sin coordenadas para priorizar.
+**hoy, en este hardware, no**: 6,4 s contra fracciones de segundo, y sin coordenadas para priorizar.
 
 ## Nota de cierre (2026-08-30)
 

@@ -4053,3 +4053,16 @@ mover también su zona de entrada. Abrir el PR a `staging`.
 - Pushear la rama de la carcasa y pasar su README a la v0.12.
 - Reemplazar las rayas largas que quedan en las secciones viejas de los documentos que no se
   reescribieron.
+
+## 2026-10-22 (cont. 3): sin rayas largas en la documentación, y la tesis al Doc
+
+- **Pedido del usuario**: completar lo pendiente de la entrada anterior y dejar la tesis en el Google
+  Doc, como siempre.
+- **Rayas largas**: se reemplazaron unas 380 en los ADRs (179), la skill y los documentos generales
+  (unas 135) y los de operación (66), por comas, dos puntos o paréntesis según el caso. Quedan
+  adentro de los bloques de código (comentarios de shell) y en lo que no se edita por regla: la
+  bitácora, las campañas de `docs/mediciones/` y el README de la carcasa, que es de su rama.
+- **README raíz y `CLAUDE.md`**: seguían diciendo "Coral TPU + Camera Module 3"; el README pasó a
+  español y al estado vigente.
+- **La placa**: no apareció por BLE (`tools/ap.py`: "No apareció"), así que el contenido de
+  `/etc/default/virovision` sigue pendiente.

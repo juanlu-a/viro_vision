@@ -1,9 +1,9 @@
 ---
 name: virovision-marca
-description: Manual de marca de ViroVision — símbolo, geometría, paleta, tipografía y reglas de uso, más cómo re-importar el proyecto desde Claude Design. Usalo al tocar cualquier cosa visual de la app (colores, tokens de tema, íconos, splash, tipografía), al generar assets de marca, o al preparar material visual de la tesis (portada, láminas, presentación).
+description: Manual de marca de ViroVision (símbolo, geometría, paleta, tipografía y reglas de uso), más cómo re-importar el proyecto desde Claude Design. Usalo al tocar cualquier cosa visual de la app (colores, tokens de tema, íconos, splash, tipografía), al generar assets de marca, o al preparar material visual de la tesis (portada, láminas, presentación).
 ---
 
-# ViroVision — marca
+# ViroVision: marca
 
 Manual completo y fuentes: [`docs/brand/`](../../../docs/brand/). El PDF
 (`virovision-manual-de-marca.pdf`) es la versión presentable; `virovision-marca.md` tiene las
@@ -12,7 +12,7 @@ reglas en texto plano.
 ## El símbolo
 
 Dos arcos que se encuentran en un vértice inferior: **ojo abstracto y V geométrica a la vez**. El
-punto central es la pupila y, a la vez, el objeto detectado. **No hay logotipo** — la marca es sólo
+punto central es la pupila y, a la vez, el objeto detectado. **No hay logotipo**: la marca es sólo
 el símbolo.
 
 Geometría sobre lienzo 200×200: arcos de radio 96 desde `(100,168)` hasta `(32,44)` y `(168,44)`;
@@ -66,7 +66,7 @@ En oscuro `primary` y `success` coinciden. En claro **no pueden**: medido contra
 
 No es un error del manual: un logo no es texto y WCAG no le exige contraste a un símbolo. Pero
 ViroVision es para personas con baja visión, así que el verde de marca va donde el manual lo pone
-—rellenos— y los rótulos verdes usan el mismo tono llevado hasta AAA.
+(rellenos) y los rótulos verdes usan el mismo tono llevado hasta AAA.
 
 Un detalle que se pasa por alto: el relleno verde sobre el fondo claro da 2.44:1, por debajo del
 **3:1 que WCAG 1.4.11 le pide al *límite* de un control**. Se resuelve contorneando el botón
@@ -123,7 +123,7 @@ pupila Azul Profundo sobre claro y blanca sobre oscuro, y una sola imagen no cum
 `ScreenHeader` elige según el esquema activo.
 
 ⚠️ **`qlmanage` compone la transparencia sobre blanco.** Un símbolo sobre fondo transparente sale
-con un rectángulo blanco, y la pupila —que es blanca en modo oscuro— desaparece dentro de él. Para
+con un rectángulo blanco, y la pupila, que es blanca en modo oscuro, desaparece dentro de él. Para
 los assets que necesitan alfa (`splash-icon`, `android-icon-foreground`, `android-icon-monochrome`)
 usá el rasterizador del repo, que deriva el alfa de una máscara y conserva el antialiasing:
 

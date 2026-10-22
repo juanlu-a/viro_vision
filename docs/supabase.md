@@ -43,7 +43,7 @@ instrumentación: el analizador estático impide importarlas desde el camino que
 
 ---
 
-# Edge Function `vision` — el proxy de claves (ADR 0008)
+# Edge Function `vision`: el proxy de claves (ADR 0008)
 
 Por qué existe: `EXPO_PUBLIC_*` no es una variable de entorno que el binario lea al arrancar, es una
 constante **compilada dentro del `.ipa`/`.apk`**. Un `strings` sobre el bundle la devuelve, y desde
@@ -68,7 +68,7 @@ Lo que cambia es el modo de falla: sin proxy, la clave está en el `.ipa` de tod
 rotarla exige publicar una versión nueva y esperar la revisión de la tienda; con proxy, se rota, se
 rate-limitea o se apaga **en segundos**. Las defensas reales son:
 
-1. La **allowlist de hosts** de la función — sin ella, `url` sería un agujero por el que la clave
+1. La **allowlist de hosts** de la función: sin ella, `url` sería un agujero por el que la clave
    sale hacia donde el atacante quiera (SSRF).
 2. El **freno por IP** de la función. Es un badén, no una pared: Supabase puede levantar varios
    isolates y cada uno cuenta lo suyo.
@@ -77,7 +77,7 @@ rate-limitea o se apaga **en segundos**. Las defensas reales son:
 
 ## Estado (2026-09-02): desplegado
 
-Proyecto `viro_vision` — ref **`oxukvenxiqkjhksgoigq`**, us-east-2. Función `vision` ACTIVE, con
+Proyecto `viro_vision`, ref **`oxukvenxiqkjhksgoigq`**, us-east-2. Función `vision` ACTIVE, con
 `GEMINI_API_KEY`, `OPENAI_API_KEY` y `GROQ_API_KEY` cargadas. `EXPO_PUBLIC_VISION_PROXY_URL` es
 secret del repo, así que **los builds de TestFlight y Play ya no llevan ninguna clave de proveedor**.
 
@@ -157,7 +157,7 @@ app registra esos eventos acá.
 |---|---|
 | Función | [`supabase/functions/telemetry/index.ts`](../supabase/functions/telemetry/index.ts) |
 | Cliente | `app/src/services/telemetry/` (barrel: `@/services/telemetry`) |
-| Tabla | `public.events` — versionada en `supabase/migrations/` |
+| Tabla | `public.events`, versionada en `supabase/migrations/` |
 | Variable | `EXPO_PUBLIC_TELEMETRY_URL`, **opcional**: si falta se deriva de `EXPO_PUBLIC_VISION_PROXY_URL` |
 
 La app **no tiene clave de la base**: manda lotes a la función, que inserta con el `service_role`.
@@ -169,7 +169,7 @@ variable propia: las dos funciones viven en el mismo proyecto, y pedirlas por se
 veces el mismo dato y dejar que se desincronicen. Sin eso, un build con proxy pero sin el secret
 nuevo sale **sin ninguna telemetría** y nadie se entera hasta que hace falta diagnosticar algo. La
 derivación **no adivina**: lo que no termina en `/vision` no deriva nada, porque una URL armada a la
-fuerza daría 404 en cada lote — apagada y sabida es mejor que encendida y rota.
+fuerza daría 404 en cada lote: apagada y sabida es mejor que encendida y rota.
 
 ## El contrato, y su trampa
 
@@ -193,7 +193,7 @@ recién aparece cuando alguien consulta la tabla después de una falla y no encu
 (`services/telemetry/types.ts`), y por eso hay un test que arma el cuerpo y lo compara campo a campo.
 
 Los otros dos topes: **100 eventos por lote** (lo de más se recorta del lado del servidor) y **8 KB
-de `detail`**, que al pasarse se reemplaza **entero** por `{"trimmed": true}` — no la parte de más.
+de `detail`**, que al pasarse se reemplaza **entero** por `{"trimmed": true}`, no la parte de más.
 Nada de imágenes ni textos largos en `detail`.
 
 ## Qué se registra
@@ -225,8 +225,8 @@ segundos. Lo descartado se cuenta y viaja en el siguiente lote como `app.error` 
 `droppedEvents`: un hueco silencioso se leería como "eso no pasó".
 
 Un lote se reintenta **como mucho tres veces** y después se da por perdido. Sin ese tope, un lote que
-el servidor no puede aceptar volvería a la cola para siempre y —como siempre se sube lo más viejo
-primero— **taparía toda la telemetría posterior**: un solo evento malo apagaría el diagnóstico entero
+el servidor no puede aceptar volvería a la cola para siempre y (como siempre se sube lo más viejo
+primero) **taparía toda la telemetría posterior**: un solo evento malo apagaría el diagnóstico entero
 justo cuando hace falta.
 
 ## Verificar que funciona
@@ -261,12 +261,12 @@ a los dos. Agregar un tipo es agregar una línea ahí.
 
 Dos migraciones, en este orden:
 
-1. [`20260907190000_eventos.sql`](../supabase/migrations/20260907190000_eventos.sql) — el archivo
+1. [`20260907190000_eventos.sql`](../supabase/migrations/20260907190000_eventos.sql): el archivo
    original de la rama que creó la tabla, recuperado con su fecha y **verificado contra la base real**
    con `supabase db dump`: coincide campo por campo e índice por índice. **No se toca**: ya está
    aplicada, y un log de migraciones se agrega, no se edita.
-2. [`20260909120000_rename_eventos_to_events.sql`](../supabase/migrations/20260909120000_rename_eventos_to_events.sql)
-   — el pase a inglés (ADR 0009). **Renombra en vez de recrear**, así que las filas de las primeras
+2. [`20260909120000_rename_eventos_to_events.sql`](../supabase/migrations/20260909120000_rename_eventos_to_events.sql):
+   el pase a inglés (ADR 0009). **Renombra en vez de recrear**, así que las filas de las primeras
    sesiones de campo se quedan donde están; traduce además los `type` históricos.
 
 Lo que conviene saber al leerlas:
@@ -279,12 +279,12 @@ Lo que conviene saber al leerlas:
   entera en orden (`session, occurred_at`) y todas las veces que pasó una cosa (`type, created_at desc`).
 - El `check` de `detail` mide **bytes del jsonb ya comprimido** (≤ 8192) y el corte de la función
   mide **caracteres de JSON** (≤ 8000): son medidas distintas. En la práctica la de la función es
-  más estricta —se probó con 7900 caracteres incompresibles y entró sin problema—, y ese margen es
+  más estricta (se probó con 7900 caracteres incompresibles y entró sin problema), y ese margen es
   el que evita que un evento gigante haga fallar el insert del lote entero.
 
 ---
 
-# Edge Function `evidence` — las fotos del modo ómnibus (2026-10-12)
+# Edge Function `evidence`: las fotos del modo ómnibus (2026-10-12)
 
 > ⚠️ **Temporal, sólo para desarrollo.** Se saca antes de la versión final (`docs/ROADMAP.md`,
 > «Antes de la versión final»): son fotos de la calle, con gente.
@@ -298,7 +298,7 @@ Une cada línea del log con la foto que la explica. El camino:
    destino, ms) y, en `detail.storage`, la ruta de cada foto (`app/src/services/evidence/`).
 3. Las fotos quedan en cola en el teléfono y se suben cuando hay internet a esta función, que las
    guarda con service role en el bucket **privado** `evidence`, en
-   `<phone>/<corrida>/<archivo>.jpg` — la misma ruta que ya dice la fila. Con el celular unido al AP
+   `<phone>/<corrida>/<archivo>.jpg`, la misma ruta que ya dice la fila. Con el celular unido al AP
    de la placa no hay internet: se reintenta cada minuto y la cola tiene tope (150).
 
 Las rutas son deterministas a propósito: la fila es correcta aunque la foto suba una hora después, y

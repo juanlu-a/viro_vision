@@ -68,7 +68,7 @@ archivo `SIN-AP`, y si hay que cambiar el flag, `modo-red.sh`.
 > narra lo que pasaba antes y ese script ya no está enganchado en `cmdline.txt`.
 >
 > **La lección, si algún día se renombra otro flag:** buscarlo en TODO `bootfs`, no en el archivo
-> obvio — `grep -ro -- '--[a-z-]*' /Volumes/bootfs/*.sh`. Un flag repetido en dos scripts se corrige
+> obvio: `grep -ro -- '--[a-z-]*' /Volumes/bootfs/*.sh`. Un flag repetido en dos scripts se corrige
 > en uno solo y vuelve en el próximo arranque.
 
 > 💡 **Para entrar sin la tarjeta: `tools/ap.py`.** Apaga el punto de acceso por BLE desde la Mac y
@@ -88,7 +88,7 @@ archivo `SIN-AP`, y si hay que cambiar el flag, `modo-red.sh`.
 
 **Con el AP arriba sí se puede entrar.** `sshd` escucha en todas las interfaces: uniéndose a la red
 `ViroVision` (clave `virovision2026`) se llega a `ssh virovision@10.42.0.1`. Lo que se pierde en esa
-computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a propósito (ADR 0003).
+computadora es **internet**, no el SSH: el AP no anuncia gateway ni DNS a propósito (ADR 0003).
 
 > ⚠️ **Aun así, no despliegues desde una máquina con una sola interfaz de red.** Si el equipo sólo
 > tiene WiFi, unirse al AP lo deja sin internet, y macOS además **se vuelve solo** a la red conocida
@@ -100,7 +100,7 @@ computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a pro
 >    el próximo reinicio, que es justo lo que se quiere para un despliegue y no para dejarla así.
 > 2. **Pasarla a modo desarrollo desde la tarjeta**: crear `/Volumes/bootfs/SIN-AP` desde cualquier
 >    computadora y arrancar. Es persistente, y es lo que se hizo el 2026-09-10.
-> 3. **Cable Ethernet a la placa** — sólo si la placa lo tiene. La Pi 3 B+ prestada traía RJ45; **la
+> 3. **Cable Ethernet a la placa**: sólo si la placa lo tiene. La Pi 3 B+ prestada traía RJ45; **la
 >    Zero 2 W, que es la que está en uso desde el 2026-09-19, no**. Cuando aplica es el camino más
 >    cómodo: la placa queda en la red de casa, se la alcanza sin tocarle el WiFi a nadie y el AP sigue
 >    arriba para el teléfono.
@@ -112,7 +112,7 @@ computadora es **internet**, no el SSH — el AP no anuncia gateway ni DNS a pro
 **El daemon no se reinstala solo.** `instalar-daemon.sh` está detrás de
 `ConditionPathExists=!/var/lib/virovision-instalado`, y esa sentinela ya existe: descomprimir un
 `virovision-daemon.tgz` nuevo en `bootfs` **no alcanza**. Y la sentinela vive en **ext4**, no en
-`bootfs`, así que **no se borra desde macOS con la tarjeta puesta** — "meto la tarjeta en la Mac y
+`bootfs`, así que **no se borra desde macOS con la tarjeta puesta**: "meto la tarjeta en la Mac y
 reinstalo" no es un camino posible.
 
 Cómo se desplegó el 2026-09-10, que es el procedimiento probado:
@@ -398,7 +398,7 @@ siempre. `--button-gpio N` para otro pin, `--no-button` para ignorarlo.
 
 | Constante | Bandera | Valor | Por qué |
 |---|---|---|---|
-| `DEBOUNCE_S` | `--debounce-ms` | **15 ms** | `bounce_time` de gpiozero ignora **todo** flanco dentro de esa ventana del anterior, el de soltar incluido: es una **cota superior de lo corto que puede ser un click**. Con 50 ms, un doble click rápido perdía un flanco y colapsaba en **un** click — por eso el primer doble click encendía ómnibus |
+| `DEBOUNCE_S` | `--debounce-ms` | **15 ms** | `bounce_time` de gpiozero ignora **todo** flanco dentro de esa ventana del anterior, el de soltar incluido: es una **cota superior de lo corto que puede ser un click**. Con 50 ms, un doble click rápido perdía un flanco y colapsaba en **un** click; por eso el primer doble click encendía ómnibus |
 | `LONG_PRESS_S` | `--long-press-ms` | 0,8 s | salir por accidente es peor que tener que insistir. Tiene que quedar **más largo que la ventana de doble click**, o los dos gestos dejan de distinguirse por duración (hay un test que lo fija) |
 | `DOUBLE_CLICK_WINDOW_S` | `--double-click-ms` | **0,6 s** | 0,4 s era la cifra del mouse; acá el botón está en la sien y no hay feedback hasta que el gesto resuelve. Lo paga el click **simple**, que cae en ómnibus y después vigila solo |
 
@@ -504,7 +504,7 @@ ve en ningún log que el usuario alcance.
 
 Cada vez que arranca el modo ómnibus, la placa guarda en la microSD lo que hubo detrás de cada
 anuncio (`virovision/evidence.py`), para poder separar después un cartel muy chico, un recorte que
-cortó medio destino, un reflejo en los LED o un error del OCR — en el log los cuatro se ven igual:
+cortó medio destino, un reflejo en los LED o un error del OCR: en el log los cuatro se ven igual:
 
 ```
 /home/virovision/evidence/<AAAAMMDD-HHMMSS>/
@@ -616,7 +616,7 @@ la lee → la app sintetiza la frase y la manda con `POST /audio` → **la placa
 > ✅ **El último paso faltaba hasta el 2026-09-11.** `http_server.py` aceptaba el archivo, lo
 > escribía en `/tmp/virovision-audio/` y llamaba a un `play` que `__main__.py` **nunca le pasaba**:
 > cada lectura llegaba a la placa y moría ahí, en silencio y con un 202 que decía que había salido
-> bien. Es el peor tipo de falla —todas las capas reportan éxito— y por eso `tests/test_audio.py`
+> bien. Es el peor tipo de falla (todas las capas reportan éxito) y por eso `tests/test_audio.py`
 > existe.
 
 `virovision/audio.py`, y tres cosas que conviene no deshacer:
@@ -632,7 +632,7 @@ la lee → la app sintetiza la frase y la manda con `POST /audio` → **la placa
 
 **Qué decodifica qué**: `.mp3` → `mpg123 -q` (es lo que manda la app); `.wav` → `aplay -q` (viene con
 alsa-utils, sin decodificador). Los dos los instala `setup.sh`. Si en alguna placa apt no se puede
-(en ésta falla cuando el reloj no sincronizó — no tiene RTC), la salida es que la app mande WAV. El
+(en ésta falla cuando el reloj no sincronizó: no tiene RTC), la salida es que la app mande WAV. El
 daemon **dice al arrancar** con qué formatos cuenta:
 
 ```
@@ -647,7 +647,7 @@ sonido.
 
 La Zero 2 W **no tiene jack**, así que el audio PWM se redirige a dos GPIO con `audremap` en
 `config.txt`. Sin `enable_jack` el overlay **apaga el jack**, así que una Pi que sí lo tiene queda
-comportándose como una Zero 2 W — la prueba es real, no una simulación.
+comportándose como una Zero 2 W: la prueba es real, no una simulación.
 
 ```
 dtoverlay=audremap,pins_12_13    # GPIO 12 = pin 32, GPIO 13 = pin 33
@@ -676,7 +676,7 @@ audio_pwm_mode=1                 # legacy: conmuta menos (ver abajo)
 
 Desde el 2026-09-13 ([ADR 0003](../../docs/architecture/adr/0003-enlace-placa-telefono.md),
 actualización): **la placa arranca con `Pairable = false`**. Ninguna característica de este perfil
-pide autenticación —ADR 0003 decidió no cifrar la carga—, así que la app nunca necesitó un vínculo
+pide autenticación (ADR 0003 decidió no cifrar la carga), así que la app nunca necesitó un vínculo
 (*bond*) para nada. Un vínculo no compraba nada y costaba la falla que el usuario reportó: iOS guarda
 su clave, las dos copias dejan de coincidir y desde ahí **cada reconexión termina en «ViroVision
 quiere emparejarse»**, a veces varias veces seguidas.
@@ -704,10 +704,10 @@ journalctl -u virovision -f | grep -E 'central|bonding|advertising'
 
 Desde el 2026-09-20 (ADR 0003, actualización). El kernel anuncia por defecto cada **1,28 s**
 (`adv_min_interval` = 2048 × 0,625 ms, leído en esta placa) y nadie lo había tocado. El teléfono sólo
-encuentra la placa —y sólo completa la conexión directa al identificador recordado— cuando atrapa un
+encuentra la placa (y sólo completa la conexión directa al identificador recordado) cuando atrapa un
 anuncio, así que ese intervalo era un piso debajo de todas las conexiones. Medido desde la Mac con el
 AP arriba: con 1,28 s, dos de seis búsquedas no la veían en 20 s; con 100–152,5 ms, cero de doce (los
-tiempos absolutos de la Mac son ruido —macOS escanea con pereza—; el número del iPhone lo da
+tiempos absolutos de la Mac son ruido (macOS escanea con pereza); el número del iPhone lo da
 `ble.connected.ms` en la telemetría).
 `virovision.service` lo fija por `debugfs` en el mismo `ExecStartPre` que ya fijaba el intervalo de
 conexión. Para verificar que el controlador lo recibió:

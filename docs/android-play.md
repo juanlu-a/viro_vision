@@ -8,7 +8,7 @@ script por paso.
 
 **Google Play Console**, cuenta **personal** (USD 25 una sola vez, no renueva; verificación de
 identidad con documento, horas a 1–2 días). Cuentas personales nuevas necesitan 12 testers durante
-14 días en closed testing **antes de producción** — no aplica a internal testing, que es lo que
+14 días en closed testing **antes de producción**; no aplica a internal testing, que es lo que
 usa el equipo.
 
 ## Una app, dos pistas
@@ -16,7 +16,7 @@ usa el equipo.
 | Rama | Pista de Google Play | Revisión de Google | Quién la recibe |
 |---|---|---|---|
 | `staging` | **Internal testing** | ninguna, minutos | hasta 100 testers por email (los devs) |
-| `main` (release: PR `staging → main`) | **Closed testing — Alpha** | la primera release | testers por lista o **link de opt-in** |
+| `main` (release: PR `staging → main`) | **Closed testing (Alpha)** | la primera release | testers por lista o **link de opt-in** |
 
 ## Pasos únicos (consola, sólo por web)
 
@@ -50,7 +50,7 @@ Secrets: `PLAY_UPLOAD_KEYSTORE_B64`, `PLAY_UPLOAD_KEYSTORE_PASSWORD` (ya cargado
 
 ## Mientras tanto: el `.apk` a mano (sideload)
 
-Un `.aab` **no se instala en un teléfono** — es formato de publicación, Google lo re-parte por
+Un `.aab` **no se instala en un teléfono**: es formato de publicación, Google lo re-parte por
 dispositivo. Así que hasta que exista la cuenta de Play, poner la app en el Android de alguien que
 está al lado tuyo se hace con un `.apk` universal firmado. Es el equivalente Android del grupo
 interno de TestFlight.
