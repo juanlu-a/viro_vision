@@ -5,7 +5,7 @@
 
 El proyecto consiste en el diseño y desarrollo de un sistema de asistencia para personas con baja o nula visión, capaz de reconocer visualmente objetos de interés mediante técnicas de Computer Vision, Machine Learning e Inteligencia Artificial. El sistema estará orientado a la identificación de líneas de ómnibus metropolitanos y de productos de supermercado pertenecientes a la canasta básica. 
 
-La solución contempla un dispositivo con cámara (acoplado a una patilla de lentes) que capture el entorno, procese la información visual y proporcione al usuario retroalimentación auditiva en tiempo real. Además, se prevé su integración con una aplicación móvil, que funcionará como apoyo para la conectividad, el procesamiento y la interacción con el sistema. 
+La solución contempla un dispositivo con cámara (acoplado a una patilla de lentes) que capture una imagen del entorno, procese la información visual y proporcione al usuario retroalimentación auditiva en tiempo real. Además, el mismo se integra con una aplicación móvil, que funcionará como apoyo para la conectividad, el procesamiento y la interacción con el sistema. 
 
 El alcance incluye el desarrollo del prototipo funcional, el entrenamiento o ajuste de modelos de reconocimiento, la vinculación con la aplicación móvil y la validación básica de funcionamiento en escenarios representativos de uso. No necesariamente abarca una implementación comercial final ni una cobertura exhaustiva de todos los objetos posibles del entorno, sino una solución enfocada en casos de uso concretos y relevantes para la autonomía cotidiana del usuario. 
 
@@ -25,10 +25,10 @@ Desarrollar un dispositivo de asistencia para personas con baja visión que perm
   - Implementar un mecanismo de captura y procesamiento de imágenes orientado a la detección e identificación de líneas de ómnibus, incorporando técnicas de OCR, así como el reconocimiento de productos de supermercado de la canasta básica. 
 
 
-  - Entrenar, ajustar (*fine-tuning*) o integrar modelos de Machine Learning adecuados para el reconocimiento de los objetos definidos.
+  - Entrenar, ajustar (*fine-tuning*) e integrar modelos de Machine Learning adecuados para el reconocimiento de los objetos definidos.
 
 
-  - Desarrollar un sistema de retroalimentación auditiva que comunique al usuario, de forma clara y oportuna, el objeto identificado.
+  - Desarrollar un sistema de retroalimentación auditiva que comunique al usuario, de forma clara y concreta, el objeto identificado.
 
 
   - Integrar el dispositivo con una aplicación móvil que permita gestionar la conectividad, apoyar el procesamiento y facilitar la interacción con el usuario.
@@ -44,7 +44,6 @@ Desarrollar un dispositivo de asistencia para personas con baja visión que perm
   - Implementar una funcionalidad de selección por señalamiento que permita que, en el caso de los productos de la canasta básica, la respuesta auditiva comunique únicamente el objeto que el usuario esté apuntando o tocando con su dedo índice entre los elementos detectados, a fin de reducir respuestas innecesarias y mejorar la experiencia de uso. 
 
 
-  - Incorporar la lectura de etiquetas o información textual de productos de la canasta básica mediante OCR, a fin de identificar características complementarias del producto, como su variedad, sabor o presentación. 
 
 ## 2.3 Entregables del proyecto
 
@@ -85,7 +84,7 @@ Como soporte de la planificación y seguimiento del proyecto, el equipo mantiene
 
 Entre los principales hitos planificados se encuentran: la compra y validación del hardware (cámara, microprocesador y auricular) junto con el modelado 3D de la carcasa; la generación de los datasets y el entrenamiento del modelo de reconocimiento de líneas de ómnibus y productos; y el desarrollo e integración de la aplicación móvil, incluyendo las pruebas de accesibilidad con lectores de pantalla nativos y de usabilidad con usuarios ciegos. El cronograma proyecta la finalización del desarrollo hacia mediados de noviembre de 2026, dejando un margen de aproximadamente dos semanas antes de la fecha límite (30 de noviembre) para integración final, corrección de errores y pruebas de conjunto.
 
-Al 22 de octubre de 2026, el modelado 3D de la carcasa lleva tres versiones impresas y una cuarta en desarrollo (v0.12), ajustada con las medidas reales que mostraron esas impresiones; el detalle está en §7.3.5.
+Al 22 de octubre de 2026, el modelado 3D de la carcasa lleva tres versiones impresas y una cuarta en desarrollo (v0.12), ajustada con las medidas reales que mostraron esas impresiones; el detalle está en sec. 7.3.5.
 
 ## 2.4 Antecedentes y contexto
 
@@ -135,7 +134,3 @@ Asimismo, se tendrá en cuenta el contexto local de Uruguay, buscando que la sol
 
 Se contemplarán también limitaciones de hardware, costos y procesamiento, priorizando un equilibrio entre precisión del sistema y factibilidad de implementación.
 
-> **Nota de edición.** Los apartados «Metodología de trabajo» y «Plan de trabajo» del documento
-> anterior, redactados en tiempo futuro como parte de la propuesta, quedan reemplazados por los
-> capítulos 5 (Metodología) y 6 (Planificación) de este documento, que describen lo efectivamente
-> realizado. Su contenido original se conserva en el historial de versiones del documento anterior.

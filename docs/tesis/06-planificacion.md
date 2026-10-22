@@ -5,7 +5,7 @@ el **30 de noviembre de 2026**, fecha límite de entrega. El desarrollo se plani
 **mediados de noviembre**, reservando deliberadamente las últimas dos semanas para integración
 final, corrección de defectos y pruebas conjuntas de los tres pilares.
 
-Aunque la metodología de trabajo es ágil (§5.1), se complementó con una **línea de referencia
+Aunque la metodología de trabajo es ágil (sec. 5.1), se complementó con una **línea de referencia
 temporal**: un desglose de entregables con estimación de complejidad y tiempo, y un cronograma de
 hitos que ordena las dependencias entre pilares. El sentido de esa línea de referencia en un
 proyecto iterativo no es fijar el contenido de cada semana, sino hacer visibles las **dependencias
@@ -14,6 +14,8 @@ es lo que permite que tres personas trabajen sobre tres dominios distintos sin b
 
 `[FIGURA 6.1: Diagrama de Gantt, vista mensual del proyecto, marzo a noviembre de 2026, con las
 cinco etapas y los hitos de entrega.]`
+
+Ver en el Anexo (sec. 12.1).
 
 `[FIGURA 6.2: Diagrama de Gantt con dependencias e hitos. Muestra qué tareas bloquean a cuáles
 entre los tres pilares.]`
@@ -65,7 +67,7 @@ hasta un teléfono real.
   cada *pull request*.
 - Primeros documentos de decisión: **ADR 0001** (offline-first, inferencia local) y **ADR 0002**
   (capa de cuenta).
-- Definición del modelo de dos ramas y del flujo de trabajo (§5.5).
+- Definición del modelo de dos ramas y del flujo de trabajo (sec. 5.5).
 
 Dos resultados de esta etapa condicionaron el resto del proyecto. El primero fue la regla de no
 apilar *pull requests*, aprendida a costa de un conflicto de fusión. El segundo fue la decisión,
@@ -122,14 +124,14 @@ La etapa final, en ejecución al momento de redactar este informe, comprende:
 - **Medición del costo de la cuantización INT8** del detector, hoy no cuantificado.
 - **Entrenamiento del detector en la GPU** puesta a disposición por Arnaldo Castro. Realizado en
   octubre, con unas 500 fotografías (el primer ajuste fino, en CPU, había usado unas 140). Sus
-  métricas quedan `[PENDIENTE]` de documentar (§7.4).
+  métricas quedan `[PENDIENTE]` de documentar (sec. 7.4).
 - **Alcance de lectura del cartel**: zoom digital del procesador de imagen sobre el cartel (19 de
   octubre, probado en la placa el 22) y ajuste de los márgenes del recorte (21 y 22 de octubre).
   Falta la prueba en la calle con y sin zoom.
 - **Cierre del hardware**: la lectura del monitor de batería quedó integrada el 6 de octubre y el
   arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en
   OpenSCAD y se iteró sobre impresiones de prueba, evaluadas el 17 de octubre (versión 0.9), el 21 (0.10) y
-  el 22 (0.11); la 0.12, en diseño (§7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un
+  el 22 (0.11); la 0.12, en diseño (sec. 7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un
   transductor de conducción ósea previsto) y la medición del consumo real.
 - **Pruebas de usabilidad con usuarios ciegos** y ajuste de los tiempos de interacción.
 - **Documentación final**, presentación y demostración.
@@ -139,10 +141,10 @@ La etapa final, en ejecución al momento de redactar este informe, comprende:
 
 | Riesgo | Estado | Mitigación adoptada |
 |---|---|---|
-| El enlace inalámbrico no alcanza para mover la imagen | **Materializado** | Medido antes de depender de él; rediseño a dos planos (§7.2) |
+| El enlace inalámbrico no alcanza para mover la imagen | **Materializado** | Medido antes de depender de él; rediseño a dos planos (sec. 7.2) |
 | La inferencia multimodal local no es viable en el teléfono | **Materializado** | Spike de dos días; se adoptó un pipeline por caso de uso |
 | Rotura del hardware de desarrollo | **Materializado** | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada (Raspberry Pi 3 B+), dejando constancia de que las mediciones de radio no son transferibles. El 19 de septiembre se volvió a la Raspberry Pi Zero 2 W, y con ella vuelven a valer las mediciones de radio originales |
 | Dependencia de servicios de nube con cuota gratuita | Vigente | Proxy propio que permite rotar o cortar una clave sin publicar una versión; tope de gasto configurado en cada proveedor |
 | Pausa automática del proyecto de backend por inactividad | **Materializado** | Documentado como riesgo operativo; requiere actividad periódica |
-| La precisión del detector cuantizado es desconocida | Vigente | Receta de validación preparada; medición pendiente (§7.4) |
+| La precisión del detector cuantizado es desconocida | Vigente | Receta de validación preparada; medición pendiente (sec. 7.4) |
 | Evaluación realizada sobre video y no sobre la calle | Vigente | Prioridad de la etapa 4; la primera prueba de campo (19 de octubre) mostró que el cartel sólo se leía con el ómnibus muy cerca, lo que motivó el zoom digital |

@@ -32,6 +32,8 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 - **Sin raya larga.** No se usa el guion largo de estilo inglés. Se emplean comas, dos puntos o
   paréntesis. `build.py` falla si aparece uno.
 - **Números en formato español**: coma decimal y punto de miles.
+- **Referencias internas como «sec. 7.4.6»**, no con el signo de párrafo (decisión del equipo en el
+  Doc, 2026-09-18).
 - **Toda cifra tiene fuente.** Cada número remite a un ADR, a una campaña de `docs/mediciones/` o a
   un resultado guardado del repositorio de visión.
 - **Lo pendiente se declara.** Lo que no está hecho o no está medido se dice, no se omite.

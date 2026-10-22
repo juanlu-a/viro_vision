@@ -27,12 +27,12 @@ es publicar:
 
 Google Play tiene los canales de prueba interna (para `staging`) y cerrada (para `main`)
 configurados, pero el flujo permanece apagado por una variable del repositorio mientras la cuenta de
-la tienda no esté activa (§8.5).
+la tienda no esté activa (sec. 8.5).
 
 Esta correspondencia tiene una consecuencia deliberada: **no existe un paso manual de publicación**.
 Un cambio aprobado y fusionado está, en minutos, instalado en los teléfonos del equipo. El costo de
 esa automatización es que la rama `staging` debe mantenerse siempre en estado publicable, lo que
-justifica los controles de calidad de §8.3.
+justifica los controles de calidad de sec. 8.3.
 
 ## 8.3 Integración continua
 
@@ -108,7 +108,7 @@ distinguir dos builds compartidos en una conversación.
 
 ### 8.6.1 Función de proxy de visión
 
-Desplegada y activa desde el 2 de septiembre de 2026. Su diseño está descrito en §7.2.3. Desde el
+Desplegada y activa desde el 2 de septiembre de 2026. Su diseño está descrito en sec. 7.2.3. Desde el
 punto de vista del despliegue interesan tres aspectos:
 
 - **Las credenciales viven en el almacén de secretos del proyecto**, nunca en el repositorio ni en el
@@ -144,7 +144,7 @@ las primeras sesiones de campo, que son el único diagnóstico disponible de esa
 ### 8.6.3 Función de evidencia y su almacenamiento
 
 Desplegada el 2026-10-12, es la tercera función. Recibe las fotos del modo ómnibus (el cuadro en que
-se detectó cada ómnibus y cada recorte del cartel que leyó el OCR, §7.7.3) y las guarda en un
+se detectó cada ómnibus y cada recorte del cartel que leyó el OCR, sec. 7.7.3) y las guarda en un
 **contenedor de almacenamiento privado**, creado por su propia migración. El camino tiene tres
 pasos: el dispositivo guarda las imágenes y avisa por Bluetooth; la aplicación las baja por WiFi y
 registra en el momento un evento de telemetría con lo que leyó el OCR y la ruta de cada imagen; las
@@ -178,10 +178,10 @@ administración**: el modo de red, los perfiles de red inalámbrica y los archiv
 avisos de sistema se instalan dejando archivos en esa partición, que un servicio lee en cada
 arranque.
 
-La razón es la restricción de §7.3.4: **un dispositivo en modo producto no tiene acceso remoto por
+La razón es la restricción de sec. 7.3.4: **un dispositivo en modo producto no tiene acceso remoto por
 la red conocida**, de modo que si la única vía de administración fuera la red, cualquier error de
 configuración dejaría al dispositivo irrecuperable sin desarmarlo. Desde septiembre existe además la
-vía por Bluetooth de §8.7.2, que evita retirar la tarjeta en el caso habitual; la tarjeta sigue
+vía por Bluetooth de sec. 8.7.2, que evita retirar la tarjeta en el caso habitual; la tarjeta sigue
 siendo el recurso que no depende de que el servicio esté funcionando.
 
 | Se deja en la partición de arranque | Efecto en el siguiente arranque |
@@ -219,7 +219,7 @@ dispositivo en un estado inconsistente.
 
 El punto de acceso **sí acepta conexiones remotas**: lo que se pierde al unirse a él no es el acceso
 al dispositivo sino el acceso a internet de la máquina, porque la red se publica deliberadamente sin
-anunciar puerta de enlace ni servidor de nombres (§8.7.5).
+anunciar puerta de enlace ni servidor de nombres (sec. 8.7.5).
 
 **Configuración de la vía por cable** (sólo en placas con conector RJ45). La interfaz de red del dispositivo tiene dirección fija, y la
 computadora actúa como encaminador mediante una regla de traducción de direcciones. Se optó por
@@ -273,10 +273,10 @@ persistente exista. Desde el 2026-09-23 una configuración propia lo hace persis
 una prueba del usuario se leyó entera después de reiniciar, con tres arranques en el registro
 (`docs/SESSION-LOG.md`, 2026-09-23).
 
-El registro tiene dos complementos: la **telemetría** que envía la aplicación móvil (§7.8.3), fechada
+El registro tiene dos complementos: la **telemetría** que envía la aplicación móvil (sec. 7.8.3), fechada
 del lado del servidor, y una herramienta que **reproduce todos los avisos de sistema en secuencia**
 para verificar el repertorio de audio sin necesidad del teléfono. La falta de reloj de tiempo real
-sigue vigente y afecta las marcas de tiempo hasta que el reloj se sincroniza por red (§8.7.3).
+sigue vigente y afecta las marcas de tiempo hasta que el reloj se sincroniza por red (sec. 8.7.3).
 
 Una precaución adicional, registrada porque costó tiempo: el servicio **toma la cámara al arrancar**,
 de modo que cualquier prueba manual de la cámara exige detenerlo primero y volver a iniciarlo al
@@ -291,7 +291,7 @@ quedaba sin acceso a internet, lo que impedía alcanzar la nube en el modo super
 así declarada como de alcance estrictamente local, y el teléfono conserva su conexión de datos.
 
 Por la misma razón, el punto de acceso tampoco sirve como vía de administración desde una máquina de
-una sola interfaz (§8.7.2): el comportamiento que protege al teléfono es el que deja sin internet a la
+una sola interfaz (sec. 8.7.2): el comportamiento que protege al teléfono es el que deja sin internet a la
 computadora.
 
 ### 8.7.6 El pipeline de visión como dependencia

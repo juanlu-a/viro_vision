@@ -18,7 +18,7 @@ resultado junto con la decisión que provocó.
 
 De ahí surge la característica más distintiva del proceso: a lo largo del proyecto, **ninguna
 decisión técnica relevante se tomó por preferencia**. Cada una tiene detrás un número, un registro
-de ejecución o una prueba en hardware, y quedó escrita en un documento de decisión (ADR, ver §5.3)
+de ejecución o una prueba en hardware, y quedó escrita en un documento de decisión (ADR, ver sec. 5.3)
 que consigna el contexto, las alternativas evaluadas, la evidencia y las consecuencias. Cuando la
 evidencia posterior contradijo una decisión previa, el ADR no se reescribió: se **enmendó con
 fecha**, dejando visible el cambio de rumbo.
@@ -39,13 +39,13 @@ accesible por SSH, una GPU para entrenar):
 
 La división por pilar tuvo un costo conocido y aceptado: el conocimiento profundo de cada pilar
 quedó concentrado en una persona. El mecanismo que se adoptó para compensarlo fue **documental**
-(§5.3): todo lo que un integrante aprendía sobre su pilar se escribía en el repositorio, de modo que
+(sec. 5.3): todo lo que un integrante aprendía sobre su pilar se escribía en el repositorio, de modo que
 el resto del equipo pudiera retomarlo sin depender de una transferencia oral.
 
 La frontera entre pilares se trató como un **contrato explícito**. El protocolo BLE, los endpoints
 HTTP de la placa y el catálogo de anuncios pregrabados están definidos una vez y duplicados a
 ambos lados de la frontera; en varios casos, un test automatizado falla si las dos copias se
-desincronizan (§7.6). Un contrato verificado por una prueba es preferible a un contrato confiado a
+desincronizan (sec. 7.6). Un contrato verificado por una prueba es preferible a un contrato confiado a
 la memoria de dos personas que trabajan en repositorios distintos.
 
 ### 5.2.2 Enfoque de desarrollo
@@ -61,7 +61,7 @@ Los tres ejemplos más claros de este patrón:
 1. **El transporte de la foto.** Se diseñó el enlace suponiendo que BLE alcanzaría para mover una
    imagen de 53 KB. Se escribió el umbral *antes* de medir (53 KB en menos de 2 s) y la medición lo
    incumplió por un factor de 2,2. El resultado fue rediseñar el enlace en dos planos: BLE para
-   control, WiFi para datos (§7.2).
+   control, WiFi para datos (sec. 7.2).
 2. **El runtime de inferencia en el teléfono.** El ADR 0004 proponía embeber un modelo multimodal en
    la aplicación. Un *spike* de dos días midió los cuatro caminos posibles y mostró que el problema
    no era el teléfono sino la librería; el ADR quedó superado en la práctica por el ADR 0006, que

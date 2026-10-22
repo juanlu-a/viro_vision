@@ -4066,3 +4066,15 @@ mover también su zona de entrada. Abrir el PR a `staging`.
   español y al estado vigente.
 - **La placa**: no apareció por BLE (`tools/ap.py`: "No apareció"), así que el contenido de
   `/etc/default/virovision` sigue pendiente.
+- **Ediciones hechas directo en el Google Doc, traídas al repo** (regla de `docs/tesis/README.md`:
+  leer el Doc antes de publicar). Las encontró una comparación del Doc contra `63dae5e`, el commit del
+  que se publicó:
+  - en el capítulo 2, el alcance ("captura una imagen del entorno", "se integra") y dos objetivos
+    reescritos, uno eliminado (OCR de etiquetas) y la "Nota de edición" borrada;
+  - en el 3.1, el texto del equipo sobre la AI Camera (precio y por qué se compró), en tercera persona;
+  - en el capítulo 6 y el 12.1, la referencia al anexo y el enlace publicado del Gantt;
+  - en el anexo, la línea cortada "L: Po" de la entrevista;
+  - las referencias internas pasan de "§" a "sec.", como las había dejado el equipo.
+  No se trajo la fórmula de exactitud del Doc (`VP/Total`, le falta VN) ni los conteos viejos del
+  capítulo 7. Quedan dos comentarios abiertos de Francisco en el Doc: la nota de edición y el
+  entregable 12 (el manual, quizá un audio en la app).

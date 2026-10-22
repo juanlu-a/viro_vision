@@ -55,7 +55,7 @@ en modo supermercado, porque el usuario que repite el gesto está pidiendo que s
 
 El sistema **nunca emite audio no solicitado**. Los dos modos difieren en qué significa "solicitado":
 en supermercado, el usuario pide una lectura puntual; en ómnibus, el modo mismo es la solicitud, y
-mientras esté activo el dispositivo vigila y anuncia lo que aparece (§7.4.9).
+mientras esté activo el dispositivo vigila y anuncia lo que aparece (sec. 7.4.9).
 
 ### 7.1.3 Los tres flujos de reconocimiento
 
@@ -72,7 +72,7 @@ que cada caso de uso terminó en un extremo distinto: **ómnibus resuelve todo e
 ### 7.1.4 Comunicación entre componentes
 
 El hallazgo que define la arquitectura de comunicación es que **un único canal no alcanza**. La
-medición de throughput BLE (§7.2.1) mostró que el enlace de baja energía no puede mover una imagen
+medición de throughput BLE (sec. 7.2.1) mostró que el enlace de baja energía no puede mover una imagen
 en el tiempo disponible, pero es exactamente el canal adecuado para lo que sí debe estar siempre
 vivo: avisar que se apretó el botón, informar un cambio de modo, reportar estado. De ahí la
 separación en **dos planos**:
@@ -280,7 +280,7 @@ sobre el cartel** (ADR 0006, actualización del 19 de octubre de 2026), que en l
 2026).
 
 **Consecuencia no deseada, documentada.** La ocupación del 90 % del chip implica que **sólo cabe un
-modelo**, lo que condiciona directamente la elección del detector (§7.4.4).
+modelo**, lo que condiciona directamente la elección del detector (sec. 7.4.4).
 
 ### 7.2.6 Calibración de la interacción física
 
@@ -330,7 +330,7 @@ aplicación destinada a personas que no la ven. Esa información no se perdió: 
 | Modelo multimodal embebido en el teléfono (Gemma vía LiteRT-LM) | La capacidad de visión no funcionó en iOS con tres modelos distintos, de 756 MB a 2,5 GB |
 | Modelo multimodal embebido vía ExecuTorch | Funciona, pero 3 GB de descarga inicial, ~4 s de carga y **6,4 s por inferencia**, muy por encima del presupuesto |
 | Audio por Bluetooth Classic (A2DP) | Agrega 150 a 250 ms de codificación y comparte antena con BLE y WiFi |
-| Coral TPU por USB | Reemplazado por la inferencia en el sensor (§7.2.5) |
+| Coral TPU por USB | Reemplazado por la inferencia en el sensor (sec. 7.2.5) |
 | Realce de contraste (CLAHE) sobre el recorte del cartel | **Empeoró** el acierto del número: de 0,875 a 0,771 |
 | Variante separada de la aplicación para pruebas internas | Con tres desarrolladores, cambiar de versión desde la plataforma de distribución alcanza; una segunda aplicación exige su propia ficha y su propia revisión |
 
@@ -344,19 +344,19 @@ aplicación destinada a personas que no la ven. Esa información no se perdió: 
 | Visión | Raspberry Pi AI Camera (sensor Sony IMX500, 12 MP, inferencia en el sensor) | Integrada |
 | Entrada | Pulsador en GPIO 5; en la carcasa, pulsador SMD de 4 × 4 × 1 mm con tecla impresa | Integrado y verificado; el de la carcasa, pendiente de verificar |
 | Audio | Salida PWM por GPIO (provisoria) hacia un transductor de conducción ósea de 14 mm; destino: conversor digital-analógico I2S | **Pendiente** la etapa definitiva |
-| Alimentación | Waveshare UPS HAT (C) + batería LiPo 803040 de 1000 mAh | Integrada; el nivel de batería llega a la aplicación (§7.3.3) |
-| Carcasa | VIA Clara, dos mitades a presión impresas en 3D sobre la patilla | v0.9 integrada al repositorio; v0.12 en desarrollo (§7.3.5) |
+| Alimentación | Waveshare UPS HAT (C) + batería LiPo 803040 de 1000 mAh | Integrada; el nivel de batería llega a la aplicación (sec. 7.3.3) |
+| Carcasa | VIA Clara, dos mitades a presión impresas en 3D sobre la patilla | v0.9 integrada al repositorio; v0.12 en desarrollo (sec. 7.3.5) |
 
 **Sobre la placa en uso.** El conector de cámara de la primera Raspberry Pi Zero 2 W se dañó durante
 el desarrollo, y entre el 9 y el 18 de septiembre de 2026 el trabajo continuó sobre una Raspberry Pi
 3 B+ prestada. Era una sustitución funcionalmente adecuada (mismo sistema operativo, misma interfaz de
 cámara) pero **con un controlador de radio distinto**. Desde el 19 de septiembre el dispositivo vuelve
 a ser una Zero 2 W, con el mismo controlador de radio (BCM43438, Bluetooth 4.2 sin extensión de
-longitud de datos) sobre el que se midió el enlace en §7.2.1, de modo que esas mediciones vuelven a
+longitud de datos) sobre el que se midió el enlace en sec. 7.2.1, de modo que esas mediciones vuelven a
 ser representativas. La placa actual no tiene puerto Ethernet y su WiFi opera sólo en 2,4 GHz. Las
 cifras tomadas sobre la Pi 3 B+ se identifican como tales donde aparecen; en particular, el costo de
-arranque en frío del modo ómnibus de §7.2.4 (47 segundos) es de esa placa, y las cifras vigentes de
-la Zero 2 W están en §7.3.2.
+arranque en frío del modo ómnibus de sec. 7.2.4 (47 segundos) es de esa placa, y las cifras vigentes de
+la Zero 2 W están en sec. 7.3.2.
 
 **Sobre el audio.** La salida actual es audio por modulación de ancho de pulso redirigida a pines de
 propósito general (señal en el pin físico 32, masa en el 34), suficiente para verificar el camino
@@ -420,7 +420,7 @@ queda en silencio: el dispositivo dice «preparando la lectura» y empieza a vig
 
 **Configuración.** Las banderas de ejecución viven en un archivo de configuración del sistema, fuera
 del paquete del servicio, de modo que sobreviven tanto a las actualizaciones como al cambio entre los
-dos modos de operación descritos en §7.3.4.
+dos modos de operación descritos en sec. 7.3.4.
 
 **Seguridad del enlace.** Desde septiembre el dispositivo arranca con el emparejamiento Bluetooth
 deshabilitado. Ninguna característica del perfil requiere autenticación, por lo que la aplicación
@@ -493,7 +493,7 @@ da ninguna señal de estarlo. Ocurrió, y el síntoma fue la ausencia de síntom
 La consecuencia de fondo de esta decisión es que **un dispositivo en modo producto sólo se puede
 actualizar desde la tarjeta o a través del enlace de control**. Esa restricción no es un inconveniente
 del entorno de desarrollo: es el comportamiento correcto del producto, y es la que dio forma al
-procedimiento de despliegue descrito en §8.7.
+procedimiento de despliegue descrito en sec. 8.7.
 
 Como vía intermedia, el proyecto incorporó una herramienta que **apaga el punto de acceso a través
 del enlace de control**, tras lo cual la placa vuelve sola a la red conocida y el acceso remoto queda
@@ -582,7 +582,7 @@ cables.
 el modelo marca como supuestos (las cabezas de los tornillos, lo que asoma la microSD, la palanca de
 la llave, el voladizo de los conectores de la placa, el pulsador con sus patas, el transductor y el
 rigidizador del flex de la cámara); imprimir la carcasa completa; y verificar con ella los tiempos del
-botón (§7.2.6), que se calibraron con otro pulsador. Las versiones v0.10 a v0.12 se desarrollan en una
+botón (sec. 7.2.6), que se calibraron con otro pulsador. Las versiones v0.10 a v0.12 se desarrollan en una
 rama propia que todavía no se integró a la rama principal de desarrollo, donde está la v0.9. Los
 archivos de impresión no se versionan en el repositorio: se publican en la carpeta compartida del
 proyecto, una por versión, y se regeneran desde el modelo.
@@ -638,13 +638,13 @@ Dellapiazza en la plataforma Roboflow, versión 6 del conjunto `find-bus-sign`:
 | Aumentación en el export | Ninguna |
 | Licencia | Dominio público |
 
-**Conjunto de dos clases.** Para la variante de un único modelo (§7.4.4) se requería además la clase
+**Conjunto de dos clases.** Para la variante de un único modelo (sec. 7.4.4) se requería además la clase
 `bus`. Etiquetar a mano 140 imágenes adicionales por segunda vez era evitable: las cajas de ómnibus
 se generaron mediante **pseudo-etiquetado** con un modelo YOLO11x preentrenado sobre COCO (que ya
 contiene la categoría `bus`) y **se revisaron manualmente una por una**. Se conservó la misma
 partición.
 
-**Ampliación para el reentrenamiento.** Para reentrenar el detector de dos clases en la GPU (§7.4.3)
+**Ampliación para el reentrenamiento.** Para reentrenar el detector de dos clases en la GPU (sec. 7.4.3)
 el conjunto se amplió a **unas 500 fotografías** (`docs/SESSION-LOG.md`, 2026-10-21). Su composición,
 su partición y su procedencia no constan en ningún repositorio: **PENDIENTE** de documentar.
 
@@ -674,7 +674,7 @@ Metropolitano de la Intendencia de Montevideo (`data/catalog_stm.csv`, recontado
 **504 filas**, de las cuales **502 son pares** de número y destino entre **145 números de línea** y
 **255 destinos**, más dos carteles sin línea (`COCHE ESCUELA` y `FUERA DE SERVICIO`); 257 destinos
 distintos en total. Cumple tres funciones: reparar la salida del OCR por similitud, decidir qué se
-puede decir y completar la mitad del cartel que no se leyó (§7.4.8), y generar el repertorio de
+puede decir y completar la mitad del cartel que no se leyó (sec. 7.4.8), y generar el repertorio de
 anuncios pregrabados.
 
 ### 7.4.3 El entrenamiento del detector
@@ -701,13 +701,13 @@ su justificación, de modo que sean citables y reproducibles:
 
 **Estado real del entrenamiento, declarado con precisión.** Las dos primeras corridas (el detector
 de una clase y el de dos clases, este último el 2026-09-15) se entrenaron con una configuración más
-conservadora: **40 épocas, lote de 16, sobre CPU**, con las 140 imágenes de §7.4.2.
+conservadora: **40 épocas, lote de 16, sobre CPU**, con las 140 imágenes de sec. 7.4.2.
 
 Después, el detector de dos clases se **reentrenó en el servidor con GPU NVIDIA Tesla V100**
 facilitado por Arnaldo Castro S.A., con **unas 500 fotografías** (`docs/SESSION-LOG.md`, 2026-10-21).
 Las épocas y la configuración efectivamente usadas, las métricas de validación y la ubicación de los
 pesos de ese reentrenamiento **no constan en ningún repositorio: PENDIENTE**. Las métricas que se
-reportan a continuación (§7.4.4 y §7.4.5) corresponden, por lo tanto, a los modelos entrenados en CPU
+reportan a continuación (sec. 7.4.4 y sec. 7.4.5) corresponden, por lo tanto, a los modelos entrenados en CPU
 con 40 épocas, y deben leerse como un **piso** y no como el techo de lo alcanzable.
 
 ### 7.4.4 La decisión del detector de dos clases
@@ -725,7 +725,7 @@ contra una métrica.
 
 **Comparación vigente sobre las 117 imágenes de evaluación** (2026-10-12, en la estación de trabajo,
 con el código del PR #7 de `bus-banner-recognizer`: reconocedor `latin` y reglas del catálogo de
-§7.4.8; README de ese repositorio, sección "Results"):
+sec. 7.4.8; README de ese repositorio, sección "Results"):
 
 | Detector | Número | Destino | Lectura completa | Detección (mediana) |
 |---|---|---|---|---|
@@ -734,11 +734,11 @@ con el código del PR #7 de `bus-banner-recognizer`: reconocedor `latin` y regla
 
 Una sola imagen, el cartel nocturno de la línea 109, mueve el número unos dos puntos: según un píxel
 de recorte se lee `109` o `10`, y el resultado cambia entre versiones de onnxruntime y OpenCV. Son
-cifras del primer modelo entrenado en CPU; el detector reentrenado en la V100 (§7.4.3) no se evaluó
+cifras del primer modelo entrenado en CPU; el detector reentrenado en la V100 (sec. 7.4.3) no se evaluó
 sobre este conjunto (**PENDIENTE**).
 
 **Comparación anterior, del ajuste de márgenes** (septiembre de 2026, antes de las reglas del
-catálogo), que muestra el efecto del margen vertical (§7.4.6):
+catálogo), que muestra el efecto del margen vertical (sec. 7.4.6):
 
 | Detector | Margen vertical | Número | Destino | Lectura completa | Detección (mediana) |
 |---|---|---|---|---|---|
@@ -749,13 +749,13 @@ catálogo), que muestra el efecto del margen vertical (§7.4.6):
 
 **Lectura de las tablas.** El esquema de dos etapas lee mejor: en la medición vigente aventaja al de
 una etapa en **4,2 puntos de lectura completa** y en **3,6 puntos de destino**, con el número igualado.
-En la anterior, el ajuste de los márgenes de recorte (§7.4.6) había cerrado aproximadamente la mitad
+En la anterior, el ajuste de los márgenes de recorte (sec. 7.4.6) había cerrado aproximadamente la mitad
 de la brecha en lectura completa, pero nada de la diferencia en destino. Los fallos restantes del
 destino son del reconocedor, que convierte el texto de matriz de LEDs en ruido, y no de letras que
 quedan fuera del recorte.
 
 **Y sin embargo se eligió el de una clase única de dos categorías.** La razón es que **el sensor sólo
-admite un modelo cargado**: la ocupación del chip llega al 90 % con uno solo (§7.2.5), y el segundo
+admite un modelo cargado**: la ocupación del chip llega al 90 % con uno solo (sec. 7.2.5), y el segundo
 no entra. El esquema de dos etapas exige ejecutar al menos una de las dos inferencias en la CPU de
 la placa, lo que destruye la propiedad que hace viable el modo vigilancia (detección continua sin
 costo de CPU) y multiplica el tiempo por cuadro.
@@ -806,7 +806,7 @@ puntos clave: devuelve un rectángulo por objeto, y el entrenamiento le enseña 
 del cartel. En los carteles de Montevideo el número de línea está a la izquierda, y el "1" es un trazo
 vertical fino. Si el borde izquierdo del recorte cae sobre él, el detector de texto interno del OCR lo
 pierde o lo confunde con el borde de la imagen: en la placa, el 2026-09-15, se leyó dos veces `15`
-donde el cartel decía `115` (§7.4.11). El problema no es el modelo sino el borde del recorte, y se
+donde el cartel decía `115` (sec. 7.4.11). El problema no es el modelo sino el borde del recorte, y se
 resuelve dejando aire alrededor de la caja.
 
 El recorte se expande alrededor de la caja del cartel con tres márgenes relativos independientes:
@@ -842,7 +842,7 @@ modelo que dibuja la caja, y el modelo se elige en el dispositivo (`--bus-model`
 reentrenado tal cual, con los tres márgenes en cero, bajo la hipótesis de que un detector mejor
 entrenado ya no necesitaba colchón. Contra un video en pantalla el "1" entró completo, pero en otras
 pruebas del equipo se siguió perdiendo a veces, y el 2026-10-22 los márgenes volvieron a los valores medidos (PR #122 de
-ViroVision). Con el zoom digital (§7.4.10), una lectura se descarta, sin descontarla de los intentos,
+ViroVision). Con el zoom digital (sec. 7.4.10), una lectura se descarta, sin descontarla de los intentos,
 si la caja **con márgenes** queda fuera del recorte del procesador de imagen: de lo contrario el
 margen izquierdo se cortaría en el borde del cuadro sin aviso y el primer dígito volvería a perderse.
 La aplicación muestra exactamente el recorte que leyó el OCR, margen incluido.
@@ -880,7 +880,7 @@ depende de la configuración y no del modelo:
 ### 7.4.8 Interpretación y reparación contra el catálogo
 
 La salida del OCR se interpreta buscando un número de dos a cuatro dígitos como línea y el texto
-alfabético como destino, y luego **se valida contra el catálogo** de la STM (§7.4.2: 504 filas, 145
+alfabético como destino, y luego **se valida contra el catálogo** de la STM (sec. 7.4.2: 504 filas, 145
 líneas). El catálogo cumple tres funciones.
 
 **Repara por similitud.** Corrige errores sistemáticos del reconocedor. En la primera corrida real
@@ -927,13 +927,13 @@ Un seguidor de objetos mantiene la identidad de cada vehículo entre cuadros y e
 
 **El silencio también es parte del diseño.** Hay dos temporizadores de supresión: 15 segundos para
 el anuncio de presencia y 10 segundos para una misma línea recién anunciada. Se incorporaron a raíz
-de un defecto observado en la primera corrida real (§7.4.11).
+de un defecto observado en la primera corrida real (sec. 7.4.11).
 
 **Evidencia de cada lectura.** Desde el 2026-10-12 (#114) el modo guarda el cuadro y el recorte exacto
 que leyó el OCR, unidos a la fila de telemetría de esa lectura, en un almacenamiento privado del
 servidor; la aplicación los muestra en su pantalla de inicio (#118). Sirven para auditar en la
 estación de trabajo qué vio el sistema cuando dijo, o no dijo, una línea, y son la materia prima del
-conjunto de evaluación con fotografías del propio dispositivo (§7.4.2).
+conjunto de evaluación con fotografías del propio dispositivo (sec. 7.4.2).
 
 ### 7.4.10 Zoom digital sobre el cartel
 
@@ -974,14 +974,14 @@ entrada hacia el ómnibus detectado.
 
 La primera ejecución del pipeline completo sobre la placa reveló cinco defectos que ninguna prueba
 sobre la estación de trabajo había expuesto. Se documentan porque son, en conjunto, el mejor
-argumento a favor de la regla metodológica de §5.2.2:
+argumento a favor de la regla metodológica de sec. 5.2.2:
 
 1. **Un ómnibus, dos anuncios.** El anuncio salió duplicado en un segundo para un mismo vehículo: se
    movió la cámara, el seguidor perdió la pista y el vehículo volvió a entrar como uno nuevo. El
    seguidor por sí solo no alcanza; se agregó la supresión temporal por línea.
 2. **El primer dígito se pierde.** El OCR leía `15` donde el cartel decía `115`: el borde izquierdo
    de la caja caía sobre el "1", un trazo fino que además queda pegado al ícono de accesibilidad para
-   silla de ruedas que precede al número (§7.4.6; bitácora del 15 de septiembre de 2026). Tres
+   silla de ruedas que precede al número (sec. 7.4.6; bitácora del 15 de septiembre de 2026). Tres
    remedios simultáneos: margen izquierdo tres veces el derecho, medio voto para líneas fuera del
    catálogo, y reparación por similitud.
 3. **El OCR no puede correr en el hilo de la cámara.** La biblioteca de captura da el sensor por
@@ -1004,7 +1004,7 @@ monoaural de 22 kHz y 16 bits, de unos 30 KB cada uno.
 
 La razón de esta decisión es directa: **un anuncio que necesita la nube para poder decirse es un
 anuncio que enmudece exactamente cuando hace falta**. Es el ADR 0001 aplicado a la capa de audio. El
-mismo criterio gobierna los avisos de sistema (§7.6.3).
+mismo criterio gobierna los avisos de sistema (sec. 7.6.3).
 
 ## 7.5 El pipeline de reconocimiento de productos
 
@@ -1114,7 +1114,7 @@ arranque.
 **d) Política pura separada del módulo nativo.** Las decisiones (a qué salida enviar el audio, qué
 transporte usar, cómo interpretar un fragmento) viven en funciones puras, separadas del código que
 habla con el sistema operativo. Esto es lo que hace que esas decisiones sean verificables por
-pruebas automatizadas (§7.8).
+pruebas automatizadas (sec. 7.8).
 
 **e) Contratos espejados y verificados.** Las definiciones que cruzan la frontera entre repositorios
 (el perfil GATT, el catálogo de avisos, el esquema de telemetría, el registro de proveedores) existen
@@ -1180,7 +1180,7 @@ destino, y sin ninguno de los dos se dice que se acerca un ómnibus: un anuncio 
 resultado que una interfaz de voz no puede tener (`app/src/features/recognition/format.ts`).
 
 **Los errores no se dicen.** Desde el ADR 0011 (2026-10-06), el texto de un error nunca llega a la
-pantalla ni a la voz: se registra en la telemetría (§7.8.3), y la persona escucha una frase fija, en
+pantalla ni a la voz: se registra en la telemetría (sec. 7.8.3), y la persona escucha una frase fija, en
 lenguaje llano, que indica qué hacer. Callar del todo no es una opción: para quien no ve la pantalla,
 el silencio después de apretar el botón es indistinguible de un dispositivo roto.
 
@@ -1205,7 +1205,7 @@ el cliente Bluetooth pasó a **encolar todas sus operaciones en el orden en que 
 la clase de defecto no lanza ni registra nada.
 
 La pestaña del dispositivo muestra su nombre y, desde el 2026-10-06, **el nivel de batería en
-texto**, leído del monitor de corriente de la fuente (§7.3.3) y con un aviso explícito por debajo del
+texto**, leído del monitor de corriente de la fuente (sec. 7.3.3) y con un aviso explícito por debajo del
 20 % (`app/src/features/device/DeviceSummary.tsx`): para un usuario ciego una barra no existe.
 
 ### 7.6.5 Configuración
@@ -1279,7 +1279,7 @@ sino de verificación para usuarios con resto visual o para un acompañante: es 
 
 El modo ómnibus no tenía equivalente, porque el dispositivo lee solo y por Bluetooth sólo llegaba el
 resultado. Desde el 2026-10-12 el dispositivo guarda, por cada ómnibus, el cuadro en que lo detectó y
-cada recorte del cartel que pasó al OCR, y la aplicación los baja por WiFi (§8.6.3). Desde el 2026-10-13, la
+cada recorte del cartel que pasó al OCR, y la aplicación los baja por WiFi (sec. 8.6.3). Desde el 2026-10-13, la
 pantalla de inicio en modo ómnibus los muestra por ómnibus: el cuadro, y debajo de cada lectura su
 texto y el recorte. Ese recorte es **exactamente el que leyó el OCR, margen incluido**, de modo que
 la imagen explica la lectura: si el «1» de una línea quedó afuera o pegado al borde, se ve. Como el
@@ -1334,4 +1334,4 @@ tiempo transcurrido separado **por etapa** (descarga de la fotografía, lectura,
 audio) y no como un total. La razón es que son etapas que fallan y demoran por motivos distintos, y
 agregadas se observan como un único «tardó». Esta instrumentación es la que permitió detectar
 defectos que no se manifestaban en la interfaz, y sustituyó a la información de diagnóstico que se
-retiró de la pantalla (§7.2.7).
+retiró de la pantalla (sec. 7.2.7).

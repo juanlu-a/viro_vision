@@ -22,7 +22,7 @@ Sin embargo, su tamaño, precio elevado y alto consumo energético hacen inviabl
 
 La Raspberry Pi Zero 2 W es una computadora de placa única que ejecuta Linux y combina un tamaño reducido con una capacidad de procesamiento suficiente para aplicaciones de visión artificial livianas. Su tamaño compacto, su bajo consumo energético y la variedad de cámaras compatibles por el conector CSI la hacen una candidata muy adecuada. Su desventaja es la potencia: tiene bastante menos capacidad de cómputo y memoria (512 MB) que una Raspberry Pi 5, lo que obliga a sacar de su CPU la parte más costosa del reconocimiento.
 
-En el diseño original esa parte iba a resolverla un acelerador **Coral TPU** conectado por USB, con los modelos en formato TensorFlow Lite. Esa combinación dejó de ser necesaria cuando se incorporó una cámara que ejecuta el detector dentro del propio sensor (§3.1.2), y el Coral salió del diseño el 2026-09-07 (ADR 0006; §7.2.5).
+En el diseño original esa parte iba a resolverla un acelerador **Coral TPU** conectado por USB, con los modelos en formato TensorFlow Lite. Esa combinación dejó de ser necesaria cuando se incorporó una cámara que ejecuta el detector dentro del propio sensor (sec. 3.1.2), y el Coral salió del diseño el 2026-09-07 (ADR 0006; sec. 7.2.5).
 
 La Raspberry Pi Zero 2 W representa un equilibrio entre costo, tamaño y capacidad de procesamiento. Además, permite implementar y comparar las dos arquitecturas, haciendo el procesamiento en el dispositivo o enviando datos al celular por WiFi o BLE para procesarlos en él, y por eso fue la elegida por el grupo.
 
@@ -43,11 +43,17 @@ Si bien el precio de este módulo es más caro que las cámaras de la ESP32, no 
 
 **Raspberry Pi AI Camera (Sony IMX500)**
 
-La AI Camera es una cámara oficial de Raspberry Pi basada en el sensor Sony IMX500 de 12,3 MP, que integra un acelerador de redes neuronales en el propio sensor, con 8 MB de memoria para el modelo. El detector corre ahí, a la frecuencia de cuadro de la cámara, y la placa recibe directamente las cajas detectadas junto con la imagen, sin gastar CPU ni memoria propias. Se conecta por CSI, como la Camera Module 3, y no ocupa el puerto USB. Sus límites son dos: el enfoque es manual (un anillo que se ajusta una vez) y en el sensor cabe una sola red, ya que un YOLO11n ocupa el 90 % de esa memoria (§7.2.5).
+La AI Camera es una cámara oficial de Raspberry Pi basada en el sensor Sony IMX500 de 12,3 MP, que integra un acelerador de redes neuronales en el propio sensor, con 8 MB de memoria para el modelo. El detector corre ahí, a la frecuencia de cuadro de la cámara, y la placa recibe directamente las cajas detectadas junto con la imagen, sin gastar CPU ni memoria propias. Se conecta por CSI, como la Camera Module 3, y no ocupa el puerto USB. Sus límites son dos: el enfoque es manual (un anillo que se ajusta una vez) y en el sensor cabe una sola red, ya que un YOLO11n ocupa el 90 % de esa memoria (sec. 7.2.5). Su integración
+con el conjunto de software de cámara de Raspberry Pi permite implementar modelos de redes neuronales
+propios con un esfuerzo mínimo. El precio es mayor que el de la Camera Module 3, pero esta última
+necesitaba sí o sí el Coral TPU para ejecutar la inferencia, mientras que la AI Camera funciona por sí
+misma, sin agregados.
 
 ### 3.1.3 Conclusiones
 
-Se seleccionó la plataforma **Raspberry Pi Zero 2 W** debido a que ofrece un equilibrio adecuado entre costo, tamaño, consumo energético y capacidad de procesamiento, y porque su conectividad WiFi y BLE posibilita comparar el procesamiento local con alternativas basadas en un teléfono móvil. La cámara elegida es la **Raspberry Pi AI Camera (Sony IMX500)**: se conecta por la interfaz CSI dedicada y ejecuta el detector dentro del sensor, lo que cubre el papel que en el diseño original tenía el acelerador Coral TPU. Con eso el acelerador externo dejó de hacer falta y salió del diseño (ADR 0006, 2026-09-07; §7.2.5), con un componente, un costo y un consumo menos. La Camera Module 3 queda como alternativa evaluada y no se usa.
+Se seleccionó la plataforma **Raspberry Pi Zero 2 W** debido a que ofrece un equilibrio adecuado entre costo, tamaño, consumo energético y capacidad de procesamiento, y porque su conectividad WiFi y BLE posibilita comparar el procesamiento local con alternativas basadas en un teléfono móvil. La cámara elegida es la **Raspberry Pi AI Camera (Sony IMX500)**: se conecta por la interfaz CSI dedicada y ejecuta el detector dentro del sensor, lo que cubre el papel que en el diseño original tenía el acelerador Coral TPU. Con eso el acelerador externo dejó de hacer falta y salió del diseño (ADR 0006, 2026-09-07; sec. 7.2.5), con un componente, un costo y un consumo menos. La compra de la AI Camera se decidió para evaluar la potencia del módulo y evitar sumar el Coral TPU al
+producto final, de modo de obtener un dispositivo más compacto y barato. La Camera Module 3 queda como
+alternativa evaluada y no se usa.
 
 ## 3.2 Dispositivos de asistencia para personas con discapacidad visual
 

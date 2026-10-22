@@ -3,7 +3,10 @@
 
 ## 12.1 Planilla de entregables y diagrama de Gantt
 
-<https://docs.google.com/spreadsheets/d/19LJSwvqMiiBDWzO6qrsdW_BlYOHt0stegudmx08klwA/edit?gid=0#gid=0> 
+<https://docs.google.com/spreadsheets/d/19LJSwvqMiiBDWzO6qrsdW_BlYOHt0stegudmx08klwA/edit?gid=0#gid=0>
+
+Versión publicada de la planilla de entregables y del diagrama de Gantt:
+<https://docs.google.com/spreadsheets/d/e/2PACX-1vRhg-RdsfdYF0pMST3cAsK1wOmZePT0zolzU6X9hQr-yuZe5WpxKEaxqlODGqa9atDd0xkch3ctckb2/pubhtml>
 
 ### 12.1.1 Diagrama de Gantt
 
@@ -286,7 +289,6 @@ L: Está bien, está bien.
   
 F: Bueno, eso vendría ser lo último con el tema de la entrevista, así que muchas gracias por el tiempo.  
   
-L: Po
 
 ## 12.5 Manual de marca
 
@@ -295,7 +297,7 @@ L: Po
 El proyecto cuenta con una identidad visual propia, documentada en un manual de marca que cubre el
 símbolo y su construcción geométrica, la paleta de color, la tipografía, las reglas de uso y el
 espacio de protección. La paleta se definió atendiendo a las relaciones de contraste exigidas por
-WCAG, criterio que se verifica de forma automatizada en la aplicación (§7.8.1).
+WCAG, criterio que se verifica de forma automatizada en la aplicación (sec. 7.8.1).
 
 El manual completo se incluye como documento adjunto.
 
