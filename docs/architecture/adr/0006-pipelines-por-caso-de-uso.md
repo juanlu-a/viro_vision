@@ -113,7 +113,7 @@ rotulada en la UI, y se cierra evaluando **Gemma 3 1B con visión** sobre produc
 fallback local. El modo ómnibus no cambia: local siempre.
 
 Consecuencia en el código: el laboratorio del spike (LiteRT-LM, Gemma multimodal por ExecuTorch,
-benchmark de nube) se retiró de la app y quedó preservado en la rama `spike/laboratorio-vision-local`.
+benchmark de nube) se retiró de la app y quedó preservado en la rama `spike/laboratorio-vision-local` (hoy, sólo en el tag `spike-laboratorio-vision-local-2026-08-30`).
 Queda **un solo runtime nativo** (ExecuTorch, sólo OCR).
 
 ## Actualización 2026-08-30 (bis) — el default pasa a Flash Lite y la lectura devuelve tipo + marca

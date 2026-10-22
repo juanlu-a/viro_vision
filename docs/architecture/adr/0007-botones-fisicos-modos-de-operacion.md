@@ -198,7 +198,7 @@ y los eventos `mode` y `read`. El selector de camino de Inicio sigue existiendo 
 desarrollo; con la placa conectada, el modo lo fija el botón y la app lo refleja.
 
 **Un click estando en modo ómnibus repite el último anuncio** (#88, 2026-09-15;
-`hardware/raspi/virovision/core.py:214-217`, `bus.repeat_last`). La decisión original reservaba el
+`hardware/raspi/virovision/core.py:215-218`, `bus.repeat_last`). La decisión original reservaba el
 click corto dentro de un modo «para disparar una lectura», y la actualización del 2026-09-09 hizo que
 un gesto nombre un modo; en ómnibus no hay nada que disparar, porque el modo vigila solo. El caso que
 cubre es el del usuario que no llegó a escuchar la línea: repetirla es lo único útil que puede pedir.

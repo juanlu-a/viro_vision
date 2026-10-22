@@ -103,7 +103,7 @@ soldado, UPS HAT (C) unida a su batería 803040, AI Camera y transductor óseo d
 |---|---|---|
 | v0.8 | `staging`, `case-via-clara/via_clara_v0_8.scad` | punto de partida (llegó por mail), se conserva sin tocar |
 | v0.9 | `staging` (#120) | impresión evaluada el 2026-10-17; es la que documenta `case-via-clara/README.md` en esta rama |
-| v0.10, v0.11 | rama local `feat/case-v0-10-slim`, sin pushear | impresas el 2026-10-21 (v0.10) y el 2026-10-22 (v0.11) |
+| v0.10, v0.11 | rama local `feat/case-v0-10-slim`, sin pushear | impresiones evaluadas el 2026-10-21 (v0.10) y el 2026-10-22 (v0.11) |
 | **v0.12 (vigente)** | la misma rama, **sin commitear**, en el worktree `viro_vision-case` | en desarrollo; **no está integrada a `staging`** |
 
 La historia completa, las medidas y lo que falta medir están en la sección de la carcasa de

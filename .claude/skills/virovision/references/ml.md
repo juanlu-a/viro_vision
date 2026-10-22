@@ -78,7 +78,7 @@ por ómnibus**.
 ## Lo que quedó atrás
 - **Coral TPU** como preprocesadora y "no hay que entrenar": superados el 2026-09-07.
 - **LiteRT-LM / Gemma vía LiteRT-LM** (ADR 0004): dejó de ser el camino primario el 2026-08-22. El
-  laboratorio del spike quedó en la rama `spike/laboratorio-vision-local`
+  laboratorio del spike quedó en el tag `spike-laboratorio-vision-local-2026-08-30`
   ([`docs/spike-vision-local.md`](../../../../docs/spike-vision-local.md)).
 - La rama `feat/bus-banner-pipeline` y los PRs apilados #2 a #6 del repo de Magalí: reemplazados por
   el #7.

@@ -15,7 +15,7 @@
  * to guarantee.
  *
  * Each mode keeps its own pipeline (ADR 0006). **Bus recognition never touches the network**, because
- * out on the street latency rules and signal is not guaranteed (only the optional copy to the device's
+ * on the street latency matters and the signal is not guaranteed (only the optional copy to the device's
  * speaker, below, goes through cloud synthesis). Since #88 (2026-09-15) its product path runs
  * entirely on the device: the board watches, crops the banner, runs the OCR and sends the reading over
  * BLE (`ReaderBridge`, `onRecognition`). What is left here is the app's own read button in bus mode,

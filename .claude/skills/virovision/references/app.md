@@ -31,7 +31,7 @@ acelerador opcional). El reparto por caso de uso es el del ADR 0006:
 (`app/eslint.config.js`) prohíbe que `features/recognition` y `features/audio` importen
 `services/vision`, `cloud`, `telemetry` o `evidence`. Desde el 2026-08-30 la app trae **un solo
 runtime nativo de inferencia** (ExecuTorch, sólo OCR); el laboratorio del spike de visión local quedó
-en la rama `spike/laboratorio-vision-local`.
+en el tag `spike-laboratorio-vision-local-2026-08-30`.
 
 ## Herramientas
 - **React Native con Expo** y **dev client propio** (BLE, WiFi y ExecuTorch no corren en Expo Go),

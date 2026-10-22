@@ -1081,8 +1081,8 @@ pendiente declarado.
 | React | 19 |
 | TypeScript | modo estricto |
 
-Al 2026-10-22, el código de la aplicación (`app/src`) suma **133 archivos y 12 978 líneas**: 97
-archivos y 9 187 líneas de código, y 36 archivos y 3 791 líneas de pruebas (contados con `wc -l`
+Al 2026-10-22, el código de la aplicación (`app/src`) suma **133 archivos y 12 979 líneas**: 97
+archivos y 9 188 líneas de código, y 36 archivos y 3 791 líneas de pruebas (contados con `wc -l`
 sobre los `.ts` y `.tsx`). Está organizado en cuatro capas con una
 regla de dependencia unidireccional: componentes de interfaz → funcionalidades (con estado de React)
 → servicios (infraestructura, sin React) → tipos compartidos. Los textos visibles viven en un único

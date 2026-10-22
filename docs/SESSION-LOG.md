@@ -3929,7 +3929,7 @@ vieja `feat/carcasa-modelo-3d` (v1) se archiva.
   (`set_inference_roi_abs`, fijado al sensor entero), separado del `ScalerCrop` del ISP, y que
   `convert_inference_coords` usa el `ScalerCrop` de cada frame.
 - **Decisión** (ADR 0006, actualización 2026-10-19): zoom digital **dinámico** con `ScalerCrop`,
-  centrado en el cartel más ancho, hasta que el cartel mide ~64 px de alto y nunca más de la mitad del
+  centrado en el cartel de mayor área entre los alargados (`widest_sign`), hasta que el cartel mide ~64 px de alto y nunca más de la mitad del
   ancho del frame; se sostiene 1,5 s si el detector pierde el cartel y después vuelve a 1x. El usuario
   aceptó perder campo de visión ("si se mira hacia donde viene el ómnibus el campo ya es muy amplio")
   mientras no agregue una latencia palpable.
@@ -4021,8 +4021,8 @@ mover también su zona de entrada. Abrir el PR a `staging`.
     porque esa rama es de otra sesión;
   - el reentrenamiento en la V100 con ~500 fotos es un hecho. Sus épocas, métricas y pesos no
     constan en ningún repositorio y quedan como `PENDIENTE`.
-- **El "1" y los márgenes, explicados**: la sospecha era que el "1" se confundía con una arista del
-  box por los keypoints. No es así:
+- **El "1" y los márgenes, explicados**: el usuario reportó que a veces el "1" se perdía, y la
+  sospecha era que se confundía con una arista del box por los keypoints. No es así:
   - el detector es un YOLO11n de **cajas** (dos clases, `bus` y `bus_sign`), no un modelo de pose;
   - el box se ajusta a los LEDs, el número de línea está a la izquierda del cartel y el "1" es un
     trazo vertical fino;

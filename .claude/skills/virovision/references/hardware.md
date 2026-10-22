@@ -103,7 +103,7 @@ El dispositivo lleva **entrada física (botón)** y el reconocimiento funciona p
 explícitos**, nunca siempre prendido: anunciar todo lo que la cámara ve, todo el tiempo, aturde.
 Desde cualquier modo: **1 click** = modo ómnibus (cámara abierta, detector en el sensor en cada frame;
 anuncia presencia y línea una vez por ómnibus; un click estando en ómnibus **repite el último
-anuncio**, `core.py:214-217`); **2 clicks** = modo supermercado **y una lectura** (pipeline LLM con
+anuncio**, `core.py:215-218`); **2 clicks** = modo supermercado **y una lectura** (pipeline LLM con
 visión); **click largo** desde cualquier modo = volver a esperando. Cada transición se anuncia por
 audio: el usuario no tiene otro indicador de estado. El diagrama canónico vive en
 [`docs/architecture/README.md`](../../../../docs/architecture/README.md).
@@ -199,8 +199,8 @@ describe la v0.11); medir lo marcado `MEASURE`; subir los STL al Drive; integrar
 - **Hecho**: firmware completo en `hardware/raspi/`: periférico BLE con el perfil GATT, servidor HTTP
   con cinco rutas, AP siempre prendido, máquina de modos, **botón físico** (2026-09-07, calibrado el
   2026-09-13), audio PWM con 386 anuncios pregrabados de ómnibus y 7 clips de sistema, **batería**
-  (2026-10-06), **modo ómnibus entero en la placa** (#88, 2026-09-15; 1,27 s del click a la línea en la Pi 3 B+ prestada; en la Zero 2 W, 1,6 s desde que el sensor ve el ómnibus, 2026-09-22;
-  dicha), catálogo de la STM que completa lo que el OCR no leyó (2026-10-07), **evidencia** de cada
+  (2026-10-06), **modo ómnibus entero en la placa** (#88, 2026-09-15; 1,27 s del click a la línea dicha en la Pi 3 B+ prestada;
+  en la Zero 2 W, 1,6 s desde que el sensor ve el ómnibus, 2026-09-22), catálogo de la STM que completa lo que el OCR no leyó (2026-10-07), **evidencia** de cada
   corrida (#114, 2026-10-12; temporal), **zoom digital** (#121, 2026-10-19; probado en la placa el
   2026-10-22), márgenes del cartel 18/6/6 (#122, 2026-10-22) y el arranque que anuncia a los 16,2 s.
 - **Falta**: la prueba del modo ómnibus en la calle con y sin zoom; medir el consumo real; el DAC I2S
