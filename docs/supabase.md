@@ -56,7 +56,7 @@ le agrega la cabecera de autenticación desde los secrets y devuelve el body ups
 proveedor no se duplica del lado del servidor y agregar un modelo sigue siendo un cambio en la app.
 
 Código: [`supabase/functions/vision/index.ts`](../supabase/functions/vision/index.ts). El lado
-cliente es `app/src/services/vision/transport.ts`.
+cliente es `app/src/services/cloud/transport.ts`.
 
 ## Qué compra, y qué no
 

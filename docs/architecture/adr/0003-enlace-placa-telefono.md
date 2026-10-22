@@ -817,8 +817,8 @@ físicamente*). Es provisional por una razón eléctrica: un GPIO entrega 16 mA 
 
 La carcasa (VIA Clara, `hardware/case-via-clara/`) aloja un **transductor de conducción ósea de
 14 mm** sobre la patilla, que es el destino físico del audio; la etapa que lo maneje está pendiente.
-El DAC I2S (MAX98357A, GPIO 18/19/21) sigue siendo el camino previsto, y exige antes mudar el botón
-cableado en el GPIO 21. La frase «USB está ocupado por el Coral» de §6 ya no vale; el descarte de A2DP
+El DAC I2S (MAX98357A, GPIO 18/19/21) sigue siendo el camino previsto; esos pines están libres hoy
+(el botón de modos está en el GPIO 5). La frase «USB está ocupado por el Coral» de §6 ya no vale; el descarte de A2DP
 desde la placa, sí: el motivo era la antena compartida, no el USB.
 
 ### El arranque: anunciar primero (2026-10-05/06)

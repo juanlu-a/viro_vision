@@ -526,14 +526,15 @@ rodeado por un anillo en bajorrelieve.
 
 **Una iteración guiada por la impresión.** Las verificaciones del modelo se hacen contra maquetas
 de los componentes, y cada impresión mostró algo que las maquetas no tenían. La tabla resume la
-secuencia (bitácora del proyecto, 14, 17, 21 y 22 de octubre de 2026):
+secuencia (bitácora del proyecto del 14 de octubre de 2026 y bitácora de la rama de la carcasa,
+`feat/case-v0-10-slim`, todavía sin integrar, del 17, 21 y 22 de octubre):
 
 | Versión | Cuerpo (mm) | Lo que mostró la impresión | Cambio en la versión siguiente |
 |---|---|---|---|
 | v0.8 | (modelo de partida) | sin imprimir; suponía un conjunto de 16,5 mm de espesor, frente a los ≈ 23 reales | v0.9 se rehízo sobre el conjunto real |
-| v0.9 | 91,9 × 31,4 × 37,6 | impresa el 17 de octubre, encajó casi todo. Los separadores estaban del lado de la placa y no del módulo; la microSD no entraba (hubo que cortar el extremo); paredes de más; imagen girada 90°; el soporte del lente era mayor que en el plano | conjunto fijado a la mitad externa; paredes de 1,6 mm; cámara girada 90° en su plano, con el flex directo al conector |
-| v0.10 | 92,9 × 28,7 × 36,6 | impresa el 21 de octubre, falló: guías de la cámara demasiado finas para la impresora (0,6 a 0,65 mm), botón contra el disipador de la placa, ranura de la microSD en espejo, brazo del auricular que no entraba, pernos traseros que se rompían | medidas reales tomadas con calibre; guías de 1,2 mm; botón alejado del disipador; microSD accesible con la carcasa cerrada; trabas traseras en lugar de pernos |
-| v0.11 | 83,4 × 28,5 × 37,2 | impresa el 22 de octubre en dos variantes (cámara integrada y con tapa aparte). La de tapa exigía demasiados ajustes; en la integrada el lente no entraba y las trabas delanteras, fundidas sobre las guías de la cámara, no flexionaban y se partieron | se descarta la variante con tapa; 5,0 mm entre la guía delantera y el frente; trabas delanteras detrás de las guías, con luz debajo |
+| v0.9 | 91,9 × 31,4 × 37,6 | impresión evaluada el 17 de octubre: encajó casi todo. Los separadores estaban del lado de la placa y no del módulo; la microSD no entraba (hubo que cortar el extremo); paredes de más; imagen girada 90°; el soporte del lente era mayor que en el plano | conjunto fijado a la mitad externa; paredes de 1,6 mm; cámara girada 90° en su plano, con el flex directo al conector |
+| v0.10 | 92,9 × 28,7 × 36,6 | impresión evaluada el 21 de octubre: falló; guías de la cámara demasiado finas para la impresora (0,6 a 0,65 mm), botón contra el disipador de la placa, ranura de la microSD en espejo, brazo del auricular que no entraba, pernos traseros que se rompían | medidas reales tomadas con calibre; guías de 1,2 mm; botón alejado del disipador; microSD accesible con la carcasa cerrada; trabas traseras en lugar de pernos |
+| v0.11 | 83,4 × 28,5 × 37,2 | impresión evaluada el 22 de octubre, en dos variantes (cámara integrada y con tapa aparte). La de tapa exigía demasiados ajustes; en la integrada el lente no entraba y las trabas delanteras, fundidas sobre las guías de la cámara, no flexionaban y se partieron | se descarta la variante con tapa; 5,0 mm entre la guía delantera y el frente; trabas delanteras detrás de las guías, con luz debajo |
 | **v0.12** | **85,8 × 28,5 × 37,2** | en desarrollo, sin imprimir completa | (vigente) |
 
 Tres hallazgos de esa secuencia cambiaron el diseño y no sólo una medida. **Los separadores
@@ -839,8 +840,8 @@ modelo que dibuja la caja, y el modelo se elige en el dispositivo (`--bus-model`
 
 **Una prueba sin márgenes, y la vuelta.** El 2026-10-21 el equipo probó leer la caja del detector
 reentrenado tal cual, con los tres márgenes en cero, bajo la hipótesis de que un detector mejor
-entrenado ya no necesitaba colchón. Contra un video en pantalla el "1" entró completo, pero en la
-calle se siguió perdiendo, y el 2026-10-22 los márgenes volvieron a los valores medidos (PR #122 de
+entrenado ya no necesitaba colchón. Contra un video en pantalla el "1" entró completo, pero en otras
+pruebas del equipo se siguió perdiendo a veces, y el 2026-10-22 los márgenes volvieron a los valores medidos (PR #122 de
 ViroVision). Con el zoom digital (§7.4.10), una lectura se descarta, sin descontarla de los intentos,
 si la caja **con márgenes** queda fuera del recorte del procesador de imagen: de lo contrario el
 margen izquierdo se cortaría en el borde del cuadro sin aviso y el primer dígito volvería a perderse.
@@ -943,7 +944,8 @@ detiene. La causa es la resolución: el cuadro del que sale el recorte tiene 102
 (estimación, no medición). El reescalado del recorte agranda el borrón, no lo resuelve.
 
 **Decisión** (ADR 0006, actualización 2026-10-19). Un **zoom digital dinámico** en el procesador de
-imagen de la placa (`ScalerCrop`), centrado en el cartel más ancho que ve el detector, hasta que el
+imagen de la placa (`ScalerCrop`), centrado en el cartel de mayor área entre los alargados que ve el detector (relación de aspecto de al
+menos 2, que corresponde al cartel frontal del ómnibus más cercano), hasta que el
 cartel mide unos 64 píxeles de alto (más no sirve: el reconocedor redimensiona a 48) y sin que ocupe
 más de la mitad del ancho del cuadro, para dejar margen al movimiento de la cabeza. Si el detector
 pierde el cartel, el zoom se sostiene 1,5 s y vuelve a 1x. El detector del sensor **sigue viendo el
@@ -979,8 +981,9 @@ argumento a favor de la regla metodológica de §5.2.2:
    seguidor por sí solo no alcanza; se agregó la supresión temporal por línea.
 2. **El primer dígito se pierde.** El OCR leía `15` donde el cartel decía `115`: el borde izquierdo
    de la caja caía sobre el "1", un trazo fino que además queda pegado al ícono de accesibilidad para
-   silla de ruedas que precede al número (§7.4.6). Tres remedios simultáneos: margen izquierdo tres veces el derecho, medio voto para líneas
-   fuera del catálogo, y reparación por similitud.
+   silla de ruedas que precede al número (§7.4.6; bitácora del 15 de septiembre de 2026). Tres
+   remedios simultáneos: margen izquierdo tres veces el derecho, medio voto para líneas fuera del
+   catálogo, y reparación por similitud.
 3. **El OCR no puede correr en el hilo de la cámara.** La biblioteca de captura da el sensor por
    perdido si nadie consume cuadros durante aproximadamente un segundo, y una pasada de OCR tarda
    cerca de un segundo. Se separó en dos hilos comunicados por colas, lo que eliminó los errores de
@@ -1078,8 +1081,9 @@ pendiente declarado.
 | React | 19 |
 | TypeScript | modo estricto |
 
-Al 2026-10-22, el código de la aplicación (`app/src`) suma **133 archivos y 12 976 líneas**: 97
-archivos y 9 185 líneas de código, y 36 archivos y 3 791 líneas de pruebas. Está organizado en cuatro capas con una
+Al 2026-10-22, el código de la aplicación (`app/src`) suma **133 archivos y 12 978 líneas**: 97
+archivos y 9 187 líneas de código, y 36 archivos y 3 791 líneas de pruebas (contados con `wc -l`
+sobre los `.ts` y `.tsx`). Está organizado en cuatro capas con una
 regla de dependencia unidireccional: componentes de interfaz → funcionalidades (con estado de React)
 → servicios (infraestructura, sin React) → tipos compartidos. Los textos visibles viven en un único
 módulo de internacionalización, con claves en inglés y valores en español.

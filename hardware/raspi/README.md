@@ -213,7 +213,7 @@ python3.11 -m venv .venv-mac && .venv-mac/bin/pip install -r requirements-mac.tx
 La primera vez macOS pide permiso de Bluetooth para la terminal (Privacidad y seguridad → Bluetooth).
 Con el emulador corriendo, el iPhone ve «ViroVision» igual que vería la placa; la app se conecta con
 *Buscar dispositivo* y *Medir transferencia* funciona de punta a punta. `--name ViroVision-Mac` si
-la placa real está cerca y querés distinguirlas. Sin cámara: el comando `photo` responde con error, y
+la placa real está cerca y hay que distinguirlas. Sin cámara: el comando `photo` responde con error, y
 `measure` manda bytes sintéticos.
 
 ## Correr a mano (depurar)
@@ -443,7 +443,7 @@ Pesan demasiado para el repo. Los dos se reconstruyen desde `bus-banner-recogniz
 
 | En la placa | Qué es | Cómo se rehace |
 |---|---|---|
-| `/home/virovision/models/*.rpk` | el detector, int8, para el sensor. `bus_sign.rpk` es el default del código (el de una clase); el que corre es el de dos clases (`bus`, `bus_sign`), elegido con `--bus-model` en `/etc/default/virovision`. Reentrenado en la V100 con ~500 fotos (2026-10-21) | `imx500-package -i packerOut.zip -o out/` sobre el `packerOut.zip` del export `format="imx"` (el de una clase, `models/bus_sign_v6_yolo11n_imx_model/`, está en el repo, LFS). Dónde quedaron los pesos del reentrenamiento: **PENDIENTE** (no constan en ningún repo) |
+| `/home/virovision/models/*.rpk` | el detector, int8, para el sensor. `bus_sign.rpk` es el default del código (el de una clase); el que corre es el de dos clases (`bus`, `bus_sign`), elegido con `--bus-model` en `/etc/default/virovision`. Reentrenado en la V100 con ~500 fotos (documentado el 2026-10-21; fecha del entrenamiento PENDIENTE) | `imx500-package -i packerOut.zip -o out/` sobre el `packerOut.zip` del export `format="imx"` (el de una clase, `models/bus_sign_v6_yolo11n_imx_model/`, está en el repo, LFS). Dónde quedaron los pesos del reentrenamiento: **PENDIENTE** (no constan en ningún repo) |
 | `/home/virovision/announcements/` | 386 `.wav`: números de línea y destinos de la STM, más `bus.wav` y `no_number.wav` | `scripts/make_announcements.py`, en `bus-banner-recognizer` |
 | `/home/virovision/announcements/system/` | 7 `.wav`: los 6 avisos de sistema de `notices.py` (modos, «preparando la lectura», salida en el dispositivo, prueba de audio) y el chirp del botón. Los de conexión y red los dice el teléfono desde el 2026-09-17 | `python3 tools/make_system_announcements.py` **en este repo**, y `scp -r announcements/system virovision.local:~/announcements/` |
 | `/home/virovision/models/catalog_stm.csv` | el catálogo de líneas y destinos de Montevideo, que repara lecturas del OCR | `scripts/build_catalog.py` |
@@ -468,8 +468,8 @@ modo de sensor 2028×1520 que usa la Zero 2 W (`MAX_ZOOM = 4.0` sólo se alcanza
 sin que el cartel pase de la mitad del ancho del frame; si se pierde el cartel lo sostiene 1,5 s
 (`HOLD_S`) y vuelve a 1x. El frame es de 1024×766. El detector del IMX500 sigue viendo
 el campo completo (su zona de entrada, `set_inference_roi_abs`, es un control aparte). Probado en la
-placa el 2026-10-22 contra un video del 115 en pantalla: 2,0x, detecciones en 68 a 76 de cada 75
-frames a 15 fps; un cartel de ~10 px de alto (sin zoom el mínimo es 22 px, `MIN_BANNER_HEIGHT_PX`) se
+placa el 2026-10-22 contra un video del 115 en pantalla: 2,0x, entre 68 y 76 frames con detecciones
+por latido de 5 s (unos 75 frames a 15 fps); un cartel de ~10 px de alto (sin zoom el mínimo es 22 px, `MIN_BANNER_HEIGHT_PX`) se
 anunció a los 7,6 s, y uno más cercano a 1,0 s. Pendiente: la prueba en la calle, con y sin zoom.
 
 **Márgenes del cartel** (`SIGN_MARGINS = (0.18, 0.06, 0.06)`, `bus.py:53-61`): izquierda, derecha y
@@ -480,8 +480,8 @@ pierde o lo confunde con el borde («15» por 115, en la placa el 2026-09-15). P
 a la izquierda. El vertical bajó de 0,12 a 0,06 el 2026-09-16, tras barrer 72 combinaciones sobre las
 117 imágenes de evaluación (`bus_banner/crop.py`, `scripts/tune_margins.py` en `bus-banner-recognizer`):
 más aire arriba y abajo gasta la altura fija de entrada del reconocedor en carrocería. El 2026-10-21 el
-equipo probó leer el box tal cual (márgenes 0) con el detector reentrenado; en la calle se seguía
-perdiendo el «1», y el 2026-10-22 (#122) volvieron los márgenes, ahora pasados explícitamente desde
+equipo probó leer el box tal cual (márgenes 0) con el detector reentrenado; en las pruebas del equipo se
+seguía perdiendo a veces el «1», y el 2026-10-22 (#122) volvieron los márgenes, ahora pasados explícitamente desde
 ViroVision, que es donde se elige el modelo (`--bus-model`). Una wheel de `bus_banner` sin el parámetro
 `margins` arranca igual, con los suyos, y lo avisa en el journal.
 
@@ -764,8 +764,8 @@ con CoreBluetooth, arrancando el emulador.
    ómnibus más los avisos de sistema en la SD), pero la salida PWM es provisional: un piezo verifica
    pero no sirve para voz, un auricular de 16-32 Ω necesita una resistencia en serie de 100-330 Ω, y la
    carcasa aloja un transductor de conducción ósea de 14 mm que necesita una etapa que lo maneje. El
-   DAC I2S (MAX98357A, GPIO 18/19/21) sigue siendo el destino, y exige mudar antes el botón cableado
-   en el GPIO 21.
+   DAC I2S (MAX98357A, GPIO 18/19/21) sigue siendo el destino; esos pines están libres hoy (el botón
+   de modos está en el GPIO 5).
 3. **Medir el consumo real** con un medidor USB en línea, y con eso la autonomía.
 4. Copiar acá el contenido exacto de `/etc/default/virovision` (ver *Cambiar el detector*).
 5. Calibrar los tiempos del botón con usuarios ciegos (ver *Botón físico*): los actuales son una

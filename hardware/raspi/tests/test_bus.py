@@ -1022,9 +1022,9 @@ def test_bus_mode_can_be_told_not_to_zoom(monkeypatch):
 
 
 def test_the_sign_is_read_with_room_for_its_first_digit():
-    """2026-10-21 the team tried reading the YOLO box as is; in the field the "1" of the line kept going
-    missing, so on 2026-10-23 the margins came back, the most on the left. They are passed explicitly:
-    the pipeline's own defaults are not this repo's decision."""
+    """2026-10-21 the team tried reading the YOLO box as is; in the team's tests the "1" of the line
+    kept going missing, so on 2026-10-22 (#122) the margins came back, the most on the left. They are
+    passed explicitly: the pipeline's own defaults are not this repo's decision."""
     from virovision.bus import SIGN_MARGINS, pipeline_options
 
     class Pipeline:

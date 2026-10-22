@@ -29,12 +29,12 @@ Tres preguntas concretas:
   del sensor, cargado desde `bus_sign.rpk`. Es el detector reentrenado en la V100 (SESSION-LOG
   2026-10-21); sus métricas de validación no constan (PENDIENTE).
 - **Modo**: ómnibus, puesto por BLE con `{"cmd": "mode", "value": 1}` en la característica `control`.
-- **Zoom**: dinámico, centrado en el cartel más ancho, hasta que el cartel mide ~64 px de alto y sin
+- **Zoom**: dinámico, centrado en el cartel de mayor área entre los alargados (relación de aspecto ≥ 2, `widest_sign`), hasta que el cartel mide ~64 px de alto y sin
   que ocupe más de la mitad del ancho del frame; se sostiene 1,5 s si se pierde el cartel y vuelve a
   1x (`hardware/raspi/virovision/zoom.py`). En el modo agrupado 2x2 del sensor (2028×1520) el techo
   práctico es 2x; el frame es de 1024×766.
 - **Márgenes del recorte**: en **cero**, la caja del detector tal cual (decisión del 2026-10-21). Los
-  márgenes `SIGN_MARGINS = (0.18, 0.06, 0.06)` volvieron ese mismo día, después de esta corrida (#122).
+  márgenes `SIGN_MARGINS = (0.18, 0.06, 0.06)` volvieron el mismo 2026-10-22, después de esta corrida (#122; SESSION-LOG del 2026-10-22).
 - **Escena**: `video2.MP4` del repo `bus-banner-recognizer` (el 115 a Luis Braille) reproducido en la
   pantalla de una laptop, con la cámara apuntada a la pantalla.
 - **Fuente de los datos**: el journal del servicio (latido cada 5 s, línea de tiempo por track fechada
@@ -74,7 +74,8 @@ esperado, porque la zona de entrada del IMX500 (`set_inference_roi_abs`) es un c
 | Ómnibus más cercano | no registrado | una | a **1,0 s** |
 
 En las imágenes de evidencia, el recorte se ajustó al LED sin margen y el "1" de 115 entró completo.
-(En la calle, en cambio, el "1" se siguió perdiendo con márgenes en cero, y por eso volvieron:
+(En otras pruebas del equipo, en cambio, el "1" se siguió perdiendo a veces con márgenes en cero
+(reporte del 2026-10-22), y por eso volvieron:
 ADR 0006, actualización 2026-10-22.)
 
 ### Modo de sensor completo (`--bus-full-res`, hasta 4x)

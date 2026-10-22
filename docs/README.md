@@ -24,7 +24,7 @@ documentación está en español (ADR 0009); el código, en inglés.
   respaldan, para que la conclusión se pueda auditar y la medición repetir.
 - [`spike-vision-local.md`](spike-vision-local.md): el spike de visión local en el teléfono (nube,
   LiteRT-LM, ExecuTorch, OCR). Histórico: lo superó el ADR 0006; el laboratorio se retiró de la app
-  el 2026-08-30 y vive en la rama `spike/laboratorio-vision-local`.
+  el 2026-08-30 y se conserva en el tag `spike-laboratorio-vision-local-2026-08-30`.
 - Guías de prueba de punta a punta: [`qa-modo-supermercado.md`](qa-modo-supermercado.md) (el paso 8
   alimenta el conjunto de evaluación; el paso 9 ya no se puede correr desde la app desde el
   2026-09-08) y [`qa-avisos-de-sistema.md`](qa-avisos-de-sistema.md) (los avisos que da la placa).

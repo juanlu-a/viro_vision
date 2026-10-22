@@ -71,9 +71,9 @@ y sólo para el OCR del modo ómnibus; LiteRT-LM y el Gemma multimodal se desins
 (`react-native-litert-lm`, `react-native-nitro-modules`, `expo-document-picker`), y el benchmark de
 nube también, porque el modo supermercado ya usa la nube como camino de producto con selector de
 modelo (ADR 0006, actualización 2026-08-30). El código completo del laboratorio sigue disponible en
-la rama `spike/laboratorio-vision-local`, el tag `spike-laboratorio-vision-local-2026-08-30` y el PR
+el tag `spike-laboratorio-vision-local-2026-08-30` y el PR
 draft "[NO MERGEAR]" #33; el índice y la receta para revivirlo están en
-[`spike-laboratorio-referencia.md`](spike-laboratorio-referencia.md) (en esa rama).
+[`spike-laboratorio-referencia.md`](https://github.com/juanlu-a/viro_vision/blob/spike-laboratorio-vision-local-2026-08-30/docs/spike-laboratorio-referencia.md) (en ese tag).
 
 ## Pendientes
 

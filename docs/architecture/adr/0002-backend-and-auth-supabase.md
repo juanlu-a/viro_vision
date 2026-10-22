@@ -91,7 +91,8 @@ explicitly rejected by ADR 0001 — inference runs locally. The backend may host
 Las dos notas de julio siguen vigentes y se confirman contra el código:
 
 - **El único método de login es email y contraseña** de Supabase (`app/src/services/supabase/authClient.ts`:
-  `signInWithPassword`, `signUp`). No hay Google ni OAuth.
+  `signInWithEmail` y `signUpWithEmail`, sobre `signInWithPassword` y `signUp` de Supabase). No hay
+  Google ni OAuth.
 - **El login no está montado.** `AuthProvider` (`app/src/features/auth/AuthContext.tsx`) no figura en
   `app/src/app/_layout.tsx`; la app abre directo en las tres pestañas y Ajustes no tiene sección de
   cuenta. El código queda archivado para una eventual sincronización opcional.

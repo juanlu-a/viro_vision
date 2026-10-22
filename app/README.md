@@ -93,7 +93,9 @@ app abre directo en las pestañas. El código se conserva para una eventual sinc
   texto, #110) y Ajustes (modelo de supermercado, salida de audio, qué reconoce y «Probar audio»).
 - **Enlace real**: BLE desde el 2026-09-04, conexión y reconexión automáticas, unión sola a la WiFi
   de la placa. Las operaciones GATT van en cola, una por vez (#94, `services/ble/serialize.ts`).
-- **Salida de audio elegible**, teléfono o dispositivo, para todo lo que suena (#83, #89, #90); el
+- **Salida de audio elegible**, teléfono o dispositivo, para todo lo que suena (#83, #89, #90). La
+  única excepción es el botón «Leer» en modo ómnibus: ese OCR corre en el teléfono, se dice siempre
+  en el teléfono y, si la síntesis está habilitada, manda además una copia a la placa. El
   teléfono es siempre el respaldo y hay **una voz por vez** (#97). Los avisos de sistema son clips
   pregrabados en la placa.
 - **Un solo tema, el oscuro** (ADR 0010).

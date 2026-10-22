@@ -108,7 +108,7 @@ Los cambios más significativos registrados por este mecanismo fueron:
 | 2026-10-06 | Los errores dejan de mostrarse o decirse al usuario: van a la **telemetría**, y el usuario escucha una frase fija | ADR 0011 |
 | 2026-10-06/07 | El modo ómnibus sólo anuncia lo que el **catálogo de líneas** conoce, y el catálogo completa la mitad del cartel que el OCR no leyó | ADR 0006, actualización |
 | 2026-10-19 | **Zoom digital** del procesador de imagen sobre el cartel, para leerlo de más lejos | ADR 0006, actualización |
-| 2026-10-21/22 | Se prueba leer el cartel con la caja del detector **sin márgenes**; en la calle se pierde el primer dígito y los márgenes vuelven al día siguiente | ADR 0006, actualización |
+| 2026-10-21/22 | Se prueba leer el cartel con la caja del detector **sin márgenes**; en las pruebas del equipo se sigue perdiendo a veces el primer dígito y los márgenes vuelven el 22 de octubre | ADR 0006, actualización |
 
 ## 5.3 Documentación del proyecto
 

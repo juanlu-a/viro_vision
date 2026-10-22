@@ -128,7 +128,8 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
 - **Zoom digital** (#121): hasta 2x sobre el cartel. Probado en la placa contra video el 2026-10-22:
   un cartel de ~10 px de alto se anunció a los 7,6 s. `--bus-full-res` traba la cámara de la Zero.
 - **Márgenes del cartel**: `SIGN_MARGINS = (0.18, 0.06, 0.06)` (#122, 2026-10-22). Se probó el box tal
-  cual el 2026-10-21 y en la calle se perdía el "1" del número de línea.
+  cual el 2026-10-21 y en las pruebas del equipo se seguía perdiendo a veces el "1" del número de línea
+  (reporte del 2026-10-22).
   - Causa: el detector es de cajas, el box se ajusta a los LEDs y el número está a la izquierda, así
     que el borde del recorte cae sobre el trazo fino del "1". No es un problema de keypoints.
   - Con zoom, una lectura se descarta si el margen cae fuera del recorte.
@@ -143,8 +144,8 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
   - Dos mitades a presión con ocho trabas, una corredera para la llave y un brazo para el
     transductor óseo de 14 mm.
   - Un solo botón: un pulsador SMD de 4×4×1 mm con tecla pegada.
-- **En `staging`**: la v0.9. Las impresiones de prueba fueron la v0.9 (2026-10-17), la v0.10
-  (2026-10-21, falló) y la v0.11 (2026-10-22). Detalle en la tesis, §7.3.5.
+- **En `staging`**: la v0.9. Las impresiones de prueba se evaluaron así: la v0.9 el
+  2026-10-17, la v0.10 el 2026-10-21 (falló) y la v0.11 el 2026-10-22. Detalle en la tesis, §7.3.5.
 - **Vigente: v0.12** (rama `feat/case-v0-10-slim`, sin commitear):
   - cuerpo de 85,8 × 28,5 × 37,2 mm;
   - se descarta la variante con tapa;

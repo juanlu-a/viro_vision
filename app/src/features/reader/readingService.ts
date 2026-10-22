@@ -14,8 +14,9 @@
  * await** of a reading (`services/audio/session.ts`), and a React round-trip makes that impossible
  * to guarantee.
  *
- * Each mode keeps its own pipeline (ADR 0006). **Bus never touches the network**, because out on the
- * street latency rules and signal is not guaranteed. Since #88 (2026-09-15) its product path runs
+ * Each mode keeps its own pipeline (ADR 0006). **Bus recognition never touches the network**, because
+ * out on the street latency rules and signal is not guaranteed (only the optional copy to the device's
+ * speaker, below, goes through cloud synthesis). Since #88 (2026-09-15) its product path runs
  * entirely on the device: the board watches, crops the banner, runs the OCR and sends the reading over
  * BLE (`ReaderBridge`, `onRecognition`). What is left here is the app's own read button in bus mode,
  * a local OCR pass on the phone over the device's whole photo. **Supermarket goes to the cloud**, to
@@ -319,7 +320,7 @@ export function readFromDevice(mode: Mode | null): Promise<void> {
   return requestReading('device');
 }
 
-/** Bus mode: ALWAYS local (ADR 0006) — OCR over the photo, without touching the network. */
+/** Bus mode: ALWAYS local (ADR 0006): OCR over the photo, no network to read it. */
 async function readBus(uri: string): Promise<void> {
   if (!isOcrLoaded()) {
     update({ status: 'preparing', message: t.preparing, progress: 0 });

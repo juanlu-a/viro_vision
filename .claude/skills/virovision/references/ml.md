@@ -34,7 +34,7 @@ por ómnibus**.
    - **Reentrenado en la V100 de Arnaldo Castro con unas 500 fotos** (SESSION-LOG 2026-10-21). Épocas,
      métricas y ubicación de los pesos: **PENDIENTE** (no constan en ningún repo).
 2. **Zoom digital** (ADR 0006, actualización 2026-10-19; #121): `ScalerCrop` del ISP, dinámico,
-   centrado en el cartel más ancho, hasta ~64 px de alto de cartel, como mucho la mitad del ancho del
+   centrado en el cartel más grande entre los alargados (`widest_sign`: área máxima con relación de aspecto ≥ 2), hasta ~64 px de alto de cartel, como mucho la mitad del ancho del
    frame; se sostiene 1,5 s y vuelve a 1x. Máximo práctico 2x en la Zero 2 W (modo agrupado);
    `--bus-full-res` (4x) no entra: 10 fps, 65 MB libres, cámara trabada (2026-10-22). El detector
    sigue viendo el campo completo (`set_inference_roi_abs` es otro control). `--no-bus-zoom` lo apaga.
@@ -45,7 +45,7 @@ por ómnibus**.
    borde del recorte cae encima, el OCR pierde ("15" por 115, 2026-09-15). Es el borde del recorte, no
    el modelo. El vertical bajó de 0,12 a 0,06 el 2026-09-16 (72 combinaciones sobre 117 imágenes,
    `scripts/tune_margins.py`). Historia: el 2026-10-21 se probó con márgenes en cero; el "1" se siguió
-   perdiendo en la calle y el 2026-10-22 volvieron (#122). Con zoom, una lectura se descarta sin
+   perdiendo a veces en las pruebas del equipo y el 2026-10-22 volvieron (#122). Con zoom, una lectura se descarta sin
    descontar el intento si la caja **con márgenes** queda fuera del recorte (`_with_margins`). La app
    muestra exactamente el recorte que leyó el OCR.
 4. **OCR**: PP-OCRv5 mobile con el reconocedor `latin`, exportado a ONNX y corrido con `rapidocr` 3.x

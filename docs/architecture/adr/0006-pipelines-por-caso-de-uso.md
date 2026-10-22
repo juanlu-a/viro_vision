@@ -399,8 +399,8 @@ tanto) y se encara sólo si la fase 1 no alcanza.
 
 **Medido el 2026-10-22, contra un video en pantalla** (`video2.MP4`, el 115 de `bus-banner-recognizer`):
 
-- El zoom de 2x funciona y **no afecta al detector**: con zoom 2.0x hubo detecciones en 68 a 76 frames
-  de cada 75, a los mismos 15 fps de siempre, y el zoom volvió a 1x al perder el cartel.
+- El zoom de 2x funciona y **no afecta al detector**: con zoom 2,0x hubo entre 68 y 76 frames con
+  detecciones por latido de 5 s (unos 75 frames), a los mismos 15 fps de siempre, y el zoom volvió a 1x al perder el cartel.
 - **Se leyeron carteles que antes no se habrían intentado**. Un cartel de ~10 px en la vista completa,
   por debajo del mínimo de 22 px, llegó al OCR con ~25 px. Las tres primeras lecturas salieron
   ilegibles y la cuarta anunció «115, Luis Braille» a los 7,6 s. Un ómnibus un poco más cercano se
@@ -412,7 +412,7 @@ tanto) y se encara sólo si la fase 1 no alcanza.
   dígito entró completo.
 
 **2026-10-22: vuelven los márgenes del recorte.** Leer el box del YOLO tal cual (decisión del
-2026-10-21) no alcanzó: en la calle se siguió perdiendo el "1" del número de línea. Vuelven los valores
+2026-10-21) no alcanzó: en las pruebas del equipo se siguió perdiendo a veces el "1" del número de línea. Vuelven los valores
 medidos sobre las 117 imágenes de evaluación: 18 % a la izquierda, donde está el número, y 6 % a la
 derecha, arriba y abajo (`SIGN_MARGINS` en `virovision/bus.py`). La app sigue mostrando exactamente el
 recorte que lee el OCR, ahora con el margen incluido. Con zoom, una lectura se descarta si el recorte
@@ -443,8 +443,8 @@ celda de la grilla habría sido ajustarse al set de evaluación.
 
 **La prueba sin márgenes, y la vuelta.** El 2026-10-21 el equipo probó leer la caja del detector
 reentrenado tal cual (márgenes en cero), con la idea de que un modelo mejor entrenado ya no
-necesitaba colchón. Contra un video en pantalla, el 2026-10-22, el "1" de 115 entró completo; en la
-calle se siguió perdiendo, y el mismo 2026-10-22 volvieron los valores medidos (#122). La diferencia
+necesitaba colchón. Contra un video en pantalla, el 2026-10-22, el "1" de 115 entró completo; en otras pruebas
+del equipo se siguió perdiendo (reporte del 2026-10-22), y el mismo 2026-10-22 volvieron los valores medidos (#122). La diferencia
 con antes es dónde viven: ViroVision se los pasa explícitamente al `Pipeline` (`pipeline_options` en
 `bus.py`), porque los márgenes dependen del modelo que dibuja la caja y el modelo se elige en
 ViroVision (`--bus-model`). Una wheel de `bus_banner` que no acepte `margins` arranca igual, con los

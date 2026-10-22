@@ -45,7 +45,8 @@ El hallazgo estructural del spike: **el problema del multimodal era la librería
 > el 2026-09-15. Lo que sigue en pie es la lógica de la decisión: local, detección, recorte, OCR.
 > Estado vigente en la [actualización 2026-10-22 del ADR 0006](architecture/adr/0006-pipelines-por-caso-de-uso.md).
 
-**La latencia manda y el camino es local**: detección en la **Coral TPU** del dispositivo (YOLO o
+**La latencia manda y el camino es local**: detección en la **Coral TPU** *(superado el 2026-09-07: el
+detector corre en el sensor IMX500)* del dispositivo (YOLO o
 similar preentrenado: COCO ya trae la clase `bus`, no hay que entrenar) → **recorte del banner**
 → **OCR** sobre el recorte. En el mejor de los casos todo corre en la TPU; como mínimo, al
 celular llega solo el recorte, no el frame crudo.
@@ -57,7 +58,8 @@ La caja de detección más grande = ómnibus más cercano: la priorización que 
 gratis.
 
 Esto redefine el rol de la TPU: de "correr los modelos completos" a **preprocesadora del camino
-de bondis**. El riesgo técnico principal es que el rendimiento de la detección sobre la Coral TPU
+de bondis** *(superado el 2026-09-07, igual que el párrafo anterior)*. El riesgo técnico principal
+era que el rendimiento de la detección sobre la Coral TPU
 de la RPi Zero 2 W todavía no está medido: el spike midió el teléfono.
 
 ## Decisión 2 — Supermercado: LLM con visión en la nube, modelo elegible ([ADR 0006](architecture/adr/0006-pipelines-por-caso-de-uso.md))

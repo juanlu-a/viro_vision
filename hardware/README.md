@@ -102,7 +102,7 @@ soldado, UPS HAT (C) unida a su batería 803040, AI Camera y transductor óseo d
 | Versión | Dónde | Estado |
 |---|---|---|
 | v0.8 | `staging`, `case-via-clara/via_clara_v0_8.scad` | punto de partida (llegó por mail), se conserva sin tocar |
-| v0.9 | `staging` (#120) | impresa el 2026-10-17; es la que documenta `case-via-clara/README.md` en esta rama |
+| v0.9 | `staging` (#120) | impresión evaluada el 2026-10-17; es la que documenta `case-via-clara/README.md` en esta rama |
 | v0.10, v0.11 | rama local `feat/case-v0-10-slim`, sin pushear | impresas el 2026-10-21 (v0.10) y el 2026-10-22 (v0.11) |
 | **v0.12 (vigente)** | la misma rama, **sin commitear**, en el worktree `viro_vision-case` | en desarrollo; **no está integrada a `staging`** |
 
@@ -117,8 +117,8 @@ En corto:
   imprimirse y que el botón chocaba con el disipador; la v0.11, que el lente no entraba y que las trabas
   delanteras no podían flexionar.
 - **Verificación**: `export.sh` regenera los STL y las imágenes, comprueba que cada pieza sea un solo
-  sólido apoyado en la cama y corre **18 verificaciones de interferencia** contra maquetas de las
-  placas; sale con error si algo falla. Las verificaciones valen tanto como las medidas de las
+  sólido apoyado en la cama y corre verificaciones de interferencia contra maquetas de las placas
+  (14 en el `export.sh` de la v0.9 que está en `staging`, 18 en el de la v0.12 de la rama de la carcasa); sale con error si algo falla. Las verificaciones valen tanto como las medidas de las
   maquetas: lo marcado `MEASURE` en el `.scad` se mide con calibre antes de imprimir.
 - **Los STL no viven en el repo**: van al Drive de ViroVision, carpeta `Tesis: ViroVision / modelo_3d`,
   una subcarpeta por versión (la de v0.9 existe; subir las siguientes está pendiente).

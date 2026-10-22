@@ -165,7 +165,7 @@ no escribir un proveedor nuevo.
 ## Implicaciones para el código actual
 
 - `app/src/services/vision/providers/` **no cambia**. Es el objetivo del diseño.
-- Se agrega `app/src/services/vision/transport.ts`: toma el `{url, headers, body}` que
+- Se agrega `app/src/services/vision/transport.ts` (hoy en `app/src/services/cloud/transport.ts`): toma el `{url, headers, body}` que
   `buildRequest` ya devuelve y lo reescribe hacia el proxy cuando `EXPO_PUBLIC_VISION_PROXY_URL`
   está seteada. Lleva **regla de frontera** comentada, como `recognizeProduct.ts`.
 - Se agrega `supabase/functions/vision/`, el primer código de servidor del repo.

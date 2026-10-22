@@ -428,8 +428,8 @@ Peores tres combinaciones:
 El margen izquierdo, el triple del derecho, no sale de la grilla sino de un defecto observado en la
 placa el 15 de septiembre: la caja del detector se ajusta a los LEDs del cartel, el número de línea
 está a la izquierda, y el trazo fino del "1" quedaba sobre el borde del recorte (el OCR leyó "15" por
-"115"). El 21 de octubre se probó leer la caja del detector reentrenado sin ningún margen; en la calle
-el primer dígito se siguió perdiendo, y el 22 de octubre volvieron los valores de esta tabla, ahora
+"115"). El 21 de octubre se probó leer la caja del detector reentrenado sin ningún margen; en las pruebas
+del equipo el primer dígito se siguió perdiendo a veces, y el 22 de octubre volvieron los valores de esta tabla, ahora
 fijados por el daemon de la placa (`SIGN_MARGINS` en `hardware/raspi/virovision/bus.py`).
 
 ## 12.9 Datos crudos de las campañas de medición

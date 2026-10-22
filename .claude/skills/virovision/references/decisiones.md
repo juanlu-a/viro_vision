@@ -38,7 +38,7 @@ vuelta al auricular de la placa. Restricciones: mínima cantidad de software en 
 **Qué se decidió firme**: (1) Raspberry Pi OS Lite + **un** servicio systemd con un daemon Python; no
 hay bare-metal posible (libcamera, libedgetpu, BlueZ). (2) **BLE (GATT) siempre vivo como plano de
 control**, porque con el teléfono bloqueado en el bolsillo sólo una notificación BLE despierta a la
-app; un socket WiFi no. (3) **Audio por DAC I2S cableado**, no A2DP: compartiría chip y antena con
+app; un socket WiFi no. (3) **Audio por DAC I2S cableado** (hasta el 2026-10-22 el DAC no está instalado: la salida es PWM provisional), no A2DP: compartiría chip y antena con
 BLE + WiFi y cortaría. Esto **reemplaza** el "Bluetooth Classic (A2DP/HFP) o cableado" de los textos
 viejos. (4) Qué vuelve: supermercado → MP3 sintetizado en el teléfono; ómnibus → anuncios
 **pregrabados** en la SD (las líneas son un conjunto finito). (5) UUIDs GATT de 128 bits: los
@@ -151,7 +151,7 @@ Buena parte ya está implementada (tokens, `theme.test.ts`, tipografía de marca
 ### ADR 0006: Pipelines por caso de uso · **Proposed (2026-08-22), a validar con tutor; actualizado 2026-08-30, 2026-09-01, 2026-09-07, 2026-10-19 (zoom) y 2026-10-22 (márgenes, V100 y catálogo)**
 
 **Qué cambió**: deja de haber un runtime único (lo que buscaba ADR 0004). Cada caso de uso tiene su
-pipeline. **Bondis = local** (la latencia manda): detección **preentrenada en la Coral TPU** del
+pipeline. *(Texto original del 2026-08-22; la detección pasó al sensor IMX500 el 2026-09-07, ver más abajo.)* **Bondis = local** (la latencia manda): detección **preentrenada en la Coral TPU** del
 dispositivo → recorte del banner → OCR sobre el recorte — la TPU pasa de "correr los modelos
 completos" a **preprocesadora**, y al celular llega el recorte, no el frame. **Supermercado = LLM
 con visión** (la complejidad manda), elección **PENDIENTE**: Gemma 3 1B local (~700 MB) vs. Gemini
@@ -202,8 +202,8 @@ evaluación** —la misma foto contra varios modelos—, y esa corrida pasa a ha
 - **Zoom digital** (2026-10-19, probado en la placa el 2026-10-22): `ScalerCrop` del ISP, dinámico,
   hasta 2x sobre el cartel; el detector sigue viendo el campo completo. `--bus-full-res` (4x) traba la
   cámara de la Zero 2 W y no se usa. Falta la prueba en la calle con y sin zoom.
-- **Márgenes del cartel** (2026-10-21 → 2026-10-22): se probó leer el box del YOLO tal cual y en la
-  calle se perdía el "1" del número de línea; volvieron `SIGN_MARGINS = (0.18, 0.06, 0.06)`, ahora
+- **Márgenes del cartel** (2026-10-21 → 2026-10-22): se probó leer el box del YOLO tal cual y en las
+  pruebas del equipo se seguía perdiendo a veces el "1" del número de línea; volvieron `SIGN_MARGINS = (0.18, 0.06, 0.06)`, ahora
   pasados desde ViroVision. El detector es de cajas, no de keypoints: el problema es que el borde
   izquierdo del recorte cae sobre el trazo fino del "1", que está a la izquierda del cartel.
 - **Reentrenamiento en la V100** con ~500 fotos (el primer fine-tune fue de ~140). Épocas, métricas y

@@ -128,8 +128,8 @@ La etapa final, en ejecución al momento de redactar este informe, comprende:
   Falta la prueba en la calle con y sin zoom.
 - **Cierre del hardware**: la lectura del monitor de batería quedó integrada el 6 de octubre y el
   arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en
-  OpenSCAD y se iteró sobre impresiones de prueba (versión 0.9 impresa el 17 de octubre, 0.10 el 21,
-  0.11 el 22, y la 0.12 en diseño; §7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un
+  OpenSCAD y se iteró sobre impresiones de prueba (impresiones de la versión 0.9 evaluada el 17 de octubre, la 0.10 el 21 y
+  la 0.11 el 22; la 0.12 en diseño; §7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un
   transductor de conducción ósea previsto) y la medición del consumo real.
 - **Pruebas de usabilidad con usuarios ciegos** y ajuste de los tiempos de interacción.
 - **Documentación final**, presentación y demostración.

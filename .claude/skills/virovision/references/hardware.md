@@ -53,7 +53,7 @@ La Zero 2 W no tiene jack: el audio PWM sale por `dtoverlay=audremap,pins_12_13`
 **provisional**: un GPIO da 16 mA, un piezo no sirve para voz y un auricular de 16 a 32 Ω necesita una
 resistencia en serie de 100 a 330 Ω. La carcasa aloja un **transductor de conducción ósea de 14 mm**;
 la etapa que lo maneje está pendiente. El **DAC I2S** (MAX98357A, GPIO 18/19/21) sigue siendo el
-destino y **no está instalado**; exige mudar antes el botón cableado en el GPIO 21.
+destino y **no está instalado**; usaría los GPIO 18/19/21, libres hoy (el botón de modos está en el GPIO 5).
 
 ### Entrada: un botón en GPIO 5 (pin 29, masa en el 30)
 `button.py`, con los gestos del ADR 0007 y tiempos calibrados el 2026-09-13 (antirrebote 15 ms,
@@ -103,7 +103,7 @@ El dispositivo lleva **entrada física (botón)** y el reconocimiento funciona p
 explícitos**, nunca siempre prendido: anunciar todo lo que la cámara ve, todo el tiempo, aturde.
 Desde cualquier modo: **1 click** = modo ómnibus (cámara abierta, detector en el sensor en cada frame;
 anuncia presencia y línea una vez por ómnibus; un click estando en ómnibus **repite el último
-anuncio**, `core.py:213-216`); **2 clicks** = modo supermercado **y una lectura** (pipeline LLM con
+anuncio**, `core.py:214-217`); **2 clicks** = modo supermercado **y una lectura** (pipeline LLM con
 visión); **click largo** desde cualquier modo = volver a esperando. Cada transición se anuncia por
 audio: el usuario no tiene otro indicador de estado. El diagrama canónico vive en
 [`docs/architecture/README.md`](../../../../docs/architecture/README.md).
@@ -127,7 +127,7 @@ llegó por mail y se versionó sin tocar (`hardware/case-via-clara/via_clara_v0_
 - `staging`: v0.8 y **v0.9** (#120). El `README.md` de `hardware/case-via-clara/` en `staging`
   describe la v0.9.
 - Rama local **`feat/case-v0-10-slim`** (sale de `564ba82`, **nunca pusheada**), en el worktree
-  `/Users/juanlu/Documents/repositorios/viro_vision-case`: v0.10 (`f636e6a`, `502bf7a`) y v0.11
+  `viro_vision-case`, junto al checkout principal: v0.10 (`f636e6a`, `502bf7a`) y v0.11
   (`aee8922`, `a758899`). La **v0.12 está sin commitear** ahí (los `via_clara_v0_11*.scad` renombrados a
   `_v0_12`, más cambios a `export.sh`, el README, las imágenes, PROJECT-STATUS y SESSION-LOG). Las
   entradas de bitácora del 2026-10-17, 10-21 y 10-22 sobre la carcasa sólo existen en ese worktree.
@@ -138,8 +138,8 @@ llegó por mail y se versionó sin tocar (`hardware/case-via-clara/via_clara_v0_
 | Versión | Medidas del cuerpo (mm) | Qué mostró su impresión y qué cambió en la siguiente |
 |---|---|---|
 | v0.9 (2026-10-14) | 91,9 × 31,4 × 37,6 | Impresa el 2026-10-17, «casi perfecta». Los separadores hexagonales de bronce quedaron **del lado de la Pi** y bajo la HAT sólo cabezas Phillips; la microSD no entraba (hubo que cortar con una Dremel); paredes gruesas; la imagen salía girada 90°; el soporte cuadrado del lente no entraba; el pulsador real era un 6 × 6 de ~5 mm y no un SMD de 2,5. Tenía 5 trabas y 14 verificaciones |
-| v0.10 (2026-10-17) | 92,9 × 28,7 × 36,6 | El conjunto pasa a la **mitad derecha**; lugar para la microSD; paredes de 1,6 a los costados; **cámara girada 90°** en su plano (flex derecho al CSI); 6 trabas; 15 verificaciones. Impresa el 2026-10-21: «salió mal». La ventana de la llave era demasiado larga, las guías de la cámara (nervios de 0,65 y de aplastamiento de 0,6) no se podían imprimir, el botón chocaba con el disipador de la Pi, la ranura de la microSD estaba en espejo, el brazo del auricular no entraba, y los pernos traseros se rompían |
-| v0.11 (2026-10-21) | 83,4 × 28,5 × 37,2 (nariz 32,2) | Con las medidas reales: disipador 12 × 12 × 4; hexágonos de 2,2 entre caras que asoman **sólo 1,2** sobre la Pi, así que **ya no se termofijan** (se calentaría la placa): los ubican postes con alojamiento holgado en la mitad derecha y la pared de la izquierda apoya en las cabezas de los tornillos; soporte del lente 11 × 11 × 3 más lente de Ø 8 × 1; **pulsador SMD 4 × 4 × 1** con tecla impresa pegada y una tapita (pieza 06) detrás. Ventana de la llave de 4,2 × 7,4; nervios de la cámara de 1,2; botón en x −14, lejos del disipador; microSD que entra y sale por el extremo trasero con la carcasa cerrada (pinza: la punta queda ~2 mm adentro); **8 trabas** (las traseras reemplazan a los pernos). Dos variantes: `integrated` y `cap` (tapa de cámara aparte, pieza 07). Se imprimieron las dos el 2026-10-22 |
+| v0.10 (2026-10-17) | 92,9 × 28,7 × 36,6 | El conjunto pasa a la **mitad derecha**; lugar para la microSD; paredes de 1,6 a los costados; **cámara girada 90°** en su plano (flex derecho al CSI); 6 trabas; 15 verificaciones. Impresión evaluada el 2026-10-21: «salió mal». La ventana de la llave era demasiado larga, las guías de la cámara (nervios de 0,65 y de aplastamiento de 0,6) no se podían imprimir, el botón chocaba con el disipador de la Pi, la ranura de la microSD estaba en espejo, el brazo del auricular no entraba, y los pernos traseros se rompían |
+| v0.11 (2026-10-21) | 83,4 × 28,5 × 37,2 (nariz 32,2) | Con las medidas reales: disipador 12 × 12 × 4; hexágonos de 2,2 entre caras que asoman **sólo 1,2** sobre la Pi, así que **ya no se termofijan** (se calentaría la placa): los ubican postes con alojamiento holgado en la mitad derecha y la pared de la izquierda apoya en las cabezas de los tornillos; soporte del lente 11 × 11 × 3 más lente de Ø 8 × 1; **pulsador SMD 4 × 4 × 1** con tecla impresa pegada y una tapita (pieza 06) detrás. Ventana de la llave de 4,2 × 7,4; nervios de la cámara de 1,2; botón en x −14, lejos del disipador; microSD que entra y sale por el extremo trasero con la carcasa cerrada (pinza: la punta queda ~2 mm adentro); **8 trabas** (las traseras reemplazan a los pernos). Dos variantes: `integrated` y `cap` (tapa de cámara aparte, pieza 07). Las dos impresiones se evaluaron el 2026-10-22 |
 | **v0.12 (2026-10-22, vigente)** | **85,8 × 28,5 × 37,2** (nariz 32,2) | La variante `cap` necesitaba muchos más ajustes y **se descarta** (`export.sh` ya no la genera; su código queda por limpiar). En la integrada: el lente no entraba, así que del centro de la guía delantera a la pared del frente hay **5,0 mm** (`CAM_GUIDE_TO_FRONT`; antes 2,65) y la nariz crece 2,35; las **trabas delanteras** estaban encima de las guías, fundidas a ellas, no flexionaban y se partieron: el gancho pasó detrás de las guías (x −33) con 0,6 de luz debajo de la viga (`SNAP_UNDER_GAP`); los **zócalos hexagonales** salieron llenos y ahora son agujeros redondos de Ø 3,4 × 1,5; la ventana de la corredera, 1 mm más ancha (5,2). Botón y brazo del auricular: perfectos, sin cambios |
 
 Las medidas son del `.scad` (largo de `NOSE_X` = −44,6 a la cola en x = 41,2; ancho `OUT_W` = 28,45;
@@ -199,7 +199,7 @@ describe la v0.11); medir lo marcado `MEASURE`; subir los STL al Drive; integrar
 - **Hecho**: firmware completo en `hardware/raspi/`: periférico BLE con el perfil GATT, servidor HTTP
   con cinco rutas, AP siempre prendido, máquina de modos, **botón físico** (2026-09-07, calibrado el
   2026-09-13), audio PWM con 386 anuncios pregrabados de ómnibus y 7 clips de sistema, **batería**
-  (2026-10-06), **modo ómnibus entero en la placa** (#88, 2026-09-15; 1,27 s del click a la línea
+  (2026-10-06), **modo ómnibus entero en la placa** (#88, 2026-09-15; 1,27 s del click a la línea en la Pi 3 B+ prestada; en la Zero 2 W, 1,6 s desde que el sensor ve el ómnibus, 2026-09-22;
   dicha), catálogo de la STM que completa lo que el OCR no leyó (2026-10-07), **evidencia** de cada
   corrida (#114, 2026-10-12; temporal), **zoom digital** (#121, 2026-10-19; probado en la placa el
   2026-10-22), márgenes del cartel 18/6/6 (#122, 2026-10-22) y el arranque que anuncia a los 16,2 s.
