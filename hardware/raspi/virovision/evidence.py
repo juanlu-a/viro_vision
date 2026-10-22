@@ -318,12 +318,15 @@ class Evidence:
 
     def _cropped(self, frame, box):
         """The same pixels the OCR got. `bus_banner.crop` also upscales a small sign to 64 px; that is
-        left out on purpose, so the picture shows how small the sign really was."""
+        left out on purpose, so the picture shows how small the sign really was.
+
+        Rounded, not truncated, like `bus_banner.types.Box.ints`: truncating left the picture a pixel
+        off the OCR's crop, and the app is where the team checks the detector's box (2026-10-22)."""
         if self._crop is not None:
             return self._crop(frame, box)
         height, width = frame.shape[:2]
-        x1, y1 = max(0, int(box.x1)), max(0, int(box.y1))
-        x2, y2 = min(width, int(box.x2)), min(height, int(box.y2))
+        x1, y1 = max(0, round(box.x1)), max(0, round(box.y1))
+        x2, y2 = min(width, round(box.x2)), min(height, round(box.y2))
         if x2 <= x1 or y2 <= y1:
             return None
         return frame[y1:y2, x1:x2]
