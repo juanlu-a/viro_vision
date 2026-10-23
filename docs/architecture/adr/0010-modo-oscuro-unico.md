@@ -1,4 +1,4 @@
-# ADR 0010 — Un solo tema (oscuro) y una sola línea de estado del dispositivo
+# ADR 0010: Un solo tema (oscuro) y una sola línea de estado del dispositivo
 
 - **Status:** Accepted (2026-09-14)
 - **Date:** 2026-09-14
@@ -37,7 +37,7 @@ diagnóstico dentro de una app para gente que no lo ve.
    usar».** «Conectado» en verde sólo cuando el enlace BLE está y la red WiFi de la placa responde.
    Si el enlace está pero la red no, dice **«Conectado (falta el WiFi)» en ámbar**, y nada más: el
    porqué y el remedio siguen en el aviso de abajo. Sin enlace BLE no hay conexión parcial posible
-   —las credenciales y la dirección llegan por él—, así que ese caso es el «Sin conectar» / «Se
+   (las credenciales y la dirección llegan por él), así que ese caso es el «Sin conectar» / «Se
    perdió la conexión» de siempre.
 3. **Inicio muestra sólo el nombre del modo**, en tamaño de cuerpo. Se van el título de sección, la
    línea del dispositivo y el rótulo «Modo actual». El lector de pantalla conserva el rótulo («Modo:

@@ -1,6 +1,6 @@
-# ADR 0006 — Pipelines por caso de uso: bondis local, supermercado nube o LLM chico
+# ADR 0006: Pipelines por caso de uso: bondis local, supermercado nube o LLM chico
 
-- **Status:** Proposed — a validar con el tutor (enmendado 2026-09-07: el detector se fine-tunea y corre en el sensor IMX500, sin Coral)
+- **Status:** Proposed, a validar con el tutor (enmendado 2026-09-07: el detector se fine-tunea y corre en el sensor IMX500, sin Coral; 2026-10-19: zoom digital sobre el cartel, medido en la placa el 2026-10-22; 2026-10-22: márgenes del cartel, reentrenamiento en la V100 y catálogo)
 - **Date:** 2026-08-22 (reunión de equipo del 2026-08-21)
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, architecture
@@ -30,18 +30,21 @@ Los dos casos de uso de la tesis tienen restricciones opuestas:
 
 ### Bondis → camino local, con la TPU como preprocesadora
 
-Pipeline: **detección en la Coral TPU** del dispositivo (YOLO o similar preentrenado — COCO ya
+Pipeline: **detección en la Coral TPU** del dispositivo (YOLO o similar preentrenado: COCO ya
 trae la clase `bus`, no hay que entrenar) **→ recorte del banner → OCR** (CRAFT + CRNN en
 español). El banner es geométricamente predecible (franja superior de la caja del ómnibus), y el
 recorte reescalado le da al OCR letras grandes y sin distracciones: en el spike, el modelo leía
-la matrícula en vez del cartel hasta que se lo prohibió — **recortar elimina el problema en vez
+la matrícula en vez del cartel hasta que se lo prohibió: **recortar elimina el problema en vez
 de parchearlo con prompts**. En el mejor de los casos, todo el pipeline corre en la TPU y al
 celular llega el resultado; como mínimo, la TPU manda **solo el recorte**, no el frame crudo, lo
 que además reduce lo que viaja por el canal app↔dispositivo.
 
 Esto **redefine el rol de la Coral TPU**: pasa de "correr los modelos completos" (como la
-describen los docs previos) a **preprocesadora del camino de bondis** — detección y recorte, con
+describen los docs previos) a **preprocesadora del camino de bondis**: detección y recorte, con
 el OCR en la TPU o en el celular según lo que dé el hardware.
+
+*(Superado el 2026-09-07: el Coral salió del diseño. La detección corre dentro del sensor IMX500 y el
+recorte y el OCR, en la Pi. Ver la actualización 2026-09-07.)*
 
 ### Supermercado → LLM con visión: nube o modelo local chico (pendiente)
 
@@ -66,10 +69,10 @@ credenciales del usuario. Coherente con ADR 0001: si gana la nube, lo local qued
 
 ### Cómo se mide la precisión: dataset de evaluación
 
-Para ambos casos se genera un **dataset de evaluación** — resultado esperado contra obtenido —
+Para ambos casos se genera un **dataset de evaluación** (resultado esperado contra obtenido)
 del que salen **recall, precision, accuracy y F1**. Es la forma de medir precisión del proyecto y
 el instrumento que cierra la decisión pendiente de supermercado. Nota de alcance: el dataset es
-**de evaluación, no de entrenamiento** — los modelos vienen preentrenados; la tarea B1 del
+**de evaluación, no de entrenamiento**: los modelos vienen preentrenados; la tarea B1 del
 roadmap cambia de "entrenar" a "evaluar".
 
 ## Alternativas consideradas
@@ -95,30 +98,31 @@ roadmap cambia de "entrenar" a "evaluar".
 
 - Dos pipelines para mantener y evaluar en vez de uno.
 - El rendimiento real de YOLO/detección **sobre la Coral TPU de la RPi Zero 2 W** no está medido
-  todavía — el spike midió el teléfono. Es el riesgo técnico principal del camino de bondis.
+  todavía: el spike midió el teléfono. Es el riesgo técnico principal del camino de bondis.
+  *(Superado el 2026-09-07: sin Coral, el riesgo pasó a ser el int8 en el IMX500.)*
 - La decisión de supermercado queda abierta; hasta cerrarla conviven dos candidatos en el plan.
 
-## Actualización 2026-08-30 — supermercado va a la nube; el fallback local queda pendiente
+## Actualización 2026-08-30: supermercado va a la nube; el fallback local queda pendiente
 
 El equipo decidió que el camino de supermercado **es la nube**, con el modelo elegible por el
-usuario en Inicio (Gemini Flash por defecto —corregido a Flash Lite en la actualización *bis* de
-más abajo—; Anthropic si el build trae su clave). Sin internet o
+usuario en Inicio (Gemini Flash por defecto (corregido a Flash Lite en la actualización *bis* de
+más abajo); Anthropic si el build trae su clave). Sin internet o
 sin clave, el modo **avisa y no lee**. Esto es una **excepción explícita y acotada a la restricción
 2 de ADR 0001** ("nube sin fallback local, prohibido"): aplica sólo al modo supermercado, está
 rotulada en la UI, y se cierra evaluando **Gemma 3 1B con visión** sobre productos reales como
 fallback local. El modo ómnibus no cambia: local siempre.
 
 Consecuencia en el código: el laboratorio del spike (LiteRT-LM, Gemma multimodal por ExecuTorch,
-benchmark de nube) se retiró de la app y quedó preservado en la rama `spike/laboratorio-vision-local`.
+benchmark de nube) se retiró de la app y quedó preservado en la rama `spike/laboratorio-vision-local` (hoy, sólo en el tag `spike-laboratorio-vision-local-2026-08-30`).
 Queda **un solo runtime nativo** (ExecuTorch, sólo OCR).
 
-## Actualización 2026-08-30 (bis) — el default pasa a Flash Lite y la lectura devuelve tipo + marca
+## Actualización 2026-08-30 (bis): el default pasa a Flash Lite y la lectura devuelve tipo + marca
 
 Dos cambios sobre la actualización de arriba, ambos con medición contra la API real detrás.
 
 **El default deja de ser Flash y pasa a Flash Lite.** Con la cuota fresca y una foto de un paquete
 de arroz, `gemini-3.5-flash-lite` responde en **2-3 s**, `gemini-3.5-flash` en **17-30 s** y
-`gemini-3.6-flash` —que era el default— en **34-47 s**. La brecha es el paso de razonamiento: los
+`gemini-3.6-flash` (que era el default) en **34-47 s**. La brecha es el paso de razonamiento: los
 Flash grandes piensan aunque la respuesta sean tres campos cortos. El Lite acertó tipo, marca y
 detalle en todas las corridas, así que la latencia del grande no compraba precisión. El selector de
 Inicio pasa a ofrecer **sólo los dos Flash Lite** (el fijado y el alias `-latest`): un modelo que
@@ -143,7 +147,7 @@ decide si el producto sirve, la marca sólo cuál de los que sirven. Separados, 
 el tipo aunque la marca no se lea (y al revés) en vez de perder los dos por un campo que el modelo
 no pudo completar entero. La frase hablada queda "arroz Saman, Blue Patna 1 kg".
 
-## Actualización 2026-09-01 — cae la gratuidad como restricción, y el selector pasa a cinco modelos
+## Actualización 2026-09-01: cae la gratuidad como restricción, y el selector pasa a cinco modelos
 
 **Qué cambia.** La decisión original ponía como restricción dura que el modelo fuera **gratuito**,
 y eso, en la práctica, dejaba el selector reducido a Gemini. Se levanta: el proyecto **paga** para
@@ -176,7 +180,7 @@ selector quedaría en siete opciones, y **un `radiogroup` de siete recorrido con
 una góndola es peor producto que uno de cinco**: cada opción de más es un swipe más entre la
 persona y la lectura. La accesibilidad es el criterio de diseño, también cuando el que sobra es un
 control técnicamente útil. Si en algún momento hace falta el techo de precisión para el informe,
-`claude-opus-5` vuelve con una línea — pero al banco de pruebas, no al selector del usuario.
+`claude-opus-5` vuelve con una línea, pero al banco de pruebas, no al selector del usuario.
 
 **La entrada del flujo, mientras no haya hardware.** El diagrama acordado
 ([`documents/logicas-casos-de-uso.pdf`](../../../documents/logicas-casos-de-uso.pdf), transcrito en
@@ -190,12 +194,12 @@ pasarle **la misma foto** a los cinco modelos y que la comparación mida modelos
 por el parlante del dispositivo, no por el del teléfono. `expo-speech` usa el motor TTS del sistema
 y **no exporta a archivo**, así que el `.mp3` tiene que venir de un TTS de nube: se usa el de OpenAI
 (`gpt-4o-mini-tts`), que devuelve MP3 directo con la clave que el selector ya necesita y sale por el
-mismo proxy — descartados Google Cloud TTS (una clave de AI Studio no tiene esa API habilitada: son
+mismo proxy; descartados Google Cloud TTS (una clave de AI Studio no tiene esa API habilitada: son
 proyectos distintos) y el TTS nativo de Gemini (devuelve PCM crudo, habría que armar el header WAV a
 mano en React Native).
 
 Va **apagado** detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED` por dos razones que conviene dejar
-escritas. Una: hoy nada consume el archivo —el hardware no existe— y prenderlo sería pagar una
+escritas. Una: hoy nada consume el archivo (el hardware no existe) y prenderlo sería pagar una
 llamada a la API en cada lectura para producir algo que nadie abre. Dos: cuando el hardware exista,
 puede que no haga falta. Un MP3 de ~3 s a 32 kbps son ~12 KB; por WiFi es nada, por GATT es del
 orden de segundos, y si el transporte termina siendo BLE probablemente convenga que la Raspi haga su
@@ -203,16 +207,16 @@ propio TTS y sólo reciba el JSON. Eso es materia de **ADR 0003**, que está res
 decisión.
 
 Lo que **no** cambia: el anuncio sigue siendo `expo-speech`, inmediato y sin red. La síntesis del
-archivo se llama **después** de anunciar, sin bloquear, y traga sus errores — si falla, el usuario ya
+archivo se llama **después** de anunciar, sin bloquear, y traga sus errores: si falla, el usuario ya
 escuchó el producto. El linter lo fuerza: `features/audio/` tiene prohibido importar
 `@/services/cloud`, así que el archivo no puede meterse dentro de `announce()`.
 
 **El camino de ómnibus queda en stand by.** Los dos casos del diagrama (modelo parcial o completo
 sobre la Raspi) quedan dibujados y versionados, sin implementar: elegir entre ellos exige tener el
 hardware para medirlos, y hasta entonces la app sostiene el camino local (OCR sobre la foto) que
-los dos comparten.
+los dos comparten. *(Superado: el modo ómnibus corre entero en la placa desde el 2026-09-15.)*
 
-## Actualización 2026-09-02 — medido contra las APIs reales; el selector queda en dos modelos
+## Actualización 2026-09-02: medido contra las APIs reales; el selector queda en dos modelos
 
 Los proveedores nuevos se habían escrito contra los docs porque no había claves. Con las claves, se
 midió con **el código de la app** contra las APIs reales: cinco corridas espaciadas por modelo,
@@ -243,7 +247,7 @@ por *tokens* por minuto (~4 lecturas), y alguien recorriendo una góndola hace d
 default que choca el límite a la cuarta lectura es peor producto que uno 800 ms más lento. Groq
 queda como segunda opción, que es donde su perfil sirve.
 
-**Qué pasa con la gratuidad.** La restricción de este ADR —gratuito **para el usuario**— se sigue
+**Qué pasa con la gratuidad.** La restricción de este ADR (gratuito **para el usuario**) se sigue
 cumpliendo: paga el proyecto (mil lecturas cuestan menos de USD 0,50) y el usuario no pone
 credenciales. Lo que ya no hay es un default con tier gratuito; el camino gratis existe y es Groq.
 
@@ -270,37 +274,38 @@ Sigue **sin verificar** `claude-haiku-4-5`: requiere tarjeta y no hay clave.
 - Un solo runtime nativo en el binario (ExecuTorch, OCR); el pendiente "cuál queda" se cerró el
   2026-08-30.
 - `ml/` deja de planificar entrenamiento: su trabajo pasa a ser el dataset de evaluación y el
-  export del detector a la TPU.
+  export del detector a la TPU. *(Superado el 2026-09-07: no hay TPU, el detector sí se entrena y se
+  exporta al IMX500, y ese trabajo vive en el repo `bus-banner-recognizer`, no en `ml/`.)*
 
-## Actualización 2026-09-08 — La entrada del flujo es la placa, y sólo la placa
+## Actualización 2026-09-08: La entrada del flujo es la placa, y sólo la placa
 
 Lo de arriba («la cámara del teléfono ocupa ese lugar mientras no haya hardware») era una condición
 con fecha de vencimiento, y venció: la placa saca la foto y baja por WiFi (ADR 0003). Se retiran de
 Inicio el botón de la cámara del teléfono y el de la fototeca, y del binario `expo-image-picker` con
 los permisos de cámara y fotos. La app vuelve a tener **una** entrada, la del diagrama acordado.
 
-**Lo que se pierde, dicho explícitamente**: la fototeca era el insumo del dataset de evaluación —
+**Lo que se pierde, dicho explícitamente**: la fototeca era el insumo del dataset de evaluación:
 pasarle *la misma* foto a varios modelos para que la comparación midiera modelos y no fotos (pasos
 8-9 de [`docs/qa-modo-supermercado.md`](../../qa-modo-supermercado.md)). Esa corrida ya no se puede
-hacer desde la app. Cuando toque medir precisión por modelo hay que hacerlo fuera de la app —contra
-el proxy, con el set de fotos guardado— o reponer una entrada de prueba detrás de una bandera, como
+hacer desde la app. Cuando toque medir precisión por modelo hay que hacerlo fuera de la app (contra
+el proxy, con el set de fotos guardado) o reponer una entrada de prueba detrás de una bandera, como
 `EXPO_PUBLIC_SIMULATE_DEVICE`. Lo que no se repone es una segunda fuente de imagen para el usuario.
 
-## Actualización 2026-09-11 — El alcance deja de ser la canasta básica: son alimentos
+## Actualización 2026-09-11: El alcance deja de ser la canasta básica: son alimentos
 
 **Probado con la placa de verdad, el modelo identifica cualquier alimento**, no sólo los rubros de la
-canasta básica — yerba suelta incluida. Funcionó mejor de lo esperado, y eso cambia una premisa: la
+canasta básica, yerba suelta incluida. Funcionó mejor de lo esperado, y eso cambia una premisa: la
 canasta era el alcance **mientras la precisión era una incógnita**, una forma de acotar el problema a
 algo medible. Con el modelo andando, restringirlo en el prompt es pedirle menos de lo que hace.
 
-**La canasta básica no desaparece: cambia de rol.** Sigue siendo el **dataset de evaluación** —lo que
-se mide, con recall/precision/accuracy/F1— y deja de ser el límite de lo que se contesta. Son dos
+**La canasta básica no desaparece: cambia de rol.** Sigue siendo el **dataset de evaluación** (lo que
+se mide, con recall/precision/accuracy/F1) y deja de ser el límite de lo que se contesta. Son dos
 cosas distintas y conviene no confundirlas de nuevo: un dataset acotado y reproducible es lo que hace
 comparables a los modelos; el alcance del modo es lo que el usuario puede pedirle.
 
 Lo que cambió en concreto:
 
-- El prompt dice **«alimentos y productos de almacén»** y aclara que sirve cualquier alimento —
+- El prompt dice **«alimentos y productos de almacén»** y aclara que sirve cualquier alimento:
   envasado, suelto, fresco o a granel (`services/vision/providers/prompts.ts`).
 - La app dice «Identifica alimentos y productos de almacén» donde decía «productos de la canasta
   básica».
@@ -309,7 +314,7 @@ Lo que cambió en concreto:
   «producto» quedó angosto.
 
 **Y un defecto que salió de la misma prueba.** Apuntado a algo que no es un alimento, el modelo
-contestaba el literal `null`; el parser lo rechazaba —un `null` de JSON no es un registro— y la frase
+contestaba el literal `null`; el parser lo rechazaba (un `null` de JSON no es un registro) y la frase
 caía al *fallback de texto crudo*, que existe para cuando el modelo contesta en prosa en vez de JSON.
 Resultado: **la placa dijo «null» en voz alta**. Arreglado por los dos lados, porque cada uno solo
 dejaba el agujero abierto:
@@ -318,14 +323,7 @@ dejaba el agujero abierto:
 2. el fallback ahora distingue prosa de basura con una regla simple: **la prosa no parsea como
    JSON**. `null`, `{}`, `[]` y un objeto sobrante parsean, y ninguno es una lectura.
 
-## Ver también
-
-[`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md) (el registro completo de lo
-probado), [`docs/spike-vision-local.md`](../../spike-vision-local.md) (las mediciones),
-[ADR 0007](0007-botones-fisicos-modos-de-operacion.md) (los modos que activan cada pipeline) y el
-diagrama de modos en [`docs/architecture/README.md`](../README.md).
-
-## Actualización 2026-09-07 — el detector del banner se fine-tunea y corre en el sensor IMX500, sin Coral
+## Actualización 2026-09-07: el detector del banner se fine-tunea y corre en el sensor IMX500, sin Coral
 
 Dos cosas cambian respecto del texto de arriba, y una se confirma.
 
@@ -345,14 +343,18 @@ cartel no existe clase preentrenada, y Magalí ya fine-tuneó yolo11n con 140 fo
 **dos clases** (`bus_sign` + `bus`, las cajas de ómnibus pseudo-etiquetadas con YOLO11x y revisadas a
 mano), entrenado en la V100 de Arnaldo Castro. "Nada se entrena" queda vigente para el **OCR**: se
 evalúa (RapidOCR / PaddleOCR / Tesseract sobre el mismo `gt.csv`) y sólo se fine-tunearía si las
-métricas lo exigen.
+métricas lo exigen. *(Superado: el modelo de dos clases se entrenó primero en CPU con esas ~140 fotos
+el 2026-09-15 y después se reentrenó en la V100 con unas 500; el OCR elegido es PP-OCRv5 mobile con
+el reconocedor `latin`. Ver la actualización 2026-10-22.)*
 
 **Se confirma el recorte como frontera del OCR.** Medido el 2026-09-07 sobre 117 imágenes: con el
 recorte del banner RapidOCR acierta el número en el 87,5 % y el destino en el 73 %; con 25 % de margen
 vertical perdía el primer dígito, con 12 % no. El catálogo finito de líneas de STM (503 pares desde
 datos abiertos) corrige el destino por similitud y da la lista de anuncios a pregrabar (ADR 0003).
 Código, métricas y scripts: repo `bus-banner-recognizer`, rama `feat/bus-banner-pipeline` (desde el
-2026-10-12, PR #7, rama `feat/bus-line-reader`).
+2026-10-12, PR #7, rama `feat/bus-line-reader`). *(Superado: el margen vertical bajó al 6 % el
+2026-09-16, las cifras vigentes son las del 2026-10-12, el catálogo tiene 504 filas y la rama
+`feat/bus-banner-pipeline` ya no es la de referencia. Ver la actualización 2026-10-22.)*
 
 **El modo ómnibus es vigilancia continua, no una foto.** El usuario no ve venir el ómnibus: al activar
 el modo (ADR 0007) la cámara queda abierta y el detector corre en cada frame dentro del sensor; una capa
@@ -363,7 +365,7 @@ de ADR 0007: el reconocimiento sigue atado a un modo explícito; dentro del modo
 función. Costo a medir: consumo de cámara + sensor durante el modo (UPS HAT), con apagado automático
 tras un tiempo sin ómnibus.
 
-## Actualización 2026-10-19 — zoom digital sobre el cartel (fase 1, a medir en la calle)
+## Actualización 2026-10-19: zoom digital sobre el cartel (fase 1, medida en la placa el 2026-10-22)
 
 **Qué mostró la prueba de campo.** El modo ómnibus lee bien cuando la toma es buena (con el ómnibus
 detenido en un semáforo, de frente), y el catálogo corrige bien. Pero el cartel sólo se vuelve legible
@@ -397,8 +399,8 @@ tanto) y se encara sólo si la fase 1 no alcanza.
 
 **Medido el 2026-10-22, contra un video en pantalla** (`video2.MP4`, el 115 de `bus-banner-recognizer`):
 
-- El zoom de 2x funciona y **no afecta al detector**: con zoom 2.0x hubo detecciones en 68 a 76 frames
-  de cada 75, a los mismos 15 fps de siempre, y el zoom volvió a 1x al perder el cartel.
+- El zoom de 2x funciona y **no afecta al detector**: con zoom 2,0x hubo entre 68 y 76 frames con
+  detecciones por latido de 5 s (unos 75 frames), a los mismos 15 fps de siempre, y el zoom volvió a 1x al perder el cartel.
 - **Se leyeron carteles que antes no se habrían intentado**. Un cartel de ~10 px en la vista completa,
   por debajo del mínimo de 22 px, llegó al OCR con ~25 px. Las tres primeras lecturas salieron
   ilegibles y la cuarta anunció «115, Luis Braille» a los 7,6 s. Un ómnibus un poco más cercano se
@@ -409,9 +411,97 @@ tanto) y se encara sólo si la fase 1 no alcanza.
 - Con el box del YOLO sin márgenes (decisión del 2026-10-21) el recorte se ajusta al LED y el primer
   dígito entró completo.
 
-**2026-10-23 — vuelven los márgenes del recorte.** Leer el box del YOLO tal cual (decisión del
-2026-10-21) no alcanzó: en la calle se siguió perdiendo el "1" del número de línea. Vuelven los valores
+**2026-10-22: vuelven los márgenes del recorte.** Leer el box del YOLO tal cual (decisión del
+2026-10-21) no alcanzó: en las pruebas del equipo se siguió perdiendo a veces el "1" del número de línea. Vuelven los valores
 medidos sobre las 117 imágenes de evaluación: 18 % a la izquierda, donde está el número, y 6 % a la
 derecha, arriba y abajo (`SIGN_MARGINS` en `virovision/bus.py`). La app sigue mostrando exactamente el
 recorte que lee el OCR, ahora con el margen incluido. Con zoom, una lectura se descarta si el recorte
 de la Pi deja afuera el margen, no sólo el cartel.
+
+## Actualización 2026-10-22: márgenes del cartel, reentrenamiento en la V100 y catálogo
+
+**Por qué el recorte lleva márgenes, y por qué importa el "1".** El detector del sensor es un YOLO11n
+de **cajas** (bounding boxes), no de keypoints: devuelve un rectángulo por objeto, y el entrenamiento
+le enseña a ajustarlo a los LEDs del cartel. En Montevideo el número de línea está a la izquierda del
+cartel, y el "1" es un trazo vertical fino. Si el borde izquierdo del recorte cae sobre él, el
+detector de texto del OCR lo pierde o lo confunde con el borde de la imagen: en la placa, el
+2026-09-15, se leyó dos veces "15" por 115. El problema no es el modelo sino el borde del recorte, y
+por eso se resuelve dejando aire alrededor de la caja: `SIGN_MARGINS = (0.18, 0.06, 0.06)`
+(izquierda, derecha y vertical, como fracción de la caja; `hardware/raspi/virovision/bus.py:53-61`).
+La izquierda triplica a la derecha porque ahí está el número.
+
+**El margen vertical es 0,06 y no 0,12.** Bajó el 2026-09-16, después de barrer 72 combinaciones sobre
+las 117 imágenes de evaluación (`scripts/tune_margins.py`; docstring de `expand_banner` en
+`bus_banner/crop.py:64-85`, repo `bus-banner-recognizer`). Es el único de los tres márgenes con una
+señal que sobrevive al ruido, y es monótona: promediada sobre el resto de la grilla, la lectura
+completa da 0,819 / 0,812 / 0,810 / 0,770 para 0,06 / 0,12 / 0,18 / 0,24. Más aire arriba y abajo
+hace que el reconocedor gaste su altura fija de entrada (48 px en PP-OCR) en carrocería en vez de en
+letras. Con el modelo de dos clases, la lectura completa pasó de 79,2 % a 83,3 % (README de
+`bus-banner-recognizer`, "Results"). Los márgenes laterales se dejaron a propósito: no mostraron
+tendencia, y con 56 imágenes con destino una sola imagen vale 1,8 puntos, así que elegir la mejor
+celda de la grilla habría sido ajustarse al set de evaluación.
+
+**La prueba sin márgenes, y la vuelta.** El 2026-10-21 el equipo probó leer la caja del detector
+reentrenado tal cual (márgenes en cero), con la idea de que un modelo mejor entrenado ya no
+necesitaba colchón. Contra un video en pantalla, el 2026-10-22, el "1" de 115 entró completo; en otras pruebas
+del equipo se siguió perdiendo (reporte del 2026-10-22), y el mismo 2026-10-22 volvieron los valores medidos (#122). La diferencia
+con antes es dónde viven: ViroVision se los pasa explícitamente al `Pipeline` (`pipeline_options` en
+`bus.py`), porque los márgenes dependen del modelo que dibuja la caja y el modelo se elige en
+ViroVision (`--bus-model`). Una wheel de `bus_banner` que no acepte `margins` arranca igual, con los
+suyos de fábrica, y lo avisa en el journal. Con zoom, una lectura se descarta sin descontar el
+intento si la caja **con márgenes** cae fuera del recorte del ISP (`_with_margins`, `bus.py:260`):
+de lo contrario el pipeline cortaría el margen izquierdo en el borde del frame sin avisar, y se
+volvería a perder el primer dígito. La app muestra exactamente el recorte que leyó el OCR, margen
+incluido.
+
+**El detector, reentrenado en la V100.** El primer fine-tune del modelo de dos clases (`bus_sign`,
+`bus`) se hizo el 2026-09-15 con unas 140 fotos, 40 épocas, en CPU (`models/bus_2classes_yolo11n.pt`,
+commit `8b8a569` del PR #7 de `bus-banner-recognizer`). Después se reentrenó en el servidor V100 de
+Arnaldo Castro con unas 500 fotos (SESSION-LOG 2026-10-21). La placa carga el detector desde
+`/home/virovision/models/bus_sign.rpk` (`bus.py:38`). Épocas, métricas de validación y ubicación de
+los pesos de ese reentrenamiento: **PENDIENTE** (no constan en ningún repo).
+
+**Cifras vigentes (2026-10-12).** Sobre las 117 imágenes, en la Mac, con el código del PR #7: con dos
+modelos (COCO + cartel), número 91,7 %, destino 89,3 % y lectura completa 91,7 %; con el modelo de dos
+clases que corre en el sensor, 91,7 %, 85,7 % y 87,5 % (README de `bus-banner-recognizer`, "Results";
+SESSION-LOG 2026-10-12). Una sola imagen, el 109 de noche, mueve el número unos dos puntos según la
+versión de onnxruntime y OpenCV. El OCR es PP-OCRv5 mobile con el reconocedor `latin`, vía ONNX
+(`rapidocr` 3.x): pasar de PP-OCRv4 a PP-OCRv5 llevó la lectura completa de 75,0 % a 85,4 %, y el
+reconocedor `latin` en vez del `ch` llevó el número de 79,2 % a 91,7 % (mismo README). Son cifras del
+primer fine-tune: el detector reentrenado no se evaluó sobre las 117 imágenes (**PENDIENTE**).
+
+**Dos reglas del catálogo.** El catálogo de la STM (`data/catalog_stm.csv`, armado desde los datos
+abiertos de la Intendencia) tiene 504 filas: 502 pares línea-destino entre 145 líneas, más dos
+carteles sin línea (`COCHE ESCUELA`, `FUERA DE SERVICIO`); 257 destinos distintos. Además de corregir
+errores del OCR por similitud, decide dos cosas:
+
+1. **Sólo se dice lo que el catálogo conoce** (SESSION-LOG 2026-10-06, cont. 5). Una línea que no
+   existe no se anuncia, y un destino sin coincidencia no se dice (queda en el texto crudo): el TTS no
+   puede hacer otra cosa con `U2 NOEVR` que deletrearlo. El destino pasó de 76,8 % a 89,3 %.
+2. **Completa la mitad del cartel que el OCR no leyó** (SESSION-LOG 2026-10-07). Si la confianza del
+   OCR es menor a 0,8 (`COMPLETE_BELOW`, `bus_banner/catalog.py`), un destino que sirve una sola
+   línea da esa línea (116 de los 257 destinos) y una línea con un solo terminal da ese destino. Lo
+   inferido queda marcado en `Reading.inferred`, no vota y nunca pisa dígitos que el OCR sí leyó.
+
+Y una lectura que el catálogo confirma en ambos campos se anuncia sola, sin esperar una segunda que
+coincida (README de `bus-banner-recognizer`, "The bus mode is a live camera", paso 3).
+
+**Qué queda superado de este ADR**, marcado también en el lugar:
+
+- Las menciones a la Coral TPU (decisión original, costos y riesgos, implicaciones): superadas el
+  2026-09-07.
+- Las ~140 fotos y "entrenado en la V100" como objetivo (actualización 2026-09-07): el estado vigente
+  es el reentrenamiento con unas 500 fotos.
+- El OCR "RapidOCR / PaddleOCR / Tesseract" con 87,5 % y 73 %, el margen vertical del 12 % y los "503
+  pares" (actualización 2026-09-07): vigentes PP-OCRv5 `latin`, 0,06, las cifras del 2026-10-12 y 504
+  filas.
+- La rama `feat/bus-banner-pipeline`: el código vive en el PR #7, rama `feat/bus-line-reader`.
+- "El camino de ómnibus queda en stand by" (actualización 2026-09-01): corre entero en la placa desde el
+  2026-09-15.
+
+## Ver también
+
+[`docs/pruebas-y-decisiones.md`](../../pruebas-y-decisiones.md) (el registro completo de lo
+probado), [`docs/spike-vision-local.md`](../../spike-vision-local.md) (las mediciones),
+[ADR 0007](0007-botones-fisicos-modos-de-operacion.md) (los modos que activan cada pipeline) y el
+diagrama de modos en [`docs/architecture/README.md`](../README.md).

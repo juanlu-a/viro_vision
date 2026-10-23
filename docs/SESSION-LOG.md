@@ -3929,7 +3929,7 @@ vieja `feat/carcasa-modelo-3d` (v1) se archiva.
   (`set_inference_roi_abs`, fijado al sensor entero), separado del `ScalerCrop` del ISP, y que
   `convert_inference_coords` usa el `ScalerCrop` de cada frame.
 - **Decisión** (ADR 0006, actualización 2026-10-19): zoom digital **dinámico** con `ScalerCrop`,
-  centrado en el cartel más ancho, hasta que el cartel mide ~64 px de alto y nunca más de la mitad del
+  centrado en el cartel de mayor área entre los alargados (`widest_sign`), hasta que el cartel mide ~64 px de alto y nunca más de la mitad del
   ancho del frame; se sostiene 1,5 s si el detector pierde el cartel y después vuelve a 1x. El usuario
   aceptó perder campo de visión ("si se mira hacia donde viene el ómnibus el campo ya es muy amplio")
   mientras no agregue una latencia palpable.
@@ -3990,7 +3990,7 @@ un video, que quedó a medias el 2026-10-19 porque se perdió la placa.
 la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, encarar la fase 2:
 mover también su zona de entrada. Abrir el PR a `staging`.
 
-## 2026-10-23 — Vuelven los márgenes del cartel para el OCR
+## 2026-10-22 (cont.): vuelven los márgenes del cartel para el OCR
 
 - **Pedido del usuario**: el "1" del número de línea sigue siendo un problema leyendo el box del YOLO tal
   cual (decisión del 2026-10-21). Vuelve la holgura, la mayor a la izquierda y "un poquito al resto, como
@@ -4002,3 +4002,100 @@ mover también su zona de entrada. Abrir el PR a `staging`.
   `test_bus.py` (195 pasan).
 - La app sigue mostrando exactamente el recorte del OCR, con el margen incluido.
 - Rama `fix/bus-sign-margins`.
+
+## 2026-10-22 (cont. 2): la documentación de los tres pilares, al día con el código
+
+- **Pedido del usuario**: actualizar toda la documentación (app, ML, hardware y carcasa) con lo
+  trabajado en septiembre y octubre. Pidió tono formal, en tercera persona y sin raya larga, y usar
+  `tackle-ticket` para encontrar lo que faltara mencionar. Rama `docs/october-knowledgebase`.
+- **Método**: tres auditorías en paralelo, una por pilar, que contrastaron cada documento con el
+  código. Encontraron unas ochenta discrepancias, cada una con su fuente. Lo más repetido:
+  - el Coral TPU, la Camera Module 3 y el DAC I2S seguían en READMEs, ADRs y la skill;
+  - la Pi 3 B+ figuraba como placa vigente;
+  - la batería figuraba en nulo y la carcasa como "pendiente";
+  - `PROJECT-STATUS.md` decía "última actualización 2026-09-16" y "todo está en `main`";
+  - faltaban el catálogo, la evidencia, el zoom, los márgenes, el reentrenamiento en la V100, la
+    batería, el arranque en 16 s y la carcasa v0.10 a v0.12.
+- **Decisiones del usuario**:
+  - la carcasa se documenta hasta la v0.12, leyendo el worktree `viro_vision-case` sin tocarlo,
+    porque esa rama es de otra sesión;
+  - el reentrenamiento en la V100 con ~500 fotos es un hecho. Sus épocas, métricas y pesos no
+    constan en ningún repositorio y quedan como `PENDIENTE`.
+- **El "1" y los márgenes, explicados**: el usuario reportó que a veces el "1" se perdía, y la
+  sospecha era que se confundía con una arista del box por los keypoints. No es así:
+  - el detector es un YOLO11n de **cajas** (dos clases, `bus` y `bus_sign`), no un modelo de pose;
+  - el box se ajusta a los LEDs, el número de línea está a la izquierda del cartel y el "1" es un
+    trazo vertical fino;
+  - si el borde izquierdo del recorte cae sobre él, el detector de texto del OCR lo pierde o lo toma
+    por el borde ("15" por 115, ya visto el 2026-09-15).
+  Por eso el margen izquierdo es el triple del derecho. Quedó escrito en el ADR 0006, la tesis
+  (§7.4.6 y anexo 12.8), `ml.md` y `hardware/raspi/README.md`.
+- **Fecha corregida**: los márgenes volvieron el 2026-10-22 (#122), no el 10-23 como decía la entrada
+  anterior de esta bitácora. Se corrigió el encabezado y el docstring de `SIGN_MARGINS` en `bus.py`.
+- **Qué se tocó**:
+  - reescritos: `PROJECT-STATUS.md`, `ROADMAP.md`, `docs/README.md`, los READMEs de `app/`,
+    `hardware/`, `hardware/raspi/` y `ml/`, y la skill (SKILL.md y sus referencias, en español);
+  - notas de actualización fechadas en los ADRs 0001, 0002, 0003, 0004, 0006 y 0007;
+  - campaña nueva `docs/mediciones/2026-10-22-zoom-omnibus.md`;
+  - en la tesis: el capítulo 3 sin el Coral, la línea de tiempo y el flujo de revisión multi-modelo
+    en el 5, la etapa 4 del 6, el 7 (placa vigente, batería, §7.3.5 nueva sobre la carcasa, V100,
+    cifras del 2026-10-12, márgenes, §7.4.10 nueva sobre el zoom, catálogo, app y conteos), el 8
+    (`.apk`, la función `evidence`, journal persistente, `tools/ap.py`) y el anexo (perfil GATT
+    completo, V100, márgenes, resultados vigentes).
+- **Conteos corridos**: app, 332 tests en 36 suites; daemon, 195 pasan y 2 se omiten; pipeline de
+  ómnibus, 96.
+
+**Pendiente**:
+- Métricas del detector reentrenado en la V100.
+- Prueba en la calle con y sin zoom.
+- Leer `/etc/default/virovision` de la placa para dejar en el README el nombre exacto del `.rpk` (la
+  placa estaba en modo AP).
+- Pushear la rama de la carcasa y pasar su README a la v0.12.
+- Reemplazar las rayas largas que quedan en las secciones viejas de los documentos que no se
+  reescribieron.
+
+## 2026-10-22 (cont. 3): sin rayas largas en la documentación, y la tesis al Doc
+
+- **Pedido del usuario**: completar lo pendiente de la entrada anterior y dejar la tesis en el Google
+  Doc, como siempre.
+- **Rayas largas**: se reemplazaron unas 380 en los ADRs (179), la skill y los documentos generales
+  (unas 135) y los de operación (66), por comas, dos puntos o paréntesis según el caso. Quedan
+  adentro de los bloques de código (comentarios de shell) y en lo que no se edita por regla: la
+  bitácora, las campañas de `docs/mediciones/` y el README de la carcasa, que es de su rama.
+- **README raíz y `CLAUDE.md`**: seguían diciendo "Coral TPU + Camera Module 3"; el README pasó a
+  español y al estado vigente.
+- **La placa**: no apareció por BLE (`tools/ap.py`: "No apareció"), así que el contenido de
+  `/etc/default/virovision` sigue pendiente.
+- **Ediciones hechas directo en el Google Doc, traídas al repo** (regla de `docs/tesis/README.md`:
+  leer el Doc antes de publicar). Las encontró una comparación del Doc contra `63dae5e`, el commit del
+  que se publicó:
+  - en el capítulo 2, el alcance ("captura una imagen del entorno", "se integra") y dos objetivos
+    reescritos, uno eliminado (OCR de etiquetas) y la "Nota de edición" borrada;
+  - en el 3.1, el texto del equipo sobre la AI Camera (precio y por qué se compró), en tercera persona;
+  - en el capítulo 6 y el 12.1, la referencia al anexo y el enlace publicado del Gantt;
+  - en el anexo, la línea cortada "L: Po" de la entrevista;
+  - las referencias internas pasan de "§" a "sec.", como las había dejado el equipo.
+  No se trajo la fórmula de exactitud del Doc (`VP/Total`, le falta VN) ni los conteos viejos del
+  capítulo 7. Quedan dos comentarios abiertos de Francisco en el Doc: la nota de edición y el
+  entregable 12 (el manual, quizá un audio en la app).
+- **La tesis, publicada en el Google Doc por la API** (conector de Google Docs, aprobado por el admin
+  de WyeWorks). No se pegó el cuerpo entero, porque el Doc tiene imágenes que el equipo agregó ahí (el
+  Gantt del capítulo 6 y su anexo) y se habrían perdido: `docs/tesis/sync_doc.py` compara cada sección
+  del Doc con el repo y reemplaza sólo las que difieren, de abajo hacia arriba, con el `revisionId`
+  como guarda. Fueron unas 50 secciones en 23 tandas, incluidas las nuevas 7.3.5, 7.4.10 y 8.6.3 y los
+  renumerados 7.4.11, 7.4.12 y 8.6.4. Dos errores del script aparecieron en el camino y se corrigieron
+  (un título que perdía su estilo cuando la sección empieza con una tabla, y un renumerado que usaba
+  una posición ya corrida); el título roto de la 8.6 se reparó a mano. Verificado al final: ninguna
+  sección difiere, las tres imágenes siguen y los títulos están en orden.
+- **Quedaron sin tocar, a propósito**: la 2.3 (en el repo la tabla tiene asteriscos de negrita mal
+  formados, y ahí está anclado un comentario de Francisco) y la 12.2.3 (en el repo hay emojis con la
+  codificación rota y faltan las comillas; además, un integrante del equipo estaba editando esa sección
+  en el Doc durante la sesión). Hay que traer esas dos al repo desde el Doc.
+- Pendiente en el Doc: actualizar el índice (la API no lo refresca).
+- **La 2.3 y la 12.2.3, traídas del Doc al repo.** La 2.3 vuelve a ser una lista numerada con el
+  título de cada entregable en negrita (el repo tenía asteriscos sueltos de una conversión vieja). En
+  la 12.2.3 el repo tenía la pregunta 17 duplicada y los emojis rotos; quedó una sola vez, con la
+  versión que el equipo había revisado en el Doc (comillas y erratas corregidas), por decisión del
+  usuario. En el Doc sigue la copia literal de esa tabla que alguien agregó el 2026-10-22, con dos
+  títulos vacíos: la resuelve quien la agregó. Un emoji de la 12.2.2 («algún comercio ð️») viene roto
+  desde la exportación de la encuesta, en el Doc y en el repo; no se adivinó cuál era.

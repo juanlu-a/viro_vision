@@ -1,54 +1,49 @@
-# Supabase backend & email auth
+# Supabase: backend, capa de cuenta y funciones
 
-The online account layer (ADR 0002). Login uses **Supabase email + password** (Supabase native auth —
-no Google, no OAuth). On sign-in the session is persisted by AsyncStorage, so the user stays signed in
-across restarts and while offline.
+Supabase cumple hoy dos papeles distintos, y conviene no mezclarlos:
 
-The app code is wired and env-gated: with no `EXPO_PUBLIC_SUPABASE_*` vars it falls back to an
-offline-safe stub (Settings shows "login not configured yet"); with them set, real email sign-in /
-sign-up works. End-to-end login can only be tested against a real Supabase project.
+1. **Infraestructura sin cuentas**, en uso: tres Edge Functions (`vision`, `telemetry`, `evidence`),
+   la tabla `events` y el bucket privado `evidence`. Ninguna pide login (ADR 0008).
+2. **La capa de cuenta** (ADR 0002), **archivada**: auth por **email y contraseña** de Supabase (sin
+   Google ni OAuth), con la sesión persistida en AsyncStorage. El código existe, pero **el login no
+   está montado**: `AuthProvider` no figura en `app/src/app/_layout.tsx`, la app abre directo en las
+   pestañas y Ajustes no tiene sección de cuenta (ADR 0002, actualizaciones del 2026-07-18 y del
+   2026-07-20).
 
-## App wiring (already in the repo)
+## La capa de cuenta en el código (archivada)
 
-- `app/src/services/supabase/config.ts` — reads `EXPO_PUBLIC_SUPABASE_URL` / `_ANON_KEY`.
-- `app/src/services/supabase/supabase.ts` — memoized supabase-js client (AsyncStorage session,
-  `detectSessionInUrl: false`, url polyfill).
-- `app/src/services/supabase/authClient.ts` — email auth (`signInWithPassword` / `signUp`).
-- `app/src/services/supabase/client.ts` — `getSupabaseAuthClient()` returns the real client when
-  configured, else the stub.
-- Consumed by `features/auth/useAuth.ts` (`signIn` / `signUp` / `signOut`), surfaced in the Settings
-  screen's Account section (email + password form).
+- `app/src/services/supabase/config.ts`: lee `EXPO_PUBLIC_SUPABASE_URL` y `_ANON_KEY`.
+- `app/src/services/supabase/supabase.ts`: cliente supabase-js memoizado (sesión en AsyncStorage,
+  `detectSessionInUrl: false`, polyfill de URL).
+- `app/src/services/supabase/authClient.ts`: auth por email (`signInWithPassword`, `signUp`).
+- `app/src/services/supabase/client.ts`: `getSupabaseAuthClient()` devuelve el cliente real si hay
+  configuración, y si no un sustituto que lo dice en lugar de fingir.
+- `app/src/features/auth/AuthContext.tsx`: `AuthProvider` y `useAuth` (`signIn`, `signUp`,
+  `signOut`). Ninguna pantalla lo consume.
 
-## One-time setup
+Si el login vuelve, la puesta en marcha es corta: habilitar *Authentication → Providers → Email*
+(viene encendido), decidir si se exige confirmar el correo (*Confirm email*; sin confirmación,
+`signUp` devuelve la sesión al instante), cargar los dos `EXPO_PUBLIC_SUPABASE_*` en `app/.env`
+(plantilla en `app/.env.example`) y en los secrets de los workflows que compilan, porque las
+`EXPO_PUBLIC_*` se incrustan en el bundle al compilar. No hace falta Google Cloud Console, cliente
+OAuth ni URL de redirección. Y montar `AuthProvider`, que es la decisión que hoy está tomada en
+contra.
 
-1. **Create the Supabase project** (supabase.com) → copy the **Project URL** and **anon public key**
-   (Settings → API).
-2. **Enable Email auth:** Supabase → *Authentication → Providers → Email* (on by default).
-3. **Email confirmation:** decide whether to require it (*Authentication → Sign In / Providers →
-   Confirm email*). For quick testing, turn it **off** so `signUp` returns a session immediately; for
-   production, keep it **on** (then `signUp` returns no session until the user confirms — the app shows
-   "revisa tu correo para confirmarla").
-4. **Local env:** copy `app/.env.example` → `app/.env` and fill both `EXPO_PUBLIC_SUPABASE_*` values.
-5. **CI/EAS:** `EXPO_PUBLIC_*` vars are inlined at build time, so add them where builds run — e.g. an
-   `env` block per profile in `eas.json`, or EAS environment variables — for EAS builds/updates that
-   should ship with the backend configured.
+## Regla de frontera
 
-> No Google Cloud Console, OAuth client, or redirect-URL configuration is needed — email auth only.
+La capa de cuenta es sólo eso. Nada en el camino cámara → detección/OCR → anuncio puede depender de
+ella (ADR 0001). Perder conectividad nunca puede romper el reconocimiento.
 
-## Boundary rule
-
-Supabase is the account layer only. Nothing on the camera → detection/OCR → announcement path may
-depend on it (ADR 0001). Losing connectivity must never break recognition or a persisted session.
-
-**Ojo con la Edge Function de abajo, que parece la excepción y no lo es.** El proxy de visión usa la
-*infraestructura* de Supabase, no la cuenta: no hay sesión, ni usuario, ni tabla — es una función
-HTTP que da la casualidad de estar hospedada en el mismo proveedor. La regla de arriba sigue vigente
-tal como está escrita. Y el camino que el proxy toca es el de **supermercado**, que ya dependía de
-internet por decisión explícita (ADR 0006); el de ómnibus corre local y no lo atraviesa.
+**Ojo con las Edge Functions de abajo, que parecen la excepción y no lo son.** Usan la
+*infraestructura* de Supabase, no la cuenta: no hay sesión ni usuario. El proxy de visión está en el
+camino de **supermercado**, que ya dependía de internet por decisión explícita (ADR 0006); el modo
+ómnibus corre entero en la placa (#88) y no lo atraviesa. La telemetría y la evidencia son
+instrumentación: el analizador estático impide importarlas desde el camino que lee y anuncia
+(`app/eslint.config.js`).
 
 ---
 
-# Edge Function `vision` — el proxy de claves (ADR 0008)
+# Edge Function `vision`: el proxy de claves (ADR 0008)
 
 Por qué existe: `EXPO_PUBLIC_*` no es una variable de entorno que el binario lea al arrancar, es una
 constante **compilada dentro del `.ipa`/`.apk`**. Un `strings` sobre el bundle la devuelve, y desde
@@ -61,7 +56,7 @@ le agrega la cabecera de autenticación desde los secrets y devuelve el body ups
 proveedor no se duplica del lado del servidor y agregar un modelo sigue siendo un cambio en la app.
 
 Código: [`supabase/functions/vision/index.ts`](../supabase/functions/vision/index.ts). El lado
-cliente es `app/src/services/vision/transport.ts`.
+cliente es `app/src/services/cloud/transport.ts`.
 
 ## Qué compra, y qué no
 
@@ -73,7 +68,7 @@ Lo que cambia es el modo de falla: sin proxy, la clave está en el `.ipa` de tod
 rotarla exige publicar una versión nueva y esperar la revisión de la tienda; con proxy, se rota, se
 rate-limitea o se apaga **en segundos**. Las defensas reales son:
 
-1. La **allowlist de hosts** de la función — sin ella, `url` sería un agujero por el que la clave
+1. La **allowlist de hosts** de la función: sin ella, `url` sería un agujero por el que la clave
    sale hacia donde el atacante quiera (SSRF).
 2. El **freno por IP** de la función. Es un badén, no una pared: Supabase puede levantar varios
    isolates y cada uno cuenta lo suyo.
@@ -82,7 +77,7 @@ rate-limitea o se apaga **en segundos**. Las defensas reales son:
 
 ## Estado (2026-09-02): desplegado
 
-Proyecto `viro_vision` — ref **`oxukvenxiqkjhksgoigq`**, us-east-2. Función `vision` ACTIVE, con
+Proyecto `viro_vision`, ref **`oxukvenxiqkjhksgoigq`**, us-east-2. Función `vision` ACTIVE, con
 `GEMINI_API_KEY`, `OPENAI_API_KEY` y `GROQ_API_KEY` cargadas. `EXPO_PUBLIC_VISION_PROXY_URL` es
 secret del repo, así que **los builds de TestFlight y Play ya no llevan ninguna clave de proveedor**.
 
@@ -162,7 +157,7 @@ app registra esos eventos acá.
 |---|---|
 | Función | [`supabase/functions/telemetry/index.ts`](../supabase/functions/telemetry/index.ts) |
 | Cliente | `app/src/services/telemetry/` (barrel: `@/services/telemetry`) |
-| Tabla | `public.events` — versionada en `supabase/migrations/` |
+| Tabla | `public.events`, versionada en `supabase/migrations/` |
 | Variable | `EXPO_PUBLIC_TELEMETRY_URL`, **opcional**: si falta se deriva de `EXPO_PUBLIC_VISION_PROXY_URL` |
 
 La app **no tiene clave de la base**: manda lotes a la función, que inserta con el `service_role`.
@@ -174,7 +169,7 @@ variable propia: las dos funciones viven en el mismo proyecto, y pedirlas por se
 veces el mismo dato y dejar que se desincronicen. Sin eso, un build con proxy pero sin el secret
 nuevo sale **sin ninguna telemetría** y nadie se entera hasta que hace falta diagnosticar algo. La
 derivación **no adivina**: lo que no termina en `/vision` no deriva nada, porque una URL armada a la
-fuerza daría 404 en cada lote — apagada y sabida es mejor que encendida y rota.
+fuerza daría 404 en cada lote: apagada y sabida es mejor que encendida y rota.
 
 ## El contrato, y su trampa
 
@@ -198,7 +193,7 @@ recién aparece cuando alguien consulta la tabla después de una falla y no encu
 (`services/telemetry/types.ts`), y por eso hay un test que arma el cuerpo y lo compara campo a campo.
 
 Los otros dos topes: **100 eventos por lote** (lo de más se recorta del lado del servidor) y **8 KB
-de `detail`**, que al pasarse se reemplaza **entero** por `{"trimmed": true}` — no la parte de más.
+de `detail`**, que al pasarse se reemplaza **entero** por `{"trimmed": true}`, no la parte de más.
 Nada de imágenes ni textos largos en `detail`.
 
 ## Qué se registra
@@ -230,8 +225,8 @@ segundos. Lo descartado se cuenta y viaja en el siguiente lote como `app.error` 
 `droppedEvents`: un hueco silencioso se leería como "eso no pasó".
 
 Un lote se reintenta **como mucho tres veces** y después se da por perdido. Sin ese tope, un lote que
-el servidor no puede aceptar volvería a la cola para siempre y —como siempre se sube lo más viejo
-primero— **taparía toda la telemetría posterior**: un solo evento malo apagaría el diagnóstico entero
+el servidor no puede aceptar volvería a la cola para siempre y (como siempre se sube lo más viejo
+primero) **taparía toda la telemetría posterior**: un solo evento malo apagaría el diagnóstico entero
 justo cuando hace falta.
 
 ## Verificar que funciona
@@ -266,12 +261,12 @@ a los dos. Agregar un tipo es agregar una línea ahí.
 
 Dos migraciones, en este orden:
 
-1. [`20260907190000_eventos.sql`](../supabase/migrations/20260907190000_eventos.sql) — el archivo
+1. [`20260907190000_eventos.sql`](../supabase/migrations/20260907190000_eventos.sql): el archivo
    original de la rama que creó la tabla, recuperado con su fecha y **verificado contra la base real**
    con `supabase db dump`: coincide campo por campo e índice por índice. **No se toca**: ya está
    aplicada, y un log de migraciones se agrega, no se edita.
-2. [`20260909120000_rename_eventos_to_events.sql`](../supabase/migrations/20260909120000_rename_eventos_to_events.sql)
-   — el pase a inglés (ADR 0009). **Renombra en vez de recrear**, así que las filas de las primeras
+2. [`20260909120000_rename_eventos_to_events.sql`](../supabase/migrations/20260909120000_rename_eventos_to_events.sql):
+   el pase a inglés (ADR 0009). **Renombra en vez de recrear**, así que las filas de las primeras
    sesiones de campo se quedan donde están; traduce además los `type` históricos.
 
 Lo que conviene saber al leerlas:
@@ -284,12 +279,12 @@ Lo que conviene saber al leerlas:
   entera en orden (`session, occurred_at`) y todas las veces que pasó una cosa (`type, created_at desc`).
 - El `check` de `detail` mide **bytes del jsonb ya comprimido** (≤ 8192) y el corte de la función
   mide **caracteres de JSON** (≤ 8000): son medidas distintas. En la práctica la de la función es
-  más estricta —se probó con 7900 caracteres incompresibles y entró sin problema—, y ese margen es
+  más estricta (se probó con 7900 caracteres incompresibles y entró sin problema), y ese margen es
   el que evita que un evento gigante haga fallar el insert del lote entero.
 
 ---
 
-# Edge Function `evidence` — las fotos del modo ómnibus (2026-10-12)
+# Edge Function `evidence`: las fotos del modo ómnibus (2026-10-12)
 
 > ⚠️ **Temporal, sólo para desarrollo.** Se saca antes de la versión final (`docs/ROADMAP.md`,
 > «Antes de la versión final»): son fotos de la calle, con gente.
@@ -303,7 +298,7 @@ Une cada línea del log con la foto que la explica. El camino:
    destino, ms) y, en `detail.storage`, la ruta de cada foto (`app/src/services/evidence/`).
 3. Las fotos quedan en cola en el teléfono y se suben cuando hay internet a esta función, que las
    guarda con service role en el bucket **privado** `evidence`, en
-   `<phone>/<corrida>/<archivo>.jpg` — la misma ruta que ya dice la fila. Con el celular unido al AP
+   `<phone>/<corrida>/<archivo>.jpg`, la misma ruta que ya dice la fila. Con el celular unido al AP
    de la placa no hay internet: se reintenta cada minuto y la cola tiene tope (150).
 
 Las rutas son deterministas a propósito: la fila es correcta aunque la foto suba una hora después, y

@@ -1,356 +1,206 @@
-# ViroVision — Project status & session handoff
+# ViroVision: estado del proyecto y traspaso entre sesiones
 
-_Living status/continuation doc. Last updated: 2026-09-16._
+_Documento vivo del estado vigente. Última actualización: 2026-10-22._
 
-This captures where the project stands so anyone (including a fresh Claude Code session, together with
-the `virovision` skill) can continue. It is a summary of work done across the setup sessions — not a
-raw chat transcript.
-
----
-
-## Current state — everything is in `main` ✅
-
-All setup work (scaffold, CI/CD, EAS config, Supabase auth) is merged into `main` and CI is green.
-The stale feature branches have been deleted; branch from an up-to-date `main` for new work.
-
-> History note: PRs #1–#4 were **stacked**, so #2–#4 initially merged into intermediate branches
-> rather than `main`; they were then consolidated into `main` via PR #5. Lesson: don't stack PRs
-> unless each base is retargeted to `main` as it merges — prefer branching each change from `main`.
+Resume dónde está el proyecto para que cualquiera (una persona nueva o una sesión nueva con la skill
+`virovision`) pueda continuar. Describe el presente; la historia, con el porqué de cada cambio, vive
+en [`SESSION-LOG.md`](SESSION-LOG.md), y el plan en [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
-## What ViroVision is (one paragraph)
+## Estado de las ramas
 
-Thesis project (Ing. en Telemática, Facultad de Ingeniería, Montevideo, 2026 — Juan Lucas Abreu,
-Magalí Dellapiazza, Francisco Tauber). An assistive system for people with low/no vision that
-identifies **metropolitan bus lines** and **food items on a supermarket shelf** (scope widened
-2026-09-11; the basic basket is now the evaluation dataset) and gives **real-time
-auditory feedback**, via a glasses-mounted camera device paired with a mobile app. Dev target
-~mid-Nov 2026; hard deadline **30 Nov 2026**. Full context: the `virovision` skill
-(`.claude/skills/virovision/`).
+- `staging` es la rama por defecto y de integración: cada PR va ahí, y cada merge publica al grupo
+  interno de TestFlight y deja un `.apk` como artefacto. `main` es producción y sólo recibe PRs
+  `staging → main` (= release), que publican al link público de TestFlight. El último release a
+  producción fue el PR #115 (2026-10-13).
+- Ramas con trabajo real fuera de `staging`:
+  - `feat/case-v0-10-slim`: la carcasa v0.10 a v0.12. No está pusheada y la v0.12 todavía no está
+    commiteada; vive en el worktree `viro_vision-case`.
+  - `feat/volume-button`: un segundo botón de volumen, con un "ADR 0010" que choca con el 0010 vigente
+    (tema oscuro); habría que renumerarlo.
+  - `feat/carcasa-modelo-3d`: la carcasa v1, reemplazada por VIA Clara; se puede archivar.
+- El pipeline de ómnibus vive en el repo de Magalí, `bus-banner-recognizer`, entero en un solo PR (#7,
+  rama `feat/bus-line-reader`). La placa se instala desde un checkout de esa rama.
 
-## Repo layout (monorepo)
+## Qué es ViroVision
+
+Proyecto de fin de carrera (Ingeniería en Telemática, Facultad de Ingeniería, Montevideo, 2026; Juan
+Lucas Abreu, Magalí Dellapiazza y Francisco Tauber). Un sistema de asistencia para personas ciegas o
+con baja visión que identifica **líneas de ómnibus metropolitanas** y **alimentos en la góndola**
+(alcance ampliado el 2026-09-11; la canasta básica queda como conjunto de evaluación) y da
+**retroalimentación auditiva en tiempo real**, con un dispositivo con cámara en la patilla de unos
+lentes y una aplicación móvil emparejada. El desarrollo apunta a mediados de noviembre de 2026; la
+fecha límite es el **30 de noviembre de 2026**.
+
+## Estructura del repositorio
 
 ```
-app/        React Native (Expo) app        ← main work so far
-hardware/   Raspberry Pi Zero 2 W (de nuevo la placa en uso desde 2026-09-19; sin Ethernet) + AI Camera (IMX500, detector en el sensor; sin Coral desde 2026-09-07) + UPS HAT (C)   raspi/ = daemon BLE (ADR 0003)
-ml/         README stub; el pipeline de ómnibus vive en el repo de Magalí (bus-banner-recognizer; todo en el PR #7 desde 2026-10-12)
-docs/       thesis deliverables, ADRs, this file
-docs/tesis/ capítulos del informe formal (3 a 8, 11 y 12); el documento armado vive en el Drive
-            del proyecto como «ViroVision PFC v2 (completo)»
-.claude/skills/virovision/   knowledge skill
+app/          aplicación React Native (Expo)
+hardware/     Raspberry Pi Zero 2 W + AI Camera (IMX500) + Waveshare UPS HAT (C)
+  raspi/        daemon Python: periférico BLE, cámara, modos, ómnibus, AP, batería (ADR 0003)
+  raspi/boot/   scripts de arranque de la microSD
+  case-via-clara/  carcasa en OpenSCAD (v0.9 en staging)
+ml/           sólo un README: el pipeline de ómnibus vive en bus-banner-recognizer
+supabase/     funciones vision (proxy de claves), telemetry y evidence
+docs/         tesis, arquitectura, ADRs, mediciones, guías de QA y operación
+docs/tesis/   capítulos del informe (fuente de verdad del texto)
+.claude/skills/virovision/   la base de conocimiento del proyecto
 ```
 
-## Key decisions (ADRs in `docs/architecture/adr/`)
+## Decisiones vigentes (ADRs en `docs/architecture/adr/`)
 
-- **ADR 0001 — Offline-first:** essential recognition (detection, OCR, audio) MUST work with no
-  internet; the model runs **locally** (on device or bundled on the phone), never a cloud inference
-  API. **Amended 2026-08-10:** the cloud is allowed as an **optional accelerator** on the
-  recognition path, with local inference as the guaranteed fallback; cloud-only recognition stays
-  forbidden.
-- **ADR 0002 — Backend & auth:** Supabase was the online account layer, but **the app now ships
-  WITHOUT login** (opens directly to the tabs; offline-first, Apple doesn't require login). The
-  Supabase email-auth code is **archived** — present but not wired into navigation — kept for a
-  possible future *optional* sync. If login ever returns → email + password, never Google/OAuth.
-- **ADR 0004 — On-device inference runtime** *(Proposed; actualizado 2026-08-13 y 2026-08-22)*:
-  proponía Gemma vía LiteRT-LM; el spike mostró que su visión está rota en iOS y que el VLM por
-  ExecuTorch funciona pero tarda 6,4 s. La pregunta del runtime se resuelve **por caso de uso** →
-  ADR 0006.
-- **ADR 0006 — Pipelines por caso de uso** *(Proposed 2026-08-22, a validar con tutor; actualizado
-  2026-08-30 y 2026-09-01)*: **bondis = local** (detección → recorte del banner → OCR).
-  Desde el 2026-09-15 la detección corre **dentro del sensor de la AI Camera**, no en una TPU aparte,
-  y el camino entero está medido en la placa: **1,27 s** del botón a la línea dicha; **supermercado = LLM con visión en la nube**,
-  con **cinco modelos elegidos por latencia** en el selector. Cae la gratuidad como restricción del
-  proyecto (se paga para poder comparar) y sigue vigente para el usuario final. La precisión se mide
-  con **datasets de evaluación** (recall / precision / accuracy / F1). **Enmienda 2026-09-07**: el
-  detector del banner **se fine-tunea** (yolo11n, 2 clases) y corre en el **sensor IMX500**, no en el
-  Coral; "nada se entrena" queda para el OCR. Estado del pipeline: anda en la Mac (numero 0,875 sobre 117
-  imágenes con RapidOCR), falta entrenar en la V100, exportar y medir en la placa. Ver
-  `docs/pruebas-y-decisiones.md` y el README de bus-banner-recognizer.
-- **ADR 0008 — Proxy propio para las claves de nube** *(Accepted 2026-09-01)*: `EXPO_PUBLIC_*` se
-  compila dentro del `.ipa`, así que las claves salen a una **Supabase Edge Function** que las
-  inyecta del lado del servidor. Cierra el pendiente (b) de ADR 0006. El ADR compara las cinco
-  opciones evaluadas y deja escrito qué compra el proxy y qué no (el endpoint sigue siendo abusable;
-  lo que cambia es poder rotar o cortar en segundos).
-- **ADR 0007 — Botones físicos y modos** *(Proposed 2026-08-22)*: 1 click = modo ómnibus, 2 clicks
-  = modo supermercado, click largo = esperando. Nunca audio no solicitado. Diagrama canónico en
-  `docs/architecture/README.md`.
-- **Git convention:** no AI co-author trailers on commits/PRs (also in the skill).
+- **0001 Offline-first** (enmendado 2026-08-10): lo esencial funciona sin internet; la nube se admite
+  como acelerador opcional, nunca como único camino.
+- **0002 Supabase** (actualizado): la app se publica **sin login**; el código de autenticación por
+  email queda archivado.
+- **0003 Enlace placa ↔ teléfono**: BLE siempre vivo como plano de control, la foto por el AP WiFi de
+  la placa (medido: BLE 4,5 s contra WiFi 0,3 s). Actualizado el 2026-10-22 con el hardware real, el
+  audio PWM y el arranque en 16 s.
+- **0004 Runtime on-device**: superado por el 0006.
+- **0006 Pipelines por caso de uso**:
+  - Ómnibus corre entero en la placa: detector YOLO11n de dos clases dentro del sensor IMX500,
+    reentrenado en la V100 con ~500 fotos, zoom digital, recorte con márgenes 18/6/6, OCR PP-OCRv5
+    por ONNX y catálogo del STM.
+  - Supermercado usa un LLM con visión en la nube: `gpt-5.6-luna` por defecto y `qwen/qwen3.8-27b`
+    en Groq.
+- **0007 Botón y modos**: 1 click ómnibus, 2 clicks supermercado (y otra lectura si ya está en
+  supermercado), click largo a reposo. En ómnibus, un click repite el último anuncio.
+- **0008 Proxy propio** para las claves de nube (Supabase Edge Function).
+- **0009** código en inglés, documentación en español. **0010** un solo tema, oscuro.
+  **0011** los errores van a la telemetría, nunca al usuario.
 
-## App tech stack
+## Stack de la app
 
-Expo SDK 57 · React Native 0.86 · React 19.2 · TypeScript 6 · New Architecture (JSI) · Expo Router.
-Key deps: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supabase/supabase-js`,
-`@react-native-async-storage/async-storage`, `react-native-url-polyfill`;
-tests via `jest-expo`.
+Expo SDK 57 · React Native 0.86 · React 19.2 · TypeScript 6 · New Architecture · Expo Router.
+Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supabase/supabase-js`,
+`@react-native-async-storage/async-storage`; tests con `jest-expo`.
 
-## What's done per pillar
+## Estado por pilar
 
-**App** (structure + honest stubs):
-- Screens: **iOS bottom tabs, no login** — `index` (Inicio: el modo y los botones, sin estado del
-  dispositivo), `connect` (Dispositivo: la única línea de estado; «Conectado» en verde = listo para
-  usar, «Conectado (falta el WiFi)» en ámbar si falta la red), `settings` (modelo, dónde se escucha,
-  qué reconoce). **Sólo modo oscuro** desde el 2026-09-14 (ADR 0010): el selector de tema se retiró.
-- Domain layers under `app/src/`: `features/{recognition,device,audio,auth}`,
-  `services/{ble,audio,supabase,storage}`, `i18n` (Spanish strings), `types`.
-- **BLE** = cliente real sobre `react-native-ble-plx` detrás del selector de `services/ble/bleClient.ts`
-  (stub tipado en Expo Go / web). Perfil GATT de 128 bits en `features/device/gatt.ts`, espejo de
-  `hardware/raspi/virovision/gatt.py`. Necesita development build. Los botones de medición del spike
-  del ADR 0003 (**Medir transferencia** y **Medir por WiFi**) se retiraron el 2026-09-08: la decisión
-  ya está tomada (WiFi) y con ellos se fue el reensamblado por chunks del lado de la app.
-- **Audio routing** to the device earphone = documented TODO in `services/audio/tts.ts`.
-- **Supabase auth** = **archived** (app has no login). The env-gated client (real/stub) + `AuthProvider`
-  remain in the repo but are not wired into navigation — available if optional sync is added later.
-- **Lector de Inicio por modos (ADR 0006/0007)**: `features/reader/` — modo ómnibus = OCR local
-  (`services/ondevice/ocr.ts`, ExecuTorch), modo supermercado = nube (`services/vision/`:
-  proveedores Gemini / OpenAI / Anthropic / Groq, SSE, schema, limitador de cuota por proveedor).
-  Sin clave o sin internet, supermercado avisa. El modelo se elige en **Ajustes** (modal accesible,
-  persistido y revalidado contra los disponibles del build; el estado lo comparte
-  `ProductModelProvider`, que es quien alimenta la lectura en Inicio). **El selector ofrece dos modelos desde
-  el 2026-09-02**: `gpt-5.6-luna` (default, mediana 1668 ms) y `qwen/qwen3.8-27b` en Groq (846 ms,
-  gratis, pero ~4 lecturas/min). Gemini salió por la medición — rango 2820-32 586 ms. Ver
-  [`docs/mediciones/`](mediciones/README.md). El laboratorio del spike se retiró
-  (2026-08-30) y vive en la rama `spike/laboratorio-vision-local`.
-- **Captura (2026-09-08)**: `services/camera/` — la foto la saca **siempre la cámara de la placa** y
-  baja por WiFi (`GET /photos/latest`, ADR 0003), ya a 1024 px y calidad 70. La cámara del teléfono y
-  la fototeca, que ocupaban ese lugar mientras no había hardware, se retiraron junto con
-  `expo-image-picker` y los permisos de cámara y fotos: el producto tiene una sola fuente de imagen
-  y sostener dos era mantener un camino que nadie recorre. **Consecuencia abierta**: el dataset de
-  evaluación (pasos 8-9 de la QA) ya no se puede correr desde la app pasándole la misma foto a
-  varios modelos; hay que correrlo fuera de la app o volver a habilitar una entrada de prueba.
-- **Telemetría (2026-09-09)**: `services/telemetry/` + la función `telemetry` → tabla `events`.
-  Es el reemplazo del diagnóstico que salió de las pantallas el 2026-09-08: arranque, BLE, red con la
-  placa, estado de la placa, modos, la lectura de punta a punta con tiempos separados (foto vs.
-  pipeline) y los crashes por el manejador global de RN. `record()` es sincrónico y no lanza —
-  ADR 0001 le prohíbe estorbar al reconocimiento, y el linter le prohíbe entrar a `features/audio/` y
-  `features/recognition/`. Cola con tope que descarta lo viejo, porque unido al AP de la placa hay
-  WiFi sin internet y los envíos fallan seguido. Se enciende con `EXPO_PUBLIC_TELEMETRY_URL`; vacía,
-  queda apagada entera. Detalle en [`docs/supabase.md`](supabase.md).
-  **Desde el 2026-10-06 (ADR 0011) es el único lugar de los errores**: la app no muestra ni dice el
-  texto de ninguno, y además captura `console.*`, rechazos de promesas sin manejar, errores de dibujo
-  (`ErrorBoundary` raíz) y los logs WARNING+ de la placa, que llegan por BLE (`device.log`).
-- **Idioma del código (2026-09-09, ADR 0009)**: todo el código pasó a inglés — identificadores,
-  archivos, comentarios, tests, y también las **fronteras**: el protocolo BLE, los endpoints de la
-  placa (`/health`, `/measure/<n>`, `/photos/latest`), los flags del daemon (`--no-ap`) y el esquema
-  de Supabase (tabla `events`, vocabulario `reading.ok`). Sigue en español lo que una persona lee o
-  escucha (los valores de `i18n/es.ts`, el prompt de supermercado) y **toda la documentación**.
-  ✅ **Placa al día desde el 2026-09-10**: el daemon nuevo está instalado y verificado (`/health`
-  con el payload en inglés, `/photos/latest` devolviendo la foto del IMX500, botón en GPIO 5, BLE
-  anunciando), los **dos** `--sin-ap` de `bootfs` corregidos —estaban en `modo-red.sh` y también en
-  `instalar-daemon.sh`— y el `.tgz` de la tarjeta refrescado con `staging`. La tarjeta quedó en modo
-  producto y el flujo completo anda de punta a punta. El procedimiento de despliegue está en
-  [`hardware/raspi/README.md`](../hardware/raspi/README.md).
-- **Botón físico y lecturas repetidas (2026-09-10, ADR 0007 act.)**: un gesto nombra un modo desde
-  cualquier estado, y **dos clicks piden una lectura siempre** — estando ya en supermercado, el doble
-  click saca otra foto en vez de no hacer nada. El pedido viaja como evento propio
-  (`{"t":"read","mode":N}`) y no como un cambio de modo, porque el modo no cambia. Un click **no**
-  pide lectura: ómnibus es vigilancia. Desde el 2026-09-15, **dentro del modo ómnibus un click repite
-  el último anuncio** (no cuesta ni foto ni nube: reproduce los `.wav` que ya están en la SD).
-  La app muestra además la foto que sacó la placa debajo del resultado. Placa y app desplegadas y
-  verificadas juntas.
-- **El botón y el enlace, tras la primera sesión de uso seguido (2026-09-13, ADR 0003 y 0007 act.)**:
-  tres defectos con causa determinista, **escritos y sin probar todavía en hardware**. (a) El
-  antirrebote de 50 ms era una *cota de lo corto que puede ser un click* —así funciona `bounce_time`
-  de gpiozero— y colapsaba el doble click rápido en uno: quedó en 15 ms, la ventana de doble click en
-  0,6 s, y los tres tiempos pasan a ser banderas calibrables con el gesto registrado en el journal.
-  (b) El evento `read` traía el modo desde siempre y la app lo descartaba, juzgando la lectura contra
-  el modo anterior al click: desde *esperando* la descartaba en silencio, que es el «prende
-  supermercado y no saca la foto». (c) La placa se emparejaba sin necesitarlo —nada en el perfil pide
-  autenticación— y la app escaneaba siempre, incluso cuando el periférico ya estaba conectado al
-  sistema y ningún escaneo puede verlo. **El botón quedó verificado en hardware el mismo día**: 30
-  gestos (11 dobles, 10 simples, 9 largos) sin un solo error, con el primer doble click de la sesión
-  entrando a supermercado en vez de a ómnibus. El arranque encontró además el vínculo viejo con el
-  iPhone que causaba la alerta de emparejamiento, y se borró. **La mitad de la app también quedó
-  verificada** con un build de la rama: el primer doble click desde *esperando* cambió de modo y bajó
-  la foto en 164 ms, sin ninguna alerta de emparejamiento. Queda anotado un hallazgo lateral: el
-  gesto que se ignora por haber una lectura en vuelo no emite sonido, y para quien no ve la pantalla
-  eso es indistinguible de un botón roto. **Cerrado el 2026-09-14**: la reconexión al reabrir la app
-  bajó de los 10-15 s (el intento directo se rendía a los 5 s y la placa se libera a los ~6), el AP
-  vuelve a la red conocida en 5 s de punta a punta, y `tools/ap.py` permite entrar a la placa sin
-  sacar la microSD.
-- **Segundo plano en iOS (2026-09-10/11, spike 1 de ADR 0003 — cerrado)**: con la pantalla bloqueada el doble
-  click no hacía nada, que es exactamente el caso del producto. Resultó que **el modo de fondo nunca
-  estuvo apagado** —`isBackgroundEnabled` no gatea el `Info.plist`, sólo el manifiesto de Android; el
-  ADR y el log decían lo contrario y quedaron corregidos—. Lo que faltaba: **ninguna sesión de
-  audio** (`expo-audio` estaba instalado y no lo importaba nadie), el **disparo del botón viajando
-  por estado de React y servido por Inicio**, y **nada con qué diagnosticar** una corrida sin
-  pantalla. Ahora hay `services/audio/session.ts` (`mixWithOthers` para no pisar VoiceOver, tono de
-  mantenimiento mientras dura la lectura, chirp al empezar), el pipeline salió de la pantalla a
-  `features/reader/readingService.ts` con `ReaderBridge` suscrito directo al cliente BLE, `announce()`
-  se puede esperar, hay tope de 12 s por lectura, y la telemetría estampa el `AppState` en cada fila
-  y vacía la cola al volver a primer plano. ✅ **Verificado en el teléfono el 2026-09-11** (build
-  `202609110048`, bloque E de [`qa-modo-supermercado.md`](qa-modo-supermercado.md)): la lectura sale y
-  se escucha bloqueada, varias seguidas, con VoiceOver vivo y también tras un rato largo bloqueado.
-  **El spike 1 de ADR 0003 queda cerrado** y con él la hipótesis sobre la que está construido todo el
-  enlace. Sigue abierto `restoreStateIdentifier` (si iOS **termina** la app, CoreBluetooth no la
-  relanza): no hace falta para el caso probado, y es el PR siguiente del tema.
-- **La placa reproduce el audio (2026-09-11, PR #82)**: `POST /audio` aceptaba el MP3 y llamaba a un
-  `play` que el entrypoint nunca le pasaba — cada lectura llegaba y moría en silencio con un 202
-  exitoso. `virovision/audio.py` lo cierra. **Probado en hardware**: la Zero 2 W no tiene jack, así
-  que el audio PWM sale por GPIO con `dtoverlay=audremap,pins_12_13` + `audio_pwm_mode=1` (sin
-  `enable_jack` el overlay **apaga** el jack, así que la Pi 3 B+ prestada queda comportándose como una
-  Zero). Tonos y **voz real audibles** en un auricular entre los pines 32 y 34. Falta el transductor
-  definitivo: el piezo no sirve para voz, el auricular va sin resistencia (100-330 Ω pendientes), y el
-  destino es el **DAC I2S** — que quiere GPIO 18/19/21, con un botón cableado en el 21.
-- **Dónde se escucha ViroVision, se elige en Ajustes (2026-09-11)**: teléfono o parlante de la placa,
-  para poder comparar los dos caminos sin el hardware final. Lo no evidente: el envío a la placa pasó
-  a estar **dentro de la sesión de audio** (antes era `void` después del anuncio), que es lo que lo
-  hace funcionar con la pantalla bloqueada; y el **teléfono es siempre el respaldo**, con el motivo
-  registrado en `audio.fallback` en vez de anunciado. ~~**Ómnibus queda afuera**~~: quedó afuera
-  hasta el **2026-09-15**, porque mandarlo a la placa exigía un TTS. Con los 386 anuncios pregrabados
-  en la SD ya no hace falta, y ómnibus respeta el mismo ajuste que supermercado. Desde el
-  **2026-09-16 el ajuste vale para todo lo que suena**, no sólo para las dos lecturas: la conexión, la
-  red, el cambio de modo, el chirp del botón y la confirmación del propio ajuste son **avisos de
-  sistema** con su `.wav` en `announcements/system/` de la SD (10 clips, disparados por
-  `{"cmd":"say","clip":…}` sobre BLE). Un aviso sólo necesita el enlace —ni nube, ni WiFi, ni clave—,
-  y por eso hay dos reglas de decisión y no una. **Falta escucharlo en la placa**: el camino del
-  dispositivo está verificado en la Mac, no en el hardware.
-  Ver ADR 0003, act. 2026-09-11, 2026-09-15 y 2026-09-16.
-- **Proxy de claves (ADR 0008)**: `supabase/functions/vision/` (primer código de servidor del repo)
-  + `services/cloud/`. **Desplegado el 2026-09-02** en el proyecto `viro_vision`
-  (`oxukvenxiqkjhksgoigq`), con las tres claves como secrets del servidor y verificado de punta a
-  punta con la clave del cliente en vacío. `EXPO_PUBLIC_VISION_PROXY_URL` es secret del repo: **los
-  builds ya no llevan ninguna clave de proveedor**. Sin esa variable el camino directo de desarrollo
-  sigue igual. ⚠️ El tier gratuito pausa el proyecto por inactividad — ver el riesgo en ADR 0008.
-- **Audio a archivo (apagado)**: `services/audio/synthesis.ts` deja un `.mp3` por lectura para el
-  parlante del dispositivo. Detrás de `EXPO_PUBLIC_AUDIO_FILE_ENABLED` porque hoy nada lo consume.
-- **QA**: `docs/qa-modo-supermercado.md` — checklist de punta a punta, partido por qué necesita cada
-  bloque. Los pasos 8 y 9 son la corrida del dataset de evaluación.
-- Tests: **226 en 24 suites**.
+### Aplicación (`app/`)
 
-**CI/CD** (`.github/workflows/`, gated EAS jobs):
-- `ci.yml` — on PRs to main / feature pushes: install → lint → typecheck → test → bundle (iOS+Android
-  `expo export`). Green.
-- `eas-update.yml` — push to main publishes an OTA **preview** update group.
-- `eas-build-ios.yml` — manual iOS build.
-- EAS jobs gated on repo var `EAS_ENABLED=true`; need secret `EXPO_TOKEN`. See `docs/ci-cd.md`.
-- Note: `app/expo-env.d.ts` is committed (un-ignored) so `tsc` resolves Expo ambient types in CI.
+- **Pantallas**: pestañas Inicio, Dispositivo y Ajustes, sin login y sólo en modo oscuro.
+  - Inicio muestra el modo y la última lectura, con la foto del supermercado o las del ómnibus.
+  - Dispositivo tiene la única línea de estado y la batería de la placa.
+  - Ajustes tiene el modelo, dónde se escucha y qué reconoce.
+- **Enlace**: cliente BLE real con cola de operaciones GATT (#94). La foto baja por el AP de la
+  placa (`GET /photos/latest`). La reconexión es rápida y no pide permiso de nuevo.
+- **Audio**: el usuario elige la salida, teléfono o dispositivo, y vale para todo lo que suena; el
+  teléfono es siempre el respaldo. Una sola voz por vez (#97). Funciona con la pantalla bloqueada.
+- **Lectura**: supermercado va a la nube por el proxy; ómnibus llega ya leído desde la placa, con la
+  frase que incluye el destino (#104).
+- **Telemetría**: el único destino de los errores (ADR 0011), con los logs de la placa reenviados por
+  BLE.
+- **Evidencia del ómnibus**: Inicio muestra exactamente el recorte que leyó el OCR, margen incluido
+  (#118). Es temporal y se saca antes de la entrega.
+- **Pruebas**: 332 tests en 36 suites (2026-10-22).
 
-**EAS** (`app/eas.json`): development / preview / production profiles bound to update channels;
-opcional — la distribución real va por TestFlight desde Xcode.
+### Placa y daemon (`hardware/raspi/`)
 
-**Hardware**: firmware inicial en `hardware/raspi/` (daemon BLE + cámara + modos; `setup.sh` por SSH),
-con **emulador para la Mac** (`python -m virovision.emulator`, mismo núcleo por CoreBluetooth) para
-probar la app sin placa. Sin verificar en la placa todavía. **ML**: not started (README stub only).
-> Nota (2026-09-16): este párrafo es del 2026-09-02 y quedó viejo. Hoy el daemon está verificado en
-> la placa y el pilar de ML existe, fuera de `ml/`: vive en `bus-banner-recognizer`, con detector
-> entrenado, dataset de evaluación de 117 imágenes y 12 corridas guardadas. Ver `docs/tesis/07-desarrollo.md` §7.4.
+- **Hardware**: Raspberry Pi Zero 2 W (en uso otra vez desde el 2026-09-19; sin Ethernet, WiFi sólo
+  de 2,4 GHz), AI Camera (IMX500), Waveshare UPS HAT (C) con LiPo, y un botón en GPIO 5.
+- **Entrada a la placa**: con `tools/ap.py` por BLE o con el archivo `SIN-AP` en la microSD. Guía en
+  la skill, `references/placa-acceso.md`.
+- **Daemon**:
+  - periférico BLE; AP WiFi siempre prendido; servidor HTTP con cinco rutas;
+  - anuncios pregrabados y avisos de sistema; batería por el INA219 (2026-10-06);
+  - vigilante de la cámara; journal persistente (2026-09-23).
+- **Arranque**: la placa anuncia a los 16,2 s, la cámara está lista a los 21,3 s y el OCR a los
+  33,6 s (2026-10-06).
+- **Audio en la placa**: PWM por `audremap`, provisional.
+- **Pruebas**: 195 tests pasan y 2 se omiten (2026-10-22).
 
-**La placa en uso volvió a ser la Zero 2 W (2026-09-19).** Los diez días de Pi 3 B+ prestada
-(2026-09-09 → 2026-09-18, por el CSI roto de la Zero) terminaron. La unidad que está en uso es otra
-—otra dirección BLE— y **su cámara responde**, así que el CSI de ésta está sano. Tres consecuencias
-que valen más que el dato:
+### Visión (`bus-banner-recognizer` y la placa)
 
-- **Se cae el acceso por cable.** La Zero 2 W no tiene RJ45. Entrar es ahora: `tools/ap.py` por BLE
-  (baja el AP, la placa vuelve a la WiFi conocida, ~5 s, no persiste al reiniciar) o `SIN-AP` en la
-  microSD (persistente). Detalle y trampas en la skill, `references/placa-acceso.md`.
-- **Vuelven a valer las mediciones BLE del ADR 0003**, que son de esta misma radio (BCM43438, BT 4.2)
-  y que la 3 B+ no podía reproducir. El throughput BLE hacia un iPhone, que figuraba «sin medir»,
-  vuelve a ser medible en el hardware que decide.
-- **La Zero es sólo 2,4 GHz** (la 3 B+ era dual band): una red de 5 GHz no la ve, y el AP de la placa
-  sigue siendo 2,4 GHz de todas formas.
+- **Modo ómnibus** en vigilancia: la cámara queda abierta y anuncia la presencia y la línea una sola
+  vez por ómnibus. Corre en la Zero 2 W desde el 2026-09-22: 1,6 s del primer avistaje a la línea
+  dicha.
+- **Evaluación sobre 117 imágenes** (2026-10-12):
 
-## Verificado en dispositivo (2026-09-02)
+  | Detector | Número | Destino | Lectura completa |
+  |---|---|---|---|
+  | Dos etapas | 91,7 % | 89,3 % | 91,7 % |
+  | Dos clases (el que corre en el sensor) | 91,7 % | 85,7 % | 87,5 % |
 
-Build `202609021823` en el grupo interno de TestFlight: **el primero que sale sin ninguna clave de
-proveedor en el binario**. El modo supermercado funciona de punta a punta contra el proxy de
-ADR 0008. Es el cierre práctico del pendiente (b) de ADR 0006.
+- **Catálogo** (2026-10-06/07): sólo se anuncia lo que el catálogo conoce, y el catálogo completa la
+  mitad del cartel que el OCR no leyó.
+- **Zoom digital** (#121): hasta 2x sobre el cartel. Probado en la placa contra video el 2026-10-22:
+  un cartel de ~10 px de alto se anunció a los 7,6 s. `--bus-full-res` traba la cámara de la Zero.
+- **Márgenes del cartel**: `SIGN_MARGINS = (0.18, 0.06, 0.06)` (#122, 2026-10-22). Se probó el box tal
+  cual el 2026-10-21 y en las pruebas del equipo se seguía perdiendo a veces el "1" del número de línea
+  (reporte del 2026-10-22).
+  - Causa: el detector es de cajas, el box se ajusta a los LEDs y el número está a la izquierda, así
+    que el borde del recorte cae sobre el trazo fino del "1". No es un problema de keypoints.
+  - Con zoom, una lectura se descarta si el margen cae fuera del recorte.
+- **Reentrenamiento en la V100** con ~500 fotos: hecho. Faltan épocas, métricas y la ubicación de los
+  pesos.
+- **Supermercado**: funciona de punta a punta contra el proxy desde el 2026-09-02. El respaldo local
+  sigue abierto.
 
-## Pending — interactive / account setup (only the user can do)
+### Carcasa (`hardware/case-via-clara/`)
 
-1. **EAS** (run locally; in a Claude session use `! ` prefix):
-   `cd app && eas login && eas init && eas update:configure`, then add repo **secret** `EXPO_TOKEN`
-   and **variable** `EAS_ENABLED=true`. `eas init`/`update:configure` edit `app.json` — fold those in.
-2. **Supabase — hecho (2026-09-02).** El proyecto existía desde el 18/07 y estaba pausado y vacío
-   (0 usuarios, 0 tablas, 0 buckets); se despausó y se usó para desplegar el **proxy de claves**
-   (ADR 0008), que es para lo que sirve hoy — la capa de cuenta de ADR 0002 sigue archivada y la app
-   no tiene login. Pendiente menor, dos toggles del dashboard: **rotar el JWT secret** y **apagar el
-   signup por email**, que no usamos y deja un endpoint abierto para crear usuarios.
-3. **Apple Developer Program — listo (2026-08, cuenta Individual del Apple ID del proyecto).**
-   **TestFlight funcionando punta a punta (2026-08-31)**: `staging` → grupo interno *Equipo
-   ViroVision* (devs, sin revisión, llega en minutos); PR `staging → main` (= release) → grupo
-   externo *Testers ViroVision*. La Beta App Review del release del PR #44 fue **aprobada** y el
-   **link público está vivo**: <https://testflight.apple.com/join/jbE7GDqV> (el grupo interno no
-   tiene link: sus testers son usuarios de App Store Connect). Una sola app. Flujo en
-   [`dev-build-ios.md`](dev-build-ios.md).
-4. **Android / Google Play — en curso (2026-08-30)**: upload key generada, scripts y workflow
-   listos y gateados con `PLAY_ENABLED`. Falta la cuenta de Google Play Console (USD 25),
-   crear la app, la service account y la primera subida manual. Ver
-   [`android-play.md`](android-play.md).
+- **Modelo**: VIA Clara, paramétrica en OpenSCAD.
+  - Dos mitades a presión con ocho trabas, una corredera para la llave y un brazo para el
+    transductor óseo de 14 mm.
+  - Un solo botón: un pulsador SMD de 4×4×1 mm con tecla pegada.
+- **En `staging`**: la v0.9. Las impresiones de prueba se evaluaron así: la v0.9 el
+  2026-10-17, la v0.10 el 2026-10-21 (falló) y la v0.11 el 2026-10-22. Detalle en la tesis, §7.3.5.
+- **Vigente: v0.12** (rama `feat/case-v0-10-slim`, sin commitear):
+  - cuerpo de 85,8 × 28,5 × 37,2 mm;
+  - se descarta la variante con tapa;
+  - trabas delanteras detrás de las guías de la cámara;
+  - alojamientos redondos para los separadores, que ya no se termofunden;
+  - piezas de prueba para validar sin imprimir la carcasa entera.
+- **Verificación**: `export.sh` corre 18 verificaciones de interferencia contra maquetas.
+- **Pendiente**: medir lo marcado `MEASURE` con calibre e imprimir las pruebas de la v0.12. Los STL
+  van al Drive (`Tesis: ViroVision / modelo_3d`), no al repo.
 
-## What's next — options (was mid-discussion)
+### Nube (`supabase/`)
 
-Pick a track (see the skill for pillar detail):
+Proyecto `viro_vision`. Tres funciones desplegadas y activas: `vision` (proxy de claves, desde el
+2026-09-02), `telemetry` (tabla `events`, desde el 2026-09-09) y `evidence` (bucket privado, desde el
+2026-10-12). Los builds no llevan ninguna clave de proveedor. Riesgo vigente: el plan gratuito pausa
+el proyecto por inactividad.
 
-- **A. Recognition pipeline in the app (highest-value, demoable now, no hardware):** integrate the
-  camera (`expo-camera`) + an on-device model runtime (e.g. `react-native-fast-tflite` /
-  `onnxruntime-react-native` / `react-native-executorch`) running a YOLO model, produce
-  `RecognitionEvent`s (types already exist in `features/recognition/types.ts`) and feed the existing
-  `announceRecognition` (`features/audio/announcer.ts`). Aligns with offline-first (ADR 0001). A
-  COCO-pretrained YOLO already detects `bus`, so an end-to-end demo is possible before custom training.
-- **B. Finish the account layer:** after EAS/Supabase setup, add auth-gated navigation (login route +
-  guard), profile, and persist settings to Supabase.
-- **C. Real BLE:** hecho el 2026-09-04 (cliente ble-plx + medición). Falta verificarlo contra la
-  placa real y correr la medición del ADR 0003.
-- **D. ML pillar:** el camino de ómnibus está en `bus-banner-recognizer` (2026-09-07/22): detector de
-  **2 clases en el sensor IMX500** → cartel → OCR PP-OCRv5 vía ONNX → seguimiento → anuncio pregrabado.
-  **Corriendo de punta a punta en la Zero 2 W desde el 2026-09-22**: del primer avistaje a «115, Luis
-  Braille», **1,6 s**, con 75 frames cada 5 s y detecciones en el 95 %. Lo que lo destrabó fue de
-  ejecución, no de modelo: una caja `bus` mala (la pantalla entera, confianza 0,35) vetaba un cartel
-  bueno, y el cartel ahora se sostiene solo ([PR #4](https://github.com/MagaliDellapiazza02/bus-banner-recognizer/pull/4)).
-  **El techo que queda es el reconocedor**: las dos lecturas crudas fueron `E s LUS TALLE` y
-  `5 LUS TALLE`, y lo que dijo la línea fue el catálogo de la STM. Siguen: fine-tune o reemplazo del
-  reconocedor para carteles LED, reentrenar la clase `bus` en la V100 con fotos desde la perspectiva
-  del dispositivo, validar el int8, y el set de evaluación con fotos del dispositivo.
-- **E. Hardware pillar:** daemon inicial hecho el 2026-09-04 (`hardware/raspi/`). **Alimentación
-  comprada el 2026-09-07**: Waveshare UPS HAT (C) + LiPo 1000 mAh (`hardware/README.md`, *Alimentación*).
-  **Botón físico hecho el 2026-09-07** (`raspi/virovision/button.py`, GPIO 5 / pin 29).
-  **El modo ómnibus entero corre en la placa desde el 2026-09-15** (detección en el sensor IMX500,
-  OCR en la Pi, anuncios pregrabados por el parlante), disparado por el botón: eso cierra a la vez los
-  anuncios pregrabados y el código de ómnibus en el daemon, que figuraban acá como pendientes.
-  El 2026-09-22 el modo dejó además de ser ciego en el journal (línea de tiempo por ómnibus y latido
-  de frames) y la cámara pasó a tener un vigilante que la reabre tras 12 s sin un frame — **sin ponerle
-  plazo a `capture_request`**, que es lo que la trabó para todo, foto de supermercado incluida.
-  La batería se lee del INA219 del HAT desde el 2026-10-06 (`battery.py`) y llega a la app por `status`.
-  Siguen: DAC I2S, medir el consumo real y la app mostrando la lectura de ómnibus. La **carcasa**
-  vigente es la VIA Clara v0.9 (`hardware/case-via-clara/`, desde 2026-10-15): dos mitades a presión
-  sobre el conjunto real HAT + batería + Pi, revisada con varios modelos; los STL para imprimir están
-  en el Drive (`Tesis: ViroVision / modelo_3d`). Falta medir con calibre e imprimir la primera.
+### CI/CD (`.github/workflows/`)
 
-**Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core
-value prop, and exercises the recognition/audio domain already scaffolded.
+- `ci.yml`: lint, typecheck, tests y bundle en los PRs a `main` y `staging`.
+- `testflight.yml`: publica en TestFlight, al grupo interno desde `staging` y al externo desde `main`.
+- `android-apk.yml`: genera un `.apk` de sideload desde `staging`.
+- `android-play.yml`: subida a Google Play, apagada con `PLAY_ENABLED`.
+- `eas-update.yml` y `eas-build-ios.yml`: opcionales, detrás de `EAS_ENABLED`.
 
-## How to continue in a new session
+Detalle en [`ci-cd.md`](ci-cd.md).
 
-1. The `virovision` skill loads automatically for ViroVision work.
-2. Read this file for current state.
-3. First action should likely be consolidating `main` (see the top section).
+### Tesis (`docs/tesis/`)
 
-### Punto de partida al 2026-09-20 (traspaso entre sesiones)
+Capítulos 1 a 8, 11 y 12 escritos y al día al 2026-10-22. Faltan los capítulos 9 (conclusiones) y
+10 (trabajo futuro), y los `PENDIENTE` declarados en el resto: métricas de la V100, prueba en la
+calle y pruebas con usuarios.
 
-Lo que estaba en vuelo cuando se cerró la sesión del 2026-09-20, para que la siguiente no lo
-redescubra:
+## Pendientes de cuentas y configuración (sólo los puede hacer el equipo)
 
-- **La conexión con la placa se rehízo entera** (rama `fix/device-connect-fast-quiet`, ADR 0003
-  act. 2026-09-20; reemplaza al PR #98, que se cerró sin mergear). Tres cosas: la placa anuncia cada
-  100–152,5 ms en vez de 1,28 s (**ya desplegado en la placa** por SSH, unidad reinstalada y
-  verificada con `btmon`); la app sondea `/health` antes de pedirle al sistema unirse al WiFi, y sólo
-  pide si la placa no contesta; y la red no se olvida nunca. **Probado en el teléfono el 2026-09-21**
-  (build `202609202230`, TestFlight interno desde la rama): BLE y WiFi «rapidísimo», un solo cartel,
-  sin «no se pudo conectar». **Pero al reabrir la app a la mañana, en casa, el cartel volvió**: el
-  teléfono estaba en la WiFi de casa (con internet) e iOS la prefiere sobre la de la placa (local),
-  así que la placa no contesta y hay que pedir el join. Es el escenario previsto en el ADR. Queda
-  por probar (a) en la calle, sin red conocida, donde iOS debería unirse solo; y decidir (b) si la
-  placa se une a la WiFi de casa cuando la ve y levanta el AP sólo sin red conocida — cero carteles
-  en casa y SSH sin bajar el AP.
-- **PR #99** (`docs/placa-zero-2w-sin-ethernet`): sólo documentación, la de este cambio de placa.
-- **La placa** es la Zero 2 W, en modo producto (AP arriba), con el daemon al día con `staging`
-  (byte a byte, con el `hush` del #97) y la unidad systemd de esta rama (intervalo de anuncio).
-  Para entrar: `tools/ap.py` por BLE.
-- **Telemetría muda desde el 2026-09-10**, sin explicación. Es lo primero que conviene entender
-  antes de diagnosticar nada más en el teléfono.
-- **Ramas viejas con trabajo real sin PR**: `feat/carcasa-modelo-3d` (modelo OpenSCAD v1 y boceto
-  v2, 38 archivos; ya reemplazado por la v0.9 de `hardware/case-via-clara/`, se puede archivar) y `feat/volume-button` (segundo botón de volumen + un «ADR 0010» que hoy choca
-  con el 0010 de modo oscuro que ya está en `staging`; habría que renumerarlo). Ninguna de las dos
-  está en `staging`. Las demás ramas locales o tienen PR mergeado (squash: `git branch --merged`
-  no las ve) o están cerradas como viejas.
+1. **Supabase**: rotar el JWT secret y apagar el signup por email, que no se usa.
+2. **Google Play**: falta la cuenta de Play Console, crear la app, la service account y la primera
+   subida manual ([`android-play.md`](android-play.md)).
+3. **EAS** (opcional): `eas login && eas init && eas update:configure`, más `EXPO_TOKEN` y
+   `EAS_ENABLED=true` en el repo.
+4. **Roboflow**: rotar la API key que quedó en la historia de un notebook del repo de visión.
+
+## Próximos pasos
+
+En orden de prioridad, ver [`ROADMAP.md`](ROADMAP.md):
+
+1. Probar el modo ómnibus en la calle, con y sin zoom.
+2. Documentar las métricas del detector reentrenado.
+3. Medir e imprimir la carcasa v0.12, e integrar su rama.
+4. Cerrar el audio de la placa.
+5. Hacer las pruebas con usuarios y la corrida de evaluación del supermercado.
+6. Antes de la entrega, sacar la evidencia del ómnibus.
+
+## Cómo continuar en una sesión nueva
+
+1. Cargar la skill `virovision` (es obligatorio, lo dice el `CLAUDE.md` de la raíz).
+2. Leer este archivo y las últimas entradas de [`SESSION-LOG.md`](SESSION-LOG.md).
+3. Crear una feature branch desde `origin/staging` al día antes del primer edit.

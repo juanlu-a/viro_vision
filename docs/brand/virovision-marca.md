@@ -1,4 +1,4 @@
-# ViroVision — marca
+# ViroVision: marca
 
 Asistente de hardware para personas ciegas: una cámara con IA que reconoce líneas de colectivo y productos de supermercado y lo comunica por voz.
 
@@ -8,10 +8,10 @@ Dos arcos que se encuentran en un vértice inferior: ojo abstracto y V geométri
 Geometría (lienzo 200×200): arcos de radio 96 desde (100,168) hasta (32,44) y (168,44); trazo 18, extremos redondeados; pupila r=17 en (100,92).
 
 ## Color
-- Verde Lectura #1FB57A — acento primario: botones, foco, estado confirmado
-- Azul Sensor #1256D4 — secundario: enlaces, datos, superficies oscuras
-- Azul Profundo #061D3A — pupila, texto, fondos oscuros
-- Gris Niebla #F4F6F8 — fondo base
+- Verde Lectura #1FB57A: acento primario: botones, foco, estado confirmado
+- Azul Sensor #1256D4: secundario: enlaces, datos, superficies oscuras
+- Azul Profundo #061D3A: pupila, texto, fondos oscuros
+- Gris Niebla #F4F6F8: fondo base
 Variantes sobre oscuro: #4D9BFF / #2BD69A / pupila blanca.
 Proporción: 70% neutros, 20% verde, 10% azul.
 

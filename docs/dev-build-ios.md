@@ -8,7 +8,7 @@ Expo Go es un binario fijo con un set cerrado de módulos nativos. `react-native
 y cualquier módulo que agreguemos no están adentro, y los config plugins de `app.json` ni se aplican.
 Para BLE, cámara o modelos on-device hace falta un **development build**: se compila *nuestra* app
 con *nuestros* módulos nativos, se instala una vez en el teléfono, y a partir de ahí el desarrollo
-sigue igual que con Expo Go — Metro, fast refresh y todo.
+sigue igual que con Expo Go: Metro, fast refresh y todo.
 
 ## Requisitos
 
@@ -128,8 +128,8 @@ la app TestFlight muestra todos los builds a los que uno tiene acceso y se elige
 
 | Rama | Grupo de TestFlight | Tipo | Revisión de Apple | Quién la recibe |
 |---|---|---|---|---|
-| `staging` — donde van todos los PRs | *Equipo ViroVision* | **interna** | **ninguna**: llega en minutos | los devs (usuarios de App Store Connect) y algún allegado invitado |
-| `main` — producción; se llega por PR `staging → main` (= *promover*) | *Testers ViroVision* | **externa**, link público <https://testflight.apple.com/join/jbE7GDqV> | Beta App Review del primer build de cada versión; los siguientes, minutos | cualquiera con el link |
+| `staging`, donde van todos los PRs | *Equipo ViroVision* | **interna** | **ninguna**: llega en minutos | los devs (usuarios de App Store Connect) y algún allegado invitado |
+| `main`: producción; se llega por PR `staging → main` (= *promover*) | *Testers ViroVision* | **externa**, link público <https://testflight.apple.com/join/jbE7GDqV> | Beta App Review del primer build de cada versión; los siguientes, minutos | cualquiera con el link |
 
 *Actions → TestFlight → Run workflow* permite además publicar cualquier rama al destino que se
 elija. Apple admite **un solo build por versión en revisión a la vez** (el script lo trata como
@@ -137,7 +137,7 @@ aviso). Un build tarda ~30 min de runner + 5–15 de procesamiento de Apple.
 
 ⚠️ **No expirar un build con Beta App Review pendiente.** Cancela la revisión, pero el slot de
 "un build por versión en revisión" queda ocupado por un fantasma durante horas: pasó el 2026-08-31
-con el build 1 — la API de lectura mostraba **cero** submissions en toda la app y
+con el build 1: la API de lectura mostraba **cero** submissions en toda la app y
 `POST /v1/betaAppReviewSubmissions` seguía respondiendo `ANOTHER_BUILD_IN_REVIEW`, y dos reenvíos
 llegaron a verse `WAITING_FOR_REVIEW` y se evaporaron. El estado real se consulta **por build**
 (`GET /v1/builds/{id}/betaAppReviewSubmission`); el listado de builds con `include` puede mentir
@@ -159,7 +159,7 @@ del release: `staging` es la antesala de `main`, no un cajón de pruebas sueltas
 
 Secrets del repo: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (el contenido del `.p8`, rol
 Administración), `EXPO_PUBLIC_GEMINI_API_KEY`, `EXPO_PUBLIC_ANTHROPIC_API_KEY` (opcional);
-variable: `EXPO_PUBLIC_SIMULATE_DEVICE` — espejo del `.env` local, para que el build de CI sea el
+variable: `EXPO_PUBLIC_SIMULATE_DEVICE`, espejo del `.env` local, para que el build de CI sea el
 mismo que el del Mac.
 
 ### Testers (App Store Connect → la app → TestFlight)
@@ -189,7 +189,19 @@ cd app
 npx expo run:android   # requiere Android Studio + SDK
 ```
 
-o un APK por EAS, que no requiere toolchain local ni cuenta paga.
+Para instalar la app en un Android sin tienda (Google Play está apagado, `PLAY_ENABLED`) se usa un
+`.apk` universal firmado:
+
+- **Desde CI**: cada push a `staging` con cambios en `app/` deja el `.apk` como artefacto del run de
+  `.github/workflows/android-apk.yml` (#79), y el mismo workflow se puede lanzar a mano desde
+  cualquier rama para repartir un build que todavía no se mergeó.
+- **En local**: `bash scripts/apk.sh` desde `app/`, con `APK_KEYSTORE` y `APK_KEYSTORE_PASSWORD` para
+  firmar con la clave de subida (sin keystore firma con la clave de debug de la plantilla, que sirve
+  para una demo).
+
+Un `.apk` firmado con la clave del equipo y uno instalado desde Play tienen firmas distintas: el día
+que la app se publique en la tienda, hay que desinstalar el `.apk` antes. Detalle en
+[`ci-cd.md`](ci-cd.md) y [`android-play.md`](android-play.md).
 
 ## Problemas conocidos
 
@@ -240,18 +252,18 @@ Cuando se agregue otro entitlement: habilitar la capacidad en el App ID, **regen
   (Xcode → Settings → Components, o `xcodebuild -downloadPlatform iOS`).
 - **El iPhone aparece como `unavailable`** en `xcrun devicectl list devices`: está bloqueado,
   desconectado, o falta aceptar *Confiar en esta computadora*. Cuando pasa a
-  `connected (no DDI)`, Xcode todavía está montando la imagen de desarrollo — esperá a que
+  `connected (no DDI)`, Xcode todavía está montando la imagen de desarrollo: esperá a que
   termine el *"Preparing iPhone…"* en Window → Devices and Simulators.
 
 - **`Communication with Apple failed` / `No profiles for 'com.virovision.app' were found`** en
   Signing & Capabilities: el texto que importa es *"Your team has no devices"*. Con provisioning
   gratuito el perfil se emite **atado a un dispositivo**, así que no existe hasta que haya uno
-  registrado. Conectá el iPhone, elegilo como destino y compilá — `xcodebuild` lo registra y
+  registrado. Conectá el iPhone, elegilo como destino y compilá: `xcodebuild` lo registra y
   genera el perfil solo. El botón *Try Again* no alcanza.
 
 - **`Error: EPERM: operation not permitted, uv_cwd`** al correr cualquier comando de npm dentro
   del repo: es **TCC de macOS** bloqueando la carpeta Documentos, no permisos Unix (verificalo con
-  `ls -ld ~/Documents` — si dice `drwx------` de tu usuario, los permisos del filesystem están
+  `ls -ld ~/Documents`: si dice `drwx------` de tu usuario, los permisos del filesystem están
   bien). El síntoma característico es que `cd` funciona pero `getcwd()` falla.
 
   ```sh
@@ -259,7 +271,7 @@ Cuando se agregue otro entitlement: habilitar la capacidad en el App ID, **regen
   ```
 
   Después **⌘Q en Terminal** y volvé a abrirlo: al entrar al repo aparece el diálogo de permiso.
-  **Abrir una pestaña o ventana nueva NO sirve** — siguen siendo hijas del mismo proceso
+  **Abrir una pestaña o ventana nueva NO sirve**: siguen siendo hijas del mismo proceso
   `Terminal.app`, y TCC se evalúa cuando arranca la app. Alternativa gráfica: Ajustes del Sistema
   → Privacidad y seguridad → Archivos y carpetas (o Acceso a disco completo).
 

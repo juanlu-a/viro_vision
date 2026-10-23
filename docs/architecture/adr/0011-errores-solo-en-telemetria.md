@@ -1,4 +1,4 @@
-# ADR 0011 — Los errores van a la telemetría, nunca al usuario
+# ADR 0011: Los errores van a la telemetría, nunca al usuario
 
 - **Status:** Accepted (2026-10-06)
 - **Date:** 2026-10-06
@@ -15,7 +15,7 @@ Supabase). Pero quedaban caminos por los que el **texto de un error** seguía ll
 la lectura fallida decía `La nube no respondió (VISION_HTTP_500)`, la foto fallida leía en voz alta
 `the device did not answer in 4 s`, la red decía la IP de la placa o el texto del sistema, y los
 avisos de la placa (`unknown command: say`, la salida de `nmcli`) se mostraban y se decían tal cual,
-en inglés, con la voz en español. Y al revés: errores que nadie registraba — `console.*`, promesas
+en inglés, con la voz en español. Y al revés: errores que nadie registraba: `console.*`, promesas
 rechazadas sin `catch` en los callbacks BLE, una pantalla que explotaba al dibujarse, los `catch`
 silenciosos del cliente Bluetooth y todo lo que la placa sólo escribía en su journal.
 
@@ -27,7 +27,7 @@ para que lo leamos nosotros, y el usuario no se entera**.
 1. **El texto de un error nunca llega a la pantalla ni a la voz.** Ni el mensaje, ni el código, ni
    la IP, ni lo que dice la placa. Se registra en la telemetría (`errorDetail()` lo acota) y ahí se
    lee.
-2. **Lo que sí llega es una frase fija, en lenguaje llano, que dice qué hacer** — «No pude leer.
+2. **Lo que sí llega es una frase fija, en lenguaje llano, que dice qué hacer**: «No pude leer.
    Probá de nuevo.», «El dispositivo no pudo sacar la foto. Probá de nuevo.». No es un error
    mostrado: es la interfaz. Para quien no ve la pantalla, el silencio después de apretar el botón
    es indistinguible de un dispositivo roto (es la queja que originó el ADR 0007), así que callar

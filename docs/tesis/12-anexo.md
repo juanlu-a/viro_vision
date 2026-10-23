@@ -3,7 +3,10 @@
 
 ## 12.1 Planilla de entregables y diagrama de Gantt
 
-<https://docs.google.com/spreadsheets/d/19LJSwvqMiiBDWzO6qrsdW_BlYOHt0stegudmx08klwA/edit?gid=0#gid=0> 
+<https://docs.google.com/spreadsheets/d/19LJSwvqMiiBDWzO6qrsdW_BlYOHt0stegudmx08klwA/edit?gid=0#gid=0>
+
+Versión publicada de la planilla de entregables y del diagrama de Gantt:
+<https://docs.google.com/spreadsheets/d/e/2PACX-1vRhg-RdsfdYF0pMST3cAsK1wOmZePT0zolzU6X9hQr-yuZe5WpxKEaxqlODGqa9atDd0xkch3ctckb2/pubhtml>
 
 ### 12.1.1 Diagrama de Gantt
 
@@ -64,62 +67,26 @@
 
 17\. Contanos una situación difícil o incómoda que hayas vivido usando transporte público.
 
-  
-
 |  |
 | :-: |
-| Una vez no me creyeron que era una persona ciega, y me cobraron el boleto ð«ð¸ð. |
-| Subirme a un bus que no era porque era de la misma empresa, bajarme y tener que tomar un taxi porque me dejo en un lugar que no pasaban buses para lazona donde yo vivo |
-| Algunas veces te paran fuera de la parada solicitada, porque se olvidaron y no te dicen dónde estás, quieren que te bajes rápido nada más |
-| Tengo baja visión y los choferes paran lejos del cordón de la vereda y lejos de la parada lo cual desorienta a la persona . |
-| El problema no son las paradas en el transporte, el problema son los perros sueltos en las calles, y el descontrol de las personas usuarios que tienen perros sueltos, y el daño que Hecho hace a las personas con discapacidad que vamos con bastón |
-| Yo uso bastón verde y muchas veces tengo que ir a asientos alejados de la puerta porque la gente no me dede los primeros asientos o te miran porque yo al tener baja visión me manejo dentro de mis posibilidades bastante bien siento que me miran como dudando de mi incapacidad y es muy incómodo y te pone mal por momentos . |
-| Estres y tension por no podrr sabrr wue linea se sproxima |
-| Estar en la parada y pedir que me avisen cuando llega la línea que necesito tomar y que me indiquen otra linea , si no fuera por qué tengo registrados los movimientos del bus por ejemplo pasar por un puente que son movimientos que registro con el cuerpo y cuento cuántas veces dobla a la derecha o izquierda uso como guía ese tipo de cosas hubiera ido a cualquier destino desconocido eso me ha pasado varias veces y lo hacen como broma, pero para mí es realmente desagradable. |
-| Para todos los omnibus y que estos pasen de largo. |
-|   |
-| El cambio de destino y tener que reacomodarme en la mitad del camino, para tomar otro ómnibus, siendo de noche. |
+| “Una vez no me creyeron que era una persona ciega, y me cobraron el boleto 🚫💸😒.” |
+| “Subirme a un bus que no era porque era de la misma empresa, bajarme y tener que tomar un taxi porque me dejo en un lugar que no pasaban buses para lazona donde yo vivo” |
+| “Algunas veces te paran fuera de la parada solicitada, porque se olvidaron y no te dicen dónde estás, quieren que te bajes rápido nada más” |
+| “Tengo baja visión y los choferes paran lejos del cordón de la vereda y lejos de la parada lo cual desorienta a la persona.” |
+| “El problema no son las paradas en el transporte, el problema son los perros sueltos en las calles, y el descontrol de las personas usuarios que tienen perros sueltos, y el daño que Hecho hace a las personas con discapacidad que vamos con bastón” |
+| “Yo uso bastón verde y muchas veces tengo que ir a asientos alejados de la puerta porque la gente no me dede los primeros asientos o te miran porque yo al tener baja visión me manejo dentro de mis posibilidades bastante bien siento que me miran como dudando de mi incapacidad y es muy incómodo y te pone mal por momentos.” |
+| “Estres y tensión por no podrr sabrr que linea se aproxima” |
+| “Estar en la parada y pedir que me avisen cuando llega la línea que necesito tomar y que me indiquen otra linea , si no fuera por qué tengo registrados los movimientos del bus por ejemplo pasar por un puente que son movimientos que registro con el cuerpo y cuento cuántas veces dobla a la derecha o izquierda uso como guía ese tipo de cosas hubiera ido a cualquier destino desconocido eso me ha pasado varias veces y lo hacen como broma, pero para mí es realmente desagradable.” |
+| “Parar a todos los ómnibus y que estos pasen de largo.” |
+| “El cambio de destino y tener que reacomodarme en la mitad del camino, para tomar otro ómnibus, siendo de noche.” |
 | Si no hay nadie en la parada siguen de largo y no paran. |
 | Algunos conductores paran lejos de la vereda,y es difícil ascender al vehículo. |
 | Pedir que te avisen en tal calle o parada y no te avisan o te dicen mal |
 | No he tenido situaciones incómodas, siempre tengo la ayuda del conductor u otro pasajero. |
 | Subirme a un bus equivocado y darme cuenta antes de pagar el boleto y el conductor insultarme creyendo que yo estaba de vivo. No uso bastonn verde a pesar de tener baja visión. |
-|   |
 | Ayer me dijo una persona que era la línea 137. Subí y en un moento agarra otro camino. Era el 185. Como trabajo en Brou, me bajé y tomé el 582. pero en lugar de para Punta carretas lo tome a Peñarol. Cuando me di cuenta, estábamos por Millan y Blanes. Me bajé y finalmente me tomé un taxi hasta el trabajo. |
 | Cuando tenía perro guía, a veces las personas o los choferes no sabían que está permitido po ley. Sin embargo, eso fue mejorando con el correr del tiempo y la visibiliad cada vez mayor de los perros |
 | Muchas veces el conductor para el coche lejos de la parada y nos deshorienta cuando bajamos o peor cuando queremos abordar y. En estos últimos casos tenemos que depender de la ayuda de la gente y muchas veces nos genera mucha anciedad el no poder llegar a tiempo. |
-
-  
-
-
-17\. Contanos una situación difícil o incómoda que hayas vivido usando transporte público.
-
-  
-
-|  |
-| :-: |
-| Una vez no me creyeron que era una persona ciega, y me cobraron el boleto ð«ð¸ð. |
-| Subirme a un bus que no era porque era de la misma empresa, bajarme y tener que tomar un taxi porque me dejo en un lugar que no pasaban buses para lazona donde yo vivo |
-| Algunas veces te paran fuera de la parada solicitada, porque se olvidaron y no te dicen dónde estás, quieren que te bajes rápido nada más |
-| Tengo baja visión y los choferes paran lejos del cordón de la vereda y lejos de la parada lo cual desorienta a la persona . |
-| El problema no son las paradas en el transporte, el problema son los perros sueltos en las calles, y el descontrol de las personas usuarios que tienen perros sueltos, y el daño que Hecho hace a las personas con discapacidad que vamos con bastón |
-| Yo uso bastón verde y muchas veces tengo que ir a asientos alejados de la puerta porque la gente no me dede los primeros asientos o te miran porque yo al tener baja visión me manejo dentro de mis posibilidades bastante bien siento que me miran como dudando de mi incapacidad y es muy incómodo y te pone mal por momentos . |
-| Estres y tension por no podrr sabrr wue linea se sproxima |
-| Estar en la parada y pedir que me avisen cuando llega la línea que necesito tomar y que me indiquen otra linea , si no fuera por qué tengo registrados los movimientos del bus por ejemplo pasar por un puente que son movimientos que registro con el cuerpo y cuento cuántas veces dobla a la derecha o izquierda uso como guía ese tipo de cosas hubiera ido a cualquier destino desconocido eso me ha pasado varias veces y lo hacen como broma, pero para mí es realmente desagradable. |
-| Para todos los omnibus y que estos pasen de largo. |
-|   |
-| El cambio de destino y tener que reacomodarme en la mitad del camino, para tomar otro ómnibus, siendo de noche. |
-| Si no hay nadie en la parada siguen de largo y no paran. |
-| Algunos conductores paran lejos de la vereda,y es difícil ascender al vehículo. |
-| Pedir que te avisen en tal calle o parada y no te avisan o te dicen mal |
-| No he tenido situaciones incómodas, siempre tengo la ayuda del conductor u otro pasajero. |
-| Subirme a un bus equivocado y darme cuenta antes de pagar el boleto y el conductor insultarme creyendo que yo estaba de vivo. No uso bastonn verde a pesar de tener baja visión. |
-|   |
-| Ayer me dijo una persona que era la línea 137. Subí y en un moento agarra otro camino. Era el 185. Como trabajo en Brou, me bajé y tomé el 582. pero en lugar de para Punta carretas lo tome a Peñarol. Cuando me di cuenta, estábamos por Millan y Blanes. Me bajé y finalmente me tomé un taxi hasta el trabajo. |
-| Cuando tenía perro guía, a veces las personas o los choferes no sabían que está permitido po ley. Sin embargo, eso fue mejorando con el correr del tiempo y la visibiliad cada vez mayor de los perros |
-| Muchas veces el conductor para el coche lejos de la parada y nos deshorienta cuando bajamos o peor cuando queremos abordar y. En estos últimos casos tenemos que depender de la ayuda de la gente y muchas veces nos genera mucha anciedad el no poder llegar a tiempo. |
-
-  
 
 ### 12.2.4 Sección 4: Supermercados y compras
 
@@ -286,7 +253,6 @@ L: Está bien, está bien.
   
 F: Bueno, eso vendría ser lo último con el tema de la entrevista, así que muchas gracias por el tiempo.  
   
-L: Po
 
 ## 12.5 Manual de marca
 
@@ -295,7 +261,7 @@ L: Po
 El proyecto cuenta con una identidad visual propia, documentada en un manual de marca que cubre el
 símbolo y su construcción geométrica, la paleta de color, la tipografía, las reglas de uso y el
 espacio de protección. La paleta se definió atendiendo a las relaciones de contraste exigidas por
-WCAG, criterio que se verifica de forma automatizada en la aplicación (§7.8.1).
+WCAG, criterio que se verifica de forma automatizada en la aplicación (sec. 7.8.1).
 
 El manual completo se incluye como documento adjunto.
 
@@ -322,8 +288,13 @@ El manual completo se incluye como documento adjunto.
 {"cmd": "ap",      "value": true, "minutes": 10}
 {"cmd": "audio",   "target": "device" | "phone"}
 {"cmd": "say",     "clip": "<archivo>.wav"}
+{"cmd": "hush"}
+{"cmd": "restart_camera"}
 {"cmd": "measure", "bytes": 53000, "chunk": 182, "interval_ms": 0}
 ```
+
+`hush` corta el parlante de la placa cuando está por hablar el teléfono (una voz por vez);
+`restart_camera` reabre la cámara si quedó trabada.
 
 **Eventos emitidos por `event`:**
 
@@ -333,7 +304,19 @@ El manual completo se incluye como documento adjunto.
 {"t": "ap",     "on": true, "minutes": 10}
 {"t": "error",  "msg": "..."}
 {"t": "result", "number": "115", "name": "LUIS BRAILLE", "ms": 570}
+{"t": "warming"}
+{"t": "bus"}
+{"t": "evidence", "ref": "<corrida>/t003-r02"}
+{"t": "log",    "lvl": "warning", "src": "bus", "msg": "...", "drop": 3, "ago": 42}
+{"t": "start",  "id": 1, "kind": "photo", "bytes": 53000, "chunks": 292, "chunk": 182}
+{"t": "end",    "id": 1, "bytes": 53000, "chunks": 292, "device_ms": 4100}
 ```
+
+`warming` avisa que el modo ómnibus todavía está cargando el OCR; `bus` anuncia la presencia de un
+ómnibus antes de leer su cartel; `evidence` indica que hay una foto y un recorte listos para bajar
+(herramienta temporal de desarrollo); `log` reenvía al teléfono las advertencias y los errores del
+daemon para la telemetría (ADR 0011); `start` y `end` enmarcan una transferencia por BLE. Los valores
+numéricos de los ejemplos son ilustrativos.
 
 **Constantes del protocolo:** tamaño de fragmento 182 bytes (ATT MTU negociada de 185 en iOS),
 tamaño máximo de evento 180 bytes, notificación de estado cada 15 segundos.
@@ -346,6 +329,7 @@ tamaño máximo de evento 180 bytes, notificación de estado cada 15 segundos.
 | `GET /photos/latest` | Captura y devuelve el JPEG (1024 px de lado mayor, calidad 70) |
 | `GET /measure/<bytes>` | Devuelve datos de prueba para medición de caudal |
 | `POST /audio` | Recibe y reproduce un archivo de audio |
+| `GET /evidence/<corrida>/<archivo>` | Devuelve un registro (`.json`) o una foto (`.jpg`) del modo ómnibus ya anunciado por el evento `evidence`; sin listado. Temporal, se retira antes de la entrega |
 
 ## 12.7 Hiperparámetros de entrenamiento del detector
 
@@ -363,7 +347,10 @@ HYPERPARAMETERS = dict(
 ```
 
 **Corridas efectivamente ejecutadas:** 40 épocas, lote de 16, sobre CPU, con Ultralytics 8.4.37
-(detector de una clase y detector de dos clases). La configuración de 120 épocas no se ejecutó.
+(detector de una clase y detector de dos clases, sobre unas 140 fotografías). En octubre de 2026 el
+detector se reentrenó en el servidor con GPU NVIDIA Tesla V100 sobre unas 500 fotografías.
+`[PENDIENTE: épocas, tamaño de lote, métricas de validación y ubicación de los pesos de esa corrida,
+que no constan en ningún repositorio al 22 de octubre de 2026.]`
 
 **Export al sensor:** cuantización posterior al entrenamiento a enteros de 8 bits, calibrada con las
 28 imágenes de la partición de validación; supresión de no máximos incorporada al modelo con
@@ -404,6 +391,13 @@ Peores tres combinaciones:
 
 **Valores adoptados en producción:** izquierdo 0,18, derecho 0,06, vertical 0,06.
 
+El margen izquierdo, el triple del derecho, no sale de la grilla sino de un defecto observado en la
+placa el 15 de septiembre: la caja del detector se ajusta a los LEDs del cartel, el número de línea
+está a la izquierda, y el trazo fino del "1" quedaba sobre el borde del recorte (el OCR leyó "15" por
+"115"). El 21 de octubre se probó leer la caja del detector reentrenado sin ningún margen; en las pruebas
+del equipo el primer dígito se siguió perdiendo a veces, y el 22 de octubre volvieron los valores de esta tabla, ahora
+fijados por el daemon de la placa (`SIGN_MARGINS` en `hardware/raspi/virovision/bus.py`).
+
 ## 12.9 Datos crudos de las campañas de medición
 
 
@@ -429,6 +423,18 @@ permitir la trazabilidad de las tablas del capítulo 7.
 presente en la que el sistema lo detecta; la exactitud del número se calcula sobre las 48 imágenes
 con número esperado y la del destino sobre las 56 con destino esperado; la lectura completa exige
 acierto simultáneo en ambos campos.
+
+**Resultado vigente (12 de octubre de 2026)**, con el código final del repositorio de visión y la
+regla de anunciar sólo lo que el catálogo conoce:
+
+| Detector | Número | Destino | Lectura completa | Detección p50 |
+|---|---|---|---|---|
+| Dos etapas (ómnibus COCO más cartel de una clase) | 0,917 | 0,893 | 0,917 | 35 ms |
+| Dos clases (el modelo que corre en el sensor) | 0,917 | 0,857 | 0,875 | 18 ms |
+
+Una sola imagen (el cuadro nocturno de la línea 109) mueve estas cifras unos dos puntos según la
+versión de las bibliotecas. Fuente: README del repositorio `bus-banner-recognizer`, sección
+*Results*.
 
 ## 12.11 Estructura del conjunto de evaluación
 

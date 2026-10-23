@@ -56,10 +56,10 @@ of the box. The most on the LEFT: Montevideo's line number sits at the left of t
 hugs the LEDs cuts its first digit ("15" for 115, first seen on 2026-09-15).
 
 History: these are `bus_banner.crop.expand_banner`'s defaults, measured on the 117 evaluation images.
-On 2026-10-21 the team tried reading the retrained detector's box as is (all zero); in the field the
-"1" kept going missing, so on 2026-10-23 the margins came back. Margins belong to the model that drew
-the box (`Pipeline`'s own docstring), and the model is chosen here (`--bus-model`), so this is where
-they live. The app's picture of the sign is the crop the OCR read, margins included."""
+On 2026-10-21 the team tried reading the retrained detector's box as is (all zero); in the team's
+tests the "1" kept going missing, so on 2026-10-22 (#122) the margins came back. Margins belong to the
+model that drew the box (`Pipeline`'s own docstring), and the model is chosen here (`--bus-model`), so
+this is where they live. The app's picture of the sign is the crop the OCR read, margins included."""
 ENGINE_RETRY_S = 60.0
 """After the OCR engine fails to build (`OcrEngineFailed`), how long bus mode refuses to try again."""
 FRAME_SILENCE_S = 12.0
