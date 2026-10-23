@@ -456,7 +456,7 @@ def main():
                 print("NEW AT END", [s["title"] for s in op["secs"]])
             else:
                 print(t.upper(), op["d"]["title"], "->", op["m"]["title"] if t == "retitle" else "")
-    SKIP = ("2.3 Entregables", "12.2.3 ")
+    SKIP = ("12.2.3 ",)
     todo = [op for op in ops if op["t"] in ("replace", "retitle", "new")
             and not (op["t"] == "replace" and op["d"]["title"].startswith(SKIP))]
     if "--only" in args:

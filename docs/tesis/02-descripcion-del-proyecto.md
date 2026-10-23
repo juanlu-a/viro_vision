@@ -49,34 +49,34 @@ Desarrollar un dispositivo de asistencia para personas con baja visión que perm
 
 El proyecto contempla los siguientes entregables:
 
-1.  **Documento de contexto y problema****  
-    **Análisis de la situación de personas con discapacidad visual, incluyendo contexto en Uruguay, estadísticas y problemáticas principales.
-2.  **Estado del arte****  
-    **Revisión de trabajos y soluciones existentes hasta la fecha en Computer Vision, OCR y dispositivos asistivos.
-3.  **Relevamiento con usuarios****  
-    **Entrevistas realizadas con transcripciones en anexos y análisis sobre necesidades reales.
-4.  **Documento de requisitos****  
-    **Definición de requisitos funcionales, no funcionales, restricciones y/o riesgos del sistema.
-5.  **Diseño de arquitectura****  
-    **Descripción de la arquitectura del sistema, componentes y flujo de información.
-6.  **Prototipo del dispositivo físico****  
-    **Implementación de un dispositivo funcional con cámara y salida de audio.
-7.  **Sistema de visión por computadora (*****Computer Vision)*****  
-    **Desarrollo e integración de modelos para reconocimiento de ómnibus y productos.
-8.  **Sistema de retroalimentación auditiva****  
-    **Implementación del mecanismo de comunicación auditiva con el usuario.
-9.  **Aplicación móvil****  
-    **Desarrollo de la aplicación para conectividad, configuración e interacción.
-10.  **Integración del sistema completo****  
-    **Integración de todos los módulos en un sistema funcional.
-11.  **Validación del prototipo****  
-    **Pruebas en escenarios reales y evaluación de desempeño.
-12.  **Documentación técnica y manual de usuario****  
-    **Documentación del sistema y guía de uso.
-13.  **Informe final de tesis****  
-    **Documento completo que describe el proyecto, desarrollo y resultados.
-14.  **Presentación y demo****  
-    **Exposición final del proyecto y demostración funcional del sistema.
+1. **Documento de contexto y problema**  
+   Análisis de la situación de personas con discapacidad visual, incluyendo contexto en Uruguay, estadísticas y problemáticas principales.
+2. **Estado del arte**  
+   Revisión de trabajos y soluciones existentes hasta la fecha en Computer Vision, OCR y dispositivos asistivos.
+3. **Relevamiento con usuarios**  
+   Entrevistas realizadas con transcripciones en anexos y análisis sobre necesidades reales.
+4. **Documento de requisitos**  
+   Definición de requisitos funcionales, no funcionales, restricciones y/o riesgos del sistema.
+5. **Diseño de arquitectura**  
+   Descripción de la arquitectura del sistema, componentes y flujo de información.
+6. **Prototipo del dispositivo físico**  
+   Implementación de un dispositivo funcional con cámara y salida de audio.
+7. **Sistema de visión por computadora (*Computer Vision*)**  
+   Desarrollo e integración de modelos para reconocimiento de ómnibus y productos.
+8. **Sistema de retroalimentación auditiva**  
+   Implementación del mecanismo de comunicación auditiva con el usuario.
+9. **Aplicación móvil**  
+   Desarrollo de la aplicación para conectividad, configuración e interacción.
+10. **Integración del sistema completo**  
+   Integración de todos los módulos en un sistema funcional.
+11. **Validación del prototipo**  
+   Pruebas en escenarios reales y evaluación de desempeño.
+12. **Documentación técnica y manual de usuario**  
+   Documentación del sistema y guía de uso.
+13. **Informe final de tesis**  
+   Documento completo que describe el proyecto, desarrollo y resultados.
+14. **Presentación y demo**  
+   Exposición final del proyecto y demostración funcional del sistema.
 
 ### 2.3.1 Planilla de seguimiento y cronograma
 

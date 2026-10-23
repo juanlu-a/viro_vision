@@ -67,62 +67,26 @@ Versión publicada de la planilla de entregables y del diagrama de Gantt:
 
 17\. Contanos una situación difícil o incómoda que hayas vivido usando transporte público.
 
-  
-
 |  |
 | :-: |
-| Una vez no me creyeron que era una persona ciega, y me cobraron el boleto ð«ð¸ð. |
-| Subirme a un bus que no era porque era de la misma empresa, bajarme y tener que tomar un taxi porque me dejo en un lugar que no pasaban buses para lazona donde yo vivo |
-| Algunas veces te paran fuera de la parada solicitada, porque se olvidaron y no te dicen dónde estás, quieren que te bajes rápido nada más |
-| Tengo baja visión y los choferes paran lejos del cordón de la vereda y lejos de la parada lo cual desorienta a la persona . |
-| El problema no son las paradas en el transporte, el problema son los perros sueltos en las calles, y el descontrol de las personas usuarios que tienen perros sueltos, y el daño que Hecho hace a las personas con discapacidad que vamos con bastón |
-| Yo uso bastón verde y muchas veces tengo que ir a asientos alejados de la puerta porque la gente no me dede los primeros asientos o te miran porque yo al tener baja visión me manejo dentro de mis posibilidades bastante bien siento que me miran como dudando de mi incapacidad y es muy incómodo y te pone mal por momentos . |
-| Estres y tension por no podrr sabrr wue linea se sproxima |
-| Estar en la parada y pedir que me avisen cuando llega la línea que necesito tomar y que me indiquen otra linea , si no fuera por qué tengo registrados los movimientos del bus por ejemplo pasar por un puente que son movimientos que registro con el cuerpo y cuento cuántas veces dobla a la derecha o izquierda uso como guía ese tipo de cosas hubiera ido a cualquier destino desconocido eso me ha pasado varias veces y lo hacen como broma, pero para mí es realmente desagradable. |
-| Para todos los omnibus y que estos pasen de largo. |
-|   |
-| El cambio de destino y tener que reacomodarme en la mitad del camino, para tomar otro ómnibus, siendo de noche. |
+| “Una vez no me creyeron que era una persona ciega, y me cobraron el boleto 🚫💸😒.” |
+| “Subirme a un bus que no era porque era de la misma empresa, bajarme y tener que tomar un taxi porque me dejo en un lugar que no pasaban buses para lazona donde yo vivo” |
+| “Algunas veces te paran fuera de la parada solicitada, porque se olvidaron y no te dicen dónde estás, quieren que te bajes rápido nada más” |
+| “Tengo baja visión y los choferes paran lejos del cordón de la vereda y lejos de la parada lo cual desorienta a la persona.” |
+| “El problema no son las paradas en el transporte, el problema son los perros sueltos en las calles, y el descontrol de las personas usuarios que tienen perros sueltos, y el daño que Hecho hace a las personas con discapacidad que vamos con bastón” |
+| “Yo uso bastón verde y muchas veces tengo que ir a asientos alejados de la puerta porque la gente no me dede los primeros asientos o te miran porque yo al tener baja visión me manejo dentro de mis posibilidades bastante bien siento que me miran como dudando de mi incapacidad y es muy incómodo y te pone mal por momentos.” |
+| “Estres y tensión por no podrr sabrr que linea se aproxima” |
+| “Estar en la parada y pedir que me avisen cuando llega la línea que necesito tomar y que me indiquen otra linea , si no fuera por qué tengo registrados los movimientos del bus por ejemplo pasar por un puente que son movimientos que registro con el cuerpo y cuento cuántas veces dobla a la derecha o izquierda uso como guía ese tipo de cosas hubiera ido a cualquier destino desconocido eso me ha pasado varias veces y lo hacen como broma, pero para mí es realmente desagradable.” |
+| “Parar a todos los ómnibus y que estos pasen de largo.” |
+| “El cambio de destino y tener que reacomodarme en la mitad del camino, para tomar otro ómnibus, siendo de noche.” |
 | Si no hay nadie en la parada siguen de largo y no paran. |
 | Algunos conductores paran lejos de la vereda,y es difícil ascender al vehículo. |
 | Pedir que te avisen en tal calle o parada y no te avisan o te dicen mal |
 | No he tenido situaciones incómodas, siempre tengo la ayuda del conductor u otro pasajero. |
 | Subirme a un bus equivocado y darme cuenta antes de pagar el boleto y el conductor insultarme creyendo que yo estaba de vivo. No uso bastonn verde a pesar de tener baja visión. |
-|   |
 | Ayer me dijo una persona que era la línea 137. Subí y en un moento agarra otro camino. Era el 185. Como trabajo en Brou, me bajé y tomé el 582. pero en lugar de para Punta carretas lo tome a Peñarol. Cuando me di cuenta, estábamos por Millan y Blanes. Me bajé y finalmente me tomé un taxi hasta el trabajo. |
 | Cuando tenía perro guía, a veces las personas o los choferes no sabían que está permitido po ley. Sin embargo, eso fue mejorando con el correr del tiempo y la visibiliad cada vez mayor de los perros |
 | Muchas veces el conductor para el coche lejos de la parada y nos deshorienta cuando bajamos o peor cuando queremos abordar y. En estos últimos casos tenemos que depender de la ayuda de la gente y muchas veces nos genera mucha anciedad el no poder llegar a tiempo. |
-
-  
-
-
-17\. Contanos una situación difícil o incómoda que hayas vivido usando transporte público.
-
-  
-
-|  |
-| :-: |
-| Una vez no me creyeron que era una persona ciega, y me cobraron el boleto ð«ð¸ð. |
-| Subirme a un bus que no era porque era de la misma empresa, bajarme y tener que tomar un taxi porque me dejo en un lugar que no pasaban buses para lazona donde yo vivo |
-| Algunas veces te paran fuera de la parada solicitada, porque se olvidaron y no te dicen dónde estás, quieren que te bajes rápido nada más |
-| Tengo baja visión y los choferes paran lejos del cordón de la vereda y lejos de la parada lo cual desorienta a la persona . |
-| El problema no son las paradas en el transporte, el problema son los perros sueltos en las calles, y el descontrol de las personas usuarios que tienen perros sueltos, y el daño que Hecho hace a las personas con discapacidad que vamos con bastón |
-| Yo uso bastón verde y muchas veces tengo que ir a asientos alejados de la puerta porque la gente no me dede los primeros asientos o te miran porque yo al tener baja visión me manejo dentro de mis posibilidades bastante bien siento que me miran como dudando de mi incapacidad y es muy incómodo y te pone mal por momentos . |
-| Estres y tension por no podrr sabrr wue linea se sproxima |
-| Estar en la parada y pedir que me avisen cuando llega la línea que necesito tomar y que me indiquen otra linea , si no fuera por qué tengo registrados los movimientos del bus por ejemplo pasar por un puente que son movimientos que registro con el cuerpo y cuento cuántas veces dobla a la derecha o izquierda uso como guía ese tipo de cosas hubiera ido a cualquier destino desconocido eso me ha pasado varias veces y lo hacen como broma, pero para mí es realmente desagradable. |
-| Para todos los omnibus y que estos pasen de largo. |
-|   |
-| El cambio de destino y tener que reacomodarme en la mitad del camino, para tomar otro ómnibus, siendo de noche. |
-| Si no hay nadie en la parada siguen de largo y no paran. |
-| Algunos conductores paran lejos de la vereda,y es difícil ascender al vehículo. |
-| Pedir que te avisen en tal calle o parada y no te avisan o te dicen mal |
-| No he tenido situaciones incómodas, siempre tengo la ayuda del conductor u otro pasajero. |
-| Subirme a un bus equivocado y darme cuenta antes de pagar el boleto y el conductor insultarme creyendo que yo estaba de vivo. No uso bastonn verde a pesar de tener baja visión. |
-|   |
-| Ayer me dijo una persona que era la línea 137. Subí y en un moento agarra otro camino. Era el 185. Como trabajo en Brou, me bajé y tomé el 582. pero en lugar de para Punta carretas lo tome a Peñarol. Cuando me di cuenta, estábamos por Millan y Blanes. Me bajé y finalmente me tomé un taxi hasta el trabajo. |
-| Cuando tenía perro guía, a veces las personas o los choferes no sabían que está permitido po ley. Sin embargo, eso fue mejorando con el correr del tiempo y la visibiliad cada vez mayor de los perros |
-| Muchas veces el conductor para el coche lejos de la parada y nos deshorienta cuando bajamos o peor cuando queremos abordar y. En estos últimos casos tenemos que depender de la ayuda de la gente y muchas veces nos genera mucha anciedad el no poder llegar a tiempo. |
-
-  
 
 ### 12.2.4 Sección 4: Supermercados y compras
 

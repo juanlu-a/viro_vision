@@ -90,8 +90,8 @@ ni los comentarios de las secciones que no cambian. El ciclo es:
 4. Repetir hasta que el script diga `ops=0`. Al final, actualizar el índice a mano (la API no lo
    refresca).
 
-El script salta a propósito las secciones donde el Doc está mejor que el repo (hoy, 2.3 y 12.2.3:
-ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
+El script salta a propósito las secciones que todavía no hay que pisar (hoy, la 12.2.3, que en el Doc
+tiene una copia de la tabla agregada a mano: ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
 abajo: traer primero al repo lo que se haya editado directo en el Doc.
 
 ## Trabajar en paralelo

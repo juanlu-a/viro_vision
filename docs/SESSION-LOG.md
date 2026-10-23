@@ -4092,3 +4092,10 @@ mover también su zona de entrada. Abrir el PR a `staging`.
   codificación rota y faltan las comillas; además, un integrante del equipo estaba editando esa sección
   en el Doc durante la sesión). Hay que traer esas dos al repo desde el Doc.
 - Pendiente en el Doc: actualizar el índice (la API no lo refresca).
+- **La 2.3 y la 12.2.3, traídas del Doc al repo.** La 2.3 vuelve a ser una lista numerada con el
+  título de cada entregable en negrita (el repo tenía asteriscos sueltos de una conversión vieja). En
+  la 12.2.3 el repo tenía la pregunta 17 duplicada y los emojis rotos; quedó una sola vez, con la
+  versión que el equipo había revisado en el Doc (comillas y erratas corregidas), por decisión del
+  usuario. En el Doc sigue la copia literal de esa tabla que alguien agregó el 2026-10-22, con dos
+  títulos vacíos: la resuelve quien la agregó. Un emoji de la 12.2.2 («algún comercio ð️») viene roto
+  desde la exportación de la encuesta, en el Doc y en el repo; no se adivinó cuál era.
