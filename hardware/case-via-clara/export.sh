@@ -5,7 +5,7 @@
 # Exits non-zero if any export fails or any check does not pass.
 set -euo pipefail
 cd "$(dirname "$0")"
-SCAD=via_clara_v0_9.scad
+SCAD=via_clara_v0_20.scad
 OS=(openscad -q --backend=manifold)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -16,15 +16,16 @@ run() { "$@" & pids+=($!); }
 join() { local f=0; for p in "${pids[@]}"; do wait "$p" || f=1; done; pids=(); return $f; }
 
 parts=(print_left:01_left_half print_right:02_right_half print_bone:03_bone_arm
-       print_button:04_mode_button print_slider:05_power_slider assembly:00_assembly_check)
+       print_button:04_mode_button print_grille:07_transducer_cover assembly:00_assembly_check
+       print_nose_left:test_nose_left print_nose_right:test_nose_right print_pads_test:test_pads print_hex_sizes:test_hex_sizes print_panel_switch_test:test_panel_switch)
 for p in "${parts[@]}"; do
-  run "${OS[@]}" --export-format=binstl -D "PART=\"${p%%:*}\"" -D 'SHOW_HW=false' -o "stl/${p#*:}_v0_9.stl" "$SCAD"
+  run "${OS[@]}" --export-format=binstl -D "PART=\"${p%%:*}\"" -D 'SHOW_HW=false' -o "stl/${p#*:}_v0_20.stl" "$SCAD"
 done
 join || { echo "STL export failed"; exit 1; }
 
 views=("assembly:0,0,0,62,0,215,200:-D SHOW_HW=false:closed_outer"
        "assembly:0,0,0,62,0,35,200:-D SHOW_HW=false:closed_head_side"
-       "assembly:0,0,0,75,0,160,200:-D SHOW_HW=false:head_side_slider"
+       "assembly:0,0,0,75,0,160,200:-D SHOW_HW=false:head_side_switch"
        "assembly:0,0,0,80,0,60,200:-D SHOW_HW=true:rear_openings"
        "assembly:0,0,0,70,0,200,200:-D EXPLODE=22:exploded_with_hardware"
        "left:0,0,0,90,0,180,200::left_half_inside"
@@ -40,7 +41,7 @@ join || { echo "image export failed"; exit 1; }
 # Annotated guide (img/guide/): arrows and labels for what each slot and hole is for. The parts are
 # rendered once to model-frame meshes, which the guide imports (preview mode draws them cleanly).
 mkdir -p img/guide "$tmp/mesh"
-for m in left right button slider bone; do
+for m in left right button bone; do
   case $m in button) part=button_placed ;; *) part=$m ;; esac
   run "${OS[@]}" --export-format=binstl -D "PART=\"$part\"" -o "$tmp/mesh/$m.stl" "$SCAD"
 done
@@ -53,7 +54,7 @@ for g in "${guide_views[@]}"; do
   IFS=, read -r dx dy dz <<<"$dir"
   eye=$(python3 -I -c "import math;d=[$dx,$dy,$dz];n=math.sqrt(sum(c*c for c in d));print(','.join(f'{$cx+$scale*d[0]/n:.2f}' if i==0 else f'{$scale*d[1]/n:.2f}' if i==1 else f'{-2+$scale*d[2]/n:.2f}' for i in range(3)))")
   run openscad -q -D 'PART="none"' -D "VIEW=\"$view\"" -D "CENTER_X=$cx" -D "MESH_DIR=\"$tmp/mesh\"" --projection=o --camera="$eye,$cx,0,-2" \
-    --imgsize=1800,1000 --colorscheme=Tomorrow -o "img/guide/$view.png" via_clara_v0_9_guide.scad
+    --imgsize=1800,1000 --colorscheme=Tomorrow -o "img/guide/$view.png" via_clara_v0_20_guide.scad
 done
 join || { echo "guide render failed"; exit 1; }
 
@@ -80,18 +81,22 @@ else:
   print(len({find(k) for k in list(par)}))'
 
 fail=0
-for p in "${parts[@]}"; do
-  [[ ${p%%:*} == assembly ]] && continue
-  n=$(python3 -I -c "$stl_py" parts "stl/${p#*:}_v0_9.stl")
-  if [[ "$n" == "1" ]]; then echo "ok    ${p#*:} is one solid"; else echo "FAIL  ${p#*:}: $n separate solids"; fail=1; fi
-  z=$(python3 -I -c "$stl_py" zmin "stl/${p#*:}_v0_9.stl")
-  if [[ "$z" =~ ^-?0\.0[0-4][0-9]$ ]]; then echo "ok    ${p#*:} sits on the bed"; else echo "FAIL  ${p#*:}: lowest point at z = $z"; fail=1; fi
+for f in stl/*.stl; do
+  [[ $f == *00_assembly_check* ]] && continue
+  name=$(basename "$f" .stl)
+  n=$(python3 -I -c "$stl_py" parts "$f")
+  if [[ "$n" == "1" ]]; then echo "ok    $name is one solid"; else echo "FAIL  $name: $n separate solids"; fail=1; fi
+  z=$(python3 -I -c "$stl_py" zmin "$f")
+  if [[ "$z" =~ ^-?0\.0[0-4][0-9]$ ]]; then echo "ok    $name sits on the bed"; else echo "FAIL  $name: lowest point at z = $z"; fail=1; fi
 done
 
-for c in halves left_hw right_hw pads_stubs button slider_off slider_on flex hw_self bone drawer_pi \
-         cap_insert switch_insert lever_insert; do
-  out="$tmp/$c.stl"
-  rc=0; log=$(openscad --backend=manifold --export-format=binstl -D "PART=\"check_$c\"" -o "$out" "$SCAD" 2>&1) || rc=$?
+checks=(halves left_hw right_hw pads_hex button panel_switch flex hw_self bone drawer_pi
+        cap_insert switch_insert grille stack_insert clamp cam_insert)
+for vc in "${checks[@]/#/integrated:}"; do
+  variant=${vc%%:*}; c=${vc#*:}
+  out="$tmp/$variant-$c.stl"
+  rc=0; log=$(openscad --backend=manifold --export-format=binstl -D "VARIANT=\"$variant\"" -D "PART=\"check_$c\"" -o "$out" "$SCAD" 2>&1) || rc=$?
+  c="$c ($variant)"
   if [[ "$log" == *ERROR* || "$log" == *WARNING* ]] || { (( rc != 0 )) && [[ "$log" != *"top level object is empty"* ]]; }; then
     # an assert (e.g. an unknown check name) also leaves an empty scene: it must not read as a pass
     echo "FAIL  $c: openscad error"; echo "$log" | grep -E "ERROR|WARNING" | head -3; fail=1

@@ -1,0 +1,24 @@
+VIA Clara v0.15: carcasa completa (versión integrada)
+
+Para imprimir (en la orientación en que vienen los STL):
+  01_left_half          cara cabeza abajo; soportes sólo bajo la cara cabeza, que apoya alta.
+  02_right_half         cara externa abajo, plana. Los 4 zócalos hexagonales quedan abiertos hacia arriba:
+                        sin soportes adentro (revisar en el slicer que no los agregue). Después de imprimir,
+                        cortar los 8 puentes de las vigas de las trabas.
+  03_bone_arm           acostado, con la copa del auricular abierta hacia arriba.
+  04_mode_button        cilindro de Ø 5 que va pegado sobre el pulsador real.
+  05_power_slider       corredera de la llave de encendido.
+  07_transducer_cover   tapa del auricular: disco abajo, dedos hacia arriba, sin soportes.
+  00_assembly_check     sólo para mirar el armado: NO se imprime.
+
+No hay pieza 06: la tapita del botón se eliminó.
+
+Cambios respecto de la v0.14:
+  - Zócalos hexagonales huecos de 5,0 entre caras y 1,5 de profundidad, como el número 5 de la prueba. Del
+    lado del header y de los puertos el poste está recortado (queda 0,8 de pared en la cara plana): girar
+    los separadores para que una cara plana quede hacia ese lado.
+  - Tapa del auricular sólida, con una ranura de 1,6 × 8 hacia el oído (hacia atrás), a click como antes.
+  - Corredera: la perilla sobresale 2,5 (antes 1,5). Agarra la palanca con un hueco rectangular a medida
+    (0,1 de luz por lado) en vez de la herradura, y sus paredes son 1 mm más largas. La carrera sigue
+    exactamente a la palanca; la ventana mide lo mismo que antes.
+  - Botón: un cilindro liso de Ø 5, 2 mm más largo, sin pestaña de adentro.

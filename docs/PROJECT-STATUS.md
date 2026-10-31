@@ -15,8 +15,8 @@ en [`SESSION-LOG.md`](SESSION-LOG.md), y el plan en [`ROADMAP.md`](ROADMAP.md).
   `staging → main` (= release), que publican al link público de TestFlight. El último release a
   producción fue el PR #115 (2026-10-13).
 - Ramas con trabajo real fuera de `staging`:
-  - `feat/case-v0-10-slim`: la carcasa v0.10 a v0.12. No está pusheada y la v0.12 todavía no está
-    commiteada; vive en el worktree `viro_vision-case`.
+  - `feat/case-v0-10-slim`: la carcasa v0.10 a v0.20, con PR a `staging`; vive en el worktree
+    `viro_vision-case`.
   - `feat/volume-button`: un segundo botón de volumen, con un "ADR 0010" que choca con el 0010 vigente
     (tema oscuro); habría que renumerarlo.
   - `feat/carcasa-modelo-3d`: la carcasa v1, reemplazada por VIA Clara; se puede archivar.
@@ -40,7 +40,7 @@ app/          aplicación React Native (Expo)
 hardware/     Raspberry Pi Zero 2 W + AI Camera (IMX500) + Waveshare UPS HAT (C)
   raspi/        daemon Python: periférico BLE, cámara, modos, ómnibus, AP, batería (ADR 0003)
   raspi/boot/   scripts de arranque de la microSD
-  case-via-clara/  carcasa en OpenSCAD (v0.9 en staging)
+  case-via-clara/  carcasa en OpenSCAD (v0.9 en staging; v0.20 en su rama)
 ml/           sólo un README: el pipeline de ómnibus vive en bus-banner-recognizer
 supabase/     funciones vision (proxy de claves), telemetry y evidence
 docs/         tesis, arquitectura, ADRs, mediciones, guías de QA y operación
@@ -141,20 +141,20 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
 ### Carcasa (`hardware/case-via-clara/`)
 
 - **Modelo**: VIA Clara, paramétrica en OpenSCAD.
-  - Dos mitades a presión con ocho trabas, una corredera para la llave y un brazo para el
-    transductor óseo de 14 mm.
-  - Un solo botón: un pulsador SMD de 4×4×1 mm con tecla pegada.
+  - Dos mitades a presión con ocho trabas, un switch deslizante de panel pegado en la cara cabeza y
+    un brazo con copa de Ø 17 y tapa a click para el transductor óseo de 14 mm.
+  - Un solo botón: un pulsador SMD de 4×4×1 mm con un cilindro pegado.
 - **En `staging`**: la v0.9. Las impresiones de prueba se evaluaron así: la v0.9 el
   2026-10-17, la v0.10 el 2026-10-21 (falló) y la v0.11 el 2026-10-22. Detalle en la tesis, §7.3.5.
-- **Vigente: v0.12** (rama `feat/case-v0-10-slim`, sin commitear):
-  - cuerpo de 85,8 × 28,5 × 37,2 mm;
-  - se descarta la variante con tapa;
-  - trabas delanteras detrás de las guías de la cámara;
-  - alojamientos redondos para los separadores, que ya no se termofunden;
-  - piezas de prueba para validar sin imprimir la carcasa entera.
-- **Verificación**: `export.sh` corre 18 verificaciones de interferencia contra maquetas.
-- **Pendiente**: medir lo marcado `MEASURE` con calibre e imprimir las pruebas de la v0.12. Los STL
-  van al Drive (`Tesis: ViroVision / modelo_3d`), no al repo.
+- **Vigente: v0.20** (rama `feat/case-v0-10-slim`): **impresa y armada completa el 2026-10-30, quedó
+  perfecta**. Desde la v0.12 se ajustaron, con piezas de prueba:
+  - la cámara;
+  - los zócalos hexagonales de los separadores (5,0 entre caras, 3,5 de profundidad);
+  - la copa del auricular;
+  - los pernos del switch (Ø 2,3 a 14,8).
+- **Verificación**: `export.sh` corre 16 verificaciones de interferencia contra maquetas.
+- **Archivos**: los STL de todas las versiones, de la v0.9 a la v0.20, están en
+  `hardware/case-via-clara/versions/`.
 
 ### Nube (`supabase/`)
 
@@ -194,7 +194,7 @@ En orden de prioridad, ver [`ROADMAP.md`](ROADMAP.md):
 
 1. Probar el modo ómnibus en la calle, con y sin zoom.
 2. Documentar las métricas del detector reentrenado.
-3. Medir e imprimir la carcasa v0.12, e integrar su rama.
+3. Integrar la rama de la carcasa v0.20 (ya impresa y armada).
 4. Cerrar el audio de la placa.
 5. Hacer las pruebas con usuarios y la corrida de evaluación del supermercado.
 6. Antes de la entrega, sacar la evidencia del ómnibus.
