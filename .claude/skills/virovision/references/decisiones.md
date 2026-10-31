@@ -1,15 +1,15 @@
 # Decisiones vigentes
 
-Índice de qué está decidido, con qué estado, y **qué cambió respecto de lo anterior** — que es la
+Índice de qué está decidido, con qué estado, y **qué cambió respecto de lo anterior**, que es la
 parte que se pierde si sólo se lee el ADR más nuevo. Los ADR completos están en
 `docs/architecture/adr/`.
 
 ## ADRs
 
-### ADR 0001 — Offline-first, inferencia on-device · **Accepted, enmendado 2026-08-10**
+### ADR 0001: Offline-first, inferencia on-device · **Accepted, enmendado 2026-08-10**
 
 Original: las funciones esenciales (detección, OCR, respuesta auditiva) funcionan **sin internet**, y
-el modelo corre local — *"never a cloud API"*.
+el modelo corre local: *"never a cloud API"*.
 
 **Qué cambió** tras la reunión con el tutor: la **nube pasa a ser un acelerador opcional** en el
 camino de reconocimiento. Un *model gateway* en runtime puede mandar una inferencia a la nube cuando
@@ -20,14 +20,14 @@ locales por defecto.
 
 Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as the only path*"**.
 
-### ADR 0002 — Supabase como capa de cuenta online · **Accepted, actualizado dos veces**
+### ADR 0002: Supabase como capa de cuenta online · **Accepted, actualizado dos veces**
 
 - 2026-07-18: email + contraseña, **no** Google/OAuth.
 - 2026-07-20: **la app se publica sin login**, abre directo a las pestañas. El núcleo es
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003 — Enlace placa ↔ teléfono · **Proposed (2026-09-04) — actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena) y 2026-09-20 (conectarse rápido y sin volver a pedir permiso)**
+### ADR 0003: Enlace placa ↔ teléfono · **Proposed (2026-09-04); actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena), 2026-09-20 (conectarse rápido y sin volver a pedir permiso) y 2026-10-22 (placa real, cola GATT, una voz por vez, arranque en 16 s)**
 
 Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
 dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
@@ -38,7 +38,7 @@ vuelta al auricular de la placa. Restricciones: mínima cantidad de software en 
 **Qué se decidió firme**: (1) Raspberry Pi OS Lite + **un** servicio systemd con un daemon Python; no
 hay bare-metal posible (libcamera, libedgetpu, BlueZ). (2) **BLE (GATT) siempre vivo como plano de
 control**, porque con el teléfono bloqueado en el bolsillo sólo una notificación BLE despierta a la
-app; un socket WiFi no. (3) **Audio por DAC I2S cableado**, no A2DP: compartiría chip y antena con
+app; un socket WiFi no. (3) **Audio por DAC I2S cableado** (hasta el 2026-10-22 el DAC no está instalado: la salida es PWM provisional), no A2DP: compartiría chip y antena con
 BLE + WiFi y cortaría. Esto **reemplaza** el "Bluetooth Classic (A2DP/HFP) o cableado" de los textos
 viejos. (4) Qué vuelve: supermercado → MP3 sintetizado en el teléfono; ómnibus → anuncios
 **pregrabados** en la SD (las líneas son un conjunto finito). (5) UUIDs GATT de 128 bits: los
@@ -61,23 +61,23 @@ Referencia: el mismo archivo por HTTP sobre la misma radio, 46 ms. Lo siguiente 
 internet. Lecciones de la placa real: BlueZ 5.82 expone `/org/bluez/test` (bluez-peripheral explota);
 dbus-next pierde chunks sin pausa entre notificaciones (4 ms); `PYTHONUNBUFFERED=1` en el servicio.
 
-**Qué cambió el 2026-09-10/11 — el spike 1 (segundo plano en iOS), cerrado**: probado como se usa de
-verdad —teléfono bloqueado, doble click en la placa— **no pasaba nada**. Lo primero que apareció fue
+**Qué cambió el 2026-09-10/11: el spike 1 (segundo plano en iOS), cerrado**: probado como se usa de
+verdad (teléfono bloqueado, doble click en la placa) **no pasaba nada**. Lo primero que apareció fue
 un error del propio ADR: decía que el modo de fondo estaba apagado porque el plugin de ble-plx tenía
 `isBackgroundEnabled: false`, y **ese flag nunca gateó iOS** (sólo agrega un `<uses-feature>` en
 Android; lo que escribe `bluetooth-central` es `modes: ["central"]`). Estuvo prendido todo el tiempo.
 Lo que faltaba de verdad: **ninguna sesión de audio** (`expo-audio` instalado y sin importar en ningún
 archivo, así que iOS dejaba la app en una categoría que no puede sonar bloqueada), y **el disparo del
 botón viajando por estado de React y servido por la pantalla de Inicio**. Se agregó
-`services/audio/session.ts` con **`interruptionMode: 'mixWithOthers'`** —apartándose a propósito del
-ejemplo de Expo, que usa `doNotMix`, porque **VoiceOver es la interfaz de este usuario**—, un tono
+`services/audio/session.ts` con **`interruptionMode: 'mixWithOthers'`** (apartándose a propósito del
+ejemplo de Expo, que usa `doNotMix`, porque **VoiceOver es la interfaz de este usuario**), un tono
 inaudible que sostiene el proceso vivo durante la lectura, un chirp al empezar (feedback y
 diagnóstico), y el pipeline salió a `features/reader/readingService.ts`, un módulo sin React que
 `ReaderBridge` suscribe directo al cliente BLE. **Verificado en el teléfono el 2026-09-11** (build
 `202609110048`, bloque E de la QA): lectura bloqueada, varias seguidas, VoiceOver vivo, y también tras
-un rato largo bloqueado — lo que además muestra que `restoreStateIdentifier` no hace falta para este
+un rato largo bloqueado, lo que además muestra que `restoreStateIdentifier` no hace falta para este
 caso de uso (queda como deuda para cuando iOS **termine** la app). **La hipótesis central del ADR
-—BLE es lo único que despierta la app con el teléfono en el bolsillo— queda demostrada.**
+(BLE es lo único que despierta la app con el teléfono en el bolsillo) queda demostrada.**
 
 **Qué cambió el 2026-09-05 (2)**: el plan B se probó en el caso real (iPhone unido al AP de la placa,
 con datos): foto en 0,34 s de mediana, **Safari y la lectura de supermercado funcionan** con el
@@ -89,19 +89,19 @@ plano.
 
 **Qué cambió el 2026-09-16**: el ajuste «dónde se escucha» pasó a gobernar **todo lo que suena**, no
 sólo las dos lecturas. Hasta acá la conexión, la red, el cambio de modo, el chirp del botón y la
-confirmación del propio ajuste llamaban directo a `announce()` —`expo-speech`, o sea siempre el
-teléfono—, así que con la salida en la placa el usuario escuchaba el producto en los anteojos y todo
+confirmación del propio ajuste llamaban directo a `announce()` (`expo-speech`, o sea siempre el
+teléfono), así que con la salida en la placa el usuario escuchaba el producto en los anteojos y todo
 el resto en el bolsillo. Los avisos de sistema son ahora un **conjunto cerrado de 10 `.wav`** en
 `announcements/system/` de la SD, disparados por `{"cmd":"say","clip":…}` sobre el canal `control` de
 BLE. **Dos reglas de decisión y no una**: una lectura necesita nube y WiFi (`decideDelivery`), un
-aviso sólo necesita el enlace (`decideNoticeDelivery`) — juzgarlos con la misma regla mandaría todos
+aviso sólo necesita el enlace (`decideNoticeDelivery`): juzgarlos con la misma regla mandaría todos
 los avisos de red al teléfono justo cuando la red es lo que falló. Se descubrieron dos cosas de
 paso: **«conectado» no se anunciaba por voz en ningún lado** (sólo texto en pantalla), y el
 `audio_target` vivía sólo en el `BusWatcher`, así que una placa sin modo ómnibus tiraba la elección
 del usuario. Pendiente anotado: con el botón físico el anuncio de modo viaja placa → app → placa, así
 que **sin teléfono conectado un cambio de modo no se anuncia**.
 
-**Qué cambió el 2026-09-20 — conectarse era lento y pedía permiso; tres causas, ninguna en el radio**:
+**Qué cambió el 2026-09-20: conectarse era lento y pedía permiso; tres causas, ninguna en el radio**:
 (1) la placa anunciaba con el intervalo por defecto del kernel, **1,28 s**; medido desde la Mac, dos
 de seis búsquedas no la veían en 20 s. `virovision.service` fija **100–152,5 ms** por `debugfs`,
 como ya hacía con el intervalo de conexión. (2) La comprobación «¿ya estoy unido?» leía el SSID, que
@@ -114,7 +114,19 @@ configuración de la red al desconectar; olvidarla es lo que trae el cartel de v
 olvida nunca. `wifi.ready` lleva `via: 'already' | 'joined'`: después de la primera conexión tiene
 que decir `already` siempre.
 
-### ADR 0004 — Runtime de inferencia on-device · **Proposed — actualizado 2026-08-22: se resuelve por caso de uso**
+**Qué cambió hasta el 2026-10-22** (nota de actualización en el ADR):
+- **Hardware real**: Raspberry Pi Zero 2 W (volvió el 2026-09-19, después de la Pi 3 B+ prestada, así
+  que las mediciones BLE originales vuelven a valer) + AI Camera (IMX500) + Waveshare UPS HAT (C). Sin
+  Coral, así que `libedgetpu` y el "USB ocupado" desaparecen.
+- **Audio en la placa**: salida PWM por `audremap`, provisional, en lugar del DAC I2S; la carcasa
+  prevé un transductor de conducción ósea.
+- **Cola de operaciones GATT** (#94): la app serializa lecturas, escrituras y suscripciones.
+- **Una voz por vez** (#97): ningún sonido se encima, venga de la salida que venga.
+- **Arranque** (2026-10-05/06): se levanta el bloqueo de `rfkill` antes de cada arranque del daemon;
+  la placa anuncia por BLE antes de abrir la cámara y el AP; dnsmasq sin ping. Anuncia a los 16,2 s,
+  la cámara está lista a los 21,3 s y el OCR a los 33,6 s.
+
+### ADR 0004: Runtime de inferencia on-device · **Proposed; actualizado 2026-08-22: se resuelve por caso de uso**
 
 Proponía **Gemma vía LiteRT-LM**. El spike lo midió: el camino de visión de LiteRT-LM **no funciona
 en iOS** (bug de la librería, aislado con evidencia); el mismo modelo por **ExecuTorch/MLX** sí ve,
@@ -126,32 +138,32 @@ Restricción encontrada y anotada: **el sandbox de iOS impide usar el Gemma que 
 app**. Tenerlo andando en Edge Gallery prueba que el hardware da, pero no acerca el producto.
 
 **Qué cambió el 2026-08-22** (reunión de equipo del 21): la pregunta de "el" runtime **deja de
-existir** — se resuelve por caso de uso en ADR 0006. "Gemma vía LiteRT-LM" deja de ser el camino
+existir**: se resuelve por caso de uso en ADR 0006. "Gemma vía LiteRT-LM" deja de ser el camino
 primario; si lo local gana en supermercado, el candidato es un Gemma chico sobre **ExecuTorch**. La
-pregunta de alcance (¿el VLM reemplaza a YOLO + OCR?) quedó **cerrada con evidencia**: no — 6,4 s
+pregunta de alcance (¿el VLM reemplaza a YOLO + OCR?) quedó **cerrada con evidencia**: no, 6,4 s
 contra fracciones de segundo, y sin coordenadas para priorizar. El VLM queda como término de
 comparación en el informe.
 
-### ADR 0005 — Design system y estándares de accesibilidad · **planeado, sin escribir**
+### ADR 0005: Design system y estándares de accesibilidad · **planeado, sin escribir**
 
 Buena parte ya está implementada (tokens, `theme.test.ts`, tipografía de marca); falta escribirla.
 
-### ADR 0006 — Pipelines por caso de uso · **Proposed (2026-08-22) — a validar con tutor; actualizado 2026-08-30 y 2026-09-01**
+### ADR 0006: Pipelines por caso de uso · **Proposed (2026-08-22), a validar con tutor; actualizado 2026-08-30, 2026-09-01, 2026-09-07, 2026-10-19 (zoom) y 2026-10-22 (márgenes, V100 y catálogo)**
 
 **Qué cambió**: deja de haber un runtime único (lo que buscaba ADR 0004). Cada caso de uso tiene su
-pipeline. **Bondis = local** (la latencia manda): detección **preentrenada en la Coral TPU** del
-dispositivo → recorte del banner → OCR sobre el recorte — la TPU pasa de "correr los modelos
+pipeline. *(Texto original del 2026-08-22; la detección pasó al sensor IMX500 el 2026-09-07, ver más abajo.)* **Bondis = local** (la latencia manda): detección **preentrenada en la Coral TPU** del
+dispositivo → recorte del banner → OCR sobre el recorte; la TPU pasa de "correr los modelos
 completos" a **preprocesadora**, y al celular llega el recorte, no el frame. **Supermercado = LLM
 con visión** (la complejidad manda), elección **PENDIENTE**: Gemma 3 1B local (~700 MB) vs. Gemini
 Flash nube, con la restricción dura de que sea **gratuito para el usuario** (exigir credenciales
 propias rompe la accesibilidad). La precisión del proyecto se mide con **datasets de evaluación**
-(esperado vs. obtenido → recall, precision, accuracy, F1) — de evaluación, no de entrenamiento: la
+(esperado vs. obtenido → recall, precision, accuracy, F1), de evaluación, no de entrenamiento: la
 tarea B1 cambia de "entrenar" a "evaluar". Ver `docs/pruebas-y-decisiones.md`.
 
 **Qué cambió el 2026-09-01**: cae la gratuidad como restricción **del proyecto** (se paga para poder
 comparar) y sigue vigente **para el usuario final**. El selector pasa a **cinco modelos elegidos por
 latencia**, uno por proveedor: `gemini-3.5-flash-lite` (default), `gpt-5.6-luna`, `claude-haiku-4-5`,
-`qwen/qwen3.8-27b` sobre Groq, y el hosteado en Arnaldo Castro —documentado, sin endpoint todavía—.
+`qwen/qwen3.8-27b` sobre Groq, y el hosteado en Arnaldo Castro (documentado, sin endpoint todavía).
 Salen `gemini-flash-lite-latest` y `claude-opus-5`: siete opciones en un radiogroup recorrido con
 VoiceOver frente a una góndola es peor producto que cinco. La **cámara del teléfono** ocupa el lugar
 de la placa mientras no hay hardware, y la lectura además puede dejar un `.mp3` (apagado por
@@ -180,33 +192,52 @@ la placa corre 3.13): en la placa corren **los mismos modelos PP-OCRv5 mobile ex
 **Qué cambió el 2026-09-08**: la placa anda, así que la entrada del flujo es **sólo la cámara de la
 placa**. Se retiran de Inicio la cámara del teléfono y la fototeca (y `expo-image-picker` con sus
 permisos). Lo que se pierde y hay que tener presente: la fototeca era el insumo del **dataset de
-evaluación** —la misma foto contra varios modelos—, y esa corrida pasa a hacerse fuera de la app.
+evaluación** (la misma foto contra varios modelos), y esa corrida pasa a hacerse fuera de la app.
 
-### ADR 0006, act. 2026-09-11 — El alcance es **alimentos**, no la canasta básica
+**Qué cambió del 2026-10-06 al 2026-10-22** (actualizaciones en el ADR):
+- **Catálogo STM** (2026-10-06/07): sólo se dice una línea o un destino que el catálogo conoce, y el
+  catálogo completa la mitad del cartel que el OCR no leyó (`Reading.inferred`).
+- **Evidencia** (2026-10-12): la placa guarda el cuadro y el recorte de cada lectura, unidos a su fila
+  de telemetría; temporal, se saca antes de la entrega.
+- **Zoom digital** (2026-10-19, probado en la placa el 2026-10-22): `ScalerCrop` del ISP, dinámico,
+  hasta 2x sobre el cartel; el detector sigue viendo el campo completo. `--bus-full-res` (4x) traba la
+  cámara de la Zero 2 W y no se usa. Falta la prueba en la calle con y sin zoom.
+- **Márgenes del cartel** (2026-10-21 → 2026-10-22): se probó leer el box del YOLO tal cual y en las
+  pruebas del equipo se seguía perdiendo a veces el "1" del número de línea; volvieron `SIGN_MARGINS = (0.18, 0.06, 0.06)`, ahora
+  pasados desde ViroVision. El detector es de cajas, no de keypoints: el problema es que el borde
+  izquierdo del recorte cae sobre el trazo fino del "1", que está a la izquierda del cartel.
+- **Reentrenamiento en la V100** con ~500 fotos (el primer fine-tune fue de ~140). Épocas, métricas y
+  ubicación de los pesos: pendientes de documentar.
+
+### ADR 0006, act. 2026-09-11: El alcance es **alimentos**, no la canasta básica
 
 **Qué cambió**: probado con la placa, el modelo identifica **cualquier alimento** (yerba suelta
 incluida) y no sólo los rubros de la canasta. La canasta era el alcance *mientras la precisión era
-una incógnita*; ahora **cambia de rol**: sigue siendo el **dataset de evaluación** —lo que se mide— y
+una incógnita*; ahora **cambia de rol**: sigue siendo el **dataset de evaluación** (lo que se mide) y
 deja de ser el límite de lo que se contesta. No confundir las dos cosas otra vez.
 
 El prompt dice «alimentos y productos de almacén», y el mensaje de fallo pasa a **«Elemento no
 reconocible»** («producto» quedó angosto).
 
 **Defecto que salió de la misma prueba**: apuntado a algo que no es un alimento el modelo devolvía el
-literal `null`, el parser lo rechazaba y la frase caía al fallback de texto crudo — **la placa dijo
+literal `null`, el parser lo rechazaba y la frase caía al fallback de texto crudo: **la placa dijo
 «null» en voz alta**. Arreglado por los dos lados: el prompt pide devolver siempre el objeto con los
 campos en null, y el fallback distingue prosa de basura con una regla simple (**la prosa no parsea
 como JSON**).
 
-### ADR 0007 — Botones físicos y modos de operación · **Proposed (2026-08-22) — a validar con tutor**
+### ADR 0007: Botones físicos y modos de operación · **Proposed (2026-08-22); a validar con tutor**
 
 **Qué cambió**: hasta ahora no había ninguna interfaz de entrada física especificada. El
-reconocimiento funciona por **modos explícitos** activados con el botón del dispositivo — nunca
+reconocimiento funciona por **modos explícitos** activados con el botón del dispositivo, nunca
 audio no solicitado. Desde *esperando*: 1 click = modo ómnibus (pipeline local), 2 clicks = modo
 supermercado (pipeline LLM), click largo = volver a esperando. Cada transición se anuncia por
 audio. Diagrama canónico en `docs/architecture/README.md`.
 
-### ADR 0008 — Proxy propio para las claves de nube · **Accepted (2026-09-01)**
+**Qué cambió hasta el 2026-10-22**: el hardware existe y el botón está calibrado (2026-09-13).
+**Un click en modo ómnibus repite el último anuncio** (#88, 2026-09-16), en lugar de no hacer nada.
+La carcasa usa un pulsador SMD de 4×4×1 mm con tecla pegada (no el tact switch de 6×6).
+
+### ADR 0008: Proxy propio para las claves de nube · **Accepted (2026-09-01)**
 
 **Qué cambió**: las claves dejan de viajar en el bundle. `EXPO_PUBLIC_*` no es una variable de
 entorno que el binario lea al arrancar, es una **constante compilada dentro del `.ipa`**; con link
@@ -224,41 +255,41 @@ reemitirlo duplicaría el parseo de eventos de cada proveedor y mataría el stre
 
 **Lo que compra y lo que no**, porque es fácil creer que resuelve más: no está autenticado (la app
 no tiene login y la anon key viajaría igual), así que el endpoint **es abusable**. Lo que cambia es
-el modo de falla — la clave se rota o se corta en segundos en vez de exigir publicar una versión.
+el modo de falla: la clave se rota o se corta en segundos en vez de exigir publicar una versión.
 Las defensas reales: allowlist de hosts (sin ella es un SSRF que regala la clave), freno por IP y
 **tope de gasto** en cada proveedor.
 
 **Estado: escrito, sin desplegar.** Falta crear el proyecto Supabase.
 
-### ADR 0009 — El código en inglés, la app y la tesis en español · **Accepted (2026-09-09)**
+### ADR 0009: El código en inglés, la app y la tesis en español · **Accepted (2026-09-09)**
 
 Antes la regla era mixta: identificadores en inglés, comentarios y cadenas en español, con los
 sustantivos del dominio en español (`BusReading.numero`). **Qué cambió**: todo el código pasa a
-inglés, y eso incluye las **fronteras** — el protocolo BLE (`{"cmd":"measure"}`, `{"t":"start"}`,
+inglés, y eso incluye las **fronteras**: el protocolo BLE (`{"cmd":"measure"}`, `{"t":"start"}`,
 `device_ms`), los endpoints de la placa (`/health`, `/measure/<n>`, `/photos/latest`), los flags del
 daemon (`--no-ap`) y el esquema de Supabase (tabla `events`, y el vocabulario `reading.ok`,
 `ble.connected`).
 
-**Qué NO cambió**: sigue en español todo lo que una persona lee o escucha — los *valores* de
+**Qué NO cambió**: sigue en español todo lo que una persona lee o escucha: los *valores* de
 `i18n/es.ts` (las claves son inglesas), el prompt de supermercado, las etiquetas del selector y
 **toda la documentación**, ADRs y skill incluidos.
 
 **El criterio para no volver a deslizarse**: *¿lo lee una persona o lo lee una máquina?* La regla
 anterior no era enunciable así, y por eso se corrió dos veces.
 
-### ADR 0010 — Un solo tema (oscuro) y una sola línea de estado · **Accepted (2026-09-14)**
+### ADR 0010: Un solo tema (oscuro) y una sola línea de estado · **Accepted (2026-09-14)**
 
 Antes había selector de tema (sistema / claro / oscuro) persistido, y la pantalla de Inicio repetía
 el estado del dispositivo con su propio vocabulario. **Qué cambió**: la app se publica **sólo en
-oscuro** —`useTheme()` devuelve `Colors.dark`, `global.css` pone la paleta oscura en `:root`, sin
-provider ni preferencia—; el estado del dispositivo vive **sólo en la pestaña Dispositivo** y
+oscuro** (`useTheme()` devuelve `Colors.dark`, `global.css` pone la paleta oscura en `:root`, sin
+provider ni preferencia); el estado del dispositivo vive **sólo en la pestaña Dispositivo** y
 «Conectado» en verde significa *listo para usar*; si falta la red dice «Conectado (falta el WiFi)»
 en ámbar (token `warning`), y nada más. Inicio muestra sólo el nombre del modo, en tamaño de cuerpo.
 
 **Qué NO cambió**: la paleta clara sigue en `colors.js` y verificada por `theme.test.ts`, porque es
 la del manual y la usa la tesis. Nadie la renderiza.
 
-### ADR 0011 — Los errores van a la telemetría, nunca al usuario · **Accepted (2026-10-06)**
+### ADR 0011: Los errores van a la telemetría, nunca al usuario · **Accepted (2026-10-06)**
 
 Antes, el texto de un error llegaba a la pantalla y a la voz (`VISION_HTTP_500`, la IP de la placa,
 `unknown command: say`), y muchos errores no llegaban a ningún lado (`console.*`, promesas sin
@@ -268,7 +299,7 @@ hacer, o nada si es una falla interna (avisos de la placa, escritura de modo). S
 `console.*` (`app.log`), rechazos sin manejar, errores de dibujo (`ErrorBoundary` raíz →
 `app.renderError`) y los logs WARNING+ de la placa (`log_relay.py` → `{t:'log'}` → `device.log`).
 
-**Qué NO cambió**: ante una lectura fallida **algo se dice** — el silencio tras el botón es
+**Qué NO cambió**: ante una lectura fallida **algo se dice**: el silencio tras el botón es
 indistinguible de un dispositivo roto. **Regla para código nuevo**: nunca concatenar `err.message`
 en una cadena que el usuario ve u oye; `record(...)` con `errorDetail(err)` y una clave de `es.ts`.
 
@@ -284,11 +315,11 @@ agrega dos modelos del mismo proveedor o devuelve un perfil retirado copiándolo
 
 **El razonamiento se apaga siempre, pero sólo en Gemini eso compra latencia.** Medido el
 2026-09-02: en Gemini no apagarlo lleva la lectura de 3 s a decenas de segundos
-(`generation_config.thinking_level`), pero sobre `gpt-5.6-luna` da igual — `none`, `medium` y el
+(`generation_config.thinking_level`), pero sobre `gpt-5.6-luna` da igual: `none`, `medium` y el
 default rinden lo mismo, con los mismos tokens de salida, porque no gasta razonamiento en tres
 campos cortos. Se manda `'none'` igual por intención y porque es gratis, no por los segundos.
 `'none'` es además el único valor que OpenAI y Groq garantizan los dos. **La documentación de Groq
-no lista sus valores reales**: documenta `none|default` y `low` devolvió 200 — otra razón para
+no lista sus valores reales**: documenta `none|default` y `low` devolvió 200, otra razón para
 verificar contra la API y no contra los docs.
 
 **El selector son DOS modelos, y el default no es el más rápido.** Medido el 2026-09-02 (5 corridas
@@ -311,7 +342,7 @@ mida en esta tesis.
 
 **De Groq va el Qwen 3.8 y no el 3.6, aunque el 3.6 sea más rápido en el papel.** El 3.6 sólo admite
 `json_object`, que deja los nombres de campo a criterio del modelo; el 3.8 admite `json_schema` con
-`strict`. Sobre ~50 tokens de respuesta esos 50 tok/s son centésimas — la garantía de forma vale
+`strict`. Sobre ~50 tokens de respuesta esos 50 tok/s son centésimas; la garantía de forma vale
 más.
 
 **El razonamiento de Gemini se apaga por `generation_config.thinking_level`.** La Interactions API

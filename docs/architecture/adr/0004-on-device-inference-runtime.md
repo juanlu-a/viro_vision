@@ -1,6 +1,6 @@
-# ADR 0004 — Runtime de inferencia on-device (Gemma vía LiteRT-LM)
+# ADR 0004: Runtime de inferencia on-device (Gemma vía LiteRT-LM)
 
-- **Status:** Proposed — a discutir con el tutor
+- **Status:** Proposed, a discutir con el tutor (superado en lo central por ADR 0006; actualización 2026-10-22)
 - **Date:** 2026-08-11
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, requirement
@@ -25,7 +25,7 @@ Dos hechos nuevos, posteriores a esa reunión:
 
 **No se puede usar el Gemma que corre dentro de otra app.** iOS aísla cada app en su sandbox: ni el
 proceso ni el archivo del modelo son accesibles desde ViroVision. Tener Gemma andando en Edge
-Gallery no acerca nada al producto — sólo prueba que el hardware da.
+Gallery no acerca nada al producto: sólo prueba que el hardware da.
 
 Los dos caminos reales:
 
@@ -42,7 +42,7 @@ teléfono como fuente de imagen.**
 
 1. **Runtime: LiteRT-LM**, no MediaPipe LLM Inference (mantenimiento) ni Core ML + Apple Vision
    (cierra la plataforma a iOS, y el equipo aún no validó el perfil iOS vs. Android).
-2. **Modelo: la variante más chica primero.** La tarea es extremadamente acotada — leer número y
+2. **Modelo: la variante más chica primero.** La tarea es extremadamente acotada: leer número y
    nombre de un cartel. Empezar por el modelo grande sería pagar latencia, RAM y batería sin
    evidencia de que haga falta. Se sube sólo si la precisión medida no alcanza.
 3. **Cámara: React Native Vision Camera** (AVFoundation en iOS, CameraX en Android). Mantiene el
@@ -92,7 +92,7 @@ es alto.
 - **El pilar de hardware no se beneficia:** la RPi Zero 2 W (~0,5 GB) no corre Gemma. LiteRT-LM sí
   corre en Raspberry Pi, así que una Pi más grande sería opción sin cambiar el stack de software.
 
-## Actualización 2026-08-12 — resultados del spike de viabilidad
+## Actualización 2026-08-12: resultados del spike de viabilidad
 
 Se hizo el paso 2 de "Próximos pasos" (evaluar `react-native-litert-lm`). Lo que sigue está medido
 sobre el iPhone 15 Pro del equipo, no estimado. El spike vive en `app/src/services/ondevice/` y en
@@ -125,32 +125,32 @@ descarga **al contenedor de la app**, no se referencia desde afuera.
 
 **2. El costo en disco es el doble de lo que parece.** Modelo + caché de pesos de XNNPack. Y cuando
 el disco se llena, el síntoma **no dice "disco lleno"**: XNNPack llama a `abort()` y la app se
-cierra sin mensaje — incluso con un modelo chico que antes funcionaba, lo que hace parecer que se
+cierra sin mensaje, incluso con un modelo chico que antes funcionaba, lo que hace parecer que se
 rompió otra cosa. Para producto esto implica **verificar espacio antes de descargar** y poder
 liberar las copias desde la app.
 
 **3. Cuidado con la variante del archivo.** El Gemma 4 que baja Edge Gallery **no trae codificador
 de visión** (`TF_LITE_VISION_ENCODER not found` en el log del runtime): es una variante de sólo
 texto y no puede leer un cartel aunque cargue. El multimodal es `gemma-4-E2B-it.litertlm`, sin
-sufijo — las variantes `-gpu` y `-web` no sirven para esta tarea.
+sufijo: las variantes `-gpu` y `-web` no sirven para esta tarea.
 
 **4. El sandbox se confirma en la práctica.** El modelo dentro de Edge Gallery no es utilizable por
 ViroVision, como decía este ADR. Sí es utilizable si el usuario lo expone por la app Archivos, pero
-sólo copiándolo — ver la restricción 1.
+sólo copiándolo (ver la restricción 1).
 
 ### Lo que todavía no se midió
 
 **El entitlement `com.apple.developer.kernel.extended-virtual-addressing` sigue sin ponerse a
 prueba**: no llegamos a cargar el modelo grande porque nos frenó el disco, no la memoria. La
 documentación de la librería dice que un modelo de más de ~2 GB lo necesita y que eso **requiere
-cuenta paga de Apple Developer** (USD 99/año) — la misma que haría falta para distribuir la app al
+cuenta paga de Apple Developer** (USD 99/año), la misma que haría falta para distribuir la app al
 resto del equipo. **Si se confirma, deja de ser una pregunta técnica y pasa a ser de presupuesto,
 para decidir con el tutor.**
 
 Tampoco hay todavía números de tiempo de carga ni de time-to-first-token con imagen, que son los que
 harían comparable el camino local contra el benchmark de nube.
 
-## Actualización 2026-08-13 — la contraprueba cierra el spike
+## Actualización 2026-08-13: la contraprueba cierra el spike
 
 Resultados completos y hallazgos en [`docs/spike-vision-local.md`](../../spike-vision-local.md).
 Lo que cambia para este ADR:
@@ -164,7 +164,7 @@ Lo que cambia para este ADR:
    acercándose no espera eso.
 4. **La pregunta de alcance de este ADR ya tiene evidencia**: el pipeline detección + OCR con
    modelos **preentrenados** de ExecuTorch (COCO trae la clase "bus"; OCR CRAFT+CRNN en español,
-   ~250 MB) lee en fracciones de segundo y devuelve coordenadas — que son lo que permite priorizar
+   ~250 MB) lee en fracciones de segundo y devuelve coordenadas, que son lo que permite priorizar
    el ómnibus más cercano. La recomendación pasa de "conservar como comparación" a **"detección +
    OCR como camino primario del teléfono, VLM local como término de comparación en el informe"**,
    a validar con el tutor.
@@ -185,7 +185,7 @@ Ver también: [ADR 0001](0001-offline-first-on-device-inference.md) (y su nota d
 nube como acelerador opcional), [`REUNIONES-TUTOR.md`](../../REUNIONES-TUTOR.md), y
 `.claude/skills/virovision/references/ml.md`.
 
-## Actualización 2026-08-22 — la pregunta se resuelve por caso de uso
+## Actualización 2026-08-22: la pregunta se resuelve por caso de uso
 
 La reunión de equipo del 2026-08-21 tomó la evidencia del spike y la llevó a su conclusión: **deja
 de haber "un" runtime on-device que decidir**. La pregunta que este ADR planteaba se responde por
@@ -194,14 +194,31 @@ caso de uso, y la decisión vive en [ADR 0006](0006-pipelines-por-caso-de-uso.md
 - **Bondis:** detección + OCR local (sin LLM), con la Coral TPU del dispositivo como
   preprocesadora (detección → recorte del banner) y el OCR sobre el recorte. Es la recomendación
   de la actualización 2026-08-13, ahora adoptada por el equipo.
-- **Supermercado:** LLM con visión — Gemma 3 1B local (~700 MB) o Gemini Flash en la nube,
+- **Supermercado:** LLM con visión: Gemma 3 1B local (~700 MB) o Gemini Flash en la nube,
   **pendiente**, con la restricción de que el modelo sea gratuito para el usuario.
 
 **"Gemma vía LiteRT-LM" deja de ser el camino primario** que da título a este ADR: LiteRT-LM no ve
 en iOS (punto 1 de la actualización anterior) y el VLM multimodal es demasiado lento para bondis
 (punto 3). Si el camino local gana en supermercado, el candidato es un Gemma chico sobre
-**ExecuTorch** — el runtime que sí funcionó. El VLM multimodal queda como término de comparación
+**ExecuTorch**, el runtime que sí funcionó. El VLM multimodal queda como término de comparación
 en el informe.
 
 El estado sigue **Proposed**: la validación con el tutor está pendiente, igual que la de ADR 0006
 y [ADR 0007](0007-botones-fisicos-modos-de-operacion.md).
+
+## Actualización 2026-10-22: sin Coral, y el supermercado en la nube
+
+Dos afirmaciones de la actualización 2026-08-22 quedaron superadas:
+
+- **La Coral TPU como preprocesadora de bondis.** Salió del diseño el 2026-09-07
+  ([ADR 0006](0006-pipelines-por-caso-de-uso.md), actualización 2026-09-07): la detección corre dentro
+  del sensor IMX500 de la Raspberry Pi AI Camera, y la Pi Zero 2 W hace el recorte del cartel y el OCR
+  (PP-OCRv5 mobile vía ONNX, con `rapidocr`). Ningún runtime de los que evalúa este ADR participa del
+  camino de ómnibus, que corre entero en la placa desde el 2026-09-15.
+- **Supermercado "Gemma 3 1B local o Gemini Flash en la nube, pendiente".** Se resolvió el 2026-08-30 a
+  favor de la nube (ADR 0006, actualización 2026-08-30), a través del proxy propio del proyecto
+  ([ADR 0008](0008-proxy-propio-para-claves-de-nube.md)). Los modelos vigentes son `gpt-5.6-luna` por
+  defecto y `qwen/qwen3.8-27b` (`MODEL_PROFILES` en `app/src/services/vision/config.ts`; ADR 0006,
+  actualización 2026-09-02). La gratuidad se mantiene para el usuario: paga el proyecto (ADR 0006,
+  actualización 2026-09-01). Un Gemma chico sobre ExecuTorch como fallback local sigue **PENDIENTE** de
+  medir.

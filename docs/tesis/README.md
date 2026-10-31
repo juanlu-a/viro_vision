@@ -32,6 +32,8 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 - **Sin raya larga.** No se usa el guion largo de estilo inglés. Se emplean comas, dos puntos o
   paréntesis. `build.py` falla si aparece uno.
 - **Números en formato español**: coma decimal y punto de miles.
+- **Referencias internas como «sec. 7.4.6»**, no con el signo de párrafo (decisión del equipo en el
+  Doc, 2026-09-18).
 - **Toda cifra tiene fuente.** Cada número remite a un ADR, a una campaña de `docs/mediciones/` o a
   un resultado guardado del repositorio de visión.
 - **Lo pendiente se declara.** Lo que no está hecho o no está medido se dice, no se omite.
@@ -73,6 +75,24 @@ En el Doc, para reemplazar una sección:
 - **No deshacer a ciegas.** Borrar el cuerpo y pegar son operaciones separadas: unos pocos `cmd+z`
   seguidos se llevan también la carátula y el índice. Ante la duda, *Archivo → Historial de
   versiones*, que guarda todo.
+
+### Publicar por la API, sección por sección (desde el 2026-10-22)
+
+Con el conector de Google Docs, `sync_doc.py` reemplaza en el Doc **sólo las secciones que cambiaron**,
+de abajo hacia arriba, sin tocar la carátula, el índice, las imágenes que el equipo agregó en el Doc
+ni los comentarios de las secciones que no cambian. El ciclo es:
+
+1. Leer el Doc con `read_doc` y quedarse con el objeto `content` (`jq '.content'`).
+2. `python3 sync_doc.py doc.json batch.json --max-chars 25000` arma la tanda siguiente; con
+   `--report` lista qué secciones difieren.
+3. Mandar `batch.json` con `update_doc`, **siempre con su `writeControl`**: si alguien editó el Doc
+   en el medio, Google rechaza la tanda entera y se vuelve al paso 1.
+4. Repetir hasta que el script diga `ops=0`. Al final, actualizar el índice a mano (la API no lo
+   refresca).
+
+El script salta a propósito las secciones que todavía no hay que pisar (hoy, la 12.2.3, que en el Doc
+tiene una copia de la tabla agregada a mano: ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
+abajo: traer primero al repo lo que se haya editado directo en el Doc.
 
 ## Trabajar en paralelo
 

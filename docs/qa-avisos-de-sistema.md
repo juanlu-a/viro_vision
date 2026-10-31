@@ -5,11 +5,11 @@ Cómo probar, de punta a punta, que **cada cosa que ViroVision dice sale por don
 Está escrito después de dos días en que este camino falló tres veces seguidas y las tres en
 silencio: la app entregada sin la placa, un lazo de realimentación que no decía nada, y una escritura
 BLE que impedía unirse al WiFi y se reportaba como «no se pudo conectar a la red». Por eso cada
-bloque dice **qué prueba** y **a dónde mirar si falla** — el síntoma de este subsistema casi nunca
+bloque dice **qué prueba** y **a dónde mirar si falla**: el síntoma de este subsistema casi nunca
 está donde está la causa.
 
 > **Corrido por primera vez el 2026-09-17 y el camino crítico pasó**: con la salida en «En el
-> dispositivo», el teléfono **se une al WiFi de la placa** —que era el bug— y los modos, el chirp y
+> dispositivo», el teléfono **se une al WiFi de la placa** (que era el bug) y los modos, el chirp y
 > las lecturas salen por el parlante mientras la conexión y la red las dice el teléfono. Lo que queda
 > sin correr entero es el bloque 4, el de que las fallas hagan ruido.
 
@@ -31,7 +31,7 @@ placa dice lo que se escucha **con los anteojos puestos y el teléfono guardado*
 
 ---
 
-## Bloque 0 — dejar las dos mitades alineadas
+## Bloque 0: dejar las dos mitades alineadas
 
 **No saltear.** La causa raíz de los tres fallos fue siempre la misma: la app y la placa en versiones
 distintas. TestFlight publica **sólo la app**; la placa no se actualiza sola.
@@ -77,7 +77,7 @@ ssh virovision@virovision.local 'sudo reboot'
 
 ---
 
-## Bloque 1 — la placa sola, sin teléfono
+## Bloque 1: la placa sola, sin teléfono
 
 Prueba la mitad de abajo antes de sumarle capas. Con la app **cerrada**:
 
@@ -98,7 +98,7 @@ cd hardware/raspi
 
 ---
 
-## Bloque 2 — con el teléfono, salida en **«En el teléfono»**
+## Bloque 2: con el teléfono, salida en **«En el teléfono»**
 
 Es la línea de base: así funcionaba antes de todo esto, y tiene que seguir igual.
 
@@ -109,7 +109,7 @@ Es la línea de base: así funcionaba antes de todo esto, y tiene que seguir igu
 
 ---
 
-## Bloque 3 — salida en **«En el dispositivo»**: lo que se arregló
+## Bloque 3: salida en **«En el dispositivo»**: lo que se arregló
 
 Ajustes → *Dónde se escucha* → **En el dispositivo**.
 
@@ -132,7 +132,7 @@ Ajustes → *Dónde se escucha* → **En el dispositivo**.
 
 ---
 
-## Bloque 4 — que las fallas se escuchen
+## Bloque 4: que las fallas se escuchen
 
 Lo más importante y lo que siempre se saltea: que **fallar haga ruido**.
 
@@ -163,5 +163,5 @@ Lo más importante y lo que siempre se saltea: que **fallar haga ruido**.
 ## Ver también
 
 - [ADR 0003](architecture/adr/0003-enlace-placa-telefono.md), actualizaciones del 15, 16 y 17 de septiembre.
-- [`placa-acceso.md`](../.claude/skills/virovision/references/placa-acceso.md) — cómo entrar a la placa y las trampas ya pisadas.
-- [`qa-modo-supermercado.md`](qa-modo-supermercado.md) — el otro camino de punta a punta.
+- [`placa-acceso.md`](../.claude/skills/virovision/references/placa-acceso.md): cómo entrar a la placa y las trampas ya pisadas.
+- [`qa-modo-supermercado.md`](qa-modo-supermercado.md): el otro camino de punta a punta.

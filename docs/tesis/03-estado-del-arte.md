@@ -16,34 +16,44 @@ Sin embargo, sus recursos de procesamiento son muy limitados para visión artifi
 **Jetson Nano**
 
 La Jetson Nano es una computadora de placa única, orientada específicamente a aplicaciones de inteligencia artificial. Incorpora una GPU NVIDIA que permite acelerar redes neuronales mediante CUDA. Tiene una capacidad altísima de procesamiento y permite ejecutar modelos complejos (YOLO, OCR, modelos multimodales) además de ser compatible con múltiples cámaras de alta resolución.  
-Sin embargo, su tamaño, precio elevado y alto consumo energético hacen inviable la aplicación a nuestro proyecto, ya que debemos desarrollar un dispositivo lo más barato posible, portatil y fácil de transportar. La potencia adicional no justifica el incremento de costo, consumo y tamaño 
+Sin embargo, su tamaño, precio elevado y alto consumo energético hacen inviable su aplicación a este proyecto, que requiere un dispositivo lo más barato posible, portátil y fácil de transportar. La potencia adicional no justifica el incremento de costo, consumo y tamaño 
 
-**Raspberry Pi Zero 2 W + Coral TPU accelerator**
+**Raspberry Pi Zero 2 W**
 
-La Raspberry Pi Zero 2 W es una computadora de placa única que ejecuta Linux y combina un tamaño reducido con una capacidad de procesamiento suficiente para aplicaciones de visión artificial livianas. Su tamaño compacto, bajo consumo energético y gran cantidad de cámaras la hacen una candidata estelar. Además, permite ejecutar modelos locales mediante TensorFlow Lite u OpenCV, siendo compatible con aceleradores como Coral TPU.  
-Si bien tiene desventajas como contar con menor potencia que una Raspberry Pi 5, su capacidad se ve potenciada cuando se cuenta con el acelerador Coral TPU.**  
-**La Raspberry Pi Zero 2 W representa un equilibrio entre costo, tamaño y capacidad de procesamiento. Además, permite implementar y comparar las dos arquitecturas distintas, permitiendo hacer el procesamiento en el dispositivo o teniendo capacidad de enviar datos al celular a través de WiFi o BLE para ser procesados en él, siendo así la elegida por el grupo.
+La Raspberry Pi Zero 2 W es una computadora de placa única que ejecuta Linux y combina un tamaño reducido con una capacidad de procesamiento suficiente para aplicaciones de visión artificial livianas. Su tamaño compacto, su bajo consumo energético y la variedad de cámaras compatibles por el conector CSI la hacen una candidata muy adecuada. Su desventaja es la potencia: tiene bastante menos capacidad de cómputo y memoria (512 MB) que una Raspberry Pi 5, lo que obliga a sacar de su CPU la parte más costosa del reconocimiento.
+
+En el diseño original esa parte iba a resolverla un acelerador **Coral TPU** conectado por USB, con los modelos en formato TensorFlow Lite. Esa combinación dejó de ser necesaria cuando se incorporó una cámara que ejecuta el detector dentro del propio sensor (sec. 3.1.2), y el Coral salió del diseño el 2026-09-07 (ADR 0006; sec. 7.2.5).
+
+La Raspberry Pi Zero 2 W representa un equilibrio entre costo, tamaño y capacidad de procesamiento. Además, permite implementar y comparar las dos arquitecturas, haciendo el procesamiento en el dispositivo o enviando datos al celular por WiFi o BLE para procesarlos en él, y por eso fue la elegida por el grupo.
 
 ### 3.1.2 Cámara
 
 **Cámara ESP32 (OV2640 / OV5640)**
 
-Las cámaras utilizadas habitualmente con ESP32 están diseñadas para aplicaciones IoT donde el costo y el consumo son prioritarios. Por eso son muy económicas tanto en precio como en consumo. Sin embargo, la calidad de imagen es limitada (incluso la propia ESP32 obliga frecuentemente a reducir resolución o aumentar la compresión JPEG debido a sus limitaciones de memoria), cosa que no nos podemos permitir pensando en el reconocimiento de ómnibus a una distancia considerable. Por esto último, tampoco es conveniente que en muchos casos utilicen un enfoque fijo.
+Las cámaras utilizadas habitualmente con ESP32 están diseñadas para aplicaciones IoT donde el costo y el consumo son prioritarios. Por eso son muy económicas tanto en precio como en consumo. Sin embargo, la calidad de imagen es limitada (incluso la propia ESP32 obliga frecuentemente a reducir resolución o aumentar la compresión JPEG debido a sus limitaciones de memoria), algo que el proyecto no puede permitirse pensando en el reconocimiento de ómnibus a una distancia considerable. Por esto último, tampoco es conveniente que en muchos casos utilicen un enfoque fijo.
 
 **Cámara USB genérica**
 
-Las cámaras USB ofrecen una amplia variedad de resoluciones y calidades, conectándose mediante el puerto USB. Entre sus ventajas se incluyen la gran disponibilidad comercial, la variedad (precios, calidad, enfoque automático o no) y lo fácil que se pueden reemplazar en caso de cualquier problema. Sin embargo, muchas tienen mayor consumo que las cámaras diseñadas para microcontroladores, ya que son fabricadas con una computadora de escritorio en mente. Por si fuera poco, ocupan el puerto USB, lo que dificulta el uso simultáneo del Coral TPU en una Raspberry Pi Zero 2 W.
+Las cámaras USB ofrecen una amplia variedad de resoluciones y calidades, conectándose mediante el puerto USB. Entre sus ventajas se incluyen la gran disponibilidad comercial, la variedad (precios, calidad, enfoque automático o no) y lo fácil que se pueden reemplazar en caso de cualquier problema. Sin embargo, muchas tienen mayor consumo que las cámaras diseñadas para microcontroladores, ya que son fabricadas con una computadora de escritorio en mente. Además ocupan el único puerto USB de datos de la Raspberry Pi Zero 2 W.
 
 **Raspberry Pi Camera module 3**
 
-La Camera Module 3 es la cámara oficial de Raspberry Pi basada en el sensor Sony IMX708 de 12 MP e incorpora enfoque automático. Esto nos proporcionaría una excelente calidad de imagen y compatibilidad con la Raspberry Zero 2 W, ya que tiene integración directa mediante el conector CSI, sin ocupar el puerto USB, dejando este libre para el acelerador Coral TPU. Al ser parte del ecosistema de Raspberry, cuenta con buena documentación y soporte.  
+La Camera Module 3 es la cámara oficial de Raspberry Pi basada en el sensor Sony IMX708 de 12 MP e incorpora enfoque automático. Esto proporcionaría una excelente calidad de imagen y compatibilidad con la Raspberry Zero 2 W, ya que tiene integración directa mediante el conector CSI, sin ocupar el puerto USB. Al ser parte del ecosistema de Raspberry, cuenta con buena documentación y soporte.  
 Si bien el precio de este módulo es más caro que las cámaras de la ESP32, no es prohibitivo, y no está demás decir que el cable flex requiere cierto cuidado mecánico en el diseño del dispositivo, pero no son obstáculos que no se puedan sortear al momento de diseñar la estructura que lo encapsule todo.
+
+**Raspberry Pi AI Camera (Sony IMX500)**
+
+La AI Camera es una cámara oficial de Raspberry Pi basada en el sensor Sony IMX500 de 12,3 MP, que integra un acelerador de redes neuronales en el propio sensor, con 8 MB de memoria para el modelo. El detector corre ahí, a la frecuencia de cuadro de la cámara, y la placa recibe directamente las cajas detectadas junto con la imagen, sin gastar CPU ni memoria propias. Se conecta por CSI, como la Camera Module 3, y no ocupa el puerto USB. Sus límites son dos: el enfoque es manual (un anillo que se ajusta una vez) y en el sensor cabe una sola red, ya que un YOLO11n ocupa el 90 % de esa memoria (sec. 7.2.5). Su integración
+con el conjunto de software de cámara de Raspberry Pi permite implementar modelos de redes neuronales
+propios con un esfuerzo mínimo. El precio es mayor que el de la Camera Module 3, pero esta última
+necesitaba sí o sí el Coral TPU para ejecutar la inferencia, mientras que la AI Camera funciona por sí
+misma, sin agregados.
 
 ### 3.1.3 Conclusiones
 
-Se seleccionó la plataforma **Raspberry Pi Zero 2 W** debido a que ofrece un equilibrio adecuado entre costo, tamaño, consumo energético y capacidad de procesamiento. Su compatibilidad con el acelerador **Coral TPU** permite evaluar algoritmos de visión artificial mediante procesamiento local, mientras que su conectividad Wi-Fi posibilita comparar esta arquitectura con alternativas basadas en procesamiento remoto utilizando un teléfono móvil. Asimismo, la utilización de la **Raspberry Pi Camera Module 3** garantiza una captura de imágenes de alta calidad mediante una interfaz CSI dedicada, liberando el puerto USB para futuros aceleradores de inteligencia artificial y mejorando la precisión esperada de los modelos de reconocimiento. 
-
-  
+Se seleccionó la plataforma **Raspberry Pi Zero 2 W** debido a que ofrece un equilibrio adecuado entre costo, tamaño, consumo energético y capacidad de procesamiento, y porque su conectividad WiFi y BLE posibilita comparar el procesamiento local con alternativas basadas en un teléfono móvil. La cámara elegida es la **Raspberry Pi AI Camera (Sony IMX500)**: se conecta por la interfaz CSI dedicada y ejecuta el detector dentro del sensor, lo que cubre el papel que en el diseño original tenía el acelerador Coral TPU. Con eso el acelerador externo dejó de hacer falta y salió del diseño (ADR 0006, 2026-09-07; sec. 7.2.5), con un componente, un costo y un consumo menos. La compra de la AI Camera se decidió para evaluar la potencia del módulo y evitar sumar el Coral TPU al
+producto final, de modo de obtener un dispositivo más compacto y barato. La Camera Module 3 queda como
+alternativa evaluada y no se usa.
 
 ## 3.2 Dispositivos de asistencia para personas con discapacidad visual
 

@@ -1,84 +1,120 @@
-# ViroVision — Mobile App
+# ViroVision: aplicación móvil
 
-React Native (Expo) app for ViroVision: it pairs with the glasses-mounted device over BLE, receives
-recognition results, and speaks them to the user. **Accessibility is a hard requirement** — the app
-targets people with low or no vision, so it is built and tested with VoiceOver / TalkBack in mind.
+Aplicación React Native (Expo) de ViroVision. Se vincula por BLE con el dispositivo (Raspberry Pi
+Zero 2 W con la AI Camera), refleja el modo que eligió el botón físico, recibe las lecturas y las
+dice en voz alta. **La accesibilidad es un requisito duro**: la aplicación está pensada para personas
+ciegas o con baja visión, la voz es la interfaz, y todo se construye y se prueba con VoiceOver y
+TalkBack.
 
 ## Stack
 
-- **Expo SDK 57** · React Native 0.86 · React 19 · TypeScript
-- **New Architecture** (JSI / bridgeless) enabled
-- **Expo Router** (file-based routing, routes live in `src/app/`)
-- **react-native-ble-plx** — BLE (GATT) data/control channel to the device
-- **expo-speech** — text-to-speech for auditory feedback
-- **expo-audio** — audio playback / (future) routing to the device earphone
+- **Expo SDK 57** · React Native 0.86 · React 19 · TypeScript (`app/package.json`)
+- **Nueva Arquitectura** (JSI, bridgeless) habilitada
+- **Expo Router** (rutas por archivo en `src/app/`), con la barra de pestañas **nativa** (`NativeTabs`)
+- **react-native-ble-plx**: canal de control BLE (GATT) con el dispositivo (ADR 0003)
+- **react-native-wifi-reborn**: unión automática al punto de acceso de la placa, por donde baja la foto
+- **expo-speech** y **expo-audio**: voz en el teléfono, sesión de audio y tono de mantenimiento
+- **react-native-executorch**: OCR local en el teléfono (sólo el botón «Leer» de la app en modo ómnibus)
+- **@supabase/supabase-js**: cliente de la capa de cuenta, archivada (ver abajo)
+- **NativeWind**: estilos con los tokens de marca (`constants/theme.ts`, `colors.js`)
 
-> Native modules (BLE) require a **custom dev client** — they do not run in Expo Go. TTS works in
-> Expo Go, so the current starting screen (incl. "Probar audio") is fully testable there.
+> Los módulos nativos (BLE, WiFi, ExecuTorch) necesitan un **dev client propio**: no corren en Expo
+> Go. Ver [`docs/dev-build-ios.md`](../docs/dev-build-ios.md).
 
-## Getting started
+## Primeros pasos
 
 ```bash
 npm install
-npx expo start            # dev server; press i / a, or open in a dev client
+cp .env.example .env      # proxy de visión, telemetría; ver los comentarios del archivo
+npx expo start            # servidor de desarrollo, contra un dev client ya instalado
 
-# Native modules (BLE) need a dev client build:
-npx expo run:ios          # or: npx expo run:android
-# or EAS: npx eas build --profile development --platform ios
+# Dev client con los módulos nativos:
+npx expo run:ios --device # o: npx expo run:android
 ```
 
-Checks:
+Verificación mínima antes de un PR (la misma que corre CI):
 
 ```bash
-npx tsc --noEmit          # typecheck
-npx expo lint             # lint
+npm run lint && npm run typecheck && npm test
 ```
 
-## Project structure
+## Estructura
 
 ```
 src/
-  app/                # Expo Router routes: index (Home), connect, settings
-  components/         # reusable UI (accessible-button, screen, themed-*)
-  constants/          # theme tokens (colors, spacing, Brand, A11y)
+  app/                  # rutas de Expo Router
+    _layout.tsx         # providers, telemetría, sesión de audio, ErrorBoundary raíz
+    (tabs)/             # pestañas nativas: index (Inicio), connect (Dispositivo), settings (Ajustes)
+  components/           # primitivos accesibles sin dominio (accessible-button, card, screen, themed-*)
+  constants/            # tokens de tema y su test de contraste WCAG
   features/
-    auth/             # online account layer: session state machine + useAuth (ADR 0002)
-    device/           # BLE connection state machine + GATT profile (types, gatt, useDeviceConnection)
-    audio/            # auditory feedback (announcer)
-    recognition/      # recognition domain model + Spanish announcement formatting
-  hooks/              # theme / color-scheme hooks
-  i18n/               # Spanish strings (single source for screen-reader labels)
+    audio/              # announcer, salida elegida (audioOutput), avisos de sistema, selector
+    auth/               # AuthContext: capa de cuenta archivada, no montada (ADR 0002)
+    device/             # DeviceProvider (enlace BLE + WiFi), perfil GATT, DeviceSummary, BusShots
+    reader/             # pipeline de lectura por modo (readingService), modos, selector de modelo
+    recognition/        # modelo de dominio y frase en español de cada reconocimiento
+  hooks/                # use-theme
+  i18n/                 # es.ts: claves en inglés, valores en español (todo texto visible o hablado)
   services/
-    ble/              # BleClient interface + stub (real react-native-ble-plx impl TODO)
-    audio/            # TTS service (expo-speech); audio-routing to device earphone TODO
-    supabase/         # SupabaseAuthClient interface + stub (real @supabase/supabase-js impl TODO)
-    storage/          # settings persistence (in-memory stub)
-  types/              # public re-exports of core domain types
+    audio/              # sesión de audio, TTS, síntesis a archivo
+    ble/                # BleClient: implementación real (bleClientPlx) + cola de operaciones GATT
+    camera/             # descarga de la foto del dispositivo por HTTP
+    cloud/              # transporte al proxy de Supabase (ADR 0008)
+    evidence/           # fotos del modo ómnibus: bajada, cola de subida, galería (temporal)
+    ondevice/           # OCR local (ExecuTorch)
+    storage/            # preferencias en AsyncStorage (salida de audio, modelo, último dispositivo)
+    supabase/           # cliente de auth por email (archivado)
+    telemetry/          # cola y envío de eventos a la tabla `events`
+    vision/             # modo supermercado: proveedores de visión en la nube, esquema, cuota
+    wifi/               # unión a la red de la placa y HTTP contra ella
+  types/                # reexportaciones de los tipos de dominio
 ```
 
-## Architecture: offline core vs. online account layer
+## Arquitectura
 
-Two strictly separated layers (see `docs/architecture/adr/`):
+**Núcleo sin internet** (ADR 0001, ADR 0006). El modo ómnibus corre entero en la placa desde el
+2026-09-15 (#88): vigila con la cámara, detecta el ómnibus y su cartel, lee con OCR y manda la lectura
+por BLE; la app la anuncia si la salida elegida es el teléfono. El enlace y los avisos de sistema
+tampoco dependen de la red. El analizador estático impide que `features/recognition` y
+`features/audio` importen `services/vision`, `cloud`, `telemetry` o `evidence` (`eslint.config.js`).
 
-- **Offline core** — recognition (bundled model + local inference), device link, audio feedback.
-  Works with **zero internet**; nothing on the recognition path awaits a network call (ADR 0001).
-- **Online account layer** — auth (Google via Supabase), profile, settings/history sync, model-file
-  updates. Requires internet; degrades gracefully; a signed-in user **stays signed in offline**
-  (ADR 0002). Configure via `.env` (see `.env.example`).
+**Modo supermercado en la nube** (ADR 0006, ADR 0008). Con dos clicks el dispositivo saca la foto, la
+app la baja por WiFi y la manda al modelo de visión elegido en Ajustes a través del proxy de
+Supabase. Sin internet o sin modelo, la app lo dice y no lee.
 
-## Current status (scaffold)
+**Capa de cuenta archivada** (ADR 0002). La autenticación es por email y contraseña de Supabase (sin
+Google ni OAuth), pero **el login no está montado**: `AuthProvider` no figura en `_layout.tsx` y la
+app abre directo en las pestañas. El código se conserva para una eventual sincronización opcional.
 
-- ✅ Accessible starting screen (Home) — navigation + working TTS ("Probar audio").
-- ✅ Connect screen with a live-region status and the connection state machine.
-- 🚧 **BLE/GATT** is a typed **stub** (`services/ble/bleClient.ts`) — reports "not implemented"
-  instead of faking success. Wire it against `features/device/gatt.ts` on a dev-client build.
-- 🚧 **Audio routing** to the device earphone (separate channel) is a documented TODO in
-  `services/audio/tts.ts`.
+## Estado (al 2026-10-22)
 
-## Accessibility strategy
+- **Tres pestañas**: Inicio (modos, botón «Leer», resultado y foto; en modo ómnibus, las fotos de cada
+  ómnibus con el recorte exacto que leyó el OCR, #118), Dispositivo (conexión, nombre y batería en
+  texto, #110) y Ajustes (modelo de supermercado, salida de audio, qué reconoce y «Probar audio»).
+- **Enlace real**: BLE desde el 2026-09-04, conexión y reconexión automáticas, unión sola a la WiFi
+  de la placa. Las operaciones GATT van en cola, una por vez (#94, `services/ble/serialize.ts`).
+- **Salida de audio elegible**, teléfono o dispositivo, para todo lo que suena (#83, #89, #90). La
+  única excepción es el botón «Leer» en modo ómnibus: ese OCR corre en el teléfono, se dice siempre
+  en el teléfono y, si la síntesis está habilitada, manda además una copia a la placa. El
+  teléfono es siempre el respaldo y hay **una voz por vez** (#97). Los avisos de sistema son clips
+  pregrabados en la placa.
+- **Un solo tema, el oscuro** (ADR 0010).
+- **Los errores van a la telemetría, nunca al usuario** (ADR 0011): la persona escucha una frase fija
+  de `i18n/es.ts` que dice qué hacer.
+- **Pruebas**: 332 tests en 36 suites (`npx jest`, al 2026-10-22).
 
-Following Mascetti et al. (2020), cross-platform frameworks expose only a subset of native
-accessibility. So the app: (1) prefers **standard RN components** correctly annotated with
-`accessibilityLabel` / `accessibilityRole` / `accessibilityHint`; (2) avoids highly custom UI;
-(3) treats **real VoiceOver/TalkBack testing** and **usability testing with blind users** as
-required steps, not assumptions. See `.claude/skills/virovision/references/app.md`.
+## Publicación
+
+Los PRs van a `staging` (rama por defecto): cada merge publica al grupo interno de TestFlight y deja
+un `.apk` como artefacto (`android-apk.yml`). `main` es producción y sólo recibe PRs
+`staging → main`: publica al grupo externo de TestFlight, con enlace público. Google Play está
+apagado (`PLAY_ENABLED`). Detalle en [`docs/ci-cd.md`](../docs/ci-cd.md).
+
+## Estrategia de accesibilidad
+
+Siguiendo a Mascetti et al. (2020), los frameworks multiplataforma exponen sólo un subconjunto de la
+accesibilidad nativa. Por eso la app: (1) prefiere **componentes estándar** de RN bien anotados con
+`accessibilityLabel`, `accessibilityRole` y `accessibilityHint`; (2) evita la interfaz muy
+personalizada (la barra de pestañas es la nativa); (3) trata la **prueba real con VoiceOver y
+TalkBack** y la **prueba de usabilidad con personas ciegas** como pasos obligatorios, no como
+supuestos. Ver `.claude/skills/virovision/references/app.md` y `references/convenciones.md`.

@@ -11,9 +11,9 @@ software en el dispositivo físico.
 | Control de versiones y alojamiento | Git · GitHub |
 | Integración y entrega continua | GitHub Actions |
 | Distribución iOS | App Store Connect API · TestFlight |
-| Distribución Android | Google Play Console (canales de prueba interna y cerrada) |
-| Servicios de nube | Supabase (funciones en el borde y base de datos PostgreSQL) |
-| Dispositivo | Script de despliegue por SSH · servicio systemd |
+| Distribución Android | Paquete instalable (`.apk`) firmado en GitHub Actions; Google Play Console configurada y apagada |
+| Servicios de nube | Supabase (funciones en el borde, base de datos PostgreSQL y almacenamiento) |
+| Dispositivo | Script de despliegue por SSH · servicio systemd · herramienta de acceso por Bluetooth |
 
 ## 8.2 Modelo de ramas y canales
 
@@ -22,18 +22,23 @@ es publicar:
 
 | Rama | Canal iOS | Canal Android | Audiencia |
 |---|---|---|---|
-| `staging` | TestFlight, grupo interno | Play, prueba interna | El equipo |
-| `main` | TestFlight, enlace público | Play, prueba cerrada | Testers externos y tutor |
+| `staging` | TestFlight, grupo interno | Paquete `.apk` como artefacto de la compilación | El equipo |
+| `main` | TestFlight, enlace público | Ninguno mientras Google Play esté apagado | Testers externos y tutor |
+
+Google Play tiene los canales de prueba interna (para `staging`) y cerrada (para `main`)
+configurados, pero el flujo permanece apagado por una variable del repositorio mientras la cuenta de
+la tienda no esté activa (sec. 8.5).
 
 Esta correspondencia tiene una consecuencia deliberada: **no existe un paso manual de publicación**.
 Un cambio aprobado y fusionado está, en minutos, instalado en los teléfonos del equipo. El costo de
 esa automatización es que la rama `staging` debe mantenerse siempre en estado publicable, lo que
-justifica los controles de calidad de §8.3.
+justifica los controles de calidad de sec. 8.3.
 
 ## 8.3 Integración continua
 
-El flujo de integración se ejecuta en cada *pull request* y en cada empuje a una rama de trabajo, y
-tiene dos etapas:
+El flujo de integración se ejecuta en cada *pull request* dirigido a `staging` o a `main` y en cada
+empuje a cualquier otra rama, y tiene dos etapas (los empujes a `staging` y `main` los cubre el flujo
+de publicación, que repite los mismos controles antes de compilar):
 
 1. **Calidad**: instalación determinista de dependencias, análisis estático, verificación de tipos y
    la suite completa de pruebas.
@@ -83,17 +88,27 @@ de terceros ni consumir su cuota.
 
 ## 8.5 Distribución Android
 
-El flujo Android genera el paquete de aplicación firmado con la clave de subida del proyecto y lo
-publica al canal correspondiente según la rama. Se mantiene además un flujo que produce un paquete
-instalable directamente, porque el formato que exige la tienda no se puede instalar en un teléfono
-para una prueba rápida. Los artefactos se nombran con versión y número de compilación: un nombre
-genérico no permite distinguir dos builds compartidos en una conversación.
+El canal Android vigente es un **paquete instalable directamente** (`.apk`), firmado con la clave de
+subida del proyecto. Cada fusión a `staging` que toca la aplicación lo produce como artefacto de la
+compilación, listo para descargar y enviar, y el mismo flujo se puede lanzar a mano desde cualquier
+rama. Es el equivalente Android del grupo interno de TestFlight. Existe porque el formato que exige
+la tienda (`.aab`) no se puede instalar en un teléfono: es un formato de publicación que la tienda
+reparte por dispositivo.
+
+El flujo hacia Google Play (paquete `.aab` firmado, publicado al canal de prueba interna o cerrada
+según la rama) está escrito y configurado, pero **apagado** mientras la cuenta de la tienda no esté
+activa; al encenderlo, la prueba interna reemplaza al `.apk` en los empujes a `staging`. Una
+advertencia queda escrita para ese día: un `.apk` firmado por el equipo y uno instalado desde la
+tienda tienen firmas distintas, y hay que desinstalar el primero.
+
+Los artefactos se nombran con versión y número de compilación: un nombre genérico no permite
+distinguir dos builds compartidos en una conversación.
 
 ## 8.6 Servicios de nube
 
 ### 8.6.1 Función de proxy de visión
 
-Desplegada y activa desde el 2 de septiembre de 2026. Su diseño está descrito en §7.2.3. Desde el
+Desplegada y activa desde el 2 de septiembre de 2026. Su diseño está descrito en sec. 7.2.3. Desde el
 punto de vista del despliegue interesan tres aspectos:
 
 - **Las credenciales viven en el almacén de secretos del proyecto**, nunca en el repositorio ni en el
@@ -126,7 +141,22 @@ El esquema se gestiona por **migraciones que se agregan y no se editan**. La mig
 los nombres al inglés (ADR 0009) **renombró en lugar de recrear**, para no perder los registros de
 las primeras sesiones de campo, que son el único diagnóstico disponible de esa etapa.
 
-### 8.6.3 Riesgo operativo declarado
+### 8.6.3 Función de evidencia y su almacenamiento
+
+Desplegada el 2026-10-12, es la tercera función. Recibe las fotos del modo ómnibus (el cuadro en que
+se detectó cada ómnibus y cada recorte del cartel que leyó el OCR, sec. 7.7.3) y las guarda en un
+**contenedor de almacenamiento privado**, creado por su propia migración. El camino tiene tres
+pasos: el dispositivo guarda las imágenes y avisa por Bluetooth; la aplicación las baja por WiFi y
+registra en el momento un evento de telemetría con lo que leyó el OCR y la ruta de cada imagen; las
+imágenes quedan en cola en el teléfono y se suben cuando hay internet.
+
+Las rutas son **deterministas**: el evento es correcto aunque la imagen llegue una hora después, y
+ningún lado tiene que avisarle al otro dónde quedó nada. Como la telemetría, la función no exige
+sesión (ADR 0008) y aplica topes: cuatro archivos por pedido, 2 MB por archivo y sólo imágenes JPEG,
+verificadas por sus primeros bytes (`docs/supabase.md`). Es una herramienta de desarrollo y
+**temporal**: son fotos de la calle, con personas, y se retira antes de la versión final.
+
+### 8.6.4 Riesgo operativo declarado
 
 El nivel gratuito de la plataforma **pausa los proyectos sin actividad durante una semana**, y ya
 ocurrió una vez. Con el proxy en producción y sin credenciales embebidas en la aplicación, una pausa
@@ -148,9 +178,11 @@ administración**: el modo de red, los perfiles de red inalámbrica y los archiv
 avisos de sistema se instalan dejando archivos en esa partición, que un servicio lee en cada
 arranque.
 
-La razón es la restricción de §7.3.4: **un dispositivo en modo producto no tiene acceso remoto**, de
-modo que si la única vía de administración fuera la red, cualquier error de configuración dejaría al
-dispositivo irrecuperable sin desarmarlo.
+La razón es la restricción de sec. 7.3.4: **un dispositivo en modo producto no tiene acceso remoto por
+la red conocida**, de modo que si la única vía de administración fuera la red, cualquier error de
+configuración dejaría al dispositivo irrecuperable sin desarmarlo. Desde septiembre existe además la
+vía por Bluetooth de sec. 8.7.2, que evita retirar la tarjeta en el caso habitual; la tarjeta sigue
+siendo el recurso que no depende de que el servicio esté funcionando.
 
 | Se deja en la partición de arranque | Efecto en el siguiente arranque |
 |---|---|
@@ -163,13 +195,20 @@ trabajó. Es la diferencia entre poder llevarlo a probar a otro lugar y tener qu
 
 ### 8.7.2 Vías de acceso y la regla que las ordena
 
-Existen tres formas de alcanzar el dispositivo, y no son equivalentes:
+Existen cuatro formas de alcanzar el dispositivo, y no son equivalentes:
 
 | Vía | Cuándo sirve | Limitación |
 |---|---|---|
-| **Red inalámbrica conocida** (modo desarrollo) | Trabajo habitual | Exige que el dispositivo esté en modo desarrollo |
-| **Cable de red** | Siempre, incluso en modo producto | La placa definitiva del proyecto no tiene conector de red; sólo la placa de reemplazo actual |
+| **Apagar el punto de acceso por Bluetooth** (`hardware/raspi/tools/ap.py`) | La vía principal, incluso en modo producto: en unos 5 s el dispositivo vuelve a la red inalámbrica conocida y queda accesible por SSH, sin abrir la carcasa ni tocar la tarjeta | Dura hasta el siguiente reinicio; exige que la aplicación del teléfono esté cerrada, porque con una central conectada el dispositivo deja de anunciarse |
+| **Red inalámbrica conocida** (modo desarrollo, desde la tarjeta) | Sesiones largas de despliegue | Exige apagar el dispositivo y retirar la tarjeta para cambiar de modo |
+| **Cable de red** | Siempre, incluso en modo producto | Sólo en una placa con conector RJ45, como la de reemplazo que se usó en septiembre; la Raspberry Pi Zero 2 W, placa vigente desde el 2026-09-19, no lo tiene |
 | **Unirse al punto de acceso del dispositivo** | Cualquier modo | **Desaconsejado**, ver abajo |
+
+La herramienta de Bluetooth existe para **no depender de la tarjeta**: en modo producto el
+dispositivo levanta su punto de acceso y abandona la red conocida, de modo que no hay acceso remoto,
+y retirar la tarjeta obliga a apagarlo y abrir la carcasa. La herramienta escribe en la
+característica de control del perfil GATT, la misma que usa la aplicación, y no requiere
+emparejamiento.
 
 La regla operativa que el proyecto adoptó, después de perder sesiones a mitad de una copia de
 archivos, es: **no desplegar desde una máquina con una sola interfaz de red**. Un equipo que sólo
@@ -180,9 +219,9 @@ dispositivo en un estado inconsistente.
 
 El punto de acceso **sí acepta conexiones remotas**: lo que se pierde al unirse a él no es el acceso
 al dispositivo sino el acceso a internet de la máquina, porque la red se publica deliberadamente sin
-anunciar puerta de enlace ni servidor de nombres (§8.7.5).
+anunciar puerta de enlace ni servidor de nombres (sec. 8.7.5).
 
-**Configuración de la vía por cable.** La interfaz de red del dispositivo tiene dirección fija, y la
+**Configuración de la vía por cable** (sólo en placas con conector RJ45). La interfaz de red del dispositivo tiene dirección fija, y la
 computadora actúa como encaminador mediante una regla de traducción de direcciones. Se optó por
 dirección fija y no por asignación dinámica porque, si el dispositivo solicita configuración y nadie
 responde, el gestor de red da la conexión por fallida y el dispositivo **desaparece del enlace** hasta
@@ -192,7 +231,8 @@ que se vuelve a conectar el cable físicamente.
 
 El procedimiento verificado consta de cinco pasos y su orden importa:
 
-1. **Pasar el dispositivo a modo desarrollo** desde la tarjeta, y arrancar.
+1. **Llevar el dispositivo a la red conocida**: apagar su punto de acceso por Bluetooth o, para una
+   sesión larga, pasarlo a modo desarrollo desde la tarjeta y arrancar.
 2. **Alcanzarlo por la red conocida** y detener el servicio.
 3. **Instalar la versión nueva del paquete**, conservando un respaldo de la anterior y verificando
    que el paquete importe correctamente **antes** de arrancar el servicio.
@@ -224,17 +264,19 @@ mientras no cambien, y se apoya en el entorno virtual ya construido en el dispos
 El registro del servicio es el **único diagnóstico disponible** del dispositivo en uso real: no hay
 pantalla, y el usuario no puede describir lo que vio.
 
-Aquí el proyecto tiene un problema **identificado y no resuelto**, y conviene declararlo: aunque el
-registro está configurado como persistente, sólo se conserva visible el último arranque. La causa es
-la misma ausencia de reloj de tiempo real: las marcas de tiempo saltan cuando la sincronización
-corrige la hora a mitad del arranque, y los arranques anteriores desaparecen de la vista. **Se perdió
-así el registro de la única prueba realizada en modo producto.** Para un dispositivo cuyo único
-diagnóstico es el registro, resolverlo es condición previa a las pruebas en la calle.
+Durante buena parte del desarrollo el registro **no sobrevivía a un reinicio**, y así se perdió el
+registro de la primera prueba realizada en modo producto. La hipótesis inicial atribuyó el problema a
+la ausencia de reloj de tiempo real; la causa real era otra: el sistema operativo de la placa trae
+una configuración que guarda el registro **sólo en memoria**, aunque el directorio del registro
+persistente exista. Desde el 2026-09-23 una configuración propia lo hace persistente (con un tope de
+64 MB), forma parte del script de instalación y está aplicada en la placa. Rindió en la misma sesión:
+una prueba del usuario se leyó entera después de reiniciar, con tres arranques en el registro
+(`docs/SESSION-LOG.md`, 2026-09-23).
 
-El proyecto compensa parcialmente esta limitación por dos vías: la **telemetría** que envía la
-aplicación móvil (§7.8.3), que sí persiste y está fechada del lado del servidor, y una herramienta
-que **reproduce todos los avisos de sistema en secuencia** para verificar el repertorio de audio sin
-necesidad del teléfono.
+El registro tiene dos complementos: la **telemetría** que envía la aplicación móvil (sec. 7.8.3), fechada
+del lado del servidor, y una herramienta que **reproduce todos los avisos de sistema en secuencia**
+para verificar el repertorio de audio sin necesidad del teléfono. La falta de reloj de tiempo real
+sigue vigente y afecta las marcas de tiempo hasta que el reloj se sincroniza por red (sec. 8.7.3).
 
 Una precaución adicional, registrada porque costó tiempo: el servicio **toma la cámara al arrancar**,
 de modo que cualquier prueba manual de la cámara exige detenerlo primero y volver a iniciarlo al
@@ -249,7 +291,7 @@ quedaba sin acceso a internet, lo que impedía alcanzar la nube en el modo super
 así declarada como de alcance estrictamente local, y el teléfono conserva su conexión de datos.
 
 Por la misma razón, el punto de acceso tampoco sirve como vía de administración desde una máquina de
-una sola interfaz (§8.7.2): el comportamiento que protege al teléfono es el que deja sin internet a la
+una sola interfaz (sec. 8.7.2): el comportamiento que protege al teléfono es el que deja sin internet a la
 computadora.
 
 ### 8.7.6 El pipeline de visión como dependencia
@@ -267,7 +309,6 @@ condicionan la etapa final:
 | Pendiente | Consecuencia |
 |---|---|
 | La tarjeta en uso **no se instaló con el script de instalación del repositorio**, sino a mano. No existe todavía una imagen reproducible | Reconstruir el dispositivo desde cero no es un procedimiento verificado |
-| El registro no sobrevive a los reinicios (§8.7.4) | Una falla en la calle es irrecuperable en cuanto alguien apaga el dispositivo |
 | Las credenciales de administración del dispositivo se compartieron por un canal no seguro durante el desarrollo, y una clave de servicio quedó en el historial de un repositorio | Ambas deben rotarse antes de cualquier distribución |
 | El sistema de aprovisionamiento automático estándar de la imagen no aplica la configuración de red en esta versión | Todo el andamiaje de configuración descrito existe por eso, y debería revisarse si se actualiza la imagen base |
 
@@ -277,8 +318,10 @@ condicionan la etapa final:
 |---|---|
 | Integración continua | Operativa |
 | TestFlight, canal interno y enlace público | Operativo punta a punta |
-| Google Play | Configurado; pendiente de verificación de identidad |
+| Android, paquete `.apk` desde `staging` | Operativo |
+| Google Play | Configurado y apagado; pendiente de activar la cuenta de la tienda |
 | Proxy de visión | **Desplegado y activo** |
 | Telemetría y base de datos | Desplegadas |
+| Evidencia del modo ómnibus (función y almacenamiento privado) | Desplegada desde el 2026-10-12; temporal, se retira antes de la versión final |
 | Servicio del dispositivo | Instalado y operativo sobre la placa en uso |
 | Imagen de tarjeta reproducible del dispositivo | Parcial: la tarjeta en uso no se instaló con el script |

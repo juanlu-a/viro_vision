@@ -18,7 +18,7 @@ resultado junto con la decisión que provocó.
 
 De ahí surge la característica más distintiva del proceso: a lo largo del proyecto, **ninguna
 decisión técnica relevante se tomó por preferencia**. Cada una tiene detrás un número, un registro
-de ejecución o una prueba en hardware, y quedó escrita en un documento de decisión (ADR, ver §5.3)
+de ejecución o una prueba en hardware, y quedó escrita en un documento de decisión (ADR, ver sec. 5.3)
 que consigna el contexto, las alternativas evaluadas, la evidencia y las consecuencias. Cuando la
 evidencia posterior contradijo una decisión previa, el ADR no se reescribió: se **enmendó con
 fecha**, dejando visible el cambio de rumbo.
@@ -39,13 +39,13 @@ accesible por SSH, una GPU para entrenar):
 
 La división por pilar tuvo un costo conocido y aceptado: el conocimiento profundo de cada pilar
 quedó concentrado en una persona. El mecanismo que se adoptó para compensarlo fue **documental**
-(§5.3): todo lo que un integrante aprendía sobre su pilar se escribía en el repositorio, de modo que
+(sec. 5.3): todo lo que un integrante aprendía sobre su pilar se escribía en el repositorio, de modo que
 el resto del equipo pudiera retomarlo sin depender de una transferencia oral.
 
 La frontera entre pilares se trató como un **contrato explícito**. El protocolo BLE, los endpoints
 HTTP de la placa y el catálogo de anuncios pregrabados están definidos una vez y duplicados a
 ambos lados de la frontera; en varios casos, un test automatizado falla si las dos copias se
-desincronizan (§7.6). Un contrato verificado por una prueba es preferible a un contrato confiado a
+desincronizan (sec. 7.6). Un contrato verificado por una prueba es preferible a un contrato confiado a
 la memoria de dos personas que trabajan en repositorios distintos.
 
 ### 5.2.2 Enfoque de desarrollo
@@ -61,7 +61,7 @@ Los tres ejemplos más claros de este patrón:
 1. **El transporte de la foto.** Se diseñó el enlace suponiendo que BLE alcanzaría para mover una
    imagen de 53 KB. Se escribió el umbral *antes* de medir (53 KB en menos de 2 s) y la medición lo
    incumplió por un factor de 2,2. El resultado fue rediseñar el enlace en dos planos: BLE para
-   control, WiFi para datos (§7.2).
+   control, WiFi para datos (sec. 7.2).
 2. **El runtime de inferencia en el teléfono.** El ADR 0004 proponía embeber un modelo multimodal en
    la aplicación. Un *spike* de dos días midió los cuatro caminos posibles y mostró que el problema
    no era el teléfono sino la librería; el ADR quedó superado en la práctica por el ADR 0006, que
@@ -105,6 +105,10 @@ Los cambios más significativos registrados por este mecanismo fueron:
 | 2026-09-09 | Todo el código pasa a **inglés**; la documentación permanece en español | ADR 0009 |
 | 2026-09-11 | El alcance del modo supermercado se **amplía** de canasta básica a cualquier alimento; la canasta pasa a ser el conjunto de evaluación | ADR 0006, actualización |
 | 2026-09-14 | La aplicación se publica con **un solo tema** y una sola línea de estado | ADR 0010 |
+| 2026-10-06 | Los errores dejan de mostrarse o decirse al usuario: van a la **telemetría**, y el usuario escucha una frase fija | ADR 0011 |
+| 2026-10-06/07 | El modo ómnibus sólo anuncia lo que el **catálogo de líneas** conoce, y el catálogo completa la mitad del cartel que el OCR no leyó | ADR 0006, actualización |
+| 2026-10-19 | **Zoom digital** del procesador de imagen sobre el cartel, para leerlo de más lejos | ADR 0006, actualización |
+| 2026-10-21/22 | Se prueba leer el cartel con la caja del detector **sin márgenes**; en las pruebas del equipo se sigue perdiendo a veces el primer dígito y los márgenes vuelven el 22 de octubre | ADR 0006, actualización |
 
 ## 5.3 Documentación del proyecto
 
@@ -114,9 +118,9 @@ para esto cinco tipos de documento con roles distintos:
 
 **a) Registros de decisión de arquitectura (ADR).** Un archivo por decisión, en
 `docs/architecture/adr/`, con el formato clásico: contexto, decisión, alternativas consideradas,
-consecuencias y estado (`Proposed` / `Accepted`). Al cierre de este informe existen diez ADRs, de
-los cuales cinco están aceptados y cuatro permanecen como propuestos a la espera de validación
-formal con el director. La numeración tiene un hueco declarado: el ADR 0005 (estándares de *design
+consecuencias y estado (`Proposed` / `Accepted`). Al 22 de octubre de 2026 existen diez ADRs
+escritos, de los cuales seis están aceptados y cuatro permanecen como propuestos a la espera de
+validación formal con el director. La numeración tiene un hueco declarado: el ADR 0005 (estándares de *design
 system* y accesibilidad) está identificado como pendiente de escritura.
 
 **b) Bitácora de sesiones (`docs/SESSION-LOG.md`).** Un registro cronológico de qué se hizo cada
@@ -148,6 +152,21 @@ artefacto versionado (revisable en un *pull request*, con historial, y sujeto a 
 actualización que el resto de la documentación) resultó ser una condición necesaria para que la
 asistencia automatizada fuera útil en un proyecto con decisiones acumuladas y reversiones. Sin ese
 contexto, el asistente proponía sistemáticamente caminos ya descartados con evidencia.
+
+**f) Revisión multi-modelo antes de integrar.** Los cambios de peso se sometieron a un flujo de
+revisión automatizada, `tackle-ticket`, antes de abrir el *pull request*. Fueron cambios en el
+daemon, en el enlace o en el pipeline, la documentación extensa y el modelo 3D de la carcasa. El
+flujo reparte el mismo diff entre cuatro revisores basados en modelos de lenguaje distintos (tres
+modelos de Anthropic de distinto tamaño, Opus, Sonnet y Haiku, y Codex de OpenAI), que sólo
+reportan hallazgos clasificados por severidad. Los hallazgos se deduplican, se corrigen los críticos
+y los mayores, y la revisión se repite sobre lo corregido hasta que una vuelta sale limpia. El valor
+del método está en la diversidad: modelos distintos fallan en lugares distintos, y un hallazgo que
+reportan varios revisores a la vez rara vez es un falso positivo. Sobre la carcasa (versión 0.9, 14
+de octubre) la revisión encontró, en tres vueltas, trabas que no enganchaban lo suficiente, un
+volumen sin reservar para el cable plano de la cámara y un orden de armado imposible, todo antes de
+imprimir. Sobre la documentación se usó para contrastar el texto con el código y detectar lo que
+había quedado desactualizado o sin mencionar. El flujo no reemplaza la revisión humana del *pull
+request*: la antecede y la acota.
 
 La regla que cierra el circuito está escrita en la raíz del repositorio: **al terminar cada sesión o
 cada tarea se actualiza la base de conocimiento**: la bitácora siempre, el estado vigente si cambió,

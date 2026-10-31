@@ -95,7 +95,7 @@ dispositivos con recursos limitados, lo que las convierte en candidatas naturale
 
 La computación en el borde (Edge Computing) se refiere al procesamiento de datos cerca de la fuente de generación, en lugar de enviarlos a servidores remotos en la nube. En el contexto de la IA, esto implica ejecutar modelos de inferencia directamente en dispositivos de recursos limitados, como microcontroladores o computadoras de placa única. Esta aproximación ofrece ventajas críticas para aplicaciones de asistencia: latencia reducida (respuesta en tiempo real sin depender de conectividad), privacidad de los datos (el procesamiento ocurre localmente) y funcionamiento offline.
 
-*⚠️ PENDIENTE: Completar con análisis de Google Gemma (modelo de IA de Google). Investigar: arquitectura del modelo, variantes disponibles para edge computing (Gemma 2B, etc.), rendimiento en tareas de visión, viabilidad de ejecución en el hardware seleccionado, y comparación con otras alternativas (MobileNet, EfficientDet, YOLO nano, etc.).*
+**Gemma en el borde: resuelto por el ADR 0006.** Los modelos Gemma de Google se evaluaron en el *spike* de visión local del 2026-08-12/13, sobre un iPhone 15 Pro (`docs/spike-vision-local.md`). Gemma 3 1B generó texto localmente en 910 ms, a 13,4 tokens por segundo, con LiteRT-LM; la visión con ese runtime falló en iOS por un defecto de la librería. El modelo multimodal más chico, Gemma 4 E2B (3 GB), sí leyó el cartel por ExecuTorch, pero con un total de ~6,4 s y sin coordenadas para priorizar entre varios ómnibus. El ADR 0006 (2026-08-22, enmendado el 2026-09-07) cerró la pregunta por caso de uso: en ómnibus no hay LLM, y la detección la hace un YOLO11n cuantizado a int8 dentro del sensor IMX500 de la cámara, seguido de recorte y OCR en la placa (sec. 7.4); en supermercado el modelo de visión corre en la nube (sec. 7.5). Gemma no se evaluó sobre la Raspberry Pi Zero 2 W, y un Gemma chico sigue siendo el candidato para el respaldo local del modo supermercado, que está pendiente (sec. 7.5.5).
 
 *[PENDIENTE: apartado asignado a Magalí Dellapiazza.]*
 > *Esta sección amplía el apartado existente «Modelos de Inteligencia Artificial en el borde (Edge
@@ -203,7 +203,7 @@ Los criterios que este trabajo utiliza como requisitos verificables son:
 La **relación de contraste** se define entre las luminancias relativas de dos colores como
 (L₁ + 0,05) / (L₂ + 0,05), donde L₁ es la luminancia del más claro. Al ser una fórmula cerrada, el
 cumplimiento de estos criterios **puede verificarse automáticamente**, y este trabajo lo incorpora
-como prueba automatizada que bloquea la integración ante un cambio que rompa el criterio (§7.8.1).
+como prueba automatizada que bloquea la integración ante un cambio que rompa el criterio (sec. 7.8.1).
 
 Una observación necesaria: el cumplimiento de WCAG es una **condición necesaria y no suficiente**.
 Una interfaz puede satisfacer todos los criterios verificables y resultar inutilizable para una
