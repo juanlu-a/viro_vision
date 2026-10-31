@@ -1,14 +1,14 @@
-// VIA Clara v0.11 — annotated assembly guide: arrows and labels saying what each part, slot and hole
+// VIA Clara v0.18 — annotated assembly guide: arrows and labels saying what each part, slot and hole
 // is for. Renders to images (see export.sh); it is not a printable part.
 // Labels are in Spanish because people read them; the code is in English (ADR 0009).
 //
 // VIEW = outer | head | left_inside | right_inside | exploded
 // Render with an orthographic projection and the eye along view_dir(VIEW), for example:
-//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_11_guide.scad
+//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_20_guide.scad
 
 // Always render with -D 'PART="none"' (export.sh does): the model's own dispatch must draw nothing.
 // Setting PART here would not work, because the included file reassigns it.
-include <via_clara_v0_11.scad>
+include <via_clara_v0_20.scad>
 
 VIEW = "head";                   // set with -D
 // export.sh renders the parts once to meshes in the model frame and passes their folder here: preview
@@ -19,7 +19,6 @@ module part(name) {
     else if (name == "left") left_body();
     else if (name == "right") right_body();
     else if (name == "button") button_cap_placed();
-    else if (name == "slider") power_slider();
     else if (name == "bone") bone_arm();
 }
 TEXT_SIZE = 2.3;
@@ -100,11 +99,9 @@ module scene(v) {
         color("#6a6a6a") part("left");
         color("#8a8a8a") part("right");
         color("#d9d9d9") part("button");
-        color("#d0a020") part("slider");
         color("#1b1b1b") part("bone");
     } else if (v == "left_inside") {
         color("#a8a8a8") part("left");
-        color("#d0a020") part("slider");
     } else if (v == "right_inside") {
         color("#b0b0b0") part("right");
         color("#f0f0f0") part("button");
@@ -112,7 +109,6 @@ module scene(v) {
         color("#8a8a8a") translate([0, -30, 0]) part("left");
         color("#a0a0a0") translate([0, 30, 0]) part("right");
         color("#d9d9d9") translate([0, 30, 0]) part("button");
-        color("#d0a020") translate([0, -16, 0]) part("slider");
         color("#1b1b1b") translate([0, -30, 0]) part("bone");
         color([.15, .35, .8]) hw_hat();
         color([.1, .55, .2]) hw_pi();
@@ -123,7 +119,7 @@ module scene(v) {
 
 // ---------- What each view points at ----------
 function items(v) =
-    let (sxk = (SLIDER_X[0] + SLIDER_X[1]) / 2, t = SNAPS[1])
+    let (sxk = PANEL_SW_C[0], t = SNAPS[1])
     v == "outer" ? [
         [[BUTTON_X, RIGHT_FACE + 0.8, BUTTON_Z], "Botón de modos"],
         [[BUTTON_X + 5.2, RIGHT_FACE - 0.3, BUTTON_Z - 1.5], "Anillo para encontrar el botón"],
@@ -134,8 +130,8 @@ function items(v) =
         [[NOSE_X + 1, 8, LENS_Z + 6], "Nariz: cámara adentro"],
         [TRANSDUCER_CENTER + [0, 0, 8], "Brazo del auricular"]] :
     v == "head" ? [
-        [[sxk, LEFT_FACE - 1.5, SLIDER_KNOB_C + SLIDER_S], "Perilla ON/OFF (arriba = OFF)"],
-        [[sxk, LEFT_FACE - 0.6, SLIDER_W0 - 1.6], "Punto en relieve = lado ON"],
+        [[sxk, LEFT_FACE - 0.5, PANEL_SW_C[1] + 2], "Ventana del switch de encendido"],
+        [[sxk, LEFT_FACE - 0.6, PANEL_SW_C[1] - PANEL_SW_WIN[1] / 2 - 1.6], "Punto en relieve (referencia)"],
         [[NOSE_X, 0, LENS_Z], "Lente de la cámara"],
         [[ELASTIC_XS[0], LEFT_FACE - 3.8, 0], "Puente para el elástico"],
         [[ELASTIC_XS[1], LEFT_FACE - 3.8, 0], "Puente para el elástico"],
@@ -144,15 +140,14 @@ function items(v) =
         [[-2, LEFT_FACE, 12], "Cara que apoya en la patilla"]] :
     v == "left_inside" ? [
         [[CAM_FRONT_X - 0.4, CAM_Y0 - AI_CAM_H / 2, 9], "Ranura del PCB de la cámara"],
-        [[sxk, -CHAMBER_HY + 1, SLIDER_KNOB_C + SLIDER_S - 5], "Corredera: agarra la palanca de la llave"],
+        [[sxk, -CHAMBER_HY + PANEL_SW_PIN_L, PANEL_SW_C[1] + PANEL_SW_PITCH / 2], "Pernos del switch (la pestaña va acá, con gotita)"],
         [[29, -CAV_HY, -0.5], "Paso del cable del auricular"],
         [[STACK_REAR_X + 3, HAT_TOP_Y + 1.5, -6.5], "Canal de carga"],
         [[-12, -2, CAV_HZ + 1.0], "Ranura donde engancha la traba"],
-        [[PI_CX - PI_HOLE_X, -CAV_HY + 0.2, -PI_HOLE_Z], "Poste que aprieta la cabeza del tornillo (x4)"],
+        [[PI_CX - PI_HOLE_X, -CAV_HY, -PI_HOLE_Z], "Pared que apoya en la cabeza del tornillo"],
         [[STACK_REAR_X + 3, -2, 12], "Extremo trasero hueco"]] :
     v == "right_inside" ? [
-        [[PI_CX - PI_HOLE_X, PAD_MOUTH_Y + 0.5, PI_HOLE_Z], "Poste: ubica el hexágono de la Pi (x4)"],
-        [[BUTTON_X, SW_BASE_Y - LID_T, BUTTON_Z], "Tapita del pulsador (pieza 06)"],
+        [[PI_CX - PI_HOLE_X, PAD_MOUTH_Y + 0.5, PI_HOLE_Z], "Zócalo hexagonal: el hexágono de la Pi entra hueco (x4)"],
         [[snap_root(t) + 4, 1.2, t[2] + 0.5], "Viga de la traba (flexiona)"],
         [[t[0], -HOOK_LEN + 0.5, t[2] + SNAP_T + 0.3], "Gancho de la traba"],
         [[snap_free(t) + 0.4, SNAP_DEPTH + 0.3, t[2] + 0.5], "Puente a cortar tras imprimir"],
@@ -164,7 +159,6 @@ function items(v) =
         [[-42.4, CAM_Y0, 12], "AI Camera (conector hacia la Pi)"],
         [[hat_x(26), HAT_TOP_Y + 4, 15], "UPS HAT + batería"],
         [[STACK_REAR_X - 20, PI_TOP_Y, 15], "Raspberry Pi Zero 2 W"],
-        [[sxk, -16 - 9, SLIDER_KNOB_C + 4], "Corredera (pieza 05)"],
         [[BUTTON_X, 30 + SW_TOP_Y + 1, BUTTON_Z + 3.5], "Tecla (pieza 04)"],
         [[BUTTON_X, 16 + SW_BASE_Y + 1, BUTTON_Z + 3], "Pulsador 6 x 6"],
         [[0, -30 + LEFT_FACE + 2, 18], "Mitad izquierda (cabeza)"],

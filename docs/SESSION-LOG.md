@@ -3957,18 +3957,157 @@ La v0.10 impresa salió mal ("espantoso"). Lo que falló y cómo quedó en `via_
   4,2 × 7,4, frente a la palanca, y la perilla de la corredera 3,8 × 3.
 - **Las guías de la cámara no se podían imprimir** (nervios de 0,65 y de aplastamiento de 0,6, aun con
   la calidad al máximo). Ahora son nervios de 1,2 con 0,3 de luz, sin nervios de aplastamiento.
-- **El botón chocaba con el disipador** de la Pi (14 × 14 × 5, el usuario lo quiere mantener). El botón
-  pasó a x −14, y el disipador entró al modelo y a las verificaciones.
+- **El botón chocaba con el disipador** de la Pi (medido: 12 × 12 × 4; el usuario lo quiere mantener).
+  El botón pasó a x −14, y el disipador entró al modelo y a las verificaciones.
 - **La microSD estaba en espejo** (el slot no está centrado en el borde de la Pi). Se corrigió de lado, y
   el espacio ahora se abre por el extremo trasero para sacar y poner la tarjeta.
 - **El brazo del auricular no entraba**: su tubo arrancaba 0,6 adentro del zócalo y los topes de la
   ficha trababan. Se corrió el tubo, se sacaron los topes y la ficha tiene 0,35 de luz por lado.
-- **Seguía grande y con relleno en los extremos.** La nariz quedó 5,3 mm más corta (la cámara se acercó
-  a la Pi, con 3,2 mm para que el flex baje al CSI) y 2 mm más baja; el extremo trasero es una cáscara de
-  1,6. El cuerpo quedó en 86,2 × 28,7 × 36,6.
+- **Seguía grande y con relleno en los extremos.** La cámara se acercó a la Pi (quedan 3,2 mm para que
+  el flex baje al CSI), la nariz quedó más baja (32,2) y el extremo trasero es una cáscara. El cuerpo
+  quedó en 83,4 × 28,5 × 37,2.
+- **Los pernos traseros se rompían.** Ahora hay un par de trabas atrás, en x 30, como las de los costados.
 - Error mío del proceso: mandé a imprimir la v0.10 con medidas supuestas sin confirmar. Las verificaciones
   pasaban contra maquetas, pero las maquetas no tenían el disipador ni el pulsador real.
 
-**Pendiente**: confirmar las medidas de la tabla del README (separadores sobre la Pi, disipador,
-microSD, soporte del lente, pulsador) antes de imprimir; imprimir primero la nariz como prueba.
+Con las medidas reales que pasó el usuario (disipador 12 × 12 × 4; hexágonos de 2,2 entre caras que
+asoman 1,2 sobre la Pi; soporte del lente 11 × 11 × 3 y lente de Ø 8 × 1; pulsador SMD de 4 × 4 × 1, con
+una tecla impresa pegada encima y una tapita detrás, la pieza 06):
 
+- **Sin termofundir por ahora**: los zócalos de los hexágonos tienen 0,2 de luz por lado para que la placa
+  entre y salga sin presión, y la pared de la mitad izquierda apoya en las cabezas de los tornillos del HAT.
+- **Dos versiones** (`VARIANT` en el `.scad`; `export.sh` arma y verifica las dos): `integrated`, con la
+  cámara en una ranura de las dos mitades, y `cap`, un cuerpo de tres piezas en el que la cámara va
+  pegada sobre 4 postes de una tapa aparte (pieza 07, `*_tapa.stl`). La tapa queda atrapada por un reborde
+  en una ranura de las dos mitades. Como su par de trabas delantero caería en la tapa, en esa versión el
+  par de x −12 se da vuelta y engancha en x −22. La corredera, el brazo, la tecla y la tapita son las
+  mismas en las dos.
+
+Revisión multi-modelo (`/tackle-review`, Opus + Sonnet + Haiku + Codex, tres rondas). Lo que encontró:
+
+- Los postes que tenían que sujetar el conjunto no lo tocaban: ahora lo sujeta la pared, apoyada en los tornillos.
+- El lente de Ø 8 no pasaba por el plano de la junta: el agujero ahora es de 9,4, con una verificación
+  nueva, `cam_insert`.
+- La tapita del botón no tenía lugar para los cables: ahora tiene 1,0 de luz, un taco y muescas.
+- Las trabas eran más finas que las de la v0.9: volvieron a sus valores, con paredes de 2,7.
+- La corredera de la versión con tapa quedaba 0,6 corta de ON. Ahora es una sola corredera para las dos
+  versiones.
+- En la versión con tapa no había ninguna traba adelante.
+- El README tenía números viejos.
+
+**Pendiente**: imprimir primero la nariz de prueba; medir lo que el README marca `MEASURE`, sobre todo el
+rigidizador del flex de la cámara (tiene 1,4 mm para doblar) y lo que asoma de la microSD (la punta
+queda ~2 mm adentro: hace falta pinza). Subir los STL al Drive de ViroVision (`modelo_3d`).
+
+
+## 2026-10-22 — Carcasa v0.12: lo que mostró la impresión de la v0.11
+
+Se imprimieron las dos versiones de la v0.11. La de tapa de cámara necesitaba muchos más ajustes, así que
+**se descarta** (`export.sh` ya no la genera; el código queda para limpiar). La integrada pasa a
+`via_clara_v0_12.scad`:
+
+- **Cámara:** las guías calzan bien con la placa, pero el lente no entraba. Del centro de la guía delantera
+  a la pared del frente ahora hay 5,0 mm (`CAM_GUIDE_TO_FRONT`; antes 2,65): la nariz crece 2,35 mm.
+- **Trabas delanteras:** estaban encima de las guías de la cámara, pegadas a ellas, y no podían flexionar:
+  costaba cerrarlas y se partieron. El gancho pasó detrás de las guías (x −33) y la viga tiene 0,6 mm libres
+  debajo (`SNAP_UNDER_GAP`).
+- **Zócalos de los hexágonos:** salieron llenos (hexágonos de 2,6 entre caras y 1,2 de profundidad, los
+  cerraban los perímetros). Ahora son agujeros redondos de Ø 3,4 × 1,5.
+- **Ventana de la corredera:** 1 mm más ancha (5,2).
+- **Botón y brazo del auricular:** perfectos, sin cambios.
+- **Flex de la cámara tapando el switch:** probablemente la cámara estaba montada al revés; a confirmar.
+
+Piezas de prueba en `export.sh`:
+
+- `test_nose_left/right`: la nariz cortada en x −28.
+- `test_nose_*_slot_plus02`: la misma nariz con la ranura de la cámara 0,2 más ancha (`RIB_GAP` 0,25), para
+  comparar.
+- `test_pads`: la pared con los 4 postes.
+
+**Pendiente:** el resultado de esas pruebas; elegir el `RIB_GAP`; sacar el código de la versión con tapa;
+actualizar el README a la v0.12.
+
+### Pruebas de la v0.12 → v0.13 (`via_clara_v0_13.scad`)
+
+- **Ranura de la cámara:** la de 0,2 más ancha calzó mejor; queda `RIB_GAP` 0,25.
+- **Flex:** se forzaba. La cámara se corrió 1 mm hacia adelante (`CAM_BACK_X` −37,5): del conector al borde
+  de la Pi hay 4,2 mm.
+- **Componente en la esquina:** un componente chico del lado del lente, en la esquina del borde del
+  conector y el borde de arriba, chocaba con la guía delantera. Esa esquina de la guía queda abierta
+  (`CAM_CORNER_FREE` 7 × 3,5).
+- **Zócalos:** los agujeros redondos de Ø 3,4 siguen chicos, así que el hexágono real es mayor que 2,2
+  (¿se midió la rosca?). `test_hex_sizes` trae zócalos de 3,0 a 5,5 entre caras para encontrarlo; `test_pads`
+  espera esa medida.
+
+**Pendiente:** el tamaño del hexágono, la nariz v0.13 probada, sacar el código de la versión con tapa y
+actualizar el README.
+
+### Pruebas de la v0.13 → v0.14, carcasa completa (`via_clara_v0_14.scad`)
+
+- **Cámara:** quedó perfecta (ranura de 1,62, 4,2 mm para el flex, esquina abierta).
+- **Hexágonos:** entran en el zócalo de 5,0 entre caras (`test_hex_sizes`; el 2,2 del principio era el
+  agujero de arriba). Pero un zócalo así pide un poste de ~8 mm, que caería sobre el header, los puertos y
+  los componentes de fuera del anillo libre de Ø 6. Por eso cada poste mide Ø 5,4, termina 0,1 por encima del
+  hexágono y tiene un perno de Ø 1,8 × 1 que entra en su agujero. Imprime hacia arriba, sin soportes.
+- **Tapita del botón (pieza 06):** eliminada; el botón queda sujeto en su bolsillo.
+- **Auricular:** es redondo, de Ø 14 × 5. La copa ahora es redonda, de Ø 15 × 6, y lleva una **rejilla a click**
+  (pieza 07): un disco con ranuras y seis dedos con reborde que entran en una ranura de la copa, sin dedos
+  del lado del tubo del brazo.
+
+**Pendiente:** imprimir la v0.14 completa y probarla; actualizar el README (todavía describe la v0.11); sacar
+el código de la versión con tapa; commitear.
+
+### v0.15 (`via_clara_v0_15.scad`), revisión del usuario sobre la v0.14
+
+- **Hexágonos:** el usuario prefiere zócalos hexagonales huecos (5,0 entre caras, como el número 5 de
+  `test_hex_sizes`) en vez del perno. El poste resultante (Ø 8,2) se recorta a 0,3 del header y de los puertos
+  (`pi_tall_parts`), donde queda 0,8 de pared en una cara plana. La maqueta de componentes bajos ahora supone
+  que no hay nada dentro de su huella: hay que verificarlo en la placa real.
+- **Tapa del auricular:** sólida, con una ranura de 1,6 × 8 hacia el oído (+X, supuesto), y el mismo click.
+- **Corredera:** perilla 1 mm más saliente (2,5); agarra la palanca con un hueco rectangular a medida (0,1 de
+  luz por lado) en vez de la herradura, con paredes 1 mm más largas; la carrera sigue exactamente a la palanca
+  y la ventana no cambió de tamaño.
+- **Botón:** cilindro liso de Ø 5 que se pega al pulsador, 2 mm más largo.
+- La carpeta del escritorio de la v0.14 quedó sin imprimir; la v0.15 va en `~/Desktop/VIA_CLARA_v0_15/`.
+
+### v0.16 (`via_clara_v0_16.scad`), impresión de la v0.15
+
+La v0.15 impresa quedó casi perfecta. Lo único: los zócalos hexagonales levantaban la placa y las mitades no
+cerraban. Los zócalos pasan a 3,5 de profundidad (2 mm más; `SOCKET_DEPTH`). Sólo cambia la mitad derecha
+(`~/Desktop/VIA_CLARA_v0_16/`). Si el conjunto real es más grueso que la maqueta, el header queda más cerca de
+la pared que los 0,6 previstos: revisarlo al cerrar.
+
+### v0.17 (`via_clara_v0_17.scad`)
+
+El auricular de Ø 14 no entró en la copa de Ø 15. Para probar, la copa pasa a Ø 17 (`CUP_D`); la tapa a click
+crece con ella. Falta saber si el problema era la contracción del agujero o algo que sobresale del auricular.
+
+### v0.18 (en curso): switch deslizante en la pared
+
+El usuario compró un switch deslizante con brida de dos tornillos (separación medida 13,5, brida de 4 de
+ancho). Va cableado al HAT y pegado del lado de adentro de la cara cabeza, con la perilla por la ventana: reemplaza
+la llave del HAT y la corredera impresa (pieza 05). La ventana pasa a 4,2 de ancho (1 mm menos). Antes de tocar
+la mitad izquierda, `test_panel_switch` prueba 5 separaciones de pernos (13,0 a 14,0) para la brida.
+
+### v0.19 (en curso): segunda prueba del switch
+
+De la prueba de la v0.18, la separación de 14,0 fue la más cercana pero le faltaba 0,5; los pernos de Ø 1,5
+quedaron flacos y cortos. `test_panel_switch` pasa a una sola ventana con pernos a 14,5, de Ø 3 y 2 mm de alto.
+Si calza, va a la mitad izquierda.
+
+Tras dos pruebas más (pernos de Ø 2,9 y luego de Ø 2,7 a 14,7), el usuario fijó la medida: pernos de Ø 2,3 a 14,8.
+
+### v0.20 (`via_clara_v0_20.scad`): la versión para imprimir completa
+
+El switch de panel queda integrado en la mitad izquierda. La ventana mide 4,2 × 7,4 y tiene dos pernos de Ø 2,3,
+a 14,8 entre centros y 2 mm de alto, para los agujeros de la pestaña; se fija con gotita. La ventana bajó 2 mm
+respecto de la de la corredera: probé una pestaña de 20 mm centrada en el lugar viejo y chocaba con la esquina
+redondeada de arriba de la cámara. El largo real de la pestaña no está medido. Se eliminan la corredera (pieza 05)
+y sus verificaciones; en su lugar está `panel_switch`, que comprueba que los pernos no toquen la mitad derecha, el
+hardware ni el paso del flex. Las curvas pasan a 128 segmentos. `export.sh`: 36 ok. Copia en
+`~/Desktop/VIA_CLARA_v0_20/`.
+
+**Resultado (2026-10-30):** el usuario la imprimió y la armó completa con todo el hardware; quedó perfecta.
+
+Pendientes: README y PROJECT-STATUS siguen describiendo la v0.11; sacar el código de la variante `cap`; commit y
+PR a staging.

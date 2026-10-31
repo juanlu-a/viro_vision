@@ -1,0 +1,22 @@
+VIA Clara v0.14: carcasa completa (versión integrada)
+
+Para imprimir (en la orientación en que vienen los STL):
+  01_left_half      cara cabeza abajo; soportes sólo bajo la cara cabeza, que apoya alta.
+  02_right_half     cara externa abajo, plana. Los 4 postes con su perno quedan hacia arriba: sin
+                    soportes. Después de imprimir, cortar los 8 puentes de las vigas de las trabas.
+  03_bone_arm       acostado, con la copa del auricular abierta hacia arriba.
+  04_mode_button    tecla que va pegada sobre el pulsador.
+  05_power_slider   corredera de la llave de encendido.
+  07_transducer_grille  rejilla del auricular: disco abajo, dedos hacia arriba, sin soportes.
+  00_assembly_check sólo para mirar el armado: NO se imprime.
+
+Ya no existe la pieza 06 (tapita del botón): el botón queda sujeto en su bolsillo.
+
+Cambios respecto de las pruebas de la v0.13:
+  - La cámara queda como en las narices de prueba de la v0.13: ranura de 1,62, 1 mm más para el flex
+    y la esquina del componente abierta.
+  - Postes de la Pi: en vez de zócalo, un perno de Ø 1,8 que entra 1 mm en el agujero de cada hexágono.
+    El poste mide Ø 5,4 y apoya 0,1 por encima del hexágono, dentro del anillo libre de Ø 6 de la Pi.
+  - Auricular: copa redonda de Ø 15 y 6 de profundidad, con la rejilla a click sobre el borde. Del lado
+    por donde entra el tubo del brazo la rejilla no tiene dedos.
+  - La ranura de la corredera es 1 mm más ancha (5,2).

@@ -313,11 +313,11 @@ Pick a track (see the skill for pillar detail):
   plazo a `capture_request`**, que es lo que la trabó para todo, foto de supermercado incluida.
   La batería se lee del INA219 del HAT desde el 2026-10-06 (`battery.py`) y llega a la app por `status`.
   Siguen: DAC I2S, medir el consumo real y la app mostrando la lectura de ómnibus. La **carcasa**
-  vigente es la VIA Clara v0.11 (`hardware/case-via-clara/`, 2026-10-21): dos mitades a presión sobre
-  el conjunto real HAT + batería + Pi. Se imprimieron la v0.9 (casi todo encajó) y la v0.10 (salió mal:
-  guías de cámara que no se podían imprimir, botón contra el disipador, microSD en espejo); la v0.11 corrige las dos. Los STL se regeneran con `export.sh` y van al Drive de ViroVision (`modelo_3d`, todavía por crear
-  en esa cuenta). Falta medir los separadores sobre la Pi, la microSD y el soporte del lente, e imprimir
-  la v0.10.
+  vigente es la VIA Clara v0.20 (`hardware/case-via-clara/`, 2026-10-29): dos mitades a presión sobre
+  el conjunto real HAT + batería + Pi, con la cámara adentro. Se imprimió y armó completa el 2026-10-30 y
+  quedó perfecta. Se llegó ahí en doce versiones, de la v0.9 a la v0.20 (varias, sólo piezas de prueba), cada una corrigiendo lo
+  que mostró la anterior (cámara, zócalos hexagonales, auricular, switch de panel). Los STL de todas las
+  versiones están en `hardware/case-via-clara/versions/`.
 
 **Recommendation:** **A** — it delivers a working, testable recognition demo now, de-risks the core
 value prop, and exercises the recognition/audio domain already scaffolded.
