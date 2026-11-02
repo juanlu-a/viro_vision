@@ -217,6 +217,29 @@ describe('a reading with nothing on screen', () => {
     expect(mockEvents).toContain('photo.failed');
   });
 
+  it('marks a failed capture as such, and clears it on the next reading and on a mode change', async () => {
+    let fail = true;
+    configureReader(
+      deps({ downloadPhoto: () => (fail ? Promise.reject(new Error('no route to host')) : Promise.resolve(photo)) }),
+    );
+    enterSupermarket();
+
+    await requestReading('device');
+    expect(getReaderState().failure).toBe('deviceCapture');
+
+    expect(getReaderState().resultPhrase).toBeNull();
+
+    fail = false;
+    await requestReading('device');
+    expect(getReaderState().failure).toBeNull();
+    expect(getReaderState().resultPhrase).toEqual(expect.stringContaining('Saman'));
+
+    fail = true;
+    await requestReading('device');
+    setModeFromDevice('bus');
+    expect(getReaderState().failure).toBeNull();
+  });
+
   it('releases the session even when the cloud throws', async () => {
     mockRecognize.mockRejectedValue(new Error('boom'));
     configureReader(deps());

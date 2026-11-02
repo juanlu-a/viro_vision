@@ -4303,3 +4303,35 @@ carcasa y el PROJECT-STATUS se pusieron al día con la v0.20; la rama se integr�
 
 **Pendiente**: sacar del `.scad` el código de la variante con tapa (ya no se exporta); los postes 1 mm más
 bajos, si el usuario lo retoma.
+
+## 2026-11-02 — Modo producto y modo desarrollo en la app
+
+**Pedido**: que la app quede limpia para quien la usa y que lo de desarrollo (fotos, campos de la
+lectura, selector de modelo) se vea sólo a pedido. La telemetría a Supabase no cambia: el ajuste es
+sólo de interfaz.
+
+- Ajustes suma "Modo de la app", con dos opciones: **Modo producto** (por defecto) y **Modo
+  desarrollo**. Es un `radiogroup` y no un interruptor, por la misma razón que "Dónde se escucha", y
+  la elección se dice en voz alta. Se guarda en el teléfono (`services/storage/appModePreference.ts`);
+  cualquier valor raro o una falla de lectura cae en modo producto.
+- En **modo producto**, Inicio muestra el modo, sus dos botones y el de leer. No muestra los campos
+  de la lectura (producto, marca, detalle, línea, destino), la foto del dispositivo, los ómnibus
+  detectados, el aviso de "no disponible en esta versión" ni las líneas de estado o error. Queda una
+  sola línea, "El dispositivo no pudo sacar la foto", porque es la única falla que se resuelve ahí
+  mismo. El selector de modelo de Ajustes también queda sólo en desarrollo.
+- La decisión vive en una función pura (`features/reader/homeView.ts`) con sus tests.
+- No cambia nada de lo que se registra: el pipeline, la telemetría y la subida de evidencia no leen
+  el modo.
+
+- Revisión multi-modelo (Opus, Sonnet y Haiku; Codex no corrió: la CLI pide `gpt-5.5`, que no está
+  disponible con la cuenta de ChatGPT). Sin hallazgos críticos ni mayores. Se aplicaron: la falla de
+  captura pasa a un campo tipado (`failure`) en vez de comparar el texto en español; esa línea va sin
+  el rótulo "Última lectura"; una elección de modo hecha antes de que cargue la guardada ya no se pisa;
+  sin modelo de nube, el aviso pasa a la pista de VoiceOver del botón de leer en modo producto.
+- A pedido del usuario, en modo producto: Inicio deja la última lectura escrita en una sola línea (la
+  frase que se dijo, campo `resultPhrase`), para que VoiceOver pueda volver a ella; y la pestaña
+  Dispositivo esconde su línea de estado (la conexión se dice por voz y la cuenta el botón).
+
+**Pendientes**: `services/evidence` sigue guardando las fotos en `cache/evidence-shown/` aunque no se
+muestren; no hay test del provider (el repo no tiene `@testing-library/react-native`); verificar en
+el iPhone que el título "Modo de la app" no se diga dos veces con VoiceOver.
