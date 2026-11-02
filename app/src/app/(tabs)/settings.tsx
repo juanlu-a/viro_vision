@@ -62,11 +62,10 @@ export default function SettingsScreen() {
     <Screen scroll>
       <ScreenHeader title={t.title} />
 
-      {/* No surrounding label, by request: the trigger already announces itself as "Modelo
-          seleccionado: X" and the menu as "Seleccionar modelo". With no key in the build there is
-          nothing to choose and it says so, because an absent control communicates no state. */}
       {/* Development mode only: which cloud model answers is the team's comparison, not a choice
-          someone using the app can weigh by ear. Product mode reads with the stored or default one. */}
+          someone using the app can weigh by ear. Product mode reads with the stored or default one.
+          No surrounding label, by request: the trigger already announces itself as "Modelo
+          seleccionado: X". With no key in the build the card says so instead of going empty. */}
       {isDevelopment && (
         <Card>
           {model ? (

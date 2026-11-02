@@ -11,19 +11,23 @@ const base: ReaderState = {
   reading: null,
   product: null,
   photoUri: null,
+  failure: null,
+  resultPhrase: null,
 };
 
 const withProduct: ReaderState = {
   ...base,
   message: 'Yerba, Canarias.',
+  resultPhrase: 'Yerba, Canarias.',
   product: { kind: 'Yerba', brand: 'Canarias', detail: null },
   photoUri: 'file:///photo.jpg',
 };
 
 describe('homeView, product mode', () => {
-  it('draws no result rows, photo or bus shots', () => {
+  it('draws the phrase that was said, but no result rows, photo or bus shots', () => {
     expect(homeView(withProduct, 'product', true)).toEqual({
-      message: null,
+      message: 'Yerba, Canarias.',
+      messageIsResult: true,
       rows: null,
       photoUri: null,
       busShots: false,
@@ -32,9 +36,17 @@ describe('homeView, product mode', () => {
     expect(homeView({ ...base, mode: 'bus' }, 'product', true).busShots).toBe(false);
   });
 
-  it('keeps only the failed-capture line', () => {
-    const failed = { ...base, message: strings.reader.deviceCaptureFailed };
-    expect(homeView(failed, 'product', true).message).toBe(strings.reader.deviceCaptureFailed);
+  it('keeps only the failed-capture line, without the result caption', () => {
+    const failed: ReaderState = {
+      ...base,
+      message: strings.reader.deviceCaptureFailed,
+      failure: 'deviceCapture',
+      photoUri: 'file:///old.jpg',
+    };
+    const view = homeView(failed, 'product', true);
+    expect(view.message).toBe(strings.reader.deviceCaptureFailed);
+    expect(view.messageIsResult).toBe(false);
+    expect(view.photoUri).toBeNull();
     for (const message of [strings.reader.error, strings.reader.readTimedOut, strings.reader.cloudUnavailable, strings.reader.readingFromDevice]) {
       expect(homeView({ ...base, message }, 'product', true).message).toBeNull();
     }
@@ -58,7 +70,9 @@ describe('homeView, development mode', () => {
   });
 
   it('shows any message when there is no result', () => {
-    expect(homeView({ ...base, message: strings.reader.error }, 'development', true).message).toBe(strings.reader.error);
+    const view = homeView({ ...base, message: strings.reader.error }, 'development', true);
+    expect(view.message).toBe(strings.reader.error);
+    expect(view.messageIsResult).toBe(true);
   });
 
   it('shows the bus shots in bus mode and the notice without a model', () => {

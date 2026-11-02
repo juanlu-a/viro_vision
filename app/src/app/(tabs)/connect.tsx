@@ -6,7 +6,9 @@
  * reports about itself. With the logs in Supabase that is read where a log is read, not on the
  * screen of someone who does not see it. What stays is what the user can use or needs to know:
  * whether the device is there, how its network is doing and its battery. Since 2026-10-06 not even
- * the device's error notices: every error goes to telemetry and none to the user.
+ * the device's error notices: every error goes to telemetry and none to the user. Since 2026-11-02
+ * the status line itself is development mode only: in product mode the connection is told by voice
+ * (connected, lost, network ready) and by the one button, which reads "Buscar" or "Desconectar".
  */
 import { View } from 'react-native';
 
@@ -19,6 +21,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import type { ThemeColor } from '@/constants/theme';
 import { notify } from '@/features/audio/systemNotice';
+import { useAppMode } from '@/features/appMode/AppModeProvider';
 import { useDevice } from '@/features/device/DeviceProvider';
 import { useTheme } from '@/hooks/use-theme';
 import { strings } from '@/i18n';
@@ -36,6 +39,7 @@ export default function ConnectScreen() {
   // No error panel since 2026-10-06: the device's own notices and the reason the network failed
   // go to telemetry only. The status line below already says what is missing, in plain language.
   const { connection, wifi, connect, disconnect } = useDevice();
+  const { isDevelopment } = useAppMode();
 
   const isConnected = connection.status === 'connected';
   const isBusy = connection.status === 'scanning' || connection.status === 'connecting';
@@ -59,24 +63,26 @@ export default function ConnectScreen() {
       }}>
       <ScreenHeader title={t.title} subtitle={t.intro} />
 
-      <Card>
-        <View
-          className="flex-row items-center gap-three"
-          accessible
-          accessibilityRole="text"
-          accessibilityLiveRegion="polite"
-          accessibilityLabel={`${t.statusLabel}: ${label.text}`}>
-          <View className="h-[12px] w-[12px] rounded-pill" style={{ backgroundColor: theme[labelColor] }} />
-          <View className="flex-1 gap-[2px]">
-            <ThemedText type="small" themeColor="textSecondary">
-              {t.statusLabel.toUpperCase()}
-            </ThemedText>
-            <ThemedText type="default" className="font-sans-bold" themeColor={labelColor}>
-              {label.text}
-            </ThemedText>
+      {isDevelopment && (
+        <Card>
+          <View
+            className="flex-row items-center gap-three"
+            accessible
+            accessibilityRole="text"
+            accessibilityLiveRegion="polite"
+            accessibilityLabel={`${t.statusLabel}: ${label.text}`}>
+            <View className="h-[12px] w-[12px] rounded-pill" style={{ backgroundColor: theme[labelColor] }} />
+            <View className="flex-1 gap-[2px]">
+              <ThemedText type="small" themeColor="textSecondary">
+                {t.statusLabel.toUpperCase()}
+              </ThemedText>
+              <ThemedText type="default" className="font-sans-bold" themeColor={labelColor}>
+                {label.text}
+              </ThemedText>
+            </View>
           </View>
-        </View>
-      </Card>
+        </Card>
+      )}
 
       {isConnected && connection.device && (
         <Card>

@@ -4314,7 +4314,7 @@ sólo de interfaz.
   desarrollo**. Es un `radiogroup` y no un interruptor, por la misma razón que "Dónde se escucha", y
   la elección se dice en voz alta. Se guarda en el teléfono (`services/storage/appModePreference.ts`);
   cualquier valor raro o una falla de lectura cae en modo producto.
-- En **modo producto**, Inicio muestra sólo el modo, sus dos botones y el de leer. No muestra los campos
+- En **modo producto**, Inicio muestra el modo, sus dos botones y el de leer. No muestra los campos
   de la lectura (producto, marca, detalle, línea, destino), la foto del dispositivo, los ómnibus
   detectados, el aviso de "no disponible en esta versión" ni las líneas de estado o error. Queda una
   sola línea, "El dispositivo no pudo sacar la foto", porque es la única falla que se resuelve ahí
@@ -4323,6 +4323,15 @@ sólo de interfaz.
 - No cambia nada de lo que se registra: el pipeline, la telemetría y la subida de evidencia no leen
   el modo.
 
-**Pendientes**: la pestaña Dispositivo sigue mostrando su línea de estado en los dos modos;
-`services/evidence` sigue guardando las fotos en `cache/evidence-shown/` aunque no se muestren.
-Probarlo en el iPhone.
+- Revisión multi-modelo (Opus, Sonnet y Haiku; Codex no corrió: la CLI pide `gpt-5.5`, que no está
+  disponible con la cuenta de ChatGPT). Sin hallazgos críticos ni mayores. Se aplicaron: la falla de
+  captura pasa a un campo tipado (`failure`) en vez de comparar el texto en español; esa línea va sin
+  el rótulo "Última lectura"; una elección de modo hecha antes de que cargue la guardada ya no se pisa;
+  sin modelo de nube, el aviso pasa a la pista de VoiceOver del botón de leer en modo producto.
+- A pedido del usuario, en modo producto: Inicio deja la última lectura escrita en una sola línea (la
+  frase que se dijo, campo `resultPhrase`), para que VoiceOver pueda volver a ella; y la pestaña
+  Dispositivo esconde su línea de estado (la conexión se dice por voz y la cuenta el botón).
+
+**Pendientes**: `services/evidence` sigue guardando las fotos en `cache/evidence-shown/` aunque no se
+muestren; no hay test del provider (el repo no tiene `@testing-library/react-native`); verificar en
+el iPhone que el título "Modo de la app" no se diga dos veces con VoiceOver.

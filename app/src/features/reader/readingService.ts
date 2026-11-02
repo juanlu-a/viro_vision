@@ -98,6 +98,18 @@ export interface ReaderState {
    * and it is the only way to tell "the model was wrong" from "the photo was of the ceiling".
    */
   photoUri: string | null;
+  /**
+   * Why the last reading did not happen, when it is the device's camera. Typed and not read off
+   * `message`: product mode shows this one failure and nothing else (`homeView.ts`), and matching
+   * the Spanish text would silently drop it the day the phrase is reworded.
+   */
+  failure: 'deviceCapture' | null;
+  /**
+   * The phrase the last successful reading said out loud, or null. Product mode shows only this line
+   * of the result, so VoiceOver can go back to it; it is cleared when a new reading starts, so it is
+   * never "Leyendo…" or an error dressed as a reading.
+   */
+  resultPhrase: string | null;
 }
 
 const initialState: ReaderState = {
@@ -108,6 +120,8 @@ const initialState: ReaderState = {
   reading: null,
   product: null,
   photoUri: null,
+  failure: null,
+  resultPhrase: null,
 };
 
 /**
@@ -273,7 +287,7 @@ async function deliverReading(text: string): Promise<void> {
 function changeMode(next: Mode, source: 'app' | 'device'): void {
   if (next === state.mode) return;
   record('mode.change', { detail: { from: state.mode, to: next, source } });
-  update({ mode: next, reading: null, product: null, message: '', photoUri: null });
+  update({ mode: next, reading: null, product: null, message: '', photoUri: null, failure: null, resultPhrase: null });
   // A system notice and no longer a bare `announce()`: since 2026-09-16 it comes out of the output
   // the user chose, like everything else. `void` because the transition is already applied — the
   // mode must not wait on a speaker.
@@ -352,7 +366,7 @@ async function readBus(uri: string): Promise<void> {
       spoken,
     },
   });
-  update({ status: 'idle', reading: busReading, message: spoken });
+  update({ status: 'idle', reading: busReading, message: spoken, resultPhrase: spoken });
   await announce(spoken);
   record('audio.spoken', { detail: { mode: 'bus', characters: spoken.length, target: 'phone' } });
   // A best-effort copy to the device's speaker, and deliberately NOT governed by the output setting:
@@ -417,7 +431,7 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal, deadlineA
         spoken,
       },
     });
-    update({ status: 'idle', product: r.product, message: spoken });
+    update({ status: 'idle', product: r.product, message: spoken, resultPhrase: spoken });
     // Where this is heard is the user's choice (`features/audio/audioOutput.ts`), and it is AWAITED:
     // the device path has to finish before the `finally` releases the audio session.
     await deliverReading(spoken);
@@ -485,7 +499,7 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
 
   try {
     record('reading.start', { detail: { mode, model: deps.getModel()?.id ?? null, source } });
-    update({ status: 'reading', message: t.readingFromDevice, progress: null });
+    update({ status: 'reading', message: t.readingFromDevice, progress: null, failure: null, resultPhrase: null });
 
     let photo: DevicePhoto;
     try {
@@ -505,7 +519,7 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
       });
       // Something is spoken: someone who cannot see the screen has no other way of knowing why the
       // button did nothing. The reason itself is not — it is in the row above.
-      update({ status: 'idle', progress: null, message: t.deviceCaptureFailed });
+      update({ status: 'idle', progress: null, message: t.deviceCaptureFailed, failure: 'deviceCapture' });
       await announce(t.deviceCaptureFailed);
       return;
     }

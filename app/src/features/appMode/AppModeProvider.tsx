@@ -6,7 +6,7 @@
  * until a remount. It only decides what the SCREEN shows: telemetry, the evidence upload and the
  * reading pipeline never read it, so product mode loses no data in Supabase.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   DEFAULT_APP_MODE,
@@ -27,11 +27,14 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
   // Product until the stored value arrives: if the team's phone flashes clean for a frame that is
   // harmless; a user's phone flashing the photos would not be.
   const [mode, setState] = useState<AppMode>(DEFAULT_APP_MODE);
+  // A choice made before the stored value arrives wins: otherwise the late load would put the old
+  // mode back on screen while storage already holds the new one.
+  const chosen = useRef(false);
 
   useEffect(() => {
     let alive = true;
     void loadAppModePreference().then((stored) => {
-      if (alive) setState(stored);
+      if (alive && !chosen.current) setState(stored);
     });
     return () => {
       alive = false;
@@ -39,6 +42,7 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setMode = useCallback((next: AppMode) => {
+    chosen.current = true;
     setState(next);
     void saveAppModePreference(next);
   }, []);

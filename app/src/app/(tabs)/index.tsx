@@ -90,7 +90,8 @@ export default function HomeScreen() {
         {/* Choosing the model is a setting and lives in Settings; what stays here is only the notice
             that this build ships no key, and only with the mode that needs it active. It is said
             before reading instead of letting the user discover it when taking the photo: state is
-            never communicated by an absent control alone. */}
+            never communicated by an absent control alone. In product mode the line is not drawn
+            and the read button's hint carries it instead, so the screen reader still says it. */}
         {view.cloudNotice && (
           <ThemedText type="small" themeColor="textSecondary">
             {r.cloudNotConfigured}
@@ -110,7 +111,13 @@ export default function HomeScreen() {
                 ? r.reading
                 : r.readWithDeviceButton
           }
-          hint={deviceReady ? r.readWithDeviceHint : r.readNeedsDeviceHint}
+          hint={
+            !deviceReady
+              ? r.readNeedsDeviceHint
+              : mode === 'product' && inSupermarket && !model
+                ? r.cloudNotConfigured
+                : r.readWithDeviceHint
+          }
           onPress={read}
           disabled={busy || state.mode === 'idle' || !deviceReady}
           loading={busy}
@@ -120,9 +127,11 @@ export default function HomeScreen() {
             walkable with the screen reader. */}
         {view.message && (
           <View accessible accessibilityRole="text" accessibilityLabel={view.message}>
-            <ThemedText type="small" themeColor="textSecondary">
-              {r.resultLabel}
-            </ThemedText>
+            {view.messageIsResult && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {r.resultLabel}
+              </ThemedText>
+            )}
             <ThemedText type="subtitle">{view.message}</ThemedText>
           </View>
         )}

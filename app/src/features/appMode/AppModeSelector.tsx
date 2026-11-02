@@ -30,6 +30,8 @@ export function AppModeSelector() {
     if (value === mode) return;
     Haptics.selectionAsync().catch(() => {});
     setMode(value);
+    // `announce` (the phone) and not `notify`: the board has no recorded clip for this phrase, and the
+    // person switching modes is the team, phone in hand.
     void announce(value === 'development' ? t.appModeSetToDevelopment : t.appModeSetToProduct);
   };
 
