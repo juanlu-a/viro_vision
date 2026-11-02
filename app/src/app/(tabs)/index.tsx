@@ -18,6 +18,9 @@
  * 2026-09-14 the device's status line is gone too: the Device tab already says whether the device is
  * fully usable, and saying it twice made Home read like a dashboard. What Home keeps is the reason a
  * read cannot happen, in the read button's hint, because that is actionable right here.
+ *
+ * Since 2026-11-02 the result fields, the photos and the status lines are development mode only
+ * (`features/reader/homeView.ts`): in product mode Home is the controls and nothing else.
  */
 import { Image } from 'expo-image';
 import { View } from 'react-native';
@@ -30,7 +33,8 @@ import { ThemedText } from '@/components/themed-text';
 import { Radius } from '@/constants/theme';
 import { BusShots } from '@/features/device/BusShots';
 import type { Mode } from '@/features/reader/modes';
-import { busLineRows, productRows } from '@/features/reader/result';
+import { useAppMode } from '@/features/appMode/AppModeProvider';
+import { homeView } from '@/features/reader/homeView';
 import { useReader } from '@/features/reader/useReader';
 import { strings } from '@/i18n';
 
@@ -44,9 +48,12 @@ export default function HomeScreen() {
   const t = strings.home;
   const r = strings.reader;
   const { state, applyGesture, read, model, deviceReady } = useReader();
+  // Product mode draws only the controls and the failed-capture line; development mode adds the
+  // result fields, the photos and the notices (`homeView.ts`).
+  const { mode } = useAppMode();
+  const view = homeView(state, mode, model != null);
 
   const busy = state.status !== 'idle';
-  const rows = state.product ? productRows(state.product) : state.reading ? busLineRows(state.reading) : null;
   const inBus = state.mode === 'bus';
   const inSupermarket = state.mode === 'supermarket';
 
@@ -84,7 +91,7 @@ export default function HomeScreen() {
             that this build ships no key, and only with the mode that needs it active. It is said
             before reading instead of letting the user discover it when taking the photo: state is
             never communicated by an absent control alone. */}
-        {inSupermarket && !model && (
+        {view.cloudNotice && (
           <ThemedText type="small" themeColor="textSecondary">
             {r.cloudNotConfigured}
           </ThemedText>
@@ -111,20 +118,20 @@ export default function HomeScreen() {
 
         {/* The voice already said the phrase; the screen shows the fields one by one, readable and
             walkable with the screen reader. */}
-        {state.message !== '' && !rows && (
-          <View accessible accessibilityRole="text" accessibilityLabel={state.message}>
+        {view.message && (
+          <View accessible accessibilityRole="text" accessibilityLabel={view.message}>
             <ThemedText type="small" themeColor="textSecondary">
               {r.resultLabel}
             </ThemedText>
-            <ThemedText type="subtitle">{state.message}</ThemedText>
+            <ThemedText type="subtitle">{view.message}</ThemedText>
           </View>
         )}
-        {rows && (
+        {view.rows && (
           <View className="gap-two">
             <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
               {r.resultLabel.toUpperCase()}
             </ThemedText>
-            {rows.map((row) => (
+            {view.rows.map((row) => (
               <View
                 key={row.label}
                 accessible
@@ -142,21 +149,19 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* The photo the device took, below the result. It is not a diagnostic —telemetry handles
-            that— but product content: someone with some vision uses it to see what the camera
-            framed, which is the only thing that tells "the model got it wrong" from "the photo was
-            of the ceiling". It goes AFTER the fields on purpose: the voice already said the result
-            and the screen reader reaches what can be read first.
+        {/* The photo the device took, below the result. Development mode only since 2026-11-02: it
+            is how the team tells "the model got it wrong" from "the photo was of the ceiling", and
+            someone who does not see the screen gets nothing from it. It goes AFTER the fields.
 
             Fixed 4:3 `aspect-ratio`, which is what the board delivers (1024x766): without it the
             height would be decided by the image on load and the card would jump. */}
-        {state.photoUri && (
+        {view.photoUri && (
           <View className="gap-two">
             <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
               {r.photoLabel.toUpperCase()}
             </ThemedText>
             <Image
-              source={{ uri: state.photoUri }}
+              source={{ uri: view.photoUri }}
               style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: Radius.md }}
               contentFit="contain"
               accessibilityLabel={r.photoHint}
@@ -165,8 +170,8 @@ export default function HomeScreen() {
         )}
 
         {/* Bus mode's counterpart of the photo above: the device reads on its own, so what it saw
-            comes in per bus. TEMPORARY, development only, removed with `services/evidence`. */}
-        {inBus && <BusShots />}
+            comes in per bus. Development mode only. */}
+        {view.busShots && <BusShots />}
       </Card>
 
     </Screen>

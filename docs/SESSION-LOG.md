@@ -4303,3 +4303,26 @@ carcasa y el PROJECT-STATUS se pusieron al día con la v0.20; la rama se integr�
 
 **Pendiente**: sacar del `.scad` el código de la variante con tapa (ya no se exporta); los postes 1 mm más
 bajos, si el usuario lo retoma.
+
+## 2026-11-02 — Modo producto y modo desarrollo en la app
+
+**Pedido**: que la app quede limpia para quien la usa y que lo de desarrollo (fotos, campos de la
+lectura, selector de modelo) se vea sólo a pedido. La telemetría a Supabase no cambia: el ajuste es
+sólo de interfaz.
+
+- Ajustes suma "Modo de la app", con dos opciones: **Modo producto** (por defecto) y **Modo
+  desarrollo**. Es un `radiogroup` y no un interruptor, por la misma razón que "Dónde se escucha", y
+  la elección se dice en voz alta. Se guarda en el teléfono (`services/storage/appModePreference.ts`);
+  cualquier valor raro o una falla de lectura cae en modo producto.
+- En **modo producto**, Inicio muestra sólo el modo, sus dos botones y el de leer. No muestra los campos
+  de la lectura (producto, marca, detalle, línea, destino), la foto del dispositivo, los ómnibus
+  detectados, el aviso de "no disponible en esta versión" ni las líneas de estado o error. Queda una
+  sola línea, "El dispositivo no pudo sacar la foto", porque es la única falla que se resuelve ahí
+  mismo. El selector de modelo de Ajustes también queda sólo en desarrollo.
+- La decisión vive en una función pura (`features/reader/homeView.ts`) con sus tests.
+- No cambia nada de lo que se registra: el pipeline, la telemetría y la subida de evidencia no leen
+  el modo.
+
+**Pendientes**: la pestaña Dispositivo sigue mostrando su línea de estado en los dos modos;
+`services/evidence` sigue guardando las fotos en `cache/evidence-shown/` aunque no se muestren.
+Probarlo en el iPhone.

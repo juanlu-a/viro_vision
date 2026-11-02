@@ -143,6 +143,16 @@ export const es = {
     audioOutputSetToPhone: 'Dónde se escucha: en el teléfono.',
     audioOutputSetToDevice: 'Dónde se escucha: en el dispositivo.',
     audioOutputNotConfigured: 'En esta versión la lectura del supermercado va a sonar en el teléfono.',
+    // Product mode is the clean app people use; development mode adds the photos, the result fields
+    // and the model selector for the team. Only the screen changes: telemetry is always on.
+    appMode: 'Modo de la app',
+    appModeProduct: 'Modo producto',
+    appModeProductHint: 'La app limpia: el resultado se dice en voz alta y la pantalla no muestra fotos ni detalles.',
+    appModeDevelopment: 'Modo desarrollo',
+    appModeDevelopmentHint:
+      'Para el equipo: muestra las fotos del dispositivo, los campos de cada lectura y el selector de modelo.',
+    appModeSetToProduct: 'Modo producto.',
+    appModeSetToDevelopment: 'Modo desarrollo.',
   },
   auth: {
     loading: 'Cargando sesión…',
