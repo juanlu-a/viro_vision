@@ -92,6 +92,12 @@ interface State {
   enabled: boolean;
   /** Consecutive failures of the batch at the front of the queue. See MAX_ATTEMPTS_PER_BATCH. */
   attempts: number;
+  /**
+   * The last send never reached a server (no network, timeout). While true, `record()` stops
+   * triggering threshold sends and only the timer retries: offline, every `record()` past the
+   * threshold used to fire a send that failed at once.
+   */
+  offline: boolean;
 }
 
 /** App version + platform: without it, comparing two failures is comparing two different builds. */
@@ -115,6 +121,7 @@ const state: State = {
   uploading: false,
   enabled: false,
   attempts: 0,
+  offline: false,
 };
 
 /**
@@ -146,7 +153,7 @@ export function record(type: EventType, extra?: { ms?: number; detail?: Record<s
       detail: { app: currentAppState(), ...extra?.detail },
     };
     state.queue.enqueue(event);
-    if (state.queue.length >= UPLOAD_THRESHOLD) void flush();
+    if (state.queue.length >= UPLOAD_THRESHOLD && !state.offline) void flush();
   } catch {
     // Rule 2: telemetry takes nothing down.
   }
@@ -178,21 +185,37 @@ export async function flush(): Promise<void> {
       app: state.app,
       events,
     };
+    // Serialized OUTSIDE the network `try`: a detail that cannot be stringified (a BigInt, a cycle)
+    // is the batch's fault, so it must reach the outer catch and count toward the attempts cap —
+    // treated as "offline" it would block the head of the queue for good.
+    const payload = JSON.stringify(body);
     const controller = new AbortController();
     const timer = state.schedule(() => controller.abort(), TIMEOUT_MS);
+    let r: Response;
     try {
-      const r = await state.fetchImpl(state.url, {
+      r = await state.fetchImpl(state.url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: payload,
         signal: controller.signal,
       });
-      if (!r.ok) throw new Error(String(r.status));
-      state.queue.clearDropped();
-      state.attempts = 0;
+    } catch (err) {
+      // A server that hangs on this batch every time (the function timing out on it) is the batch's
+      // problem, not the network's: it counts as an attempt, or it would block the queue for good.
+      if (controller.signal.aborted) throw err;
+      // Never reached a server: the batch is not to blame, so it does NOT count toward
+      // MAX_ATTEMPTS_PER_BATCH. Counting it gave up a whole batch within three `record()` calls of
+      // going offline — on the street, in bus mode, which is the timeline this table exists for.
+      state.offline = true;
+      state.queue.returnBatch(batch);
+      return;
     } finally {
       state.cancel(timer);
     }
+    state.offline = false;
+    if (!r.ok) throw new Error(String(r.status));
+    state.queue.clearDropped();
+    state.attempts = 0;
   } catch {
     state.attempts += 1;
     if (state.attempts >= MAX_ATTEMPTS_PER_BATCH) {
@@ -201,7 +224,7 @@ export async function flush(): Promise<void> {
       state.queue.drop(batch.length);
       state.attempts = 0;
     } else {
-      // With no internet (the normal case on the device's AP) the batch returns to the queue and waits.
+      // A rejection that may be transient (a 503): the batch returns to the queue and is retried.
       state.queue.returnBatch(batch);
     }
   } finally {
@@ -301,5 +324,6 @@ export function resetTelemetryForTests(): void {
   state.uploading = false;
   state.enabled = false;
   state.attempts = 0;
+  state.offline = false;
   state.phone = 'no-id';
 }

@@ -100,7 +100,10 @@ journalctl --flush || true
 echo "→ systemd service"
 sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$INSTALL_DIR/virovision.service" > /etc/systemd/system/virovision.service
 systemctl daemon-reload
-systemctl enable --now virovision.service
+systemctl enable virovision.service
+# restart, not `enable --now`: on a redeploy the service is already running, and `--now` would
+# leave the old code in memory.
+systemctl restart virovision.service
 
 echo
 echo "done. follow the logs:      journalctl -u virovision -f"

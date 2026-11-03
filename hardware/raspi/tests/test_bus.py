@@ -62,16 +62,33 @@ class FakeBus:
 @pytest.fixture
 def loop():
     loop_ = asyncio.new_event_loop()
+    # The core sends `bus.start`/`bus.stop` to the executor, and those futures are not tasks: a drain
+    # that only gathered tasks raced the worker thread, and the first CI run (2026-11-02) lost it.
+    # Every executor future is tracked so `_drain` can wait for it too.
+    original = loop_.run_in_executor
+    loop_.executor_futures = []
+
+    def tracked(*args, **kwargs):
+        future = original(*args, **kwargs)
+        loop_.executor_futures.append(future)
+        return future
+
+    loop_.run_in_executor = tracked
     yield loop_
     loop_.close()
 
 
 async def _drain(loop_):
-    for _ in range(5):
-        await asyncio.sleep(0)
-    pending = [t for t in asyncio.all_tasks(loop_) if t is not asyncio.current_task()]
-    if pending:
-        await asyncio.gather(*pending)
+    """Until nothing the scenario started is still running: tasks, and work in the executor (which
+    can schedule more tasks when it finishes)."""
+    for _ in range(20):
+        for _ in range(5):
+            await asyncio.sleep(0)
+        tasks = [t for t in asyncio.all_tasks(loop_) if t is not asyncio.current_task()]
+        futures = [f for f in getattr(loop_, "executor_futures", []) if not f.done()]
+        if not tasks and not futures:
+            return
+        await asyncio.gather(*tasks, *futures, return_exceptions=True)
 
 
 def build(loop_, bus=None):
@@ -1007,7 +1024,9 @@ def test_leaving_bus_mode_undoes_the_zoom():
     watcher = BusWatcher(camera, lambda files: None, lambda event: None)
     watcher.running = True
     watcher.stop()
-    assert camera.zooms == [None] and camera.crop == ZoomingCamera.FULL
+    # Twice on purpose: once before the joins (a double click asks for the supermarket photo at the
+    # same moment) and once after, for a frame loop that re-zoomed on its way out.
+    assert camera.zooms == [None, None] and camera.crop == ZoomingCamera.FULL
 
 
 def test_bus_mode_can_be_told_not_to_zoom(monkeypatch):
@@ -1060,3 +1079,34 @@ def test_a_sign_whose_left_margin_the_zoom_cut_is_not_read(monkeypatch):
 
     watcher._queue_read(frame, Box(540, 100, 640, 120), None)  # its margin starts at x = 522: inside
     assert not watcher._jobs.empty()
+
+
+def test_a_press_during_the_boot_build_says_preparing_before_waiting():
+    """The 2026-09-22 bug through a second door: `warm_up` holds the build lock for the whole OCR
+    build (20 to 120 s), and `start` used to wait on that lock before it could say «preparando»."""
+    import threading as _threading
+
+    events = []
+    watcher = BusWatcher(ZoomingCamera(frames=0, sign=None), lambda files: None, events.append)
+    held = _threading.Event()
+    release = _threading.Event()
+
+    def build_in_progress():
+        with watcher._build_lock:
+            held.set()
+            release.wait(5)
+
+    builder = _threading.Thread(target=build_in_progress)
+    builder.start()
+    held.wait(5)
+    starter = _threading.Thread(target=watcher.start)
+    starter.start()
+    deadline = time.monotonic() + 5
+    while not events and time.monotonic() < deadline:
+        time.sleep(0.01)
+    try:
+        assert {"t": "warming"} in events, "silence while the OCR was being built"
+    finally:
+        release.set()
+        builder.join(5)
+        starter.join(5)

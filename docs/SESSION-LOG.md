@@ -4335,3 +4335,59 @@ sólo de interfaz.
 **Pendientes**: `services/evidence` sigue guardando las fotos en `cache/evidence-shown/` aunque no se
 muestren; no hay test del provider (el repo no tiene `@testing-library/react-native`); verificar en
 el iPhone que el título "Modo de la app" no se diga dos veces con VoiceOver.
+
+## 2026-11-02 — Revisión de toda la base (app, placa, Supabase)
+
+**Pedido**: revisar la base entera con el flujo `tackle-review` y corregir errores, optimizaciones y
+fallas. Rama `fix/codebase-review`, desde `staging`. Cinco revisores en paralelo (Opus sobre
+`app/src/services` y `features`, Opus sobre `hardware/raspi`, Sonnet sobre la interfaz y Supabase,
+Sonnet sobre los contratos entre los tres pilares, Haiku sobre tests y CI) y cuatro rondas de
+re-revisión sobre lo corregido. Codex no corrió (la CLI pide `gpt-5.5`, que la cuenta de ChatGPT no
+tiene).
+
+Lo corregido, por pilar:
+
+- **App.** El envío de audio a la placa no recibía la señal de corte, así que el límite de 8 s nunca
+  llegaba al POST. La copia de la lectura de ómnibus a la placa salía con la salida en el teléfono
+  (dos voces) y sin red con la placa (síntesis pagada para nadie): ahora sólo con salida
+  "dispositivo" y la placa alcanzable. Al conectar se lee una vez la característica `mode`, porque
+  la placa no la notifica al suscribirse y un daemon reiniciado volvía en reposo mientras la app
+  seguía en ómnibus; al perder el enlace se olvida el modo. La telemetría sin red descartaba un lote
+  entero a los tres `record()`: un fallo de red ya no cuenta como intento (un timeout o una
+  respuesta de error sí) y, sin red, se deja de disparar un envío por evento. Una elección de salida
+  o de modelo hecha antes de que cargue la guardada ya no se pisa. Se registran las fallas de
+  `readWifi` y el estado de `BleRadioOffError`; `Speech.stop()` quedó dentro del `try`.
+- **Placa.** Un botón durante la carga del OCR al arrancar (20 a 120 s) no decía «preparando»
+  porque esperaba el lock de la carga; ahora lo dice antes de esperar, una sola vez aunque haya dos
+  pulsaciones. El zoom del cartel se deshace antes de esperar a los hilos (la foto de supermercado
+  del mismo doble clic salía recortada) y al empezar cada corrida. La evidencia en el hilo de OCR
+  quedó protegida (una excepción ahí mataba la lectura con el modo "activo"), la línea de tiempo se
+  reinicia por corrida y `setup.sh` reinicia el servicio en un redeploy.
+- **Supabase.** El proxy de visión valida también la ruta por proveedor (antes cualquier endpoint
+  del host recibía la clave), limita el cuerpo contando bytes, no sigue redirecciones, corta la
+  llamada si el teléfono se va (con un límite de 60 s hasta los headers), no devuelve el nombre del
+  secreto ni el error interno y pasa `retry-after`. La función de evidencia tiene un freno por IP.
+  **Hay que redesplegar las dos funciones** para que valga.
+- **Contratos.** Las referencias de evidencia aceptan más de tres dígitos de track (placa, app y
+  función), porque pasado el track 999 todo daba 404.
+- **CI.** Un job nuevo corre los tests de Python de la placa (verificado en un venv limpio); un test
+  de avisos dejó de depender de un `sleep` fijo.
+
+**Pendientes** (encontrados, no corregidos):
+
+- **Decisión del equipo: la clave del AP es fija y pública** (`virovision2026`, en el repo) y el
+  servidor HTTP de la placa no pide autenticación: cualquiera que se una al AP puede bajar las fotos
+  del entorno del usuario o reproducir audio por el parlante. Lo propone una clave por unidad
+  publicada por la característica `wifi` y un token por sesión en los endpoints. Contradice lo
+  aceptado en el ADR 0003, así que va con ADR.
+- Verificar en la función desplegada qué header de IP sobrescribe el edge (el freno por IP puede ser
+  esquivable).
+- Telemetría sin clave de idempotencia (un lote reintentado se inserta dos veces).
+- Menores de accesibilidad: el botón de leer en `loading` muestra sólo el spinner, sin el texto; la
+  línea de estado de Conectar usa `accessibilityLiveRegion` sin anuncio en iOS; la imagen de Inicio
+  sin `accessible`.
+- Código muerto: `features/auth` y sus claves de `es.ts`; `settings.intro` y `connection.connecting`;
+  en la placa, los comandos `measure`/`photo` y la característica `transfer`.
+- Placa: carrera de `camera.start()` contra `restart_camera`; `play_sequence` puede pisar un `play`;
+  el apagado espera al executor; `instalar-daemon.sh` borra la instalación antes de que `setup.sh`
+  termine bien.

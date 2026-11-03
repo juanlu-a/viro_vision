@@ -388,7 +388,7 @@ class Evidence:
 # listing, no pages — what the app was told about is all there is to ask for.
 
 RUN_NAME = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
-FILE_NAME = re.compile(r"^t\d{3}-[a-z0-9-]+\.(jpg|json)$")
+FILE_NAME = re.compile(r"^t\d{3,}-[a-z0-9-]+\.(jpg|json)$")
 """Only names this module writes. A request path is never joined to the root without matching one:
 that is what keeps `/evidence/../../etc/shadow` out — the daemon runs as root."""
 

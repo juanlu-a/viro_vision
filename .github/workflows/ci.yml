@@ -36,6 +36,24 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
+  # The board's daemon has its own suite, and until 2026-11-02 nothing ran it: a PR could break it
+  # and only the board would find out. The tests import-skip what needs the Pi (picamera2, dbus).
+  raspi:
+    name: Daemon tests (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./hardware/raspi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Test
+        run: python -m pytest -q tests
+
   build:
     name: Bundle (build check)
     runs-on: ubuntu-latest

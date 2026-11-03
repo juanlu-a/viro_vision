@@ -26,8 +26,8 @@ import type { DeviceAddress } from '@/services/wifi/deviceHttp';
 import { HttpDownloadError, deviceUrl } from '@/services/wifi/deviceHttp';
 
 /** `<run>/t003-r02`: the names the device writes, and nothing else is ever requested. */
-const REF = /^\d{8}-\d{6}(?:-\d+)?\/t\d{3}-[a-z0-9-]+$/;
-const FILE = /^t\d{3}-[a-z0-9-]+\.jpg$/;
+const REF = /^\d{8}-\d{6}(?:-\d+)?\/t\d{3,}-[a-z0-9-]+$/;
+const FILE = /^t\d{3,}-[a-z0-9-]+\.jpg$/;
 
 export function isEvidenceRef(ref: string): boolean {
   return REF.test(ref);

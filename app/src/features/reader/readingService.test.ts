@@ -190,6 +190,28 @@ describe('a reading with nothing on screen', () => {
     expect(mockAudio.indexOf('end')).toBe(mockAudio.length - 1);
   });
 
+  it('a bus reading is copied to the device only when the device is the chosen, reachable output', async () => {
+    // With the output on the phone, the copy was a second voice saying the same line a moment
+    // later; with the device unreachable, a cloud synthesis that had nowhere to go.
+    const flushVoid = () => new Promise((r) => setImmediate(r));
+    for (const [output, ready, expected] of [
+      ['phone', true, 0],
+      ['device', false, 0],
+      ['device', true, 1],
+    ] as const) {
+      resetReaderForTests();
+      setAudioOutput(output);
+      configureReader(deps({ isDeviceReady: () => ready }));
+      setModeFromDevice('bus');
+      mockSynthesize.mockClear();
+
+      await requestReading('device');
+      await flushVoid();
+
+      expect([output, ready, mockSynthesize.mock.calls.length]).toEqual([output, ready, expected]);
+    }
+  });
+
   it('does not pay for a synthesis when the device cannot receive it', async () => {
     setAudioOutput('device');
     configureReader(deps({ isDeviceReady: () => false }));

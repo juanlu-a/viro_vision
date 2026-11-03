@@ -70,6 +70,14 @@ async def _drain(loop_):
         await asyncio.gather(*pending)
 
 
+async def _until(condition, timeout_s: float = 2.0):
+    """Waits for the executor thread instead of a fixed 50 ms: on a loaded CI runner the thread had
+    not run yet and the assertion raced it."""
+    deadline = asyncio.get_running_loop().time() + timeout_s
+    while not condition() and asyncio.get_running_loop().time() < deadline:
+        await asyncio.sleep(0.005)
+
+
 def _plays(played: list, missing=()):
     """A speaker that has every clip except `missing`."""
 
@@ -88,7 +96,7 @@ def test_a_known_notice_is_played(loop):
         core.write_control(json.dumps({"cmd": "say", "clip": "mode_bus.wav"}).encode())
         # The play runs in an executor so it cannot block the loop BLE is answering from; without
         # this wait the assertion would race the thread.
-        await asyncio.sleep(0.05)
+        await _until(lambda: played)
         assert played == ["mode_bus.wav"]
 
     loop.run_until_complete(scenario())
@@ -104,7 +112,7 @@ def test_a_clip_missing_from_the_sd_is_reported_instead_of_silent(loop):
 
     async def scenario():
         core.write_control(json.dumps({"cmd": "say", "clip": "mode_bus.wav"}).encode())
-        await asyncio.sleep(0.05)
+        await _until(lambda: played)
         await _drain(loop)
         errors = [e for e in notifications.events() if e["t"] == "error"]
         assert len(errors) == 1
