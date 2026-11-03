@@ -62,16 +62,33 @@ class FakeBus:
 @pytest.fixture
 def loop():
     loop_ = asyncio.new_event_loop()
+    # The core sends `bus.start`/`bus.stop` to the executor, and those futures are not tasks: a drain
+    # that only gathered tasks raced the worker thread, and the first CI run (2026-11-02) lost it.
+    # Every executor future is tracked so `_drain` can wait for it too.
+    original = loop_.run_in_executor
+    loop_.executor_futures = []
+
+    def tracked(*args, **kwargs):
+        future = original(*args, **kwargs)
+        loop_.executor_futures.append(future)
+        return future
+
+    loop_.run_in_executor = tracked
     yield loop_
     loop_.close()
 
 
 async def _drain(loop_):
-    for _ in range(5):
-        await asyncio.sleep(0)
-    pending = [t for t in asyncio.all_tasks(loop_) if t is not asyncio.current_task()]
-    if pending:
-        await asyncio.gather(*pending)
+    """Until nothing the scenario started is still running: tasks, and work in the executor (which
+    can schedule more tasks when it finishes)."""
+    for _ in range(20):
+        for _ in range(5):
+            await asyncio.sleep(0)
+        tasks = [t for t in asyncio.all_tasks(loop_) if t is not asyncio.current_task()]
+        futures = [f for f in getattr(loop_, "executor_futures", []) if not f.done()]
+        if not tasks and not futures:
+            return
+        await asyncio.gather(*tasks, *futures, return_exceptions=True)
 
 
 def build(loop_, bus=None):
