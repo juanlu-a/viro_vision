@@ -162,6 +162,30 @@ describe('flush', () => {
     expect(notice?.detail?.droppedEvents).toBe(1); // and the loss is declared
   });
 
+  it('a network failure never gives a batch up: offline is the normal case on the street, not a poisoned batch', async () => {
+    let calls = 0;
+    const rejects = (async () => {
+      calls += 1;
+      throw new Error('Network request failed');
+    }) as unknown as typeof fetch;
+    const stop = start(rejects);
+    record('reading.ok', { detail: { kept: true } });
+    // Far more than MAX_ATTEMPTS_PER_BATCH: before the fix the third one dropped the batch.
+    for (let i = 0; i < 5; i++) await flush();
+    // And once offline, crossing the threshold no longer fires a send per `record()`.
+    const before = calls;
+    for (let i = 0; i < 30; i++) record('device.status');
+    await new Promise((r) => setImmediate(r));
+    expect(calls).toBe(before);
+    stop();
+
+    const { impl, bodies } = recordingFetch();
+    const stop2 = start(impl);
+    await flush();
+    stop2();
+    expect(bodies[0].events.some((e: any) => e.detail?.kept === true)).toBe(true);
+  });
+
   it('after overflowing the queue with no network, the batch that does upload declares how many events were lost', async () => {
     const rejects = (async () => {
       throw new Error('Network request failed');

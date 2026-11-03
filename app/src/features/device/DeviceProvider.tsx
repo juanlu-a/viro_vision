@@ -34,7 +34,7 @@ import {
 import { encodeBase64 } from '@/services/ble/base64';
 import { downloadDevicePhoto, type DevicePhoto } from '@/services/camera';
 import { handleEvidence } from '@/services/evidence';
-import { errorDetail, record } from '@/services/telemetry';
+import { errorDetail, errorType, record } from '@/services/telemetry';
 import { deviceUrl, type DeviceAddress } from '@/services/wifi/deviceHttp';
 import { reachDeviceNetwork } from '@/services/wifi/join';
 
@@ -87,6 +87,15 @@ function errorMessage(err: unknown): string {
   if (err instanceof BleDeviceNotFoundError) return strings.connection.notFound;
   if (err instanceof BleRadioOffError) return strings.connection.radioOff;
   return strings.connection.error;
+}
+
+/**
+ * `readWifi` records its own GATT failures, but not the `BleNotConnectedError` it throws before
+ * trying: without this a lost link here vanished silently (ADR 0011).
+ */
+function recordWifiReadFailure(err: unknown): null {
+  record('ble.readFailed', { detail: { char: 'wifi', message: errorDetail(err), type: errorType(err) } });
+  return null;
 }
 
 export function DeviceProvider({ children }: { children: React.ReactNode }) {
@@ -165,7 +174,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // The device turned its AP on but the app has no credentials for it: almost always it is
         // iOS's GATT cache serving a characteristics list from before `wifi` existed (2026-09-05). It
         // is read once more; if it is still empty, the user is told the remedy, which is theirs.
-        credentials.current = await getBleClient().readWifi().catch(() => null);
+        credentials.current = await getBleClient().readWifi().catch(recordWifiReadFailure);
         if (!current()) return false;
         if (!credentials.current) {
           failNetwork('noCredentials');
@@ -322,7 +331,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       setAddress(device.address);
       setAp(device.ap);
       const run = networkSyncRun.current;
-      credentials.current = await client.readWifi().catch(() => null);
+      credentials.current = await client.readWifi().catch(recordWifiReadFailure);
       // The link can drop during that read (the disconnect handlers bump `networkSyncRun`), and
       // joining and announcing "network ready" for a device that is already gone would be a sentence
       // about nothing. A heartbeat that started its own check meanwhile bumps it too, and then that
@@ -335,8 +344,11 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       record('ble.failed', {
         ms: Date.now() - t0,
         detail: {
-          type: err instanceof Error ? err.name : typeof err,
+          type: errorType(err),
           message: errorDetail(err),
+          // "off" vs "unauthorized" vs "unsupported": the field exists to be read, and they have
+          // different remedies.
+          ...(err instanceof BleRadioOffError ? { state: err.state } : null),
         },
       });
       // Disconnect was tapped while this attempt was failing: no retry is coming, so "still looking"
@@ -377,6 +389,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         setAddress(null);
         setAp(false);
         setWifi('off');
+        // Forgotten too, so a board that comes back reporting the same mode still fires the
+        // reader's `[deviceMode]` effect instead of being treated as "no change". The board wins on
+        // reconnect (ADR 0007: the button is the source of truth): a mode picked in the app while
+        // the link was down never reached it, and keeping it here would show a mode nothing is
+        // running.
+        setDeviceMode(null);
         scheduleRetry();
       }),
       client.onStatus(applyStatus),

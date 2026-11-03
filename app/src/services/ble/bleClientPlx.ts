@@ -15,7 +15,7 @@ import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, hushCommand, noticeCommand,
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 import { loadLastDeviceId, saveLastDeviceId } from '@/services/storage/lastDevice';
-import { errorDetail, record } from '@/services/telemetry';
+import { errorDetail, errorType, record } from '@/services/telemetry';
 
 import {
   encodeBase64,
@@ -179,6 +179,11 @@ class BleClientPlx implements BleClient {
     );
 
     const status = await this.readStatus(device);
+    // Read once, because the board does not notify `mode` on subscribe: a daemon that restarted
+    // (battery, crash) comes back idle, and without this read the app kept showing — and waiting
+    // in — the mode from before the drop while nothing on the board was watching for buses.
+    const mode = await this.readMode(device);
+    if (mode !== null && current()) for (const listener of this.modeListeners) listener(mode);
     return {
       id: device.id,
       name: device.name ?? device.localName ?? DEVICE_ADVERTISED_NAME,
@@ -491,6 +496,19 @@ class BleClientPlx implements BleClient {
     }
   }
 
+  private async readMode(device: Device): Promise<number | null> {
+    try {
+      const c = await this.gatt(() =>
+        this.manager.readCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.mode)
+      );
+      const bytes = c.value ? decodeBase64(c.value) : new Uint8Array();
+      return bytes.length > 0 ? bytes[0] : null;
+    } catch (err) {
+      record('ble.readFailed', { detail: { char: 'mode', message: errorDetail(err), type: errorType(err) } });
+      return null;
+    }
+  }
+
   private receiveEvent(base64: string): void {
     let event: DeviceEvent;
     try {
@@ -505,7 +523,9 @@ class BleClientPlx implements BleClient {
     // separates "iOS never woke us" from "we woke up and the rest of the chain failed", and there is
     // no console to ask: telemetry is the only witness (`services/` may import it; the ADR 0001 ban
     // covers `features/audio/` and `features/recognition/`).
-    record('ble.event', { detail: { t: event.t } });
+    // Except `log`, which already gets its own `device.log` row: one row about another doubled the
+    // table for every line the daemon relays.
+    if (event.t !== 'log') record('ble.event', { detail: { t: event.t } });
     switch (event.t) {
       case 'error':
         for (const listener of this.errorListeners) listener(event.msg);

@@ -377,7 +377,13 @@ async function readBus(uri: string): Promise<void> {
   // destination, plus the notices in `hardware/raspi/virovision/notices.py`), but this reading is
   // OCR'd on the phone and nothing here asks the board to play a clip for it, so this copy still
   // goes through synthesis.
-  if (isSynthesisEnabled) void sendReadingToDevice(spoken);
+  //
+  // Only when the user chose the device AND it can receive it: with the output on the phone this
+  // copy was a second voice saying the same line (`audioOutput.ts`), and with no device network it
+  // paid for a cloud synthesis that had nowhere to go.
+  if (isSynthesisEnabled && getAudioOutput() === 'device' && deps.isDeviceReady()) {
+    void sendReadingToDevice(spoken);
+  }
 }
 
 /**
