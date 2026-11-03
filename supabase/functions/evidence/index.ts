@@ -27,8 +27,41 @@ const MAX_FILE_BYTES = 2_000_000;
 
 /** The names the device writes (`hardware/raspi/virovision/evidence.py`), and nothing else. */
 const PHONE = /^[A-Za-z0-9_-]{1,64}$/;
-const REF = /^(\d{8}-\d{6}(?:-\d+)?)\/t\d{3}-[a-z0-9-]+$/;
-const FILE = /^t\d{3}-[a-z0-9-]+\.jpg$/;
+// `\d{3,}`: the device pads to three digits, and a long run goes past track 999.
+const REF = /^(\d{8}-\d{6}(?:-\d+)?)\/t\d{3,}-[a-z0-9-]+$/;
+const FILE = /^t\d{3,}-[a-z0-9-]+\.jpg$/;
+
+/**
+ * A per-IP brake, the same speed bump as `vision`'s and with the same limits on what it can know
+ * (one count per isolate, the IP from a header). Without one, a loop of valid-shaped POSTs wrote
+ * up to 6 MB a request into the bucket with the service role. A field run uploads a few pictures a
+ * minute; 60 leaves plenty of room.
+ */
+const WINDOW_MS = 60_000;
+const MAX_PER_WINDOW = 60;
+const hits = new Map<string, number[]>();
+let sweptAt = 0;
+
+function overTheBrake(ip: string, now: number): boolean {
+  if (now - sweptAt >= WINDOW_MS) {
+    sweptAt = now;
+    for (const [key, times] of hits) if (times.every((t) => now - t >= WINDOW_MS)) hits.delete(key);
+  }
+  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+  const over = recent.length >= MAX_PER_WINDOW;
+  if (!over) recent.push(now);
+  hits.set(ip, recent);
+  return over;
+}
+
+function clientIp(request: Request): string {
+  return (
+    request.headers.get('cf-connecting-ip')?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown'
+  );
+}
 
 function reply(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -47,6 +80,7 @@ function decode(base64: string): Uint8Array | null {
 
 Deno.serve(async (request: Request) => {
   if (request.method !== 'POST') return reply(405, { error: 'POST' });
+  if (overTheBrake(clientIp(request), Date.now())) return reply(429, { error: 'too many' });
   if (Number(request.headers.get('content-length') ?? '0') > MAX_BODY_BYTES) return reply(413, { error: 'too large' });
 
   let body: { phone?: unknown; ref?: unknown; files?: unknown };
