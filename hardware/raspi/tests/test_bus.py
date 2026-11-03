@@ -1007,7 +1007,9 @@ def test_leaving_bus_mode_undoes_the_zoom():
     watcher = BusWatcher(camera, lambda files: None, lambda event: None)
     watcher.running = True
     watcher.stop()
-    assert camera.zooms == [None] and camera.crop == ZoomingCamera.FULL
+    # Twice on purpose: once before the joins (a double click asks for the supermarket photo at the
+    # same moment) and once after, for a frame loop that re-zoomed on its way out.
+    assert camera.zooms == [None, None] and camera.crop == ZoomingCamera.FULL
 
 
 def test_bus_mode_can_be_told_not_to_zoom(monkeypatch):
@@ -1060,3 +1062,34 @@ def test_a_sign_whose_left_margin_the_zoom_cut_is_not_read(monkeypatch):
 
     watcher._queue_read(frame, Box(540, 100, 640, 120), None)  # its margin starts at x = 522: inside
     assert not watcher._jobs.empty()
+
+
+def test_a_press_during_the_boot_build_says_preparing_before_waiting():
+    """The 2026-09-22 bug through a second door: `warm_up` holds the build lock for the whole OCR
+    build (20 to 120 s), and `start` used to wait on that lock before it could say «preparando»."""
+    import threading as _threading
+
+    events = []
+    watcher = BusWatcher(ZoomingCamera(frames=0, sign=None), lambda files: None, events.append)
+    held = _threading.Event()
+    release = _threading.Event()
+
+    def build_in_progress():
+        with watcher._build_lock:
+            held.set()
+            release.wait(5)
+
+    builder = _threading.Thread(target=build_in_progress)
+    builder.start()
+    held.wait(5)
+    starter = _threading.Thread(target=watcher.start)
+    starter.start()
+    deadline = time.monotonic() + 5
+    while not events and time.monotonic() < deadline:
+        time.sleep(0.01)
+    try:
+        assert {"t": "warming"} in events, "silence while the OCR was being built"
+    finally:
+        release.set()
+        builder.join(5)
+        starter.join(5)

@@ -321,6 +321,10 @@ class BusWatcher:
         # once on a 512 MB board, and the loser's never stopped.
         # Reentrant: `start` holds it across its whole sequence and calls `_build`, which takes it too.
         self._build_lock = threading.RLock()
+        # «Preparando» already said for the build in progress (see `start`), and its own lock: two
+        # presses that miss the build lock at once must not both read False and both say it.
+        self._warming_said = False
+        self._warming_lock = threading.Lock()
         self._watcher = None
         self._settings: dict = {}
         self._stop = threading.Event()
@@ -387,10 +391,40 @@ class BusWatcher:
         bus, another mode, bus again, all inside a cold build — and both used to see `running` False
         and launch their own three threads on the same camera."""
         self._wanted = True
-        with self._build_lock:
-            return self._start_locked()
+        if not self._build_lock.acquire(blocking=False):
+            # Someone else holds the build — almost always `warm_up` building the OCR at boot, which
+            # takes 20 to 120 s. Waiting on the lock first meant `_start_locked` only got to say
+            # «preparando» once the build was over, so a press in that window was silence: the
+            # 2026-09-22 bug again, through a different door.
+            # Not when the holder is another `start` that already said it: two presses in one cold
+            # build would hear «preparando» twice.
+            # The camera still starting is the same sentence and the same wait, so it is said here too:
+            # at boot the two overlap, and the camera branch of `_start_locked` only runs once the
+            # lock is free.
+            announced = not self.ready and self._claim_warming()
+            if announced:
+                log.info("bus: asked to watch while the OCR is being built; saying so")
+                self._warming_up()
+            self._build_lock.acquire()
+        else:
+            announced = False
+        try:
+            return self._start_locked(announced=announced)
+        finally:
+            # This start's build is over, one way or the other: the next cold build may say it again.
+            with self._warming_lock:
+                self._warming_said = False
+            self._build_lock.release()
 
-    def _start_locked(self) -> bool:
+    def _claim_warming(self) -> bool:
+        """True for the one caller that gets to say «preparando» for the build in progress."""
+        with self._warming_lock:
+            if self._warming_said:
+                return False
+            self._warming_said = True
+            return True
+
+    def _start_locked(self, announced: bool = False) -> bool:
         self.unavailable_reason = None
         if self.running:
             return True
@@ -401,7 +435,8 @@ class BusWatcher:
             # Said out loud for the same reason as the OCR warm-up below; `__main__` starts the mode
             # for real once the camera is ready.
             log.info("bus: asked to watch while the camera is still starting; saying so")
-            self._warming_up()
+            if not announced:
+                self._warming_up()
             return False
         if not self.available:
             self.unavailable_reason = "no detector in the sensor" if is_available() else "bus_banner is not installed"
@@ -411,7 +446,7 @@ class BusWatcher:
             self.unavailable_reason = f"the OCR engine failed to build {time.monotonic() - self._engine_failed_at:.0f} s ago"
             log.warning("bus mode unavailable: %s", self.unavailable_reason)
             return False
-        if not self.ready:
+        if not self.ready and not announced and self._claim_warming():
             # The OCR takes tens of seconds to load and `_build` below is where that happens. Until
             # 2026-09-22 a button press inside that window left the device silent, which for someone
             # who cannot see the screen is the same thing as a device that died. It is said before
@@ -438,6 +473,12 @@ class BusWatcher:
             self._jobs = queue.Queue()
             self._results = queue.Queue()
             self._last_frame_at = time.monotonic()
+            # Fresh too: `_build` makes a new Tracker per run and its ids restart at 1, so a timeline
+            # kept across runs logged the new track 1 as "is back", aged from the previous run.
+            self._timeline = Timeline()
+            # From the full view, always: a frame loop of the previous run still inside its `aim`
+            # may have re-zoomed after `_halt`'s reset, and this run's fresh zoom assumes no crop.
+            self._undo_zoom()
             if self._evidence is not None:
                 self._evidence.begin_run()
             self._threads = [
@@ -478,18 +519,29 @@ class BusWatcher:
             self._jobs.put(None)
             threads, self._threads = self._threads, []
             self.running = False
+        # The zoom is undone BEFORE the joins as well as after. The camera is shared, and a double
+        # click from bus mode asks for the supermarket photo at the same moment it stops this mode:
+        # waiting up to 9 s of joins first let that photo come out cropped on a bus sign. The second
+        # reset covers a frame loop that re-zoomed on its way out.
+        self._undo_zoom()
         # Joined outside the lock: three threads at up to 3 s each, and a `start` waiting on the lock
         # meanwhile is a button press that answers 9 s late. Each run has its own stop event and
         # queues, so a thread still finishing cannot touch the next run.
         for thread in threads:
             thread.join(timeout=3)
-        if self._zoom_enabled:
-            # The camera is shared: a supermarket photo taken after this must show the whole view.
-            try:
-                self._camera.set_zoom(None)
-            except Exception as exc:  # noqa: BLE001 — a camera mid-restart comes back unzoomed anyway
-                log.warning("bus: could not undo the zoom (%s)", exc)
+        # Not if a new run started during the joins: that run owns the zoom now.
+        if not self.running:
+            self._undo_zoom()
         log.info("bus mode stopped")
+
+    def _undo_zoom(self) -> None:
+        if not self._zoom_enabled:
+            return
+        # The camera is shared: a supermarket photo taken after this must show the whole view.
+        try:
+            self._camera.set_zoom(None)
+        except Exception as exc:  # noqa: BLE001 — a camera mid-restart comes back unzoomed anyway
+            log.warning("bus: could not undo the zoom (%s)", exc)
 
     def repeat_last(self) -> bool:
         """Says the last reading again. A short click inside bus mode: the user did not catch it, and
@@ -628,7 +680,15 @@ class BusWatcher:
                 log.warning("bus: the reading failed: %s", exc)
                 result = None
             ocr_ms = round((time.monotonic() - started) * 1000)
-            evidence = self._evidence.read(track_id, attempt, frame, result, ocr_ms) if self._evidence else None
+            evidence = None
+            if self._evidence is not None:
+                # Instrumentation, guarded like the read above: a raise here (a full SD, a bad frame
+                # for the encoder) ended the `bus-ocr` thread while `running` stayed true, and the mode
+                # kept watching without ever reading again.
+                try:
+                    evidence = self._evidence.read(track_id, attempt, frame, result, ocr_ms)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("bus: could not keep the evidence: %s", exc)
             results.put((track_id, result.reading if result else None, ocr_ms, evidence))
 
     def _watchdog(self, stop: threading.Event) -> None:
@@ -874,9 +934,14 @@ class BusWatcher:
         Both halves, like every reading: the clip when the device is the output, and the event always,
         so a phone that is listening says it instead. A board with no `.wav` for it (deployed before
         the clip existed) stays quiet here rather than failing to start the mode."""
-        clip = self._announcements / NOTICES_DIR / WARMING_UP_CLIP
-        self._speak([clip] if clip.exists() else [])
-        self._emit({"t": "warming"})
+        # Never raises: `start` calls it with the once-flag claimed and outside its `finally`, so a
+        # failing notify or speaker would have left the flag set and every later cold press silent.
+        try:
+            clip = self._announcements / NOTICES_DIR / WARMING_UP_CLIP
+            self._speak([clip] if clip.exists() else [])
+            self._emit({"t": "warming"})
+        except Exception as exc:  # noqa: BLE001
+            log.warning("bus: could not say it is preparing: %s", exc)
 
     def _announce_presence(self) -> None:
         """«Se acerca un ómnibus»: both halves, like a reading.
