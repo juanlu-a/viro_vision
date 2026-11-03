@@ -4400,5 +4400,7 @@ adversario plausible en el alcance de la tesis. Quedó escrito como actualizaci�
 fila en la tabla de riesgos de la tesis (sec. 6.7) y en el comentario de `ap.py`. Para una versión
 distribuible: clave por unidad y luego token por sesión (trabajo futuro).
 
-**Pendiente**: redesplegar `vision` y `evidence` en Supabase (el token guardado daba 401; el usuario
-está generando uno nuevo).
+**Desplegadas** `vision` y `evidence` con los cambios de #126 (token nuevo en
+`~/.config/virovision/supabase-token`; el anterior daba 401). Verificado: una ruta fuera de la lista
+(`/v1/files`) se rechaza y `evidence` contesta 405 a un GET. Falta una lectura de supermercado real
+desde la app para confirmar el camino completo.
