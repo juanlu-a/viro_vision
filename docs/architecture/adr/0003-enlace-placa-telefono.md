@@ -848,6 +848,33 @@ listo» que §1 proponía antes de pensar en Buildroot es el propio anuncio BLE:
 Para quien llegue por número de PR: la **cola de operaciones GATT** es la actualización del
 2026-09-17 (#94) y **una voz por vez** (`hush`) es la del 2026-09-18 (#97). Las dos siguen vigentes.
 
+## Actualización 2026-11-03: la clave fija del AP queda como riesgo aceptado
+
+La revisión de toda la base del 2026-11-02 (`docs/SESSION-LOG.md`) señaló dos hechos que este ADR ya
+admitía y que conviene escribir con sus consecuencias:
+
+- **La clave del AP es una constante publicada en el repositorio** (`virovision2026`, en
+  `hardware/raspi/virovision/ap.py`), y no una clave por unidad como proponía §4.
+- **El servidor HTTP de la placa no autentica**: atiende a cualquier cliente unido al AP.
+
+Juntos, permiten que alguien cerca del usuario que haya leído el repositorio se una a la red de la
+placa y **descargue la última foto** (`GET /photos/latest`, el entorno de la persona) o **reproduzca
+audio** por su salida (`POST /audio`, por ejemplo un anuncio de línea falso). La premisa de
+«Consecuencias» («los datos no son sensibles») no es exacta para estos dos casos.
+
+**Decisión: se acepta el riesgo para el prototipo**, sin cambios en el código. Motivos:
+
+1. **Hay una sola placa.** La segunda existió sólo porque la primera se rompió. La clave por unidad
+   resuelve un problema de flota que el proyecto no tiene.
+2. **El ataque requiere proximidad física, conocer el proyecto y leer el código.** En el alcance de la
+   tesis (pruebas del equipo y con usuarios acompañados) no hay un adversario plausible.
+3. **El AP es el plan B y tiene alcance local**: no enruta a internet (tesis, sec. 8.7.5).
+
+**Para una versión distribuible**, en este orden: una clave generada por unidad en la primera
+instalación y publicada sólo por la característica `wifi`, que ya la transporta; y luego un token por
+sesión, leído por BLE, que el servidor HTTP exija en cada pedido. Queda como trabajo futuro (tesis,
+cap. 10).
+
 ## Ver también
 
 - Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).

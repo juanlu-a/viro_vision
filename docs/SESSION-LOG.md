@@ -4391,3 +4391,14 @@ Lo corregido, por pilar:
 - Placa: carrera de `camera.start()` contra `restart_camera`; `play_sequence` puede pisar un `play`;
   el apagado espera al executor; `instalar-daemon.sh` borra la instalación antes de que `setup.sh`
   termine bien.
+
+## 2026-11-03 — La clave fija del AP, riesgo aceptado
+
+Del pendiente de la revisión de ayer: el equipo eligió **dejar la clave fija del AP y el HTTP sin
+autenticación como riesgo aceptado** para el prototipo, porque hay una sola placa y no hay un
+adversario plausible en el alcance de la tesis. Quedó escrito como actualización del ADR 0003, como
+fila en la tabla de riesgos de la tesis (sec. 6.7) y en el comentario de `ap.py`. Para una versión
+distribuible: clave por unidad y luego token por sesión (trabajo futuro).
+
+**Pendiente**: redesplegar `vision` y `evidence` en Supabase (el token guardado daba 401; el usuario
+está generando uno nuevo).

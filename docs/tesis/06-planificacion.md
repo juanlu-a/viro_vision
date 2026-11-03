@@ -147,4 +147,5 @@ La etapa final, en ejecución al momento de redactar este informe, comprende:
 | Dependencia de servicios de nube con cuota gratuita | Vigente | Proxy propio que permite rotar o cortar una clave sin publicar una versión; tope de gasto configurado en cada proveedor |
 | Pausa automática del proyecto de backend por inactividad | **Materializado** | Documentado como riesgo operativo; requiere actividad periódica |
 | La precisión del detector cuantizado es desconocida | Vigente | Receta de validación preparada; medición pendiente (sec. 7.4) |
+| Red local del dispositivo con clave fija y servidor HTTP sin autenticación | **Aceptado** | Con una sola unidad y sin adversario plausible en el alcance de la tesis, no se mitiga en el prototipo; para una versión distribuible, clave por unidad y token por sesión (ADR 0003, actualización del 3 de noviembre) |
 | Evaluación realizada sobre video y no sobre la calle | Vigente | Prioridad de la etapa 4; la primera prueba de campo (19 de octubre) mostró que el cartel sólo se leía con el ómnibus muy cerca, lo que motivó el zoom digital |
