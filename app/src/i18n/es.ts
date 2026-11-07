@@ -146,6 +146,8 @@ export const es = {
     // Product mode is the clean app people use; development mode adds the photos, the result fields
     // and the model selector for the team. Only the screen changes: telemetry is always on.
     appMode: 'Modo de la app',
+    appModeSelect: 'Seleccionar modo de la app',
+    appModeHint: 'Elegí si la pantalla muestra sólo el resultado o también los detalles para el equipo.',
     appModeProduct: 'Modo producto',
     appModeProductHint: 'La app limpia: el resultado se dice en voz alta y la pantalla no muestra fotos ni detalles.',
     appModeDevelopment: 'Modo desarrollo',
