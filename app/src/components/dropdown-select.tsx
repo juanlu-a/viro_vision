@@ -1,14 +1,21 @@
 /**
- * A one-line trigger that opens a modal menu: the dropdown every Settings choice uses.
+ * A one-line trigger that opens a modal menu: the dropdown behind the model and app-mode choices.
  *
- * Extracted on 2026-11-07 from `ModelSelector` when the app-mode choice became a dropdown too, so the
+ * Extracted from `ModelSelector` when the app-mode choice became a dropdown too, so the
  * two cannot drift apart in how they sound. The accessible grammar is the one `ModelSelector` had:
  * the trigger is a `button` whose label already says what is in force ("Modelo seleccionado: X"),
  * and the menu is a `radiogroup` whose options carry `checked`. A dropdown and not inline options
  * because it does not inflate the screen, and the trigger says the current value without opening it.
  *
- * Controlled by props: it knows nothing about storage or what the options mean.
+ * Controlled by props: it knows nothing about storage or what the options mean. Picking the option
+ * already in force still reaches `onChange` (the model's provider persists that as a choice); whether
+ * a re-pick is a no-op is the caller's call.
+ *
+ * `onChange` runs in the same tick as the tap, so the trigger already holds the new value when the
+ * modal closes and the screen reader lands back on it. A spoken confirmation is the caller's, and it
+ * should wait for the modal to close (`AppModeSelector` does).
  */
+
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
@@ -51,11 +58,9 @@ export function DropdownSelect<T extends string>({
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const current = options.find((option) => option.value === value);
-
   const choose = (next: T) => {
     setOpen(false);
-    if (next === value) return;
-    Haptics.selectionAsync().catch(() => {});
+    if (next !== value) Haptics.selectionAsync().catch(() => {});
     onChange(next);
   };
 
@@ -63,7 +68,7 @@ export function DropdownSelect<T extends string>({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${current?.label ?? ''}`}
+        accessibilityLabel={`${label}: ${current?.label ?? value}`}
         accessibilityHint={hint}
         accessibilityState={{ disabled }}
         disabled={disabled}
@@ -81,7 +86,7 @@ export function DropdownSelect<T extends string>({
           />
         )}
         <ThemedText type="smallBold" className="flex-1">
-          {current?.label}
+          {current?.label ?? value}
         </ThemedText>
         <Ionicons
           name="chevron-down"
