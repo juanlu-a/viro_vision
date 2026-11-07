@@ -4391,3 +4391,37 @@ Lo corregido, por pilar:
 - Placa: carrera de `camera.start()` contra `restart_camera`; `play_sequence` puede pisar un `play`;
   el apagado espera al executor; `instalar-daemon.sh` borra la instalación antes de que `setup.sh`
   termine bien.
+
+## 2026-11-07 — Placa nueva y el modo de la app como desplegable
+
+**Placa nueva, misma microSD.** La Zero 2 W se rompió de nuevo y se compró otra; la tarjeta es la
+misma, así que arrancó con todo lo que tenía. Se le sumó la red del laboratorio (`TIC.nmconnection`
+en `bootfs`, 2,4 GHz, WPA2/WPA3), pero la red rechazó la clave (`need-auth → no-secrets` en el log de
+NetworkManager): queda por confirmar. En TIC, además, `virovision.local` no resolvía. El despliegue
+se hizo por el hotspot del iPhone: cámara verificada con `rpicam-still`, y el daemon de `staging`
+(PR #126; sólo cambiaban `bus.py` y `evidence.py`) instalado sobre el `.venv`, con el `.tgz` de
+`bootfs` y el `instalar-daemon.sh` puestos al día.
+
+**Audio de la placa nueva: se oye muy bajo, pendiente.** El software quedó descartado: el overlay
+está cargado, el GPIO 12 es PWM0 y `speaker-test`/`aplay` reproducen sin errores en los dos canales;
+sólo se escuchó un pitido muy bajo. Quedó cambiado en la tarjeta `audio_pwm_mode=2` (copia en
+`config.txt.antes-pwm2`), sin veredicto, y el PCM al 100 %. Se retoma en otra sesión.
+
+**El modo de la app es un desplegable** (pedido del usuario: dos botones ocupaban mucho para algo
+que sólo usa el equipo). Se extrajo `components/dropdown-select.tsx` del selector de modelo, y los
+dos selectores lo usan. La revisión multi-modelo encontró dos cosas que se corrigieron: el
+«Modo producto.» hablado espera 600 ms a que el menú se cierre, porque si no se pisaba con
+VoiceOver leyendo el botón al que vuelve el foco (una primera versión demoraba el cambio entero, y la
+segunda vuelta mostró que así VoiceOver leía el valor viejo); y volver a elegir el modelo vigente
+sigue guardándolo.
+La tarjeta del modo perdió su encabezado, que se decía dos veces.
+
+El reporte «en modo producto no se oculta el modelo» no se reprodujo en el código: la tarjeta del
+modelo está detrás de `isDevelopment` desde el PR #125. Se sospecha un build anterior; a confirmar
+con el build instalado.
+
+### Pendientes
+
+- Audio de la placa nueva (ver arriba).
+- Confirmar la clave de la red TIC.
+- Confirmar qué build mostraba el modelo en modo producto.
