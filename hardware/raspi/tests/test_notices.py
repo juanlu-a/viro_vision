@@ -112,7 +112,9 @@ def test_a_clip_missing_from_the_sd_is_reported_instead_of_silent(loop):
 
     async def scenario():
         core.write_control(json.dumps({"cmd": "say", "clip": "mode_bus.wav"}).encode())
-        await _until(lambda: played)
+        # Wait for the error itself, not for `played`: the clip is recorded before `say` raises, and
+        # on a loaded runner the error notification had not been sent yet (CI, 2026-11-07).
+        await _until(lambda: any(e["t"] == "error" for e in notifications.events()))
         await _drain(loop)
         errors = [e for e in notifications.events() if e["t"] == "error"]
         assert len(errors) == 1
