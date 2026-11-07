@@ -4392,6 +4392,19 @@ Lo corregido, por pilar:
   el apagado espera al executor; `instalar-daemon.sh` borra la instalación antes de que `setup.sh`
   termine bien.
 
+## 2026-11-03 — La clave fija del AP, riesgo aceptado
+
+Del pendiente de la revisión de ayer: el equipo eligió **dejar la clave fija del AP y el HTTP sin
+autenticación como riesgo aceptado** para el prototipo, porque hay una sola placa y no hay un
+adversario plausible en el alcance de la tesis. Quedó escrito como actualización del ADR 0003, como
+fila en la tabla de riesgos de la tesis (sec. 6.7) y en el comentario de `ap.py`. Para una versión
+distribuible: clave por unidad y luego token por sesión (trabajo futuro).
+
+**Desplegadas** `vision` y `evidence` con los cambios de #126 (token nuevo en
+`~/.config/virovision/supabase-token`; el anterior daba 401). Verificado: una ruta fuera de la lista
+(`/v1/files`) se rechaza y `evidence` contesta 405 a un GET. Falta una lectura de supermercado real
+desde la app para confirmar el camino completo.
+
 ## 2026-11-07 — Placa nueva y el modo de la app como desplegable
 
 **Placa nueva, misma microSD.** La Zero 2 W se rompió de nuevo y se compró otra; la tarjeta es la
@@ -4400,7 +4413,9 @@ en `bootfs`, 2,4 GHz, WPA2/WPA3), pero la red rechazó la clave (`need-auth → 
 NetworkManager): queda por confirmar. En TIC, además, `virovision.local` no resolvía. El despliegue
 se hizo por el hotspot del iPhone: cámara verificada con `rpicam-still`, y el daemon de `staging`
 (PR #126; sólo cambiaban `bus.py` y `evidence.py`) instalado sobre el `.venv`, con el `.tgz` de
-`bootfs` y el `instalar-daemon.sh` puestos al día.
+`bootfs` y el `instalar-daemon.sh` puestos al día. Con la placa de vuelta en modo producto, el
+usuario reportó que todo funciona desde la app (lectura de supermercado incluida, lo que cierra el
+pendiente del despliegue del proxy del 2026-11-03) salvo el auricular.
 
 **Audio de la placa nueva: se oye muy bajo, pendiente.** El software quedó descartado: el overlay
 está cargado, el GPIO 12 es PWM0 y `speaker-test`/`aplay` reproducen sin errores en los dos canales;

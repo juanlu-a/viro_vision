@@ -21,9 +21,10 @@ log = logging.getLogger(__name__)
 
 CONNECTION_NAME = "virovision-ap"
 SSID = "ViroVision"
-# Fixed for now, and with no pretence of secrecy (ADR 0003: WPA2 encrypts the air, the data is not
-# sensitive). Once there are several units, one per unit and published through the `wifi`
-# characteristic.
+# Fixed and public, as an ACCEPTED risk (ADR 0003, update of 2026-11-03): anyone who reads the repo
+# can join the AP, and the HTTP server does not authenticate, so they could fetch the latest photo or
+# play audio. Accepted because there is one unit and no plausible adversary in the thesis's scope.
+# A distributable version needs a per-unit key (published through `wifi`) and a per-session token.
 PASSWORD = "virovision2026"
 AP_IP = "10.42.0.1"
 

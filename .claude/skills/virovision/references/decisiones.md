@@ -27,7 +27,7 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003: Enlace placa ↔ teléfono · **Proposed (2026-09-04); actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena), 2026-09-20 (conectarse rápido y sin volver a pedir permiso) y 2026-10-22 (placa real, cola GATT, una voz por vez, arranque en 16 s)**
+### ADR 0003: Enlace placa ↔ teléfono · **Proposed (2026-09-04); actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena), 2026-09-20 (conectarse rápido y sin volver a pedir permiso), 2026-10-22 (placa real, cola GATT, una voz por vez, arranque en 16 s) y 2026-11-03 (clave fija del AP y HTTP sin autenticación: riesgo aceptado para el prototipo)**
 
 Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
 dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
