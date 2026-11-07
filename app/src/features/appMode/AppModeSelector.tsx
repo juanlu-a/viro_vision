@@ -1,15 +1,15 @@
 /**
  * Product mode or development mode, in Settings.
  *
- * A `radiogroup` of two named modes and not a `Switch`, for the reason `AudioOutputSelector` gives:
- * "modo desarrollo, desactivado" does not say which mode is in force. Inline and not in a modal: two
- * options do not need a menu, and every extra step is one more for someone walking it by ear. The
- * choice is spoken, because nothing else confirms it to someone who does not see Home change.
+ * A dropdown (`DropdownSelect`) since 2026-11-07, by request: the two inline options took the room of
+ * two buttons for a switch only the team uses, and the trigger already says which mode is in force
+ * ("Modo de la app: Modo producto"), which is what a `Switch` would not ("modo desarrollo,
+ * desactivado" does not say which mode is on). The choice is spoken, because nothing else confirms it
+ * to someone who does not see Home change.
  */
-import * as Haptics from 'expo-haptics';
-import { Pressable, View } from 'react-native';
+import { useRef } from 'react';
 
-import { ThemedText } from '@/components/themed-text';
+import { DropdownSelect, type DropdownOption } from '@/components/dropdown-select';
 import { announce } from '@/features/audio/announcer';
 import { strings } from '@/i18n';
 import type { AppMode } from '@/services/storage/appModePreference';
@@ -18,44 +18,39 @@ import { useAppMode } from './AppModeProvider';
 
 const t = strings.settings;
 
-const OPTIONS: { value: AppMode; label: string; hint: string }[] = [
+/** Long enough for the menu's fade-out (~300 ms) and for the screen reader to land on the trigger. */
+const ANNOUNCE_DELAY_MS = 600;
+
+const OPTIONS: readonly DropdownOption<AppMode>[] = [
   { value: 'product', label: t.appModeProduct, hint: t.appModeProductHint },
   { value: 'development', label: t.appModeDevelopment, hint: t.appModeDevelopmentHint },
 ];
 
 export function AppModeSelector() {
   const { mode, setMode } = useAppMode();
+  // Only the last switch is said: two quick switches must not speak a stale mode after the new one.
+  const pendingAnnounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const choose = (value: AppMode) => {
     if (value === mode) return;
-    Haptics.selectionAsync().catch(() => {});
     setMode(value);
     // `announce` (the phone) and not `notify`: the board has no recorded clip for this phrase, and the
-    // person switching modes is the team, phone in hand.
-    void announce(value === 'development' ? t.appModeSetToDevelopment : t.appModeSetToProduct);
+    // person switching modes is the team, phone in hand. Delayed: said while the menu closes, it would
+    // talk over the screen reader reading the trigger that focus lands on.
+    const phrase = value === 'development' ? t.appModeSetToDevelopment : t.appModeSetToProduct;
+    if (pendingAnnounce.current) clearTimeout(pendingAnnounce.current);
+    pendingAnnounce.current = setTimeout(() => void announce(phrase), ANNOUNCE_DELAY_MS);
   };
 
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={t.appMode} className="gap-one">
-      {OPTIONS.map((option) => {
-        const selected = mode === option.value;
-        return (
-          <Pressable
-            key={option.value}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: selected }}
-            accessibilityLabel={option.label}
-            accessibilityHint={option.hint}
-            onPress={() => choose(option.value)}
-            className={`min-h-touch flex-row items-center rounded-md border border-border-strong px-three active:opacity-85 ${
-              selected ? 'bg-primary' : 'bg-surface-elevated'
-            }`}>
-            <ThemedText type="smallBold" themeColor={selected ? 'onPrimary' : 'text'} className="flex-1">
-              {option.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
-    </View>
+    <DropdownSelect
+      value={mode}
+      options={OPTIONS}
+      onChange={choose}
+      label={t.appMode}
+      hint={t.appModeHint}
+      menuLabel={t.appModeSelect}
+      icon="construct"
+    />
   );
 }

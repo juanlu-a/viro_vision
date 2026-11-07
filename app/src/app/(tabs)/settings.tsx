@@ -108,11 +108,10 @@ export default function SettingsScreen() {
         />
       </Card>
 
-      {/* Last: it is the team's switch, and the user should reach everything else first. */}
+      {/* Last: it is the team's switch, and the user should reach everything else first. No header,
+          like the model card: the trigger already says "Modo de la app: Modo producto", and a header
+          above it would make the screen reader say "modo de la app" twice. */}
       <Card>
-        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
-          {t.appMode.toUpperCase()}
-        </ThemedText>
         <AppModeSelector />
       </Card>
     </Screen>
