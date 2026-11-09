@@ -101,6 +101,18 @@ Ultralytics proporciona modelos YOLO11 de detección preentrenados sobre el data
 
 Para realizar esta adaptación se utiliza un conjunto de imágenes anotadas con las clases y los rectángulos delimitadores de los objetos de interés. El entrenamiento ajusta los parámetros del modelo a la tarea de destino, permitiendo obtener un detector especializado a partir de los pesos preentrenados.
 
+YOLO11 ofrece cinco tamaños de modelo de detección, identificados por una letra: n (*nano*), s (*small*), m (*medium*), l (*large*) y x (*extra large*). Todos comparten la misma arquitectura y difieren en la cantidad de capas y de canales, y por lo tanto en la cantidad de parámetros y en el cálculo necesario por imagen. La tabla resume los valores publicados por Ultralytics para entradas de 640×640 píxeles, con el mAP@0,5:0,95 sobre el conjunto de validación de COCO:
+
+| **Modelo** | **Parámetros (millones)** | **Operaciones (GFLOPs)** | **mAP@0,5:0,95 (COCO)** |
+|---|---|---|---|
+| YOLO11n | 2,6 | 6,5 | 39,5 |
+| YOLO11s | 9,4 | 21,5 | 47,0 |
+| YOLO11m | 20,1 | 68,0 | 51,5 |
+| YOLO11l | 25,3 | 86,9 | 53,4 |
+| YOLO11x | 56,9 | 194,9 | 54,7 |
+
+Fuente: documentación de modelos YOLO11 de Ultralytics. Pasar de la variante n a la x mejora el mAP en unos 15 puntos, a cambio de unas 22 veces más parámetros y 30 veces más operaciones. En un dispositivo con recursos limitados el tamaño suele estar determinado por la memoria disponible antes que por la precisión deseada; en este proyecto, la memoria del sensor de la cámara sólo admite la variante n (sec. 7.4.3). La variante x se utilizó, en cambio, fuera del dispositivo, para generar etiquetas de entrenamiento (sec. 7.4.2).
+
 La comparación con otras alternativas se presenta en el apartado 3.6 del estado del arte. La justificación de la elección del modelo y los detalles de su entrenamiento para el proyecto se desarrollan en el capítulo 7.
 
 ## 3.5 Reconocimiento óptico de caracteres
@@ -123,7 +135,7 @@ Las herramientas existentes se presentan en el apartado 3.4 del estado del arte.
 
 La computación en el borde (Edge Computing) se refiere al procesamiento de datos cerca de la fuente de generación, en lugar de enviarlos a servidores remotos en la nube. En el contexto de la IA, esto implica ejecutar modelos de inferencia directamente en dispositivos de recursos limitados, como microcontroladores o computadoras de placa única. Esta aproximación ofrece ventajas críticas para aplicaciones de asistencia: latencia reducida (respuesta en tiempo real sin depender de conectividad), privacidad de los datos (el procesamiento ocurre localmente) y funcionamiento offline.
 
-Los modelos Gemma de Google se evaluaron en el *spike* de visión local del 2026-08-12/13, sobre un iPhone 15 Pro (docs/spike-vision-local.md). Gemma 3 1B generó texto localmente en 910 ms, a 13,4 tokens por segundo, con LiteRT-LM; la visión con ese runtime falló en iOS por un defecto de la librería. El modelo multimodal más chico, Gemma 4 E2B (3 GB), sí leyó el cartel por ExecuTorch, pero con un total de ~6,4 s y sin coordenadas para priorizar entre varios ómnibus. El ADR 0006 (2026-08-22, enmendado el 2026-09-07) cerró la pregunta por caso de uso: en ómnibus no hay LLM, y la detección la hace un YOLO11n cuantizado a int8 dentro del sensor IMX500 de la cámara, seguido de recorte y OCR en la placa (sec. 7.4); en supermercado el modelo de visión corre en la nube (sec. 7.5). Gemma no se evaluó sobre la Raspberry Pi Zero 2 W, y un Gemma chico sigue siendo el candidato para el respaldo local del modo supermercado, que está pendiente (sec. 7.5.5).
+Los modelos Gemma de Google se evaluaron en el *spike* de visión local del 2026-08-12/13, sobre un iPhone 15 Pro (docs/spike-vision-local.md). Gemma 3 1B generó texto localmente en 910 ms, a 13,4 tokens por segundo, con LiteRT-LM; la visión con ese runtime falló en iOS por un defecto de la librería. El modelo multimodal más chico, Gemma 4 E2B (3 GB), sí leyó el cartel por ExecuTorch, pero con un total de ~6,4 s y sin coordenadas para priorizar entre varios ómnibus. El ADR 0006 (2026-08-22, enmendado el 2026-09-07) cerró la pregunta por caso de uso: en ómnibus no hay LLM, y la detección la hace un YOLO11n cuantizado a int8 dentro del sensor IMX500 de la cámara, seguido de recorte y OCR en la placa (sec. 7.4); en supermercado el modelo de visión corre en la nube (sec. 7.5). Gemma no se evaluó sobre la Raspberry Pi Zero 2 W. Para el respaldo local del modo supermercado no se llegó a incorporar ningún modelo: un modelo multimodal pequeño, por ejemplo de la familia Gemma, es la alternativa identificada, pero su evaluación sobre productos reales quedó como trabajo futuro (sec. 7.5.5).
 
 *\[PENDIENTE: apartado asignado a Magalí Dellapiazza.\]*
 
@@ -161,6 +173,14 @@ React Native expone una API de accesibilidad que permite anotar los componentes 
 Estas propiedades permiten que, en los casos donde se usan componentes estándar de React Native, VoiceOver (iOS) y TalkBack (Android) puedan leer e interactuar con la interfaz sin necesidad de código nativo adicional. Sin embargo, como se detalla en la sección de Estado del Arte, esta cobertura no es completa para todos los casos de uso.
 
 ## 3.9 Síntesis de voz y gestión de audio como interfaz
+
+La síntesis de voz (*text-to-speech*, TTS) convierte un texto en una señal de audio que reproduce el habla. Los sistemas actuales realizan el proceso en dos etapas: primero analizan el texto (normalizan números y abreviaturas y determinan la pronunciación de cada palabra) y luego generan la señal de audio. Los sistemas más recientes se basan en redes neuronales, que producen una voz más natural que los métodos anteriores por concatenación de fragmentos grabados.
+
+Los sistemas operativos móviles incluyen un motor de síntesis que funciona sin conexión y es el mismo que utilizan los lectores de pantalla. También existen servicios de síntesis en la nube, que suelen ofrecer voces más naturales y permiten indicar el acento o la pronunciación, a cambio de requerir conexión y de agregar latencia. Una tercera alternativa, cuando el repertorio de frases es cerrado y conocido de antemano, es generar los audios con anticipación y reproducirlos como archivos, lo que no requiere conexión ni procesamiento en el momento.
+
+Para una persona ciega o con baja visión, el audio es el canal principal de información. Esto plantea requisitos que no aparecen en una aplicación convencional. El primero es la convivencia con el lector de pantalla (VoiceOver en iOS, TalkBack en Android), que también habla: la aplicación debe decidir si su voz interrumpe, atenúa o se mezcla con la del lector, y una mala elección corta los mensajes que el usuario necesita para navegar. Los sistemas operativos gestionan esta convivencia mediante sesiones de audio, que definen cómo se combina el sonido de una aplicación con el del resto del sistema. El segundo es la latencia: entre el pedido del usuario y la respuesta no hay otra forma de saber que el sistema está trabajando, por lo que una espera larga se percibe como una falla. El tercero es la brevedad y el orden de los mensajes: el usuario escucha la frase completa antes de poder actuar, de modo que conviene decir primero el dato que más información aporta.
+
+La aplicación de estos criterios en el sistema (la elección entre la voz del sistema, la síntesis en la nube y los audios pregrabados, y la configuración de la sesión de audio) se describe en las secciones 7.4.12, 7.5.3 y 7.6.3.
 
 ## 3.10 Criterios de accesibilidad: WCAG
 

@@ -2,7 +2,7 @@
 
 ## 2.1 Alcance
 
-El proyecto consiste en el diseño y desarrollo de un sistema de asistencia para personas con baja o nula visión, capaz de reconocer visualmente objetos de interés mediante técnicas de Computer Vision, Machine Learning e Inteligencia Artificial. El sistema estará orientado a la identificación de líneas de ómnibus metropolitanos y de productos de supermercado.
+El proyecto consiste en el diseño y desarrollo de un sistema de asistencia para personas con baja o nula visión, capaz de reconocer visualmente objetos de interés mediante técnicas de Computer Vision, Machine Learning e Inteligencia Artificial. El sistema estará orientado a la identificación de líneas de ómnibus metropolitanos y de productos de supermercado. En la propuesta original el segundo caso se limitaba a los productos de la canasta básica; durante el desarrollo el alcance se amplió a los alimentos en general y luego a todo producto alimenticio, y la canasta básica pasó a ser el conjunto de evaluación (sec. 7.5.4).
 
 La solución contempla un dispositivo con cámara (acoplado a una patilla de lentes) que capture una imagen del entorno, procese la información visual y proporcione al usuario retroalimentación auditiva en tiempo real. Además, el mismo se integra con una aplicación móvil, que funcionará como apoyo para la conectividad, el procesamiento y la interacción con el sistema.
 
@@ -32,7 +32,7 @@ Desarrollar un dispositivo de asistencia para personas con baja visión que perm
 1. Diseñar e implementar un criterio de priorización para la retroalimentación auditiva en escenarios con múltiples ómnibus detectados, de modo que el sistema comunique en primer lugar la línea más relevante según su posición o proximidad, pudiendo informar adicionalmente la presencia de otras líneas sin generar sobrecarga auditiva en el usuario.
 ### 2.2.3 Objetivos opcionales
 
-1. Implementar una funcionalidad de selección por señalamiento que permita que, en el caso de los productos de la canasta básica, la respuesta auditiva comunique únicamente el objeto que el usuario esté apuntando o tocando con su dedo índice entre los elementos detectados, a fin de reducir respuestas innecesarias y mejorar la experiencia de uso.
+1. Implementar una funcionalidad de selección por señalamiento que permita que, en el caso de los productos de supermercado, la respuesta auditiva comunique únicamente el objeto que el usuario esté apuntando o tocando con su dedo índice entre los elementos detectados, a fin de reducir respuestas innecesarias y mejorar la experiencia de uso.
 ## 2.3 Entregables del proyecto
 
 El proyecto contempla los siguientes entregables:
@@ -57,7 +57,7 @@ Como soporte de la planificación y seguimiento del proyecto, el equipo mantiene
 
 Entre los principales hitos planificados se encuentran: la compra y validación del hardware (cámara, microcontrolador y auricular) junto con el modelado 3D de la carcasa; la generación de los datasets y el entrenamiento del modelo de reconocimiento de líneas de ómnibus y productos; y el desarrollo e integración de la aplicación móvil, incluyendo las pruebas de accesibilidad con lectores de pantalla nativos y de usabilidad con usuarios ciegos. El cronograma proyecta la finalización del desarrollo hacia mediados de noviembre de 2026, dejando un margen de aproximadamente dos semanas antes de la fecha límite (30 de noviembre) para integración final, corrección de errores y pruebas de conjunto.
 
-Al 22 de octubre de 2026, el modelado 3D de la carcasa lleva tres versiones impresas y una cuarta en desarrollo (v0.12), ajustada con las medidas reales que mostraron esas impresiones; el detalle está en sec. 7.3.5.
+Al 9 de noviembre de 2026, la carcasa se imprimió y se armó completa con todo el hardware en su versión 0.20 (30 de octubre), la versión 0.24 corrigió la orientación de la cámara y la 0.25 está en desarrollo; el detalle está en sec. 7.3.5.
 
 ## 2.4 Antecedentes y contexto
 

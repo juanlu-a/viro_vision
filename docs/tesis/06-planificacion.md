@@ -40,9 +40,9 @@ Dos resultados de esta etapa condicionaron el resto del proyecto. El primero fue
 
 Esta etapa concentró el mayor riesgo técnico del proyecto: determinar qué se puede ejecutar localmente y qué no.
 
-1. **Reunión de seguimiento con el director (10 de agosto).** De ella surgió la propuesta de una pasarela de modelos que permita derivar una inferencia a la nube cuando hay cobertura y eso aporta precisión, manteniendo lo local como respaldo garantizado. Se formalizó como enmienda al ADR 0001.
-1. **Spike de visión local (12 y 13 de agosto).** Se midieron los cuatro caminos posibles de inferencia multimodal sobre un teléfono real. El hallazgo estructural fue que la limitación no estaba en el hardware del teléfono sino en el estado de las librerías disponibles.
-1. **Definición de pipelines por caso de uso (ADR 0006)** y del **modelo de interacción por gestos del botón físico (ADR 0007)**, acordados en reunión de equipo.
+1. Reunión de seguimiento con el director (10 de agosto). De ella surgió la propuesta de una pasarela de modelos que permita derivar una inferencia a la nube cuando hay cobertura y eso aporta precisión, manteniendo lo local como respaldo garantizado. Se formalizó como enmienda al ADR 0001.
+1. Spike de visión local (12 y 13 de agosto). Se midieron los cuatro caminos posibles de inferencia multimodal sobre un teléfono real. El hallazgo estructural fue que la limitación no estaba en el hardware del teléfono sino en el estado de las librerías disponibles.
+1. Definición de pipelines por caso de uso (ADR 0006) y del modelo de interacción por gestos del botón físico (ADR 0007), acordados en reunión de equipo.
 1. Identidad visual y manual de marca.
 1. Primer envío a distribución interna y configuración de los dos canales de publicación.
 
@@ -52,34 +52,35 @@ Al cierre de la etapa quedó definida la arquitectura que el proyecto sostiene h
 
 La etapa en la que el sistema pasó de componentes separados a un producto que funciona de punta a punta, y en la que se concentran las campañas de medición que sustentan el capítulo 7.
 
-1. **Modo supermercado completo** y **ADR 0008**: las claves de los proveedores de nube salen del binario de la aplicación y pasan a un proxy propio.
-1. **Campaña de medición de modelos de nube (2 de septiembre).** Cambió dos decisiones de producto y puso en evidencia tres defectos que no eran visibles de otro modo.
-1. **ADR 0003 y campaña de throughput BLE (4 y 5 de septiembre).** El resultado obligó a rediseñar el enlace: BLE como plano de control, WiFi como plano de datos.
-1. **Dispositivo físico**: daemon en la Raspberry Pi, botón físico, alimentación con batería, cámara con inferencia en el sensor.
-1. **Camino de ómnibus** integrado desde el repositorio de visión hasta la placa.
-1. **ADR 0009** (idioma del código) y **ADR 0010** (un solo tema).
-1. **Hito principal de la etapa (15 de septiembre):** el modo ómnibus corre entero en la placa, con 1,27 segundos entre el gesto del usuario y la línea anunciada.
+1. Modo supermercado completo y ADR 0008: las claves de los proveedores de nube salen del binario de la aplicación y pasan a un proxy propio.
+1. Campaña de medición de modelos de nube (2 de septiembre). Cambió dos decisiones de producto y puso en evidencia tres defectos que no eran visibles de otro modo.
+1. ADR 0003 y campaña de throughput BLE (4 y 5 de septiembre). El resultado obligó a rediseñar el enlace: BLE como plano de control, WiFi como plano de datos.
+1. Dispositivo físico: daemon en la Raspberry Pi, botón físico, alimentación con batería, cámara con inferencia en el sensor.
+1. Camino de ómnibus integrado desde el repositorio de visión hasta la placa.
+1. ADR 0009 (idioma del código) y ADR 0010 (un solo tema).
+1. Hito principal de la etapa (15 de septiembre): el modo ómnibus corre entero en la placa, con 1,27 segundos entre el gesto del usuario y la línea anunciada.
 ## 6.6 Etapa 4: validación en campo y cierre (octubre a noviembre de 2026)
 
 La etapa final comprende:
 
-- **Pruebas en campo reales**: una parada de ómnibus con vehículos en movimiento y una góndola de supermercado. Toda la evaluación del modo ómnibus realizada hasta ahora se hizo contra video reproducido en pantalla, y cerrar esa brecha es la prioridad de la etapa.
-- **Construcción del conjunto de evaluación del modo supermercado**, con fotografías tomadas por el propio dispositivo.
-- **Medición del costo de la cuantización INT8** del detector, hoy no cuantificado.
-- **Entrenamiento del detector en la GPU** puesta a disposición por Arnaldo Castro. Realizado en octubre, con casi 400 fotografías (el primer ajuste fino, en CPU, había usado unas 140). Sus métricas quedan \[PENDIENTE\] de documentar (sec. 7.4).
-- **Alcance de lectura del cartel**: zoom digital del procesador de imagen sobre el cartel (19 de octubre, probado en la placa el 22) y ajuste de los márgenes del recorte (21 y 22 de octubre).
-- **Cierre del hardware**: la lectura del monitor de batería quedó integrada el 6 de octubre y el arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en OpenSCAD y se iteró sobre impresiones de prueba, evaluadas el 17 de octubre (versión 0.9), el 21 (0.10) y el 22 (0.11); la 0.12, en diseño (sec. 7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un transductor de conducción ósea previsto) y la medición del consumo real.
-- **Pruebas de usabilidad con usuarios ciegos** y ajuste de los tiempos de interacción.
-- **Documentación final**, presentación y demostración.
+- Pruebas en campo reales: una parada de ómnibus con vehículos en movimiento y una góndola de supermercado. Toda la evaluación del modo ómnibus realizada hasta ahora se hizo contra video reproducido en pantalla, y cerrar esa brecha es la prioridad de la etapa.
+- Construcción del conjunto de evaluación del modo supermercado, con fotografías tomadas por el propio dispositivo.
+- Medición del costo de la cuantización INT8 del detector, que todavía no se pudo realizar porque el modelo convertido sólo se carga en el entorno del fabricante (sec. 7.4.5).
+- Entrenamiento del detector en la GPU puesta a disposición por Arnaldo Castro. Realizado en octubre, con casi 400 fotografías (el primer ajuste fino, en CPU, había usado unas 140). Sus métricas quedan \[PENDIENTE\] de documentar (sec. 7.4).
+- Alcance de lectura del cartel: zoom digital del procesador de imagen sobre el cartel (19 de octubre, probado en la placa el 22) y ajuste de los márgenes del recorte (21 y 22 de octubre).
+- Cierre del hardware: la lectura del monitor de batería quedó integrada el 6 de octubre y el arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en OpenSCAD y se iteró sobre impresiones de prueba desde el 14 de octubre; la versión 0.20 se imprimió y se armó con todo el hardware el 30 de octubre, la 0.24 corrigió la orientación de la cámara y la 0.25 está en desarrollo (sec. 7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un transductor de conducción ósea previsto) y la medición del consumo real.
+- Pruebas de usabilidad con usuarios ciegos y ajuste de los tiempos de interacción.
+- Documentación final, presentación y demostración.
 - Dos semanas de reserva antes del 30 de noviembre para integración, corrección y pruebas conjuntas.
 ## 6.7 Riesgos identificados y su tratamiento
 
 | **Riesgo** | **Estado** | **Mitigación adoptada** |
 |---|---|---|
-| El enlace inalámbrico no alcanza para mover la imagen | **Materializado** | Medido antes de depender de él; rediseño a dos planos (sec. 7.2) |
-| La inferencia multimodal local no es viable en el teléfono | **Materializado** | Spike de dos días; se adoptó un pipeline por caso de uso |
-| Rotura del hardware de desarrollo | **Materializado** | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada (Raspberry Pi 3 B+), dejando constancia de que las mediciones de radio no son transferibles. El 19 de septiembre se volvió a la Raspberry Pi Zero 2 W, y con ella vuelven a valer las mediciones de radio originales |
+| El enlace inalámbrico no alcanza para mover la imagen | Materializado | Medido antes de depender de él; rediseño a dos planos (sec. 7.2) |
+| La inferencia multimodal local no es viable en el teléfono | Materializado | Spike de dos días; se adoptó un pipeline por caso de uso |
+| Rotura del hardware de desarrollo | Materializado | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada (Raspberry Pi 3 B+), dejando constancia de que las mediciones de radio no son transferibles. El 19 de septiembre se volvió a la Raspberry Pi Zero 2 W, y con ella vuelven a valer las mediciones de radio originales. A comienzos de noviembre la placa volvió a dañarse y se reemplazó; como toda la configuración vive en la tarjeta de memoria, la placa nueva funcionó sin reinstalar nada (sec. 7.3.6) |
 | Dependencia de servicios de nube con cuota gratuita | Vigente | Proxy propio que permite rotar o cortar una clave sin publicar una versión; tope de gasto configurado en cada proveedor |
-| Pausa automática del proyecto de backend por inactividad | **Materializado** | Documentado como riesgo operativo; requiere actividad periódica |
+| Pausa automática del proyecto de backend por inactividad | Materializado | Documentado como riesgo operativo; requiere actividad periódica |
 | La precisión del detector cuantizado es desconocida | Vigente | Receta de validación preparada; medición pendiente (sec. 7.4) |
+| Red local del dispositivo con clave fija y servidor HTTP sin autenticación | Aceptado | Con una sola unidad y sin adversario plausible en el alcance de la tesis, no se mitiga en el prototipo; para una versión distribuible, clave por unidad y token por sesión (ADR 0003, actualización del 3 de noviembre) |
 | Evaluación realizada sobre video y no sobre la calle | Vigente | Prioridad de la etapa 4; la primera prueba de campo (19 de octubre) mostró que el cartel sólo se leía con el ómnibus muy cerca, lo que motivó el zoom digital |
