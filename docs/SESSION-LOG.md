@@ -4542,3 +4542,38 @@ la medida.
 - Commit y PR de la v0.27 a la v0.29 (rama `feat/case-v0-27`).
 - ~~Lo pendiente de la v0.26~~: el usuario confirmó el 2026-11-12 que no queda nada por probar; la carcasa
   está impresa y es la versión final.
+
+## 2026-11-09 — La tesis, revisada con los comentarios del equipo
+
+**Pedido**: el equipo comentó y corrigió el Doc, sobre todo las partes escritas con IA (negritas,
+tono). Iterar sobre eso, con foco en el desarrollo propio (OCR, YOLO, app, carcasa), benchmarks al
+día, problemas con su solución y alternativas, y el cambio de alcance de supermercado.
+
+- **El Doc estaba adelante del repo.** Desde el 22 de octubre el equipo reescribió en el Doc el marco
+  teórico (que pasó a ser el capítulo 3, antes que el estado del arte), sacó negritas y frases de
+  remate, agregó citas numeradas y la sec. 7.2.9. Se importó el Doc entero al repo antes de tocar
+  nada (commit propio; `03-marco-teorico.md` y `04-estado-del-arte.md` cambiaron de número). El
+  conversor (en el scratchpad, no versionado) arma el Markdown desde `read_doc`; quedó verificado con
+  `sync_doc.py --report` en `ops=0`. Se perdió y se repuso la fila del riesgo de la clave fija del AP
+  (#127), que nunca había llegado al Doc.
+- **Capítulo 7 reescrito**: prosa llana, sin negritas en el cuerpo ni etiquetas tipo «Problema.»; en
+  cada componente, problema, alternativas y solución. Nuevo: 7.3.6 (fallas de hardware: conector de
+  cámara, sensor suelto al cerrar la carcasa, placa reemplazada el 7 de noviembre, audio bajo), 7.6.7
+  (modo producto y desarrollo), 7.8.2 (la revisión de toda la base, #126), la tabla de la carcasa
+  hasta la v0.25, y 7.5.4 con el alcance en tres pasos (canasta básica, alimentos, todo producto
+  alimenticio; la canasta queda como conjunto de evaluación). Cifras al 9 de noviembre: 345 pruebas
+  en la app, 197 en la placa, 122 PRs. Trece títulos renombrados en el Doc con `replaceAllText` antes
+  del sync, para que no quedaran secciones duplicadas.
+- **Comentarios atendidos**: tamaños de YOLO11 (3.4), Gemma para el respaldo (3.6), 3.9 escrita, 4.1
+  en tercera persona, 4.3.1 coherente con el enlace real, 4.4 con Tesseract, PaddleOCR y RapidOCR,
+  ADR 0005 (5.3), cifras de 5.4, «hoy no cuantificado» (6.6). En 2.1 se menciona el cambio de alcance.
+- **Sin dato, quedó PENDIENTE**: las métricas del reentrenamiento en la V100 (no están en ningún repo
+  ni en el Drive) y el resultado de Tesseract sobre las 117 imágenes.
+
+### Pendientes
+
+- Métricas del reentrenamiento en la V100 (7.4.3, 12.7): las tiene quien corrió el entrenamiento.
+- Comentarios que son decisión del equipo: objetivos opcionales a trabajo futuro (2.2.3, 10), rehacer
+  los diagramas de 7.1.3, el manual de usuario como audio en la app, el registro de reuniones (5.6).
+- Agregar a la bibliografía la documentación de YOLO11 de Ultralytics y RapidOCR (se citan en 3.4 y 4.4).
+- Actualizar el índice del Doc a mano (la API no lo refresca).
