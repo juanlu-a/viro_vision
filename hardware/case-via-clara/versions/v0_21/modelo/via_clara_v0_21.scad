@@ -1,5 +1,21 @@
-// VIA Clara v0.20 — two-half snap-fit case for Raspberry Pi Zero 2 W + Waveshare UPS HAT (C) with its
+// VIA Clara v0.21 — two-half snap-fit case for Raspberry Pi Zero 2 W + Waveshare UPS HAT (C) with its
 // 803040 battery + Raspberry Pi AI Camera (IMX500) + bone-conduction transducer.
+//
+// v0.21 (2026-11-01), the whole case turned a quarter round on the temple. Worn like the v0.20 the picture
+// came out turned 90 degrees, and the bus detector runs inside the sensor, so software cannot fix that; the
+// picture comes out right with the HAT face UP, so that is how the case is turned (`worn`): the HAT face,
+// with the power switch, looks at the sky; the Pi face, with the button, at the floor; the old bottom face
+// (model -Z) rests on the temple. No flip is needed. Everything inside (stack, camera guides, sockets,
+// snaps, switch) is the v0.20's as printed, and so is the split, now horizontal when worn. What moved:
+//   - the elastic bridges, the arm socket, the arm and the transducer go to the head face (model -Z), at the
+//     same place relative to the head (written as before against HEAD_FACE and laid there by `to_model`).
+//     The split runs along that face, so each bridge and the socket are half in each half;
+//   - the arm's cable port goes through that face's wall off the split (model Y -2.3, in the HAT half),
+//     clear of the rear snap there (moved to x 33); the arm's plug and tunnel start follow it. Inside it
+//     opens beside the HAT's battery JST, which reaches up to model Y -3.2 there;
+//   - the button to the middle of the Pi face; the mark under the switch window is a dimple, so the HAT
+//     face is flat to print on (it no longer carries the bridges the left half used to stand on).
+// (A first take turned it the other way, HAT down: the picture would have needed a 180 degree flip.)
 //
 // v0.20, the version to print whole: the panel slide switch goes into the head-side wall. The window is 4.2
 // wide (was 5.2) and 2 mm lower, so a ~20 mm flange clears the chamber's top corner, and two Ø2.3 pins
@@ -47,8 +63,9 @@
 //   - room in front of the PCB for the camera's square lens holder, and a bottom twin for the front snap
 //     now that the flex no longer lies on the chamber floor; a wider power slider knob.
 //
-// Units: mm. Frame: X along the temple (front = -X, camera end), Y across (left half / head side
-// is Y < 0, right half / outer side is Y > 0, parting plane Y = 0), Z up.
+// Units: mm. Frame: X along the temple (front = -X, camera end), Y through the stack (left half: the HAT
+// face, Y < 0; right half: the Pi face, Y > 0; parting plane Y = 0), Z across the boards. Since v0.21 the
+// case is worn turned (`worn` = rotate([90, 0, 0])): -Y down, +Y up, +Z (the head face) on the temple.
 // Sources: Raspberry Pi Zero 2 W mechanical drawing, AI Camera product brief (Sept. 2024, page 4),
 // Waveshare UPS HAT (C) wiki photos, and the v0.9 test print. Values tagged MEASURE must be checked
 // with a caliper.
@@ -93,7 +110,7 @@ SOCKET_AF = 5.0;
 SOCKET_DEPTH = HEX_ENGAGE + 0.5 + 2.0;   // v0.15 print: 1.5 lifted the stack and the halves did not close
 PAD_D = SOCKET_AF * 2 / sqrt(3) + 2.4;   // 8.2: 1.2 of wall at the socket corners
 
-// Stack heights along Y (head side -> outer side)
+// Stack heights along Y (HAT face -> Pi face)
 HAT_PCB = 1.6;
 HAT_UNDER = 0.9;                 // tallest part under the HAT (Waveshare STEP model)
 BAT = [40, 30, 8];               // 803040, on the pogo-pin side of the HAT
@@ -122,8 +139,8 @@ ABOVE_PI = max(HEADER_H, HEX_H, HEATSINK[2]) + HEADER_CLEAR;
 CAV_HY = (UNDER_HAT + HAT_PCB + BOARD_GAP + PI_PCB + ABOVE_PI) / 2;   // 12.625
 CAV_HZ = 15.9;                   // 30 mm boards + the port overhang + 0.1
 CAV_L = 67.2;
-LEFT_FACE = -(CAV_HY + WALL);    // head side
-RIGHT_FACE = CAV_HY + WALL;      // outer side
+LEFT_FACE = -(CAV_HY + WALL);    // the HAT face (the head side up to v0.20; down when worn since v0.21)
+RIGHT_FACE = CAV_HY + WALL;      // the Pi face, with the button (up when worn since v0.21)
 OUT_W = 2 * (CAV_HY + WALL);     // 28.45
 OUT_H = 2 * (CAV_HZ + WALL_TB);  // 37.2
 
@@ -153,9 +170,9 @@ JST_Z = [-15.2, -10.1];
 JST_H = 6.0;
 
 // ---------- Raspberry Pi AI Camera (product brief, Sept. 2024, page 4) ----------
-// Turned 90 degrees from v0.9 so the image matches the wearer's view: the 23.862 side (the one with the
-// FPC connector at its end) runs along Y, the 25 side along Z, and the connector edge faces +Y.
-// If the picture comes out upside down, it is a 180 degree software flip (libcamera transform).
+// As placed since v0.10 (unchanged in v0.21): the 23.862 side, with the FPC connector at its end, runs along
+// Y, the 25 side along Z, and the connector edge faces +Y. Worn like the v0.20 the picture came out turned
+// 90 degrees; v0.21 turns the whole case instead, HAT face up, which puts the picture upright.
 AI_CAM_W = 25.0;                 // along Z
 AI_CAM_H = 23.862;               // along Y; FPC connector on the +Y edge
 AI_CAM_PCB_T = 1.12;
@@ -208,7 +225,8 @@ NOSE_X = CHAMBER_FRONT_X - NOSE_WALL;    // -44.6 (v0.11 print: -42.2)
 // broke. The hook now sits behind the ribs, where nothing is under it, and the beam runs forward over
 // the ribs with a gap under it (snap_reliefs).
 SNAPS_ALL = [[-33.0, 3.0, CHAMBER_HZ, -1, 5.0, 2], [-12.0, 5.0, CAV_HZ, -1, 10.0, 2], [18.0, 5.0, CAV_HZ, -1, 10.0, 2],
-             [30.0, 4.0, CAV_HZ, -1, 5.0, 2]];   // the rear pair replaces the old pins, which broke
+             [33.0, 4.0, CAV_HZ, -1, 5.0, 2]];   // the rear pair replaces the old pins, which broke; v0.21: 3 mm
+                                                 // back (it was at 30), 1.4 clear of the arm's cable port
 // With a camera cap the front pair would land in the cap, and the cap's strips only hold it in X, not
 // the halves together. So that version turns the x -12 pair round, root to the rear, which brings its
 // hooks forward to x -22, about 11 mm behind the joint.
@@ -232,16 +250,17 @@ PIN_HOLE_D = 2.75;
 PINS = [];                       // the rear end is a hollow shell now: the lips align the halves
 
 // ---------- Mode button (one) ----------
-BUTTON_X = -14.0;                // off the Pi's heatsink (v0.10 had it right over it)
-BUTTON_Z = 2.0;
+BUTTON_X = -4.0;                 // v0.21: the middle of the Pi face's flat part, still clear of the heatsink
+BUTTON_Z = 0;
 BUTTON_WALL = 1.4;
 BUTTON_HOLE_D = 5.4;
 BUTTON_HEAD_D = 5.0;
 BUTTON_PROUD = 2.8;              // v0.14: 2 mm longer
 BUTTON_FLANGE_T = 0.6;
 // 4 x 4 x 1 SMD tact switch (measured); its actuator is under 1 mm, so the printed cap is glued onto it.
-// The cap and then the switch go into a pocket open toward the inside of the right half; a printed lid
-// (part 06) presses into a step behind the switch and holds it when the button is pushed from outside.
+// The cap and then the switch go into a pocket open toward the inside of the right half and are glued. The
+// pocket keeps the step a printed lid (part 06) pressed into up to v0.13; since v0.14 there is no lid (the
+// switch holds in its pocket), and button_lid is only kept as that pocket's reference.
 SWITCH_W = 4.0;                  // body, square (measured)
 SWITCH_BODY_T = 1.0;             // measured
 SWITCH_T = 1.5;                  // MEASURE: body + actuator ("under a millimetre" on top of the body)
@@ -267,27 +286,18 @@ SD_CLEAR = 1.0;
 CHARGE_PLUG = [11.5, 7.5];       // moulded micro USB plug: Z x Y
 CHARGE_CLEAR = 0.5;              // per side: holes print undersize
 
-// ---------- Power slider (HAT switch, head-side face) ----------
-// One solid with a common X range, so it prints lying flat on its -X face. With the camera flex now on
-// the Pi side, the slider takes the whole space behind the camera: a 9 mm wide knob.
-// The window and the knob match the lever itself: its exposed part (x -33.9 .. -29.8) and its travel.
+// ---------- Power switch window (HAT face) ----------
+// These place the panel switch's window where the printed slider's was (v0.11 to v0.19): it was sized to
+// the HAT switch lever, its exposed part (x -33.9 .. -29.8) and its travel.
 SLIDER_X = [hat_x(-LEVER_TIP) + 0.1, hat_x(SW_BODY_X[0]) - 0.2];   // -33.8 .. -30.0
-SLIDER_PLATE_X1 = -28.6;         // the plate runs on past the window, short of the HAT screw heads
 SLIDER_KNOB_Z = 3.0;
-SLIDER_KNOB_PROUD = 2.5;         // v0.14: 1 mm more, easier to find from outside
-SLIDER_PLATE_T = 1.0;
-SLIDER_PRONG_T = 1.2;
 SLIDER_CLEAR = 0.35;
-SLIDER_FIT = 0.1;                // the square pocket around the lever, each side
-SLIDER_PRONG_EXTRA = 1.0;        // v0.14: the walls of the pocket reach 1 mm further past the lever
-SLIDER_WIN_SIDE = 0.7;           // window past the knob in X, each side (window 5.2 wide)
-SLIDER_S = LEVER_TRAVEL / 2;                         // knob stroke each way: the pocket follows the lever
+SLIDER_S = LEVER_TRAVEL / 2;                         // the old knob's stroke each way
 SLIDER_WIN_Z = SLIDER_KNOB_Z + LEVER_TRAVEL + 2 * SLIDER_CLEAR + 0.4;   // the window size that worked (7.4)
-SLIDER_TOP = CHAMBER_HZ0 - CHAMBER_R - 0.1;          // where the chamber wall starts to round off (same slider for both versions)
+SLIDER_TOP = CHAMBER_HZ0 - CHAMBER_R - 0.1;          // where the chamber wall starts to round off
 SLIDER_P1 = SLIDER_TOP - SLIDER_S;                   // plate top, slider-local
 SLIDER_W1 = SLIDER_P1 - SLIDER_S - 0.8;              // window top: the plate overlaps it by 0.8 at ON
 SLIDER_W0 = SLIDER_W1 - SLIDER_WIN_Z;
-SLIDER_P0 = SLIDER_W0 - SLIDER_S - 0.8;              // plate bottom: overlaps by 0.8 at OFF
 SLIDER_KNOB_C = (SLIDER_W0 + SLIDER_W1) / 2;
 
 // ---------- Elastic channel, bone arm ----------
@@ -297,7 +307,17 @@ ELASTIC_GAP = 2.5;               // bridges reach the same plane as the arm boss
 ELASTIC_BRIDGE_T = 1.6;
 ELASTIC_LEN = 12.0;
 
-ARM_DY = LEFT_FACE + 12.1;       // the arm socket follows the head-side face (v0.8 had it at -12.1)
+// v0.21: the head face is the old bottom face (model -Z). The elastic, the arm and the transducer are still
+// written in the frame the case was worn in up to v0.20 (head face at -Y, up = +Z), with the head face at
+// HEAD_FACE, and `to_model` lays them on it: the transducer stays where it was relative to the head.
+HEAD_FACE = -(CAV_HZ + WALL_TB);
+ARM_DY = HEAD_FACE + 12.1;       // the arm socket follows the head face (v0.8 had it at -12.1)
+// cable port: x, and model Y. Inside the socket's outline and off the split (in the left half), 1.5 clear of
+// the rear snap's recess in that wall. Inside the case it opens between the HAT and the Pi behind the
+// battery's end (x > 17), where the boards are 11 apart: the cable comes out of there.
+// [x, z in the head features' frame]; that z is model -Y, so 2.3 puts the port at model Y -2.3, in the HAT half,
+// 0.8 off the split (Ø3.0), with 1.2 of plug wall around the plug's Ø2.6 hole (the plug_wall check).
+ARM_PORT = [27.6, 2.25];
 // Round transducer (measured 2026-10-26: Ø 14 x 5) in a round cup that opens toward the head, closed
 // by a snap-on grille (part 07). The cup's axis is Y; its open face is at CUP_FACE_Y.
 TRANSDUCER_D = 14.0;
@@ -329,7 +349,7 @@ stations = [
     [-31.0, OUT_W, OUT_H - 0.4, 6.0],
     [-24.0, OUT_W, OUT_H, 6.2],
     [ 30.0, OUT_W, OUT_H, 6.2],
-    [ 35.0, OUT_W - 0.2, OUT_H, 6.0],          // full height over the rear snaps
+    [ 36.0, OUT_W - 0.2, OUT_H, 6.0],          // full height over the rear snaps (v0.21: 1.0 further back, snap at x 33)
     [ 37.6, OUT_W - 0.8, OUT_H - 2.4, 5.8],
     [ 39.6, OUT_W - 2.8, OUT_H - 7.0, 5.4],
     [ 41.2, OUT_W - 6.8, OUT_H - 12.6, 4.8]
@@ -429,16 +449,18 @@ module pads() { difference() { pad_positions() pad_solid(); pi_tall_parts(0.3); 
 module pad_socket() { translate([0, PAD_MOUTH_Y - 0.01, 0]) hex_y(SOCKET_AF, SOCKET_DEPTH); }
 module pad_positions() { for (dx = [-PI_HOLE_X, PI_HOLE_X], z = [-PI_HOLE_Z, PI_HOLE_Z]) translate([PI_CX + dx, 0, z]) children(); }
 
-// ---------- Power slider: a knob on the head-side face drives the HAT switch lever ----------
+// ---------- Panel power switch (HAT face, down when worn) ----------
 // v0.20: a panel slide switch, wired to the HAT, replaces the printed slider. Its knob comes out of the window
 // the slider had (same length, 1 mm narrower) and its flange sits on the inner face of the wall, its two screw
 // holes on the pins; glue holds it. Centred 2 mm lower than the slider window: a flange ~20 long centred there
 // would reach the rounded top corner of the chamber.
 PANEL_SW_DROP = 2.0;
 PANEL_SW_C = [(SLIDER_X[0] + SLIDER_X[1]) / 2, SLIDER_KNOB_C - PANEL_SW_DROP];    // window centre: x, z
-// a raised dot below the window marks the bottom end of the stroke
-module slider_on_dot() {
-    translate([PANEL_SW_C[0], LEFT_FACE + 0.3, PANEL_SW_C[1] - PANEL_SW_WIN[1] / 2 - 1.6]) rotate([90, 0, 0]) cylinder(h = 0.9, d1 = 1.8, d2 = 1.2, $fn = 24);
+// a dimple below the window marks the bottom end of the stroke (v0.21: sunk, not raised, so the HAT face is flat
+// for the left half to print on)
+module slider_end_dimple() {
+    // big enough to find by touch, and beside the lower pin (not over its root): ahead of the window's bottom end
+    translate([PANEL_SW_C[0] - 3.6, LEFT_FACE - 0.01, PANEL_SW_C[1] - PANEL_SW_WIN[1] / 2 - 2.2]) rotate([-90, 0, 0]) cylinder(h = 0.4, d1 = 3.0, d2 = 2.4, $fn = 32);   // 0.9 of the 1.3 wall left behind
 }
 module panel_switch_window() {
     box([PANEL_SW_C[0] - PANEL_SW_WIN[0] / 2, LEFT_FACE - 1, PANEL_SW_C[1] - PANEL_SW_WIN[1] / 2],
@@ -456,9 +478,10 @@ module panel_switch_pins() {
         panel_switch_pin();
     }
 }
-// ---------- Elastic channel (head-side face) ----------
+module to_model() { rotate([90, 0, 0]) children(); }   // (x, y, z) -> (x, -z, y): head face at -Y -> model -Z, up -> model -Y (the HAT face)
+// ---------- Elastic channel (head face; written against HEAD_FACE, placed by to_model) ----------
 module elastic_bridges() {
-    wall = LEFT_FACE + 0.3;
+    wall = HEAD_FACE + 0.3;
     for (x = ELASTIC_XS) difference() {
         hull() {
             translate([x, wall + 0.5, 0]) cube([ELASTIC_W + 4.0, 1, ELASTIC_LEN + 4], center = true);
@@ -470,8 +493,12 @@ module elastic_bridges() {
 
 // ---------- Bone arm socket ----------
 module bone_socket_boss() { translate([29, -13.2 + ARM_DY, -.5]) rounded_box3d([13.2, 5.4, 15.4], 2); }
-module bone_socket_cut() { translate([29, -15 + ARM_DY, -.5]) rounded_box3d([9.2, 6.3, 11.3], 1.1); }
-module bone_cable_port() { translate([29, -CAV_HY + 2, -.5]) rotate([90, 0, 0]) cylinder(h = 13, d = 3.4); }
+// v0.21: 0.5 shallower than up to v0.20 (its floor is now over the rear snap in that wall: 1.25 left over the
+// snap's groove; the socket_skin check)
+SOCKET_FLOOR = HEAD_FACE - 0.25;         // the socket's floor, toward the wall (it was HEAD_FACE + 0.25)
+module bone_socket_cut() { translate([29, -15.25 + ARM_DY, -.5]) rounded_box3d([9.2, 5.8, 11.3], 1.1); }
+// from 1.2 inside the cavity (clear of the standoff at x 32) to 0.75 into the socket
+module bone_cable_port() { translate([ARM_PORT[0], -CAV_HZ + 1.2, ARM_PORT[1]]) rotate([90, 0, 0]) cylinder(h = (-CAV_HZ + 1.2) - (SOCKET_FLOOR - 0.75), d = 3.0); }   // v0.21: 3.0 (was 3.4)
 
 // ---------- Snap beams, lip, pins ----------
 function snap_free(t) = t[0] - t[3] * t[1] / 2;              // free end of the beam (hook side)
@@ -610,9 +637,7 @@ module left_body_full() {
         union() {
             intersection() { difference() { outer_shell(); cavity(); } half_space(-1); }
             if (!CAP) intersection() { camera_frame(); half_space(-1); }
-            elastic_bridges();
-            bone_socket_boss();
-            slider_on_dot();
+            intersection() { to_model() { elastic_bridges(); bone_socket_boss(); } half_space(-1); }
             panel_switch_pins();
         }
         lens_opening();
@@ -620,8 +645,8 @@ module left_body_full() {
         panel_switch_window();
         snap_recesses();
         lip_recesses_left();
-        bone_socket_cut();
-        bone_cable_port();
+        slider_end_dimple();
+        to_model() { bone_socket_cut(); bone_cable_port(); }
     }
 }
 
@@ -634,18 +659,20 @@ module right_body_full() {
             switch_drawer_solid();
             snap_hooks();
             lips_right();
+            intersection() { to_model() { elastic_bridges(); bone_socket_boss(); } half_space(1); }
         }
         pad_positions() pad_socket();
         lens_opening();
         rear_openings();
         snap_reliefs();
         switch_drawer_cut();
+        to_model() { bone_socket_cut(); bone_cable_port(); }
     }
     snap_webs();
 }
 
 // ---------- Button cap ----------
-// model frame: axis along +Y, flange face at SW_TOP_Y; a sunken ring on the head marks it
+// model frame: axis along +Y, flange face at SW_TOP_Y; a sunken ring around the hole marks it
 module button_cap() {
     // v0.14: just a cylinder glued onto the switch actuator (no inner flange), with a chamfered tip
     l = BUTTON_FLANGE_T + BUTTON_WALL + BUTTON_PROUD;
@@ -668,13 +695,14 @@ module button_lid() {
 }
 module button_lid_placed() { translate([BUTTON_X, LID_Y, BUTTON_Z]) button_lid(); }
 
-// ---------- Bone arm (v0.8 geometry, moved with the head-side face, 14 mm pocket) ----------
+// ---------- Bone arm (v0.8 geometry, moved with the head face, 14 mm pocket) ----------
+// Written in the frame the case was worn in up to v0.20 (see HEAD_FACE); bone_arm_placed lays it on the model.
 // The tube starts 0.4 clear of the socket boss (v0.10 had it 0.6 into the boss, so the arm did not seat)
 ARM_OUT = -1.0;
 arm_pts = [for (p = [[29, -18, -.5], [36.5, -18.2, -.8], [44, -19, -2.5], [52, -20.1, -6.1], [59, -21.2, -10.8], [64, -22, -14.9]]) p + [0, ARM_DY + ARM_OUT, 0]];
 module bone_outer() { for (i = [0 : len(arm_pts) - 2]) capsule(arm_pts[i], arm_pts[i + 1], 2.7); }
 module bone_tunnel() {
-    p0 = [29, -12.8 + ARM_DY, -.5]; pN = [66.2, -22 + ARM_DY + ARM_OUT, -15.4];
+    p0 = [ARM_PORT[0], -12.8 + ARM_DY, ARM_PORT[1]]; pN = [66.2, -22 + ARM_DY + ARM_OUT, -15.4];
     capsule(p0, arm_pts[0], 1.3);
     for (i = [0 : len(arm_pts) - 2]) capsule(arm_pts[i], arm_pts[i + 1], 1.3);
     capsule(arm_pts[len(arm_pts) - 1], pN, 1.3);
@@ -682,7 +710,7 @@ module bone_tunnel() {
 // plug: 0.35 clearance per side in the socket, no detent bumps (they jammed: the socket has no dimples);
 // it reaches out to the tube. Push it in and fix it with a drop of glue if it is loose.
 module bone_plug() {
-    translate([29, -15.4 + ARM_DY, -.5]) rounded_box3d([8.5, 6.5, 10.6], 1);   // reaches 0.3 short of the socket floor
+    translate([29, -15.65 + ARM_DY, -.5]) rounded_box3d([8.5, 6.0, 10.6], 1);   // reaches 0.3 short of the socket floor (0.5 shorter since v0.21)
     hull() {
         translate([29, -18.2 + ARM_DY, -.5]) cube([8.5, 0.1, 6.0], center = true);
         translate(arm_pts[0]) sphere(r = 2.7, $fn = 28);
@@ -720,7 +748,8 @@ module grille() {
             [20 * cos(GRILLE_GAP_ANGLE / 2), 20 * sin(GRILLE_GAP_ANGLE / 2)], [20 * cos(GRILLE_GAP_ANGLE / 2), -20 * sin(GRILLE_GAP_ANGLE / 2)]]);
     }
 }
-module grille_placed() { at_cup() grille(); }
+module grille_placed() { to_model() at_cup() grille(); }
+module bone_arm_placed() { to_model() bone_arm(); }
 module bone_arm() {
     difference() {
         union() {
@@ -730,7 +759,7 @@ module bone_arm() {
         }
         bone_tunnel();
         transducer_pocket();
-        translate([29, -13.6 + ARM_DY, -.5]) rotate([90, 0, 0]) cylinder(h = 3.8, d = 2.8, center = true);
+        translate([ARM_PORT[0], -13.6 + ARM_DY, ARM_PORT[1]]) rotate([90, 0, 0]) cylinder(h = 3.8, d = 2.6, center = true);   // as the arm's tunnel (v0.21: was 2.8)
         translate([64.6, -22 + ARM_DY + ARM_OUT, -15.4]) rotate([0, 90, 0]) cylinder(h = 7.4, d = 2.8);
     }
 }
@@ -791,7 +820,7 @@ module hw_switch() {
     // SMD legs on the X sides, flush with the base
     box([BUTTON_X - SWITCH_LEG_SPAN / 2, SW_BASE_Y, BUTTON_Z - 1.6], [BUTTON_X + SWITCH_LEG_SPAN / 2, SW_BASE_Y + 0.4, BUTTON_Z + 1.6]);
 }
-module hw_transducer() { at_cup() translate([0, 0, CUP_DEPTH - TRANSDUCER_H - 0.3]) cylinder(h = TRANSDUCER_H, d = TRANSDUCER_D, $fn = 48); }
+module hw_transducer() { to_model() at_cup() translate([0, 0, CUP_DEPTH - TRANSDUCER_H - 0.3]) cylinder(h = TRANSDUCER_H, d = TRANSDUCER_D, $fn = 48); }
 module hardware() {
     color([.15, .35, .8]) hw_hat();
     color("red") hw_lever();
@@ -809,29 +838,32 @@ module assembly() {
     color("#2c2c2c") translate([0, -EXPLODE, 0]) left_body();
     color("#4a4a4a", 0.55) translate([0, EXPLODE, 0]) right_body();
     color("#d9d9d9") translate([0, EXPLODE, 0]) button_cap_placed();
-    color("#bdbdbd") translate([0, -EXPLODE, 0]) grille_placed();
+    color("#bdbdbd") translate([0, 0, EXPLODE]) grille_placed();
     if (CAP) color("#3a3a3a") translate([-EXPLODE, 0, 0]) camera_cap();
-    color("#1b1b1b") translate([0, -EXPLODE, 0]) bone_arm();
+    color("#1b1b1b") bone_arm_placed();
     if (SHOW_HW) hardware();
 }
 
+// the assembly as worn (v0.21: HAT face up, Pi face down, model -Z on the temple): for the pictures
+module worn() { rotate([-90, 0, 0]) children(); }
+
 // ---------- Print orientation ----------
-// left half: rests on the flat tops of the arm boss and the elastic bridges (3.8 proud of the
-// head-side face), with supports under the face; right half: on its flat outer face
-module print_left() { translate([0, 0, -LEFT_FACE + 3.8]) rotate([90, 0, 0]) left_body(); }
+// left half: on its flat HAT face; right half: on its flat Pi face. In both the half bridges and the half arm
+// socket stand on the side (model -Z) and need a little support under their ends away from the split
+module print_left() { translate([0, 0, -LEFT_FACE]) rotate([90, 0, 0]) left_body(); }
 module print_right() { translate([0, 0, RIGHT_FACE]) rotate([-90, 0, 0]) right_body(); }
 // Test print: only the nose of each half, cut in front of the stack, to try the camera before the whole case
 NOSE_TEST_CUT_X = -28.0;
 module nose_test_cut() { box([-100, -50, -50], [NOSE_TEST_CUT_X, 50, 50]); }
 // Test print for the panel slide switch that replaces the HAT's switch (2026-10-29): a plate as thick as the
-// head-side wall with the 4.2 wide window, and two pins for the flange's screw holes on the inside. The v0.18
+// HAT-face wall with the 4.2 wide window, and two pins for the flange's screw holes on the inside. The v0.18
 // coupon tried 13.0..14.0; 14.0 was the closest and still 0.5 short. Glue holds it.
 PANEL_SW_WIN = [4.2, 7.4];        // window across (X in the case) and along the travel (Z)
 PANEL_SW_PITCH = 14.8;            // v0.18 test: 14.0 + 0.5; v0.19 tests: 14.5, 14.7, then 14.8
 PANEL_SW_PIN_D = 2.3;             // v0.18 test: 1.5 too thin; v0.19 tests: 3.0, 2.9, 2.7, then 2.3
 PANEL_SW_PIN_L = 2.0;
 module print_panel_switch_test() {
-    wall = -LEFT_FACE - CHAMBER_HY;          // the head-side wall where the window goes (1.3)
+    wall = -LEFT_FACE - CHAMBER_HY;          // the HAT-face wall where the window goes (1.3)
     size = [10, 26];
     difference() {
         cube([size[0], size[1], wall]);
@@ -869,13 +901,8 @@ module print_pads_test() {
         }
     }
 }
-// the head-side face lies flat on the bed; the raised ON dot under the slider window is cut off
-module print_nose_left() {
-    intersection() {
-        translate([0, 0, -LEFT_FACE]) rotate([90, 0, 0]) intersection() { left_body(); nose_test_cut(); }
-        box([-100, -100, 0], [100, 100, 100]);
-    }
-}
+// the HAT face lies flat on the bed (the mark under the switch window is sunk since v0.21)
+module print_nose_left() { translate([0, 0, -LEFT_FACE]) rotate([90, 0, 0]) intersection() { left_body(); nose_test_cut(); } }
 module print_nose_right() { translate([0, 0, RIGHT_FACE]) rotate([-90, 0, 0]) intersection() { right_body(); nose_test_cut(); } }
 module print_button() { rotate([90, 0, 0]) button_cap(); }
 module print_grille() { translate([0, 0, GRILLE_T]) grille(); }   // cover: disc down, fingers up
@@ -883,7 +910,7 @@ module print_grille() { translate([0, 0, GRILLE_T]) grille(); }   // cover: disc
 module print_cap() { translate([0, 0, -NOSE_X + 0.15]) rotate([0, -90, 0]) camera_cap(); }   // the loft's end slice reaches 0.15 past NOSE_X
 // lying down; the offset is the measured lowest point of the rotated arm (export.sh checks that
 // every print part sits on the bed, so a change that moves the arm fails loudly)
-BONE_PRINT_Z = ARM_DY - 13.76 + 1.601;   // follows the arm when the head-side face moves
+BONE_PRINT_Z = ARM_DY - 13.76 + 1.101;   // follows the arm when the head face moves (v0.21: plug 0.5 shorter)
 module print_bone() { translate([0, 0, BONE_PRINT_Z]) rotate([-90, 0, 0]) bone_arm(); }
 
 // ---------- Interference checks: every one of these must render EMPTY (or zero-volume contact) ----------
@@ -896,15 +923,28 @@ module check(name) {
     else if (name == "panel_switch") intersection() { panel_switch_pins(); union() { right_body(); hw_all(); hw_hex(); flex_keepout(); } }
     else if (name == "flex") intersection() { flex_keepout(); union() { left_body(); right_body(); hw_hat(); hw_hex(); } }
     else if (name == "hw_self") intersection() { hw_hat(); hw_pi(); }
-    else if (name == "bone") intersection() { bone_arm(); union() { left_body(); hw_transducer(); } }
+    else if (name == "bone") intersection() { bone_arm_placed(); union() { left_body(); right_body(); hw_transducer(); } }
     else if (name == "drawer_pi") intersection() { union() { switch_drawer_solid(); hw_switch(); } union() { hw_pi(); hw_hex(); hw_heatsink(); } }
     // assembly paths, not just the final positions. The cap goes up low in the bay (flange against the
     // backing), then steps out into its hole: those two legs are the whole path
     // the cap, then the switch, go straight into the pocket from the cavity (moving +Y)
     else if (name == "cap_insert") intersection() { right_body(); union() for (dy = [-8 : 0.5 : 0]) translate([BUTTON_X, SW_TOP_Y + dy, BUTTON_Z]) button_cap(); }
     else if (name == "switch_insert") intersection() { union() { right_body(); button_cap_placed(); } union() for (dy = [-8 : 0.5 : 0]) translate([0, dy, 0]) hw_switch(); }
-    else if (name == "grille") intersection() { grille_placed(); union() { bone_arm(); hw_transducer(); left_body(); } }
+    else if (name == "grille") intersection() { grille_placed(); union() { bone_arm_placed(); hw_transducer(); left_body(); right_body(); } }
     else if (name == "clamp") intersection() { left_body(); hw_screw_heads(); }
+    // v0.21: the arm's plug keeps 1.2 of wall around its cable hole and the tunnel's start
+    else if (name == "plug_wall") difference() {
+        intersection() {
+            union() {
+                translate([ARM_PORT[0], -13.6 + ARM_DY, ARM_PORT[1]]) rotate([90, 0, 0]) cylinder(h = 3.8, d = 2.6 + 2.4, center = true);
+                capsule([ARM_PORT[0], -12.8 + ARM_DY, ARM_PORT[1]], arm_pts[0], 1.3 + 1.2);
+            }
+            // the plug's own span, less its top 1.0 (the r 1 rounding of its end shrinks the outline there)
+            box([0, -18.65 + ARM_DY, -50], [60, -12.65 + ARM_DY - 1.0, 50]);
+        }
+        bone_plug(); }
+    // v0.21: the arm socket sits over the rear snap: 1.2 of material must stay between them
+    else if (name == "socket_skin") intersection() { to_model() translate([0, 1.2, 0]) bone_socket_cut(); union() { snap_recesses(); snap_reliefs(); } }
     // the camera goes into the right half moving +Y, then the left half closes over it (relative -Y)
     else if (name == "cap_hw" && CAP) intersection() { camera_cap(); union() { hw_all(); hw_hex(); } }
     else if (name == "cap_halves" && CAP) intersection() { camera_cap(); union() { left_body(); right_body(); } }
@@ -926,7 +966,8 @@ if (PART == "left") left_body();
 else if (PART == "cap") camera_cap();
 else if (PART == "print_cap") print_cap();
 else if (PART == "right") right_body();
-else if (PART == "bone") bone_arm();
+else if (PART == "bone") bone_arm_placed();
+else if (PART == "worn") worn() assembly();
 else if (PART == "button") button_cap();
 else if (PART == "button_placed") button_cap_placed();
 else if (PART == "print_left") print_left();

@@ -1,14 +1,14 @@
-// VIA Clara v0.18 — annotated assembly guide: arrows and labels saying what each part, slot and hole
+// VIA Clara v0.22 — annotated assembly guide: arrows and labels saying what each part, slot and hole
 // is for. Renders to images (see export.sh); it is not a printable part.
 // Labels are in Spanish because people read them; the code is in English (ADR 0009).
 //
 // VIEW = outer | head | left_inside | right_inside | exploded
 // Render with an orthographic projection and the eye along view_dir(VIEW), for example:
-//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_20_guide.scad
+//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_22_guide.scad
 
 // Always render with -D 'PART="none"' (export.sh does): the model's own dispatch must draw nothing.
 // Setting PART here would not work, because the included file reassigns it.
-include <via_clara_v0_20.scad>
+include <via_clara_v0_22.scad>
 
 VIEW = "head";                   // set with -D
 // export.sh renders the parts once to meshes in the model frame and passes their folder here: preview
@@ -139,7 +139,7 @@ function items(v) =
         [TRANSDUCER_CENTER + [0, -4, 0], "Transductor óseo (14 mm)"],
         [[-2, LEFT_FACE, 12], "Cara que apoya en la patilla"]] :
     v == "left_inside" ? [
-        [[CAM_FRONT_X - 0.4, CAM_Y0 - AI_CAM_H / 2, 9], "Ranura del PCB de la cámara"],
+        [[CAM_FRONT_X - 0.4, CAM_Y0 - AI_CAM_W / 2, CAM_Z0 + 6], "Ranura del PCB de la cámara"],
         [[sxk, -CHAMBER_HY + PANEL_SW_PIN_L, PANEL_SW_C[1] + PANEL_SW_PITCH / 2], "Pernos del switch (la pestaña va acá, con gotita)"],
         [[29, -CAV_HY, -0.5], "Paso del cable del auricular"],
         [[STACK_REAR_X + 3, HAT_TOP_Y + 1.5, -6.5], "Canal de carga"],
@@ -153,10 +153,10 @@ function items(v) =
         [[snap_free(t) + 0.4, SNAP_DEPTH + 0.3, t[2] + 0.5], "Puente a cortar tras imprimir"],
         [[BUTTON_X, SW_BASE_Y + 1, BUTTON_Z + 3.4], "Bolsillo del pulsador (entra desde adentro)"],
         [[-38.5, 1, 0], "Nervios de la cámara"],
-        [[-36, CHAMBER_HY - 1, 0], "Recorrido del flex (lado de la Pi)"],
+        [[-35, 1, -CHAMBER_HZ + 0.8], "Recorrido del flex (por abajo)"],
         [[STACK_REAR_X + 4, PI_TOP_Y + 1, SD_ZC], "microSD: entra y sale por atrás"]] :
     [
-        [[-42.4, CAM_Y0, 12], "AI Camera (conector hacia la Pi)"],
+        [[-42.4, CAM_Y0, 12], "AI Camera (conector hacia abajo)"],
         [[hat_x(26), HAT_TOP_Y + 4, 15], "UPS HAT + batería"],
         [[STACK_REAR_X - 20, PI_TOP_Y, 15], "Raspberry Pi Zero 2 W"],
         [[BUTTON_X, 30 + SW_TOP_Y + 1, BUTTON_Z + 3.5], "Tecla (pieza 04)"],
