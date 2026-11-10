@@ -4440,3 +4440,57 @@ con el build instalado.
 - Audio de la placa nueva (ver arriba).
 - Confirmar la clave de la red TIC.
 - Confirmar qué build mostraba el modelo en modo producto.
+
+## 2026-11-09 — Carcasa v0.21 a v0.26: la cámara girada
+
+Esta entrada resume las sesiones de la carcasa del 2026-10-31 al 2026-11-09, que no se habían commiteado.
+
+**El problema.** Con la v0.20 armada y puesta en la patilla derecha, la foto salía girada 90°. El detector
+de ómnibus corre dentro del sensor IMX500, así que el giro no se arregla por software: hay que girar la
+cámara en la carcasa.
+
+**Dos alternativas, impresas las dos.**
+
+- **v0.21**: la v0.20 girada entera, con la cara de la HAT arriba. El elástico y el brazo pasan a la cara que
+  apoya en la patilla, sobre la junta. Antes hubo un intento con el corte en Z = 0, que se descartó: el
+  usuario quería rotar todo tal cual.
+- **v0.22**: la v0.20 con **sólo la cámara girada** un cuarto de vuelta en su plano, con sus guías. El
+  conector queda hacia abajo, y el flex baja, va por el piso y sube frente a la Pi. El usuario resuelve el
+  recorrido del flex.
+
+Las dos pasaron una revisión multi-modelo (Sonnet, Haiku y Codex; Opus no corrió por el límite de gasto de
+la organización). Se corrigió, entre otras cosas, que el componente de la esquina de la cámara entraba
+primero al deslizar la placa y rozaba la guía. **El usuario eligió la v0.22.**
+
+**Lo que pidió después**, cada cambio entregado en una versión nueva:
+
+- **v0.23**: la cámara 2 mm más lejos de las placas, porque ahí va enrollado el flex. La tapa del auricular,
+  1,5 mm más alta (`GRILLE_RAISE`), porque no hacía click; con tapas de prueba de 1 y 2 mm.
+- **v0.24**: la ranura de la microSD 1 mm hacia la junta. La guía delantera de la cámara, abierta en toda
+  la franja de abajo, en las dos mitades. **Se imprimió y armó: "está bien de bien".**
+- **v0.25**, con lo que mostró la v0.24:
+  - el botón, centrado en la cara externa;
+  - el mini HDMI y el micro USB de la Pi sobresalen 2 mm del borde, no 0,8, y el conjunto entraba a la
+    fuerza. El hueco interior crece 1,2 mm de cada lado y la carcasa pasa a 39,8 mm de alto. Se descartaron
+    las guías en la pared porque caían sobre las trabas de la cara de abajo;
+  - los zócalos hexagonales, 2 mm más profundos (5,5);
+  - la patilla del lente pasaba justo por encima del brazo del auricular: los puentes del elástico suben y
+    el zócalo del brazo baja (`ELASTIC_Z`, `ARM_Z`). El transductor sigue a la patilla, para no moverse
+    respecto de la oreja;
+  - ganchos de las trabas más anchos (7 y 5 mm) y diente de 0,5.
+- **v0.26**: la patilla todavía tocaba el brazo. Ahora quedan 11 mm entre sus ejes (5,5 arriba y 5,5 abajo
+  del centro), lo máximo que entra en la parte plana de la cara.
+
+**Impresión** (FLSUN T1 Max, PLA, fuzzy skin). La 02 va boca arriba. La 01 boca abajo da un exterior muy
+prolijo, pero el borde de la junta pierde definición y las trabas no enganchan bien. Se recomendó apagar el
+fuzzy skin en los primeros 3 mm y compensar la pata de elefante (0,2).
+
+**En el repo.** La rama `feat/case-v0-26` sale de `staging` y reemplaza el modelo vigente (v0.20 → v0.26).
+`versions/` suma de la v0.21 a la v0.26, con sus STL, su LEEME y su `.scad`. `export.sh`: 36 ok. El trabajo
+viejo de la rama `fix/case-v0-21` quedó en un `git stash` del worktree.
+
+### Pendientes
+
+- Imprimir y armar la v0.26: probar la patilla con el brazo, los conectores de la Pi, los zócalos de 5,5 y
+  las trabas nuevas.
+- Probar la 01 boca abajo sin fuzzy skin en el borde; si sigue sin enganchar, un chaflán de 0,4 en la junta.

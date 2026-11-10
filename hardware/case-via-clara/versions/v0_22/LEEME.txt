@@ -1,0 +1,30 @@
+VIA Clara v0.22 (2026-11-01): la v0.20 con SÓLO la cámara girada
+
+Con la v0.20 puesta la foto salía girada 90°. Acá se gira únicamente la cámara (un cuarto de vuelta
+en su plano), con sus guías. Todo lo demás es la v0.20 que imprimiste: cuerpo, medidas, switch,
+botón, zócalos, trabas, brazo y tapa.
+
+La cámara:
+  - el conector del flex mira hacia ABAJO (hacia la junta de la cara de abajo); el lado de 25 mm de
+    la placa queda a lo ancho
+  - el flex sale hacia abajo, va hacia atrás por el piso y sube frente a la Pi para doblarse y entrar
+    a su conector
+  - las guías son las mismas de la v0.20 (nervios de 1,2, 0,25 de luz, 5 mm hasta el frente), giradas;
+    la esquina abierta para el componente de la cámara quedó del lado de la junta
+  - el lente queda en la junta: el agujero es el lente + 0,4
+
+Piezas:
+  01_left_half_v0_22.stl          mitad del lado de la cabeza (como la v0.20; cambió la nariz)
+  02_right_half_v0_22.stl         mitad externa (como la v0.20; cambió la nariz)
+  03_bone_arm_v0_22.stl           brazo (igual a la v0.20)
+  04_mode_button_v0_22.stl        botón (igual)
+  07_transducer_cover_v0_22.stl   tapa del auricular (igual)
+  00_assembly_check_v0_22.stl     todo armado, sólo para mirar
+  Orientación y soportes: como la v0.20.
+
+Recomendado primero (pruebas/): test_nose_left / test_nose_right, la nariz de cada mitad, para
+probar la cámara girada en sus guías y el doblez del flex.
+
+Revisión (2026-11-01): la guía delantera de la cámara quedó abierta del lado de la junta en toda la
+franja de abajo, porque con la cámara girada el componente de la esquina entra primero al deslizar la
+placa y rozaba la guía en unos 9 mm de recorrido (en la v0.20 eran 4,5).
