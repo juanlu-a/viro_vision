@@ -133,7 +133,7 @@ El procedimiento verificado consta de cinco pasos y su orden importa:
 1. Actualizar la configuración de arranque y dejar el paquete también en la partición de la tarjeta, de modo que una instalación desde cero no necesite conectividad.
 1. Verificar contra el punto de consulta de salud del dispositivo y volver a modo producto.
 
-Tres restricciones de este procedimiento se descubrieron identificadas durante las pruebas:
+Tres restricciones de este procedimiento se identificaron durante las pruebas:
 
 - El instalador automático no se vuelve a ejecutar. Está protegido por un archivo centinela que ya existe, y ese centinela vive en la partición del sistema, no en la de arranque, por lo que no se puede borrar desde otra computadora con la tarjeta puesta. Dejar una versión nueva del paquete en la tarjeta no alcanza: hay que instalarla por acceso remoto.
 - El paquete debe llevar el árbol completo, y no sólo el módulo de la aplicación. Un paquete incompleto instala un servicio a medias, y el síntoma aparece mucho después, sin nada que lo vincule con el día en que se ensambló de forma incorrecta.
