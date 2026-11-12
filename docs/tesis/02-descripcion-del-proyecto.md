@@ -2,7 +2,7 @@
 
 ## 2.1 Alcance
 
-El proyecto consiste en el diseño y desarrollo de un sistema de asistencia para personas con baja o nula visión, capaz de reconocer visualmente objetos de interés mediante técnicas de Computer Vision, Machine Learning e Inteligencia Artificial. El sistema estará orientado a la identificación de líneas de ómnibus metropolitanos y de productos de supermercado. En la propuesta original el segundo caso se limitaba a los productos de la canasta básica; durante el desarrollo el alcance se amplió a los alimentos en general y luego a todo producto alimenticio, y la canasta básica pasó a ser el conjunto de evaluación (sec. 7.5.4).
+El proyecto consiste en el diseño y desarrollo de un sistema de asistencia para personas con baja o nula visión, capaz de reconocer visualmente objetos de interés mediante técnicas de Computer Vision, Machine Learning e Inteligencia Artificial. El sistema estará orientado a la identificación de líneas de ómnibus metropolitanos y de productos de supermercado. En el segundo caso el alcance original fueron los productos de la canasta básica. Una vez verificado en el dispositivo real que ese objetivo se cumplía con margen, y sin perder el tiempo de respuesta fijado, el alcance se amplió a cualquier alimento, y la canasta básica se mantuvo como conjunto de evaluación (sec. 7.5.4).
 
 La solución contempla un dispositivo con cámara (acoplado a una patilla de lentes) que capture una imagen del entorno, procese la información visual y proporcione al usuario retroalimentación auditiva en tiempo real. Además, el mismo se integra con una aplicación móvil, que funcionará como apoyo para la conectividad, el procesamiento y la interacción con el sistema.
 
@@ -33,6 +33,9 @@ Desarrollar un dispositivo de asistencia para personas con baja visión que perm
 ### 2.2.3 Objetivos opcionales
 
 1. Implementar una funcionalidad de selección por señalamiento que permita que, en el caso de los productos de supermercado, la respuesta auditiva comunique únicamente el objeto que el usuario esté apuntando o tocando con su dedo índice entre los elementos detectados, a fin de reducir respuestas innecesarias y mejorar la experiencia de uso.
+
+Este objetivo no se implementó en el prototipo y se retoma como trabajo futuro (sec. 10.4).
+
 ## 2.3 Entregables del proyecto
 
 El proyecto contempla los siguientes entregables:
