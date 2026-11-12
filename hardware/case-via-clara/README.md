@@ -1,10 +1,10 @@
-# Carcasa VIA Clara v0.26: dos mitades con cierre a presión
+# Carcasa VIA Clara v0.29: dos mitades con cierre a presión
 
-Modelo paramétrico en **OpenSCAD** (`via_clara_v0_26.scad`) para la Raspberry Pi Zero 2 W con el header
+Modelo paramétrico en **OpenSCAD** (`via_clara_v0_29.scad`) para la Raspberry Pi Zero 2 W con el header
 soldado, la Waveshare UPS HAT (C) unida a su batería 803040, la Raspberry Pi AI Camera y el auricular
 de conducción ósea, montado sobre la patilla de los lentes. **La v0.20 se imprimió y se armó completa el
-2026-10-30, y quedó perfecta.** Puesta, la foto salía girada 90°, y de ahí salió la línea v0.22 a v0.26
-(ver abajo). La vigente es la **v0.26**, todavía sin imprimir; la v0.24 se imprimió y se armó. La v0.8
+2026-10-30, y quedó perfecta.** Puesta, la foto salía girada 90°, y de ahí salió la línea v0.22 a v0.29
+(ver abajo). La **v0.29 es la final**: se imprimió y se armó, y el enchufe de 6,0 calza perfecto en la copa; la v0.27 se imprimió y sólo falló el encastre de la copa, que quedaba flojo; la v0.24 se imprimió y se armó. La v0.8
 (`via_clara_v0_8.scad`) se conserva como referencia.
 Para regenerar todo, correr `./export.sh`: arma los STL, las imágenes y las verificaciones, y sale con
 error si algo falla.
@@ -13,7 +13,7 @@ error si algo falla.
 
 Las mitades miden **89,2 mm de largo y 39,8 de alto**, sin contar el brazo del auricular.
 
-## De la v0.20 a la v0.26
+## De la v0.20 a la v0.29
 
 Con la v0.20 puesta, la foto salía girada 90°. El detector del ómnibus corre dentro del sensor, así que eso
 no se corrige por software. Se probaron dos caminos:
@@ -37,6 +37,10 @@ Lo que se fue corrigiendo sobre la v0.22:
 | v0.25 | zócalos hexagonales 2 mm más profundos (5,5) | los hexágonos hacían tope antes de tiempo |
 | v0.25 | ganchos de las trabas más anchos (7 y 5 mm) y diente de 0,5 | más robustas |
 | v0.25, v0.26 | puentes del elástico 5,5 mm arriba del centro (`ELASTIC_Z`) y zócalo del brazo 5,5 abajo (`ARM_Z`): 11 mm entre la patilla y el brazo; el auricular sigue a la patilla | la patilla del lente pasaba justo por encima del brazo y no se podía usar puesto |
+| v0.27 | la copa del auricular, pieza aparte (08), encastrada en la punta del brazo como el brazo en la carcasa | pasar el cable por el brazo era difícil |
+| v0.27 | canal del cable de Ø 3,4 (pared del tubo de 1 mm), curva de 3 mm de radio dentro del enchufe y paso de Ø 3,8 abierto en embudo hacia adentro | el cable no pasaba bien: era chico y doblaba a 90° |
+| v0.28 | enchufe del brazo para la copa de 5,1 × 5,1, con la copa igual | se supuso que el brazo de la v0.27 no entraba; era al revés |
+| v0.29 | enchufe de 6,0 × 6,0 con esquinas de 0,8 (0,15 de luz por lado) y puntas de prueba de 5,8, 6,0 y 6,2 (`test_cup_plug_*`, `PART=print_cup_plug_test` con `CUP_PLUG_TEST`) | el brazo de la v0.27 quedaba flojo en la copa, y el de la v0.28 más todavía |
 
 ## Piezas
 
@@ -44,7 +48,8 @@ Lo que se fue corrigiendo sobre la v0.22:
 |---|---|---|---|
 | `01_left_half` | mitad del lado de la cabeza, con el switch de encendido | cara cabeza abajo | bajo la cara cabeza; bloquearlos dentro de la cavidad |
 | `02_right_half` | mitad externa: zócalos, botón, trabas | cara externa abajo | sólo bajo el ahusado trasero y la nariz; **ninguno dentro de los zócalos hexagonales**. Después de imprimir, cortar los puentes de las vigas de las trabas |
-| `03_bone_arm` | brazo del auricular, con la copa | acostado | de árbol |
+| `03_bone_arm` | brazo del auricular, con un enchufe en cada punta | acostado | de árbol |
+| `08_transducer_cup` | copa del auricular, con el zócalo para el brazo | piso abajo | no |
 | `04_mode_button` | botón: un cilindro que se pega al pulsador | parado | no |
 | `07_transducer_cover` | tapa a click del auricular, con una ranura hacia el oído | disco abajo | no |
 | `00_assembly_check` | todo armado | — | **no se imprime**: para mirar en el laminador |
@@ -76,7 +81,7 @@ pulsador queda firme en su bolsillo. PETG si es posible, o PLA; boquilla 0,4, ca
 ## Todas las versiones
 
 `versions/` guarda los STL de cada versión tal como se mandaron a imprimir, con su `LEEME`: de la v0.9 a
-la v0.26 (desde la v0.21, también el `.scad` de cada una en `modelo/`), incluidas las piezas de prueba (narices, tamaños de hexágono, separaciones del switch). Es el
+la v0.29 (desde la v0.21, también el `.scad` de cada una en `modelo/`), incluidas las piezas de prueba (narices, tamaños de hexágono, separaciones del switch). Es el
 registro del proceso: no se borra ni se pisa una versión anterior. `./export.sh` vuelve a crear los STL
 de la versión vigente en `stl/`, que git ignora.
 
@@ -89,8 +94,9 @@ de la versión vigente en `stl/`, que git ignora.
    los hexágonos de la Pi entran en los zócalos. La cámara entra en su ranura con el conector hacia abajo (hacia la junta) y el lado de 25 mm a lo ancho; el flex baja, va por el piso y sube frente a la Pi hasta su conector.
 4. **Switch.** En la mitad izquierda, desde adentro, pasar la perilla del switch por su ventana y
    calzar la pestaña en los dos pernos; una gota de gotita.
-5. **Auricular.** Pasar el cable por el puerto de la mitad izquierda y el canal del brazo, enchufar el
-   brazo en su zócalo, poner el transductor en la copa y cerrar con la tapa (pieza 07).
+5. **Auricular.** Pasar el cable por el puerto de la mitad izquierda, por el brazo (pieza 03) y por la
+   copa (pieza 08); encastrar la copa en la punta del brazo y el brazo en su zócalo, poner el
+   transductor en la copa y cerrar con la tapa (pieza 07).
 6. **Cerrar.** Bajar la mitad izquierda sobre la derecha hasta escuchar las ocho trabas. Para abrir:
    uña o moneda en la ranura trasera.
 
@@ -98,7 +104,7 @@ de la versión vigente en `stl/`, que git ignora.
 
 `img/guide/` tiene cinco vistas con flechas que dicen para qué es cada ranura, agujero y pieza
 (`outer`, `head`, `left_inside`, `right_inside`, `exploded`). Las genera `export.sh` a partir de
-`via_clara_v0_26_guide.scad`.
+`via_clara_v0_29_guide.scad`.
 
 ![Adentro de la mitad derecha](img/guide/right_inside.png)
 ![Cara cabeza](img/guide/head.png)
@@ -106,12 +112,12 @@ de la versión vigente en `stl/`, que git ignora.
 ## Archivos y verificaciones
 
 ```
-via_clara_v0_26.scad         el modelo. PART = assembly | left | right | bone | button | grille |
+via_clara_v0_29.scad         el modelo. PART = assembly | left | right | bone | cup | button | grille |
                              print_* | hardware | check_*;  SHOW_HW y EXPLODE para la vista armada
-via_clara_v0_26_guide.scad   la guía con flechas (img/guide/); no se imprime
+via_clara_v0_29_guide.scad   la guía con flechas (img/guide/); no se imprime
 via_clara_v0_8.scad          la versión de partida, sin tocar, como referencia
 export.sh                    regenera stl/ e img/ y corre las verificaciones
-versions/                    los STL de cada versión, v0.9 a v0.26
+versions/                    los STL de cada versión, v0.9 a v0.29
 ```
 
 `export.sh` comprueba que cada pieza imprimible sea **un solo sólido** que apoya en la cama, y corre

@@ -15,7 +15,7 @@ en [`SESSION-LOG.md`](SESSION-LOG.md), y el plan en [`ROADMAP.md`](ROADMAP.md).
   `staging → main` (= release), que publican al link público de TestFlight. El último release a
   producción fue el PR #115 (2026-10-13).
 - Ramas con trabajo real fuera de `staging`:
-  - `feat/case-v0-26`: la carcasa v0.21 a v0.26 (la cámara girada), con PR a `staging`; vive en el
+  - `feat/case-v0-27`: la carcasa v0.27 a v0.29 (la copa del auricular aparte), sin commitear; vive en el
     worktree `viro_vision-case`.
   - `feat/volume-button`: un segundo botón de volumen, con un "ADR 0010" que choca con el 0010 vigente
     (tema oscuro); habría que renumerarlo.
@@ -40,7 +40,7 @@ app/          aplicación React Native (Expo)
 hardware/     Raspberry Pi Zero 2 W + AI Camera (IMX500) + Waveshare UPS HAT (C)
   raspi/        daemon Python: periférico BLE, cámara, modos, ómnibus, AP, batería (ADR 0003)
   raspi/boot/   scripts de arranque de la microSD
-  case-via-clara/  carcasa en OpenSCAD (v0.20 en staging; v0.26 en su rama)
+  case-via-clara/  carcasa en OpenSCAD (v0.26 en staging; v0.29 en su rama)
 ml/           sólo un README: el pipeline de ómnibus vive en bus-banner-recognizer
 supabase/     funciones vision (proxy de claves), telemetry y evidence
 docs/         tesis, arquitectura, ADRs, mediciones, guías de QA y operación
@@ -145,10 +145,10 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
     un brazo con copa de Ø 17 y tapa a click para el transductor óseo de 14 mm.
   - La AI Camera va con el conector hacia abajo, para que la foto salga derecha con el equipo puesto.
   - Un solo botón: un pulsador SMD de 4×4×1 mm con un cilindro pegado.
-- **En `staging`**: la v0.20 (PR #124). Las impresiones de prueba se evaluaron así: la v0.9 el
+- **En `staging`**: la v0.26 (PR #129). Las impresiones de prueba se evaluaron así: la v0.9 el
   2026-10-17, la v0.10 el 2026-10-21 (falló) y la v0.11 el 2026-10-22. Detalle en la tesis, §7.3.5.
 - **v0.20**: impresa y armada completa el 2026-10-30, pero puesta la foto salía girada 90°.
-- **Vigente: v0.26** (rama `feat/case-v0-26`), sin imprimir. Es la v0.20 con sólo la cámara girada (la
+- **Final: v0.29** (rama `feat/case-v0-27`), impresa y armada; el usuario confirmó el 2026-11-12 que no queda nada por probar. La v0.27 se imprimió: todo bien salvo el encastre de la copa, que quedaba flojo; la v0.29 agranda el enchufe del brazo a 6,0 y calza perfecto. Es la v0.26 con la copa del auricular como pieza aparte (08), encastrada en el brazo, y un canal del cable más ancho y sin curvas de 90°. La v0.26 es la v0.20 con sólo la cámara girada (la
   v0.22, elegida sobre la v0.21, que giraba la carcasa entera) y lo que mostró la impresión de la v0.24:
   - cámara 2 mm más lejos de las placas, para el flex enrollado;
   - tapa del auricular 1,5 mm más alta;
@@ -161,7 +161,7 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
   - la copa del auricular;
   - los pernos del switch (Ø 2,3 a 14,8).
 - **Verificación**: `export.sh` corre 16 verificaciones de interferencia contra maquetas.
-- **Archivos**: los STL de todas las versiones, de la v0.9 a la v0.26, están en
+- **Archivos**: los STL de todas las versiones, de la v0.9 a la v0.29, están en
   `hardware/case-via-clara/versions/`.
 
 ### Nube (`supabase/`)
@@ -202,10 +202,9 @@ En orden de prioridad, ver [`ROADMAP.md`](ROADMAP.md):
 
 1. Probar el modo ómnibus en la calle, con y sin zoom.
 2. Documentar las métricas del detector reentrenado.
-3. Imprimir y armar la carcasa v0.26.
-4. Cerrar el audio de la placa.
-5. Hacer las pruebas con usuarios y la corrida de evaluación del supermercado.
-6. Antes de la entrega, sacar la evidencia del ómnibus.
+3. Cerrar el audio de la placa.
+4. Hacer las pruebas con usuarios y la corrida de evaluación del supermercado.
+5. Antes de la entrega, sacar la evidencia del ómnibus.
 
 ## Cómo continuar en una sesión nueva
 

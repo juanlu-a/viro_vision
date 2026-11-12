@@ -1,0 +1,28 @@
+VIA Clara v0.27 (2026-11-10): el brazo y la copa del auricular, separados
+
+1. La copa del auricular es una pieza aparte (08). Se encastra en la punta del brazo igual que el
+   brazo en la carcasa: un enchufe en el brazo (4,4 de largo, 5,6 x 5,6) que entra en un zócalo de la
+   copa, con 0,35 de luz por lado. Si queda flojo, una gota de gotita.
+   Armado: pasar el cable por el brazo (ahora es un tubo abierto en las dos puntas), después por la
+   copa, y encastrar la copa en el brazo.
+
+2. El canal del cable ya no dobla a 90° dentro del enchufe que va a la carcasa: dobla en curva, con
+   un radio de 3 mm. El paso por la pared de la carcasa es más ancho (Ø 3,8) y por dentro se abre en
+   embudo, para que el cable gire hacia las placas sin una arista.
+
+3. Pared del tubo más fina: el canal pasa de Ø 2,6 a Ø 3,4, y la pared del tubo queda en 1 mm.
+
+Piezas:
+  01_left_half_v0_27.stl          mitad del lado de la cabeza (cambia el paso del cable)
+  02_right_half_v0_27.stl         mitad externa (igual a la v0.26)
+  03_bone_arm_v0_27.stl           brazo, ahora sin la copa: acostado, con soportes de árbol
+  08_transducer_cup_v0_27.stl     copa del auricular, NUEVA: piso abajo, boca arriba, sin soportes
+  04_mode_button_v0_27.stl        botón (igual)
+  07_transducer_cover_v0_27.stl   tapa del auricular (igual)
+  00_assembly_check_v0_27.stl     todo armado, sólo para mirar
+
+Si ya imprimiste la v0.26, alcanza con la 01, la 03 y la 08.
+
+pruebas/: test_pads y las narices, como la v0.26.
+explotada_v0_27.png: el armado, con la copa separada.
+modelo/: el .scad, la guía y export.sh.

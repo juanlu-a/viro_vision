@@ -1,0 +1,14 @@
+VIA Clara v0.28 (2026-11-11): el brazo, con el encastre de la copa más chico
+
+En la v0.27 el brazo no calzaba en la copa (08). En el modelo el encastre estaba bien (0,35 de luz
+por lado, centrado), pero el zócalo de la copa se imprime acostado y su techo es un puente, así que
+sale más chico.
+
+Cambia SÓLO el brazo (03): el enchufe rectangular de la punta pasa de 5,6 x 5,6 a 5,1 x 5,1, o sea
+0,6 de luz por lado en el mismo zócalo de la copa que ya imprimiste. Si queda flojo, una gota de
+gotita.
+
+  >>> Imprimir sólo: 03_bone_arm_v0_28.stl (acostado, con soportes de árbol) <<<
+
+Las demás piezas son idénticas a la v0.27 (están acá para tener el juego completo).
+modelo/: el .scad, la guía y export.sh.
