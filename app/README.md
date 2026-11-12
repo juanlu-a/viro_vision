@@ -86,11 +86,11 @@ Supabase. Sin internet o sin modelo, la app lo dice y no lee.
 Google ni OAuth), pero **el login no está montado**: `AuthProvider` no figura en `_layout.tsx` y la
 app abre directo en las pestañas. El código se conserva para una eventual sincronización opcional.
 
-## Estado (al 2026-10-22)
+## Estado (al 2026-11-12)
 
 - **Tres pestañas**: Inicio (modos, botón «Leer», resultado y foto; en modo ómnibus, las fotos de cada
   ómnibus con el recorte exacto que leyó el OCR, #118), Dispositivo (conexión, nombre y batería en
-  texto, #110) y Ajustes (modelo de supermercado, salida de audio, qué reconoce y «Probar audio»).
+  texto, #110) y Ajustes (modo de la app, modelo de supermercado, salida de audio, qué reconoce y «Probar audio»). El modo producto, el predeterminado, oculta las fotos, los campos del resultado y el selector de modelo (ver abajo).
 - **Enlace real**: BLE desde el 2026-09-04, conexión y reconexión automáticas, unión sola a la WiFi
   de la placa. Las operaciones GATT van en cola, una por vez (#94, `services/ble/serialize.ts`).
 - **Salida de audio elegible**, teléfono o dispositivo, para todo lo que suena (#83, #89, #90). La
@@ -98,10 +98,18 @@ app abre directo en las pestañas. El código se conserva para una eventual sinc
   en el teléfono y, si la síntesis está habilitada, manda además una copia a la placa. El
   teléfono es siempre el respaldo y hay **una voz por vez** (#97). Los avisos de sistema son clips
   pregrabados en la placa.
+- **Modo de la app** (#125, #128): en Ajustes, el desplegable «Modo de la app» elige entre **modo
+  producto** (por defecto) y **modo desarrollo**. El modo producto es la app limpia: Inicio oculta los
+  campos del resultado, las fotos del dispositivo y de los ómnibus, el selector de modelo y las líneas de
+  estado; queda a la vista la última frase dicha (y el aviso de que el dispositivo no pudo sacar la
+  foto). La telemetría no cambia. La lógica es `features/reader/homeView.ts` y la preferencia
+  (`virovision.appMode`, en AsyncStorage) está en `services/storage/appModePreference.ts`. Cualquier valor
+  que no sea exactamente `development` se lee como producto.
+- **Revisión de todo el código** (#126, 2026-11-03): correcciones en la app, la placa, Supabase y el CI.
 - **Un solo tema, el oscuro** (ADR 0010).
 - **Los errores van a la telemetría, nunca al usuario** (ADR 0011): la persona escucha una frase fija
   de `i18n/es.ts` que dice qué hacer.
-- **Pruebas**: 332 tests en 36 suites (`npx jest`, al 2026-10-22).
+- **Pruebas**: 345 tests en 38 suites (`npx jest`, al 2026-11-09).
 
 ## Publicación
 

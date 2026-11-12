@@ -4495,6 +4495,41 @@ viejo de la rama `fix/case-v0-21` quedó en un `git stash` del worktree.
   las trabas nuevas.
 - Probar la 01 boca abajo sin fuzzy skin en el borde; si sigue sin enganchar, un chaflán de 0,4 en la junta.
 
+## 2026-11-09 — La tesis, revisada con los comentarios del equipo
+
+**Pedido**: el equipo comentó y corrigió el Doc, sobre todo las partes escritas con IA (negritas,
+tono). Iterar sobre eso, con foco en el desarrollo propio (OCR, YOLO, app, carcasa), benchmarks al
+día, problemas con su solución y alternativas, y el cambio de alcance de supermercado.
+
+- **El Doc estaba adelante del repo.** Desde el 22 de octubre el equipo reescribió en el Doc el marco
+  teórico (que pasó a ser el capítulo 3, antes que el estado del arte), sacó negritas y frases de
+  remate, agregó citas numeradas y la sec. 7.2.9. Se importó el Doc entero al repo antes de tocar
+  nada (commit propio; `03-marco-teorico.md` y `04-estado-del-arte.md` cambiaron de número). El
+  conversor (en el scratchpad, no versionado) arma el Markdown desde `read_doc`; quedó verificado con
+  `sync_doc.py --report` en `ops=0`. Se perdió y se repuso la fila del riesgo de la clave fija del AP
+  (#127), que nunca había llegado al Doc.
+- **Capítulo 7 reescrito**: prosa llana, sin negritas en el cuerpo ni etiquetas tipo «Problema.»; en
+  cada componente, problema, alternativas y solución. Nuevo: 7.3.6 (fallas de hardware: conector de
+  cámara, sensor suelto al cerrar la carcasa, placa reemplazada el 7 de noviembre, audio bajo), 7.6.7
+  (modo producto y desarrollo), 7.8.2 (la revisión de toda la base, #126), la tabla de la carcasa
+  hasta la v0.25, y 7.5.4 con el alcance en tres pasos (canasta básica, alimentos, todo producto
+  alimenticio; la canasta queda como conjunto de evaluación). Cifras al 9 de noviembre: 345 pruebas
+  en la app, 197 en la placa, 122 PRs. Trece títulos renombrados en el Doc con `replaceAllText` antes
+  del sync, para que no quedaran secciones duplicadas.
+- **Comentarios atendidos**: tamaños de YOLO11 (3.4), Gemma para el respaldo (3.6), 3.9 escrita, 4.1
+  en tercera persona, 4.3.1 coherente con el enlace real, 4.4 con Tesseract, PaddleOCR y RapidOCR,
+  ADR 0005 (5.3), cifras de 5.4, «hoy no cuantificado» (6.6). En 2.1 se menciona el cambio de alcance.
+- **Sin dato, quedó PENDIENTE**: las métricas del reentrenamiento en la V100 (no están en ningún repo
+  ni en el Drive) y el resultado de Tesseract sobre las 117 imágenes.
+
+### Pendientes
+
+- Métricas del reentrenamiento en la V100 (7.4.3, 12.7): las tiene quien corrió el entrenamiento.
+- Comentarios que son decisión del equipo: objetivos opcionales a trabajo futuro (2.2.3, 10), rehacer
+  los diagramas de 7.1.3, el manual de usuario como audio en la app, el registro de reuniones (5.6).
+- Agregar a la bibliografía la documentación de YOLO11 de Ultralytics y RapidOCR (se citan en 3.4 y 4.4).
+- Actualizar el índice del Doc a mano (la API no lo refresca).
+
 ## 2026-11-10 — Carcasa v0.27: la copa del auricular, aparte
 
 Pedidos del usuario para el brazo del auricular, para que el cable pase más fácil:
@@ -4542,3 +4577,36 @@ la medida.
 - Commit y PR de la v0.27 a la v0.29 (rama `feat/case-v0-27`).
 - ~~Lo pendiente de la v0.26~~: el usuario confirmó el 2026-11-12 que no queda nada por probar; la carcasa
   está impresa y es la versión final.
+
+## 2026-11-12 — Tesis: alcance, periferia, carcasa hasta la v0.29 y trabajo futuro
+
+**Pedido**: reescribir el alcance del modo supermercado como una ampliación de la canasta básica (se
+cumplía con margen y sin costo de latencia), contar que el modo ómnibus sin conexión importa sobre todo
+en la periferia y el interior, donde las líneas llevan letras, y volcar lo nuevo: carcasa, impresoras,
+interruptor, cámara girada, modo producto, audio, limitaciones y trabajo futuro.
+
+- **El equipo seguía editando el capítulo 3 en el Doc** (YOLO y OCR pasaron a 3.3.2 y 3.3.3, más
+  ajustes en 2.4.2, 4.1.1 y 4.1.2). Se trajeron al repo antes de publicar y en esta pasada no se tocaron
+  los capítulos 3 y 4. Se comparó el Doc contra el estado publicado el 2026-11-09 (`git archive` de ese
+  commit) para separar lo del equipo de lo propio.
+- **7.5.4** pasa a «Ampliación del alcance»: la canasta básica se cumplió, el modelo daba para más
+  (yerba suelta), la latencia y el costo no cambiaron, y la canasta queda como conjunto de evaluación. Se
+  dice además que el texto de la app («productos de supermercado») es más amplio que el prompt (sólo
+  alimentos). En 2.1, la canasta básica queda como alcance original.
+- **Periferia**: 7.2.4 da el motivo del modo sin conexión; 7.4.8 describe los prefijos que acepta el
+  intérprete (CE, BT, D, E, G, L; 55 de 147 códigos del catálogo); la nueva 7.4.13 cuenta qué está
+  soportado, qué casi no está medido (en las 117 imágenes hay sólo una línea con letras, la G) y qué no
+  se anuncia (las líneas fuera del STM).
+- **Carcasa** hasta la v0.29, con el cambio de la Ender 3 V3 a la FLSUN T1 Max, el interruptor de panel
+  pegado y la cámara girada (el YOLO corre en el sensor). **Audio**: el auricular de 4 Ω, 260 Ω + 47 µF
+  y los pines 12/14 (#130).
+- **Nuevas**: 7.9 (limitaciones del prototipo) y el capítulo 10 (trabajo futuro): placa dedicada,
+  batería mayor, amplificador, prueba en la calle, líneas periféricas e interior, respaldo local de
+  supermercado, objetivos opcionales, seguridad y Google Play.
+
+### Pendientes
+
+- Las métricas de la V100 siguen sin dato.
+- La bibliografía todavía no tiene la documentación de Ultralytics (YOLO11) ni la de RapidOCR.
+- Actualizar el índice del Doc a mano.
+- PR de `docs/thesis-team-review` a `staging`.

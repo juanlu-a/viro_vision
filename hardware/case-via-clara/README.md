@@ -2,10 +2,21 @@
 
 Modelo paramétrico en **OpenSCAD** (`via_clara_v0_29.scad`) para la Raspberry Pi Zero 2 W con el header
 soldado, la Waveshare UPS HAT (C) unida a su batería 803040, la Raspberry Pi AI Camera y el auricular
-de conducción ósea, montado sobre la patilla de los lentes. **La v0.20 se imprimió y se armó completa el
-2026-10-30, y quedó perfecta.** Puesta, la foto salía girada 90°, y de ahí salió la línea v0.22 a v0.29
-(ver abajo). La **v0.29 es la final**: se imprimió y se armó, y el enchufe de 6,0 calza perfecto en la copa; la v0.27 se imprimió y sólo falló el encastre de la copa, que quedaba flojo; la v0.24 se imprimió y se armó. La v0.8
-(`via_clara_v0_8.scad`) se conserva como referencia.
+de conducción ósea, montado sobre la patilla de los lentes.
+
+Estado al 2026-11-12, con el PR que integró cada hito a `staging`:
+
+- **v0.20** (#124): impresa y armada completa el 2026-10-30, quedó perfecta. Puesta, la foto salía
+  girada 90°, y de ahí salió la línea v0.22 a v0.29 (ver abajo).
+- **v0.26** (#129, 2026-11-10): la cámara girada, de modo que la foto sale derecha con el equipo puesto.
+- **v0.29, la final** (#131, 2026-11-12): impresa y armada, con la copa del auricular como pieza aparte
+  (08) y un enchufe de 6,0 mm que calza perfecto. La v0.27 se imprimió y sólo falló el encastre de la
+  copa, que quedaba flojo; la v0.28 achicó el enchufe por error; la v0.24 también se imprimió y se armó.
+  El equipo confirmó que no queda nada por probar.
+- La v0.8 (`via_clara_v0_8.scad`) se conserva como referencia.
+
+Se imprime en una **FLSUN T1 Max** (las primeras versiones, en una Creality Ender 3 V3): la FLSUN dio bordes
+más definidos, mejor terminación y soportes que se retiran con menos marcas.
 Para regenerar todo, correr `./export.sh`: arma los STL, las imágenes y las verificaciones, y sale con
 error si algo falla.
 
@@ -15,8 +26,8 @@ Las mitades miden **89,2 mm de largo y 39,8 de alto**, sin contar el brazo del a
 
 ## De la v0.20 a la v0.29
 
-Con la v0.20 puesta, la foto salía girada 90°. El detector del ómnibus corre dentro del sensor, así que eso
-no se corrige por software. Se probaron dos caminos:
+Con la v0.20 puesta, la foto salía girada 90°. El detector del ómnibus (YOLO) corre dentro del sensor IMX500,
+así que la imagen no se puede girar por software antes de que el detector la vea. Se probaron dos caminos:
 
 - **v0.21**: la carcasa entera girada, con la cara de la HAT arriba. Se descartó.
 - **v0.22**: la v0.20 con **sólo la cámara girada**, un cuarto de vuelta en su plano, junto con sus guías.
@@ -52,11 +63,10 @@ Lo que se fue corrigiendo sobre la v0.22:
 | `08_transducer_cup` | copa del auricular, con el zócalo para el brazo | piso abajo | no |
 | `04_mode_button` | botón: un cilindro que se pega al pulsador | parado | no |
 | `07_transducer_cover` | tapa a click del auricular, con una ranura hacia el oído | disco abajo | no |
-| `00_assembly_check` | todo armado | — | **no se imprime**: para mirar en el laminador |
+| `00_assembly_check` | todo armado | no aplica | **no se imprime**: para mirar en el laminador |
 
 Ya no existen la corredera (05), que reemplaza el switch de panel, ni la tapita del botón (06): el
-pulsador queda firme en su bolsillo. PETG si es posible, o PLA; boquilla 0,4, capa de 0,12 a 0,16,
-3 perímetros. Las curvas salen con 128 segmentos.
+pulsador queda firme en su bolsillo. PLA con *fuzzy skin* en el exterior; boquilla 0,4, capa de 0,12 a 0,16, 3 perímetros. Las curvas salen con 128 segmentos.
 
 **Lo que dejó la impresión de la v0.24** (FLSUN T1 Max, PLA, con fuzzy skin):
 
@@ -121,7 +131,7 @@ versions/                    los STL de cada versión, v0.9 a v0.29
 ```
 
 `export.sh` comprueba que cada pieza imprimible sea **un solo sólido** que apoya en la cama, y corre
-**16 verificaciones** de interferencia que tienen que dar vacío o un contacto de volumen cero: las
+**18 verificaciones** de interferencia que tienen que dar vacío o un contacto de volumen cero: las
 mitades entre sí y contra las maquetas del hardware, los zócalos contra los hexágonos, el botón, los
 pernos del switch, el recorrido del flex, el brazo y su tapa, y los caminos de armado (botón, conjunto,
 cámara). Valen **contra las maquetas**, y las maquetas valen tanto como las medidas: lo que no tienen

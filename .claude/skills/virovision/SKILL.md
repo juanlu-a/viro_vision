@@ -61,7 +61,7 @@ para integración final, corrección de errores y pruebas de conjunto).
 |--------|--------|---------|
 | **Aplicación móvil** | `app/` | React Native (Expo). Enlace BLE (GATT) con el dispositivo, salida de audio elegible (teléfono o dispositivo), configuración y accesibilidad de primera clase. Ver [references/app.md](references/app.md). |
 | **Hardware / IoT** | `hardware/` | Dispositivo en la patilla: Raspberry Pi Zero 2 W + Raspberry Pi AI Camera (IMX500) + Waveshare UPS HAT (C), en la carcasa VIA Clara (OpenSCAD). Ver [references/hardware.md](references/hardware.md). |
-| **ML / OCR / CV** | `ml/` (puntero) | Pipelines por caso de uso (ADR 0006). Ómnibus: YOLO11n de dos clases dentro del sensor IMX500 (el Coral salió del diseño el 2026-09-07; reentrenado en la V100 con ~500 fotos) → zoom digital → recorte con márgenes → OCR PP-OCRv5 → catálogo STM. Supermercado: LLM con visión en la nube por el proxy propio (ADR 0008); el respaldo local sigue abierto. Conjuntos de evaluación con recall, precisión, accuracy y F1. Ver [references/ml.md](references/ml.md). |
+| **ML / OCR / CV** | `ml/` (puntero) | Pipelines por caso de uso (ADR 0006). Ómnibus: YOLO11n de dos clases dentro del sensor IMX500 (el Coral salió del diseño el 2026-09-07; reentrenado en la V100 con casi 400 fotos, la cifra de la tesis) → zoom digital → recorte con márgenes → OCR PP-OCRv5 → catálogo STM. Supermercado: LLM con visión en la nube por el proxy propio (ADR 0008); el respaldo local sigue abierto. Conjuntos de evaluación con recall, precisión, accuracy y F1. Ver [references/ml.md](references/ml.md). |
 
 Y referencias transversales, que aplican al trabajo diario más que cualquier otra cosa de este
 documento:
@@ -129,7 +129,7 @@ haya dos copias que se desincronicen.
 - `hardware/`: la Raspberry Pi Zero 2 W. `raspi/` es el daemon Python (periférico BLE, cámara,
   modos, ómnibus en vigilancia, AP WiFi, batería, evidencia; ADR 0003); `raspi/boot/` son los
   scripts de arranque de la microSD; `case-via-clara/` es la carcasa en OpenSCAD (en `staging` la
-  v0.9; la v0.10 a v0.12 se itera en la rama `feat/case-v0-10-slim`).
+  **v0.29, final**, impresa y armada, con los STL de la v0.9 a la v0.29 en `versions/`).
 - `ml/`: sólo un README que apunta al pipeline de ómnibus (YOLO11n, dataset, OCR, export IMX500), que
   vive en el repo aparte `bus-banner-recognizer` de Magalí y se instala en la placa como dependencia.
 - `docs/`: la tesis (`docs/tesis/`), arquitectura, ADRs, mediciones, guías de QA y de operación.
@@ -141,11 +141,15 @@ haya dos copias que se desincronicen.
 ## Pendientes abiertos de la tesis
 
 Marcados `PENDIENTE` en `docs/tesis/`; se tratan como trabajo abierto:
-- Métricas del detector reentrenado en la V100 (épocas, mAP, evaluación sobre las 117 imágenes).
+- Métricas del detector reentrenado en la V100 (épocas, mAP, evaluación sobre las 117 imágenes):
+  siguen pendientes.
 - Prueba en la calle del modo ómnibus con y sin zoom.
 - Respaldo local del modo supermercado.
-- Capítulos 9 (conclusiones) y 10 (trabajo futuro), y las pruebas con usuarios.
+- Las pruebas con usuarios.
+- Ya escritos al 2026-11-12: el capítulo 10 (trabajo futuro) y la sección 7.9 (limitaciones del
+  prototipo). El capítulo 9 (conclusiones) sigue siendo un marcador de lugar, a escribir cuando estén las
+  métricas de la V100 y las pruebas.
 
-> Esta skill resume el estado al 2026-10-22. Antes de tratar una decisión como final, verificarla
+> Esta skill resume el estado al 2026-11-12. Antes de tratar una decisión como final, verificarla
 > contra el repo vivo y la planilla de trabajo:
 > https://docs.google.com/spreadsheets/d/19LJSwvqMiiBDWzO6qrsdW_BlYOHt0stegudmx08klwA/edit

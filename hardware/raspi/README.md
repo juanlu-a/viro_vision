@@ -9,7 +9,7 @@ cerró el 2026-09-05: la foto va por WiFi.
 
 Software mínimo a propósito: Raspberry Pi OS **Lite** 64-bit (Bookworm), BlueZ que ya viene, un venv,
 un servicio de systemd. No hay camino sin Linux: la cámara necesita libcamera y el BLE, BlueZ. La placa
-es una **Raspberry Pi Zero 2 W** (de vuelta desde el 2026-09-19; entre el 2026-09-09 y el 2026-09-18
+es una **Raspberry Pi Zero 2 W** (reemplazada el 2026-11-07 por otra unidad, con la misma microSD; de vuelta desde el 2026-09-19; entre el 2026-09-09 y el 2026-09-18
 se trabajó sobre una Pi 3 B+ prestada, y algunas cifras viejas son de ella): 415 MB de RAM útiles,
 sin Ethernet, WiFi sólo de 2,4 GHz.
 
@@ -659,6 +659,16 @@ audio_pwm_mode=1                 # legacy: conmuta menos (ver abajo)
 | señal | **32** | GPIO 12, canal izquierdo |
 | masa | **34** | GND, el de al lado |
 
+> **Propuesta abierta, sin integrar (PR #130, 2026-11-12).** Pasar a `pins_18_19`: **señal en el pin
+> físico 12 (GPIO 18) y masa en el 14**, del lado de la microSD, donde la carcasa tiene lugar para la
+> resistencia en serie (260 Ω) y el capacitor de acople (47 a 100 µF) que necesita el **auricular de
+> 4 Ω**. En `staging`, `setup.sh` no escribe ninguna línea `audremap` (se pone a mano en `config.txt`) y
+> sigue vigente lo de arriba; el PR haría que `setup.sh` escriba `pins_18_19` y borre cualquier
+> `audremap` anterior. El overlay deja además el pin 35 (GPIO 19) como salida, así que ahí no puede
+> haber nada conectado, y son los pines del futuro DAC I2S: al instalarlo, el `audremap` se saca. La
+> tarjeta de la placa nueva ya está en `pins_18_19` con `audio_pwm_mode=2` (2026-11-07); el audio se
+> oye muy bajo y falta soldar en los pines 12 y 14 y probar.
+>
 > ⚠️ **Antes de elegir los pines, mirar qué hay soldado.** El overlay convierte esos pines en
 > **salidas**: un botón a masa en uno de ellos, al apretarlo, es un cortocircuito contra el pad. Por
 > eso 12/13 se eligió recién después de confirmar que el pin 33 estaba libre. La alternativa es
@@ -748,8 +758,8 @@ cd hardware/raspi && pip install -r requirements-dev.txt && python3 -m pytest
 # o, con el venv de la Mac: .venv-mac/bin/python -m pytest -q
 ```
 
-Al 2026-10-22: **195 pasan y 2 se saltean**, en 18 archivos `tests/test_*.py`. El daemon son 22
-archivos en `virovision/` (4915 líneas). Se prueba lo que no necesita hardware: el partido en chunks,
+Al 2026-11-09: **197 pasan y 2 se saltean** (corrido otra vez el 2026-11-12), en 18 archivos
+`tests/test_*.py`. El daemon son 22 archivos en `virovision/` (4981 líneas). Se prueba lo que no necesita hardware: el partido en chunks,
 la máquina de modos, el núcleo de comandos (que es el mismo código en la placa y en el emulador), el
 botón, el audio, la batería, el AP, el servidor HTTP, el modo ómnibus contra motores de OCR falsos, el
 zoom, la evidencia y el proceso del OCR. Lo que habla con BlueZ se prueba en la placa; lo que habla
@@ -760,7 +770,8 @@ con CoreBluetooth, arrancando el emulador.
 1. **La prueba del modo ómnibus en la calle**, con y sin zoom (`--no-bus-zoom`): a qué distancia se
    anuncia la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, la fase
    2 es mover también su zona de entrada (`set_inference_roi_abs`).
-2. **El transductor definitivo.** El camino de audio está (`audio.py` + `audremap`, y 386 anuncios de
+2. **El transductor definitivo** (el PR #130, abierto, propone `pins_18_19` con 260 Ω y 47 a 100 µF
+   para un auricular de 4 Ω; falta soldarlo y probarlo). El camino de audio está (`audio.py` + `audremap`, y 386 anuncios de
    ómnibus más los avisos de sistema en la SD), pero la salida PWM es provisional: un piezo verifica
    pero no sirve para voz, un auricular de 16-32 Ω necesita una resistencia en serie de 100-330 Ω, y la
    carcasa aloja un transductor de conducción ósea de 14 mm que necesita una etapa que lo maneje. El
