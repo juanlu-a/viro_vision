@@ -4577,3 +4577,36 @@ día, problemas con su solución y alternativas, y el cambio de alcance de super
   los diagramas de 7.1.3, el manual de usuario como audio en la app, el registro de reuniones (5.6).
 - Agregar a la bibliografía la documentación de YOLO11 de Ultralytics y RapidOCR (se citan en 3.4 y 4.4).
 - Actualizar el índice del Doc a mano (la API no lo refresca).
+
+## 2026-11-12 — Tesis: alcance, periferia, carcasa hasta la v0.29 y trabajo futuro
+
+**Pedido**: reescribir el alcance del modo supermercado como una ampliación de la canasta básica (se
+cumplía con margen y sin costo de latencia), contar que el modo ómnibus sin conexión importa sobre todo
+en la periferia y el interior, donde las líneas llevan letras, y volcar lo nuevo: carcasa, impresoras,
+interruptor, cámara girada, modo producto, audio, limitaciones y trabajo futuro.
+
+- **El equipo seguía editando el capítulo 3 en el Doc** (YOLO y OCR pasaron a 3.3.2 y 3.3.3, más
+  ajustes en 2.4.2, 4.1.1 y 4.1.2). Se trajeron al repo antes de publicar y en esta pasada no se tocaron
+  los capítulos 3 y 4. Se comparó el Doc contra el estado publicado el 2026-11-09 (`git archive` de ese
+  commit) para separar lo del equipo de lo propio.
+- **7.5.4** pasa a «Ampliación del alcance»: la canasta básica se cumplió, el modelo daba para más
+  (yerba suelta), la latencia y el costo no cambiaron, y la canasta queda como conjunto de evaluación. Se
+  dice además que el texto de la app («productos de supermercado») es más amplio que el prompt (sólo
+  alimentos). En 2.1, la canasta básica queda como alcance original.
+- **Periferia**: 7.2.4 da el motivo del modo sin conexión; 7.4.8 describe los prefijos que acepta el
+  intérprete (CE, BT, D, E, G, L; 55 de 147 códigos del catálogo); la nueva 7.4.13 cuenta qué está
+  soportado, qué casi no está medido (en las 117 imágenes hay sólo una línea con letras, la G) y qué no
+  se anuncia (las líneas fuera del STM).
+- **Carcasa** hasta la v0.29, con el cambio de la Ender 3 V3 a la FLSUN T1 Max, el interruptor de panel
+  pegado y la cámara girada (el YOLO corre en el sensor). **Audio**: el auricular de 4 Ω, 260 Ω + 47 µF
+  y los pines 12/14 (#130).
+- **Nuevas**: 7.9 (limitaciones del prototipo) y el capítulo 10 (trabajo futuro): placa dedicada,
+  batería mayor, amplificador, prueba en la calle, líneas periféricas e interior, respaldo local de
+  supermercado, objetivos opcionales, seguridad y Google Play.
+
+### Pendientes
+
+- Las métricas de la V100 siguen sin dato.
+- La bibliografía todavía no tiene la documentación de Ultralytics (YOLO11) ni la de RapidOCR.
+- Actualizar el índice del Doc a mano.
+- PR de `docs/thesis-team-review` a `staging`.
