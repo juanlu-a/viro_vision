@@ -376,7 +376,7 @@ Se construyó además un catálogo de líneas a partir de los datos abiertos del
 
 ### 7.4.3 El entrenamiento del detector
 
-El detector es un YOLO11n ajustado por aprendizaje por transferencia (*fine-tuning*) a partir de los pesos preentrenados sobre COCO. La familia YOLO11 ofrece cinco tamaños (sec. 3.4); se eligió el más pequeño, nano, porque es el único que entra en la memoria del sensor de la cámara una vez convertido.
+El detector es un YOLO11n ajustado por aprendizaje por transferencia (*fine-tuning*) a partir de los pesos preentrenados sobre COCO. La familia YOLO11 ofrece cinco tamaños (sec. 3.3.2); se eligió el más pequeño, nano, porque es el único que entra en la memoria del sensor de la cámara una vez convertido.
 
 Los hiperparámetros están escritos en el script de entrenamiento del repositorio, con su justificación:
 

@@ -65,17 +65,17 @@ Toda comparación entre alternativas de reconocimiento necesita un criterio num�
 | **Exactitud** (*accuracy*) | (VP + VN) / total | La **proporción global de aciertos**. Útil para comparar alternativas entre sí bajo idénticas condiciones. |
 | **F1** | 2 · (precisión · exhaustividad) / (precisión + exhaustividad) | **Media armónica** de ambas. Resume el equilibrio en un solo número, apto para tablas comparativas. |
 
-La prioridad asignada a la precisión frente a la exhaustividad responde a una decisión de diseño basada en las consecuencias de los errores para el usuario. En un sistema que comunica los reconocimientos mediante la voz, la persona ciega puede no disponer de una forma inmediata de contrastar la información recibida con la escena. **Anunciar una línea equivocada puede llevar a la persona a subir a un ómnibus equivocado.** Por ello, se prioriza la fiabilidad de los reconocimientos anunciados, sin desconocer que una omisión también puede hacer perder una oportunidad de viaje. Cuando no se obtiene una lectura suficientemente fiable, se prefiere una respuesta explícita como "no pude leerlo", que informa la limitación y permite considerar un nuevo intento, antes que comunicar un resultado incierto.
+La prioridad asignada a la precisión frente a la exhaustividad responde a una decisión de diseño basada en las consecuencias de los errores para el usuario. En un sistema que comunica los reconocimientos mediante la voz, la persona ciega puede no disponer de una forma inmediata de contrastar la información recibida con la escena. Anunciar una línea equivocada puede llevar a la persona a subir a un ómnibus equivocado. Por ello, se prioriza la fiabilidad de los reconocimientos anunciados, sin desconocer que una omisión también puede hacer perder una oportunidad de viaje. Cuando no se obtiene una lectura suficientemente fiable, se prefiere una respuesta explícita como "no pude leerlo", que informa la limitación y permite considerar un nuevo intento, antes que comunicar un resultado incierto.
 
 ## 3.3 Visión por computadora
 
 La visión por computadora (*computer vision*, CV) es un campo de la inteligencia artificial dedicado a extraer información de imágenes y videos. Comprende tareas como la clasificación de imágenes, la detección de objetos y el reconocimiento de texto. Para resolverlas puede emplear diferentes métodos, entre ellos el aprendizaje automático (*machine learning*, ML) y el aprendizaje profundo (*deep learning*, DL).
 
-En esta tesis, el desarrollo de los fundamentos de visión por computadora se centra en los métodos basados en aprendizaje profundo, particularmente en las **redes neuronales** utilizadas para detectar objetos y reconocer texto. Este enfoque permite comprender el funcionamiento de los modelos estudiados y su adaptación mediante aprendizaje por transferencia. La detección de objetos se desarrolla en la sección 3.3.1, la familia YOLO en la sección 3.4 y el reconocimiento óptico de caracteres en la sección 3.5.
+En esta tesis, el desarrollo de los fundamentos de visión por computadora se centra en los métodos basados en aprendizaje profundo, particularmente en las redes neuronales utilizadas para detectar objetos y reconocer texto. Este enfoque permite comprender el funcionamiento de los modelos estudiados y su adaptación mediante aprendizaje por transferencia. La detección de objetos se desarrolla en la sección 3.3.1, la familia YOLO en la sección 3.4 y el reconocimiento óptico de caracteres en la sección 3.5.
 
 Para su procesamiento, una imagen digital se representa mediante valores numéricos organizados espacialmente. Cada píxel es un elemento de la imagen que contiene información de intensidad o color. En una imagen en color RGB, esta información se distribuye en tres canales correspondientes al rojo, verde y azul (*red, green, blue*). Esta representación permite proporcionar imágenes como entrada a los modelos de aprendizaje automático.
 
-Entre las arquitecturas utilizadas para analizar imágenes se encuentran las **redes neuronales convolucionales** (*convolutional neural networks*, CNN). Estas redes emplean operaciones de convolución: cálculos que aplican pequeños conjuntos de pesos, denominados filtros, sobre distintas regiones de la entrada. Durante el entrenamiento, los filtros aprenden a responder a patrones visuales útiles para la tarea. La aplicación de sucesivas capas permite combinar patrones locales y construir representaciones más complejas, siguiendo el aprendizaje jerárquico descrito en la sección 3.1.2.
+Entre las arquitecturas utilizadas para analizar imágenes se encuentran las redes neuronales convolucionales (*convolutional neural networks*, CNN). Estas redes emplean operaciones de convolución: cálculos que aplican pequeños conjuntos de pesos, denominados filtros, sobre distintas regiones de la entrada. Durante el entrenamiento, los filtros aprenden a responder a patrones visuales útiles para la tarea. La aplicación de sucesivas capas permite combinar patrones locales y construir representaciones más complejas, siguiendo el aprendizaje jerárquico descrito en la sección 3.1.2.
 
 ### 3.3.1 Detección de objetos
 
@@ -87,7 +87,7 @@ Además de la clase y la ubicación, los detectores suelen proporcionar una punt
 
 Entre los enfoques utilizados para resolver esta tarea se encuentra la familia YOLO, cuyo funcionamiento se desarrolla en la sección 3.4.
 
-## 3.4 Detección de objetos en una etapa: la familia YOLO
+### 3.3.2 Detección de objetos en una etapa: la familia YOLO
 
 YOLO, acrónimo de *You Only Look Once*, es una familia de modelos basados en redes neuronales profundas utilizada para la detección de objetos en imágenes y videos. Su propuesta original plantea obtener las ubicaciones de los objetos y sus categorías mediante una única evaluación de la red sobre la imágen completa.
 
@@ -101,7 +101,7 @@ Ultralytics proporciona modelos YOLO11 de detección preentrenados sobre el data
 
 Para realizar esta adaptación se utiliza un conjunto de imágenes anotadas con las clases y los rectángulos delimitadores de los objetos de interés. El entrenamiento ajusta los parámetros del modelo a la tarea de destino, permitiendo obtener un detector especializado a partir de los pesos preentrenados.
 
-YOLO11 ofrece cinco tamaños de modelo de detección, identificados por una letra: n (*nano*), s (*small*), m (*medium*), l (*large*) y x (*extra large*). Todos comparten la misma arquitectura y difieren en la cantidad de capas y de canales, y por lo tanto en la cantidad de parámetros y en el cálculo necesario por imagen. La tabla resume los valores publicados por Ultralytics para entradas de 640×640 píxeles, con el mAP@0,5:0,95 sobre el conjunto de validación de COCO:
+YOLO11 ofrece cinco tamaños de modelo de detección, identificados por una letra: n (nano), s (small), m (medium), l (large) y x (extra large). Todos comparten la misma arquitectura y difieren en la cantidad de capas y de canales, y por lo tanto en la cantidad de parámetros y en el cálculo necesario por imagen. La tabla resume los valores publicados por Ultralytics para entradas de 640×640 píxeles, con el mAP@0,5:0,95 sobre el conjunto de validación de COCO:
 
 | **Modelo** | **Parámetros (millones)** | **Operaciones (GFLOPs)** | **mAP@0,5:0,95 (COCO)** |
 |---|---|---|---|
@@ -115,7 +115,7 @@ Fuente: documentación de modelos YOLO11 de Ultralytics. Pasar de la variante n 
 
 La comparación con otras alternativas se presenta en el apartado 3.6 del estado del arte. La justificación de la elección del modelo y los detalles de su entrenamiento para el proyecto se desarrollan en el capítulo 7.
 
-## 3.5 Reconocimiento óptico de caracteres
+### 3.3.3 Reconocimiento óptico de caracteres
 
 El reconocimiento óptico de caracteres (*optical character recognition*, OCR) es una tecnología que permite convertir el texto contenido en una imagen en una secuencia de caracteres digitales. Su entrada puede ser una página escaneada, una fotografía o un recorte que contenga texto. El resultado puede almacenarse, buscarse, compararse y utilizarse en otros procesos informáticos.
 
@@ -131,7 +131,7 @@ Finalmente, reconocer caracteres no equivale a interpretar o validar su signific
 
 Las herramientas existentes se presentan en el apartado 3.4 del estado del arte. Su comparación experimental y la selección utilizada en el sistema se desarrollan en el apartado 7.4.7.
 
-## 3.6 Inteligencia artificial en el borde
+## 3.4 Inteligencia artificial en el borde
 
 La computación en el borde (Edge Computing) se refiere al procesamiento de datos cerca de la fuente de generación, en lugar de enviarlos a servidores remotos en la nube. En el contexto de la IA, esto implica ejecutar modelos de inferencia directamente en dispositivos de recursos limitados, como microcontroladores o computadoras de placa única. Esta aproximación ofrece ventajas críticas para aplicaciones de asistencia: latencia reducida (respuesta en tiempo real sin depender de conectividad), privacidad de los datos (el procesamiento ocurre localmente) y funcionamiento offline.
 
@@ -141,27 +141,27 @@ Los modelos Gemma de Google se evaluaron en el *spike* de visión local del 2026
 
 *Esta sección amplía el apartado existente «Modelos de Inteligencia Artificial en el borde (Edge AI)», cuyo contenido introductorio se conserva.*
 
-## 3.7 Comunicación inalámbrica de corto alcance
+## 3.5 Comunicación inalámbrica de corto alcance
 
 El paradigma de Internet de las Cosas (IoT) interconecta dispositivos físicos equipados con sensores, capacidad de procesamiento perimetral y conectividad, permitiéndoles interactuar con su entorno y coordinarse con sistemas distribuidos. En el contexto de redes de sensores y plataformas embebidas, la transmisión eficiente de la información capturada requiere de protocolos de comunicación especializados que operen sobre los modelos de red estándar (como TCP/IP). La selección e implementación de estos protocolos depende de un compromiso de diseño crítico entre el volumen de la carga útil (*payload*), el ancho de banda disponible, la tolerancia a la latencia y las severas restricciones energéticas del hardware.
 
 A nivel abstracto, estas comunicaciones se estructuran en diferentes patrones de intercambio de mensajes: modelos de petición-respuesta (*request-response*) para transacciones sincrónicas, esquemas de publicación-suscripción (*publish-subscribe*) orientados a eventos para enrutar telemetría de forma asíncrona, y canales bidireccionales continuos (*full-duplex*) para arquitecturas que demandan flujos de datos ininterrumpidos. La correcta orquestación de estos enfoques abstractos define la viabilidad operativa del sistema, determinando directamente su autonomía, estabilidad y tiempos de respuesta.
 
-## 3.8 Desarrollo móvil multiplataforma
+## 3.6 Desarrollo móvil multiplataforma
 
-### 3.8.1 Frameworks de desarrollo móvil multiplataforma
+### 3.6.1 Frameworks de desarrollo móvil multiplataforma
 
-El desarrollo de aplicaciones móviles puede abordarse mediante tres estrategias principales: desarrollo nativo (código específico para cada plataforma, en Swift/Objective-C para iOS y Kotlin/Java para Android), frameworks multiplataforma basados en motor de renderizado propio (como **Flutter**, que usa el lenguaje Dart y el motor gráfico Impeller para dibujar cada píxel de la interfaz) y frameworks multiplataforma que traducen la interfaz a componentes nativos reales (como React Native, basado en JavaScript/TypeScript y React).
+El desarrollo de aplicaciones móviles puede abordarse mediante tres estrategias principales: desarrollo nativo (código específico para cada plataforma, en Swift/Objective-C para iOS y Kotlin/Java para Android), frameworks multiplataforma basados en motor de renderizado propio (como Flutter, que usa el lenguaje Dart y el motor gráfico Impeller para dibujar cada píxel de la interfaz) y frameworks multiplataforma que traducen la interfaz a componentes nativos reales (como React Native, basado en JavaScript/TypeScript y React).
 
-**React Native** permite escribir la lógica de la aplicación una sola vez y ejecutarla tanto en iOS como en Android, delegando el renderizado final de cada componente visual (botones, textos, listas) a los elementos nativos equivalentes de cada sistema operativo. Esto lo diferencia de motores como el de Flutter, que dibuja su propia interfaz sobre un lienzo (canvas) sin usar los widgets nativos del sistema.
+React Native permite escribir la lógica de la aplicación una sola vez y ejecutarla tanto en iOS como en Android, delegando el renderizado final de cada componente visual (botones, textos, listas) a los elementos nativos equivalentes de cada sistema operativo. Esto lo diferencia de motores como el de Flutter, que dibuja su propia interfaz sobre un lienzo (canvas) sin usar los widgets nativos del sistema.
 
-### 3.8.2 Arquitectura: de Bridge a Bridgeless (JSI)
+### 3.6.2 Arquitectura: de Bridge a Bridgeless (JSI)
 
 Históricamente, React Native se apoyaba en un "puente" (bridge) asíncrono que serializaba mensajes en formato JSON entre el hilo de JavaScript y el hilo nativo, lo cual introducía latencia perceptible en interacciones complejas (animaciones, gestos). Desde 2024, la Nueva Arquitectura de React Native reemplaza este puente por el JSI (JavaScript Interface), una capa de interoperabilidad que permite que el código JavaScript invoque directamente métodos nativos en memoria compartida, sin serialización intermedia ("arquitectura Bridgeless").
 
 Esto reduce significativamente la latencia de comunicación entre la capa de interfaz y la capa nativa, un aspecto relevante para ViroVision dado que la aplicación deberá reaccionar en tiempo casi real a los resultados del sistema de reconocimiento y a la retroalimentación auditiva.
 
-### 3.8.3 API de accesibilidad de React Native
+### 3.6.3 API de accesibilidad de React Native
 
 React Native expone una API de accesibilidad que permite anotar los componentes de la interfaz para que sean interpretados correctamente por los lectores de pantalla nativos:
 
@@ -172,7 +172,7 @@ React Native expone una API de accesibilidad que permite anotar los componentes 
 
 Estas propiedades permiten que, en los casos donde se usan componentes estándar de React Native, VoiceOver (iOS) y TalkBack (Android) puedan leer e interactuar con la interfaz sin necesidad de código nativo adicional. Sin embargo, como se detalla en la sección de Estado del Arte, esta cobertura no es completa para todos los casos de uso.
 
-## 3.9 Síntesis de voz y gestión de audio como interfaz
+## 3.7 Síntesis de voz y gestión de audio como interfaz
 
 La síntesis de voz (*text-to-speech*, TTS) convierte un texto en una señal de audio que reproduce el habla. Los sistemas actuales realizan el proceso en dos etapas: primero analizan el texto (normalizan números y abreviaturas y determinan la pronunciación de cada palabra) y luego generan la señal de audio. Los sistemas más recientes se basan en redes neuronales, que producen una voz más natural que los métodos anteriores por concatenación de fragmentos grabados.
 
@@ -182,9 +182,7 @@ Para una persona ciega o con baja visión, el audio es el canal principal de inf
 
 La aplicación de estos criterios en el sistema (la elección entre la voz del sistema, la síntesis en la nube y los audios pregrabados, y la configuración de la sesión de audio) se describe en las secciones 7.4.12, 7.5.3 y 7.6.3.
 
-## 3.10 Criterios de accesibilidad: WCAG
-
-*Esta sección complementa los apartados existentes sobre la API de accesibilidad de React Native.*
+## 3.8 Criterios de accesibilidad: WCAG
 
 Las Pautas de Accesibilidad para el Contenido Web (*Web Content Accessibility Guidelines*, WCAG) del W3C, en su versión 2.2, constituyen el marco de referencia normativo para accesibilidad digital y se aplican, con las adaptaciones correspondientes, a interfaces móviles. Se organizan en cuatro principios (perceptible, operable, comprensible y robusto) y en tres niveles de conformidad: A, AA y AAA.
 
