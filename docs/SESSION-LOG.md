@@ -4494,3 +4494,51 @@ viejo de la rama `fix/case-v0-21` quedó en un `git stash` del worktree.
 - Imprimir y armar la v0.26: probar la patilla con el brazo, los conectores de la Pi, los zócalos de 5,5 y
   las trabas nuevas.
 - Probar la 01 boca abajo sin fuzzy skin en el borde; si sigue sin enganchar, un chaflán de 0,4 en la junta.
+
+## 2026-11-10 — Carcasa v0.27: la copa del auricular, aparte
+
+Pedidos del usuario para el brazo del auricular, para que el cable pase más fácil:
+
+- **La copa, separada del brazo.** Es una pieza nueva (08) que se encastra en la punta del brazo igual
+  que el brazo en la carcasa: un enchufe de 5,6 × 5,6 × 4,4 en el brazo, un zócalo con 0,35 de luz por
+  lado en un saliente de la copa, y gotita si queda flojo. La copa se imprime con el piso abajo, sin
+  soportes, porque el saliente ocupa todo su largo.
+- **El canal ya no dobla a 90°.** Dentro del enchufe de la carcasa el cable bajaba recto y doblaba en
+  esquina hacia el tubo; ahora dobla con 3 mm de radio. El paso por la pared de la carcasa pasa a Ø 3,8 y se
+  abre en embudo hacia adentro. Se interpretó así «el encastre a la placa por dentro»; a confirmar con el
+  usuario.
+- **Pared del tubo más fina**: canal de Ø 3,4 (era 2,6), pared de 1 mm.
+
+Al principio, el brazo salió en dos sólidos: el enchufe nuevo sólo tocaba la punta del tubo. Además, el
+redondeo del zócalo estrechaba la boca y el enchufe chocaba al entrar. Se corrigieron las dos cosas, y se
+sumaron dos verificaciones: `cup`, la copa contra la carcasa y el transductor, y `cup_insert`, la copa
+deslizándose sobre el enchufe. `export.sh`: 40 ok. Cambian la 01 (el paso del cable), la 03 y la 08 nueva;
+la 02 es igual a la de la v0.26. Rama `feat/case-v0-27`, sin commitear; STL en
+`~/Desktop/Modelos 3D/VIA_CLARA_v0_27/` y en `versions/v0_27/`.
+
+### 2026-11-11: v0.28, el brazo con más luz en la copa
+
+El usuario imprimió la v0.27: todo salió bien salvo el brazo, que no calzaba en la copa, sobre todo el
+enchufe rectangular. En el modelo el encastre estaba centrado y con 0,35 de luz por lado (se verificó con un
+corte). La causa es la impresión: el zócalo de la copa queda acostado y su techo sale en puente, así que el
+hueco se achica. Como el usuario sólo reimprime el brazo, la copa queda igual y el enchufe del brazo pasa a
+5,1 × 5,1 (`CUP_PLUG_FIT`, 0,6 de luz por lado). Se confirmó que la copa, las mitades, el botón y la tapa
+dan la misma geometría que en la v0.27: mismos triángulos y mismo volumen. `export.sh`: 40 ok. STL en
+`~/Desktop/Modelos 3D/VIA_CLARA_v0_28/` y `versions/v0_28/`.
+
+### 2026-11-12: v0.29, el encastre de la copa al revés
+
+El usuario avisó que la parte del brazo que entra en la copa es demasiado chica. La v0.28 se había hecho
+sobre un supuesto equivocado: que en la v0.27 el brazo no entraba. En realidad quedaba flojo, y achicar el
+enchufe a 5,1 lo empeoró. La v0.29 lo agranda a 6,0 × 6,0, con esquinas de 0,8 (la luz queda en 0,15 por
+lado en el zócalo de 6,3 de la copa ya impresa). Suma tres puntas de prueba (5,8, 6,0 y 6,2), sólo el
+enchufe impreso acostado como el brazo, para probar en la copa antes de imprimir el brazo entero.
+`export.sh`: 40 ok. Lección: ante «no calza bien», preguntar si entra justo o queda flojo antes de cambiar
+la medida.
+
+### Pendientes
+
+- ~~Probar las puntas `test_cup_plug_*` de la v0.29 en la copa~~: el enchufe de 6,0 calzó perfecto (confirmado por el usuario el 2026-11-12). La v0.29 es la carcasa final, impresa.
+- Commit y PR de la v0.27 a la v0.29 (rama `feat/case-v0-27`).
+- ~~Lo pendiente de la v0.26~~: el usuario confirmó el 2026-11-12 que no queda nada por probar; la carcasa
+  está impresa y es la versión final.

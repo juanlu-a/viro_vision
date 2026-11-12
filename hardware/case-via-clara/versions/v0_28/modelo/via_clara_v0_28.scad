@@ -1,5 +1,13 @@
-// VIA Clara v0.26 — two-half snap-fit case for Raspberry Pi Zero 2 W + Waveshare UPS HAT (C) with its
+// VIA Clara v0.28 — two-half snap-fit case for Raspberry Pi Zero 2 W + Waveshare UPS HAT (C) with its
 // 803040 battery + Raspberry Pi AI Camera (IMX500) + bone-conduction transducer.
+//
+// v0.28 (2026-11-11): the v0.27 cup's socket printed tight (its roof is a bridge in the print) and the arm did
+// not go in. Only the arm changes: its cup plug is 5.1 square (was 5.6), 0.6 clear per side in the same socket.
+//
+// v0.27 (2026-11-10): the transducer cup is its own part (08), plugged onto the arm's end the way the arm plugs
+// into the case, so the cable is threaded through a straight open tube. The cable channel is wider (Ø3.4, was
+// Ø2.6: the tube wall is 1.0) and turns into the arm on a 3 mm radius inside the plug, with no square corner;
+// the port through the case wall is Ø3.8 and flared on the inside.
 //
 // v0.26 (2026-11-09): the temple still met the arm. The elastic bridges go 3 more up (ELASTIC_Z 5.5) and the arm
 // socket 1.5 more down (ARM_Z -5.5): 11 between the temple and arm axes, as far as the flat of the face allows.
@@ -513,7 +521,11 @@ module elastic_bridges() {
 // ---------- Bone arm socket ----------
 module bone_socket_boss() { translate([29, -13.2 + ARM_DY, ARM_Z]) rounded_box3d([13.2, 5.4, 15.4], 2); }
 module bone_socket_cut() { translate([29, -15 + ARM_DY, ARM_Z]) rounded_box3d([9.2, 6.3, 11.3], 1.1); }
-module bone_cable_port() { translate([29, -CAV_HY + 2, ARM_Z]) rotate([90, 0, 0]) cylinder(h = 13, d = 3.4); }
+module bone_cable_port() {
+    translate([29, -CAV_HY + 2, ARM_Z]) rotate([90, 0, 0]) cylinder(h = 13, d = 3.8);
+    // v0.27: flared on the inside, so the cable turns toward the boards without a square edge
+    translate([29, -CAV_HY + 0.01, ARM_Z]) rotate([90, 0, 0]) cylinder(h = 1.2, d1 = 6.2, d2 = 3.8);
+}
 
 // ---------- Snap beams, lip, pins ----------
 function snap_free(t) = t[0] - t[3] * t[1] / 2;              // free end of the beam (hook side)
@@ -713,14 +725,38 @@ module button_lid_placed() { translate([BUTTON_X, LID_Y, BUTTON_Z]) button_lid()
 // ---------- Bone arm (v0.8 geometry, moved with the head-side face, 14 mm pocket) ----------
 // The tube starts 0.4 clear of the socket boss (v0.10 had it 0.6 into the boss, so the arm did not seat)
 ARM_OUT = -1.0;
+ARM_R = 2.7;                     // tube outer radius
+CABLE_R = 1.7;                   // v0.27: cable channel Ø3.4 (was Ø2.6), so the tube wall is 1.0
+// v0.27: the cup is a separate part (08). Its boss takes a plug on the arm's end, along +X, like the case socket
+CUP_JOINT_X = 55.3;              // socket mouth
+CUP_PLUG = [4.4, 5.6, 5.6];      // the v0.27 plug: the cup's socket is sized from it (0.35 per side), and stays
+CUP_PLUG_CLEAR = 0.35;
+CUP_PLUG_FIT = [4.4, 5.1, 5.1];  // v0.28: the plug the arm has (the v0.27 socket printed tight): 0.6 per side
+CUP_JOINT = [CUP_JOINT_X, TRANSDUCER_CENTER[1], TRANSDUCER_CENTER[2] + 0.6];   // joint axis point at the mouth
 // from ARM_Z down to the cup: the v0.24 curve, scaled to the drop
-arm_pts = [for (p = [[29, -18, 0], [36.5, -18.2, 0.021], [44, -19, 0.139], [52, -20.1, 0.389], [59, -21.2, 0.715], [64, -22, 1]]) [p[0], p[1] + ARM_DY + ARM_OUT, ARM_Z + p[2] * ARM_DROP]];
-module bone_outer() { for (i = [0 : len(arm_pts) - 2]) capsule(arm_pts[i], arm_pts[i + 1], 2.7); }
+// v0.27: it ends at the cup joint's mouth, on the joint axis
+arm_pts = concat([for (p = [[29, -18, 0], [36.5, -18.2, 0.021], [44, -19, 0.139], [50, -20.4, 0.33]]) [p[0], p[1] + ARM_DY + ARM_OUT, ARM_Z + p[2] * ARM_DROP]],
+                 [CUP_JOINT]);
+module bone_outer() { for (i = [0 : len(arm_pts) - 2]) capsule(arm_pts[i], arm_pts[i + 1], ARM_R); }
+// the cable channel: in through the case plug along -Y, then a 3 mm radius bend into the tube (v0.27: no
+// square corner), along the tube and straight through the cup plug
+function plug_bend(a) = [29 + 3 - 3 * cos(a), -16 + ARM_DY + ARM_OUT + 1 - 3 * sin(a), ARM_Z];
 module bone_tunnel() {
-    p0 = [29, -12.8 + ARM_DY, ARM_Z]; pN = [66.2, -22 + ARM_DY + ARM_OUT, TRANSDUCER_CENTER[2] + 0.6];
-    capsule(p0, arm_pts[0], 1.3);
-    for (i = [0 : len(arm_pts) - 2]) capsule(arm_pts[i], arm_pts[i + 1], 1.3);
-    capsule(arm_pts[len(arm_pts) - 1], pN, 1.3);
+    bend = [for (a = [0 : 22.5 : 90]) plug_bend(a)];
+    capsule([29, -12.8 + ARM_DY, ARM_Z], bend[0], CABLE_R);
+    for (i = [0 : len(bend) - 2]) capsule(bend[i], bend[i + 1], CABLE_R);
+    capsule(bend[len(bend) - 1], arm_pts[1], CABLE_R);
+    for (i = [1 : len(arm_pts) - 2]) capsule(arm_pts[i], arm_pts[i + 1], CABLE_R);
+    translate(CUP_JOINT) rotate([0, 90, 0]) cylinder(h = CUP_PLUG[0] + 0.1, r = CABLE_R, $fn = 28);
+}
+// it starts 0.5 back from the mouth, inside the tube's end, so the two are one solid
+module cup_plug() { translate(CUP_JOINT + [CUP_PLUG_FIT[0] / 2 - 0.25, 0, 0]) rounded_box3d(CUP_PLUG_FIT + [0.5, 0, 0], 1); }
+module cup_socket() {
+    // from 2 mm outside the mouth (so its rounded end is not in the mouth) to 0.3 past the plug's tip
+    translate(CUP_JOINT + [(CUP_PLUG[0] + 0.3 - 2) / 2, 0, 0])
+        rounded_box3d([CUP_PLUG[0] + 0.3 + 2, CUP_PLUG[1] + 2 * CUP_PLUG_CLEAR, CUP_PLUG[2] + 2 * CUP_PLUG_CLEAR], 1.1);
+    // the cable on into the pocket
+    translate(CUP_JOINT) rotate([0, 90, 0]) cylinder(h = 12, r = CABLE_R, $fn = 28);
 }
 // plug: 0.35 clearance per side in the socket, no detent bumps (they jammed: the socket has no dimples);
 // it reaches out to the tube. Push it in and fix it with a drop of glue if it is loose.
@@ -728,7 +764,7 @@ module bone_plug() {
     translate([29, -15.4 + ARM_DY, ARM_Z]) rounded_box3d([8.5, 6.5, 10.6], 1);   // reaches 0.3 short of the socket floor
     hull() {
         translate([29, -18.2 + ARM_DY, ARM_Z]) cube([8.5, 0.1, 6.0], center = true);
-        translate(arm_pts[0]) sphere(r = 2.7, $fn = 28);
+        translate(arm_pts[0]) sphere(r = ARM_R, $fn = 28);
     }
 }
 // cup frame: origin on the cup axis at the open face, +Z along the cup into it (= +Y in the model)
@@ -768,13 +804,27 @@ module bone_arm() {
     difference() {
         union() {
             bone_plug();
-            // the arm stays 0.2 off the socket boss (v0.8 had it 0.6 inside the boss)
-            difference() { union() { bone_outer(); transducer_cradle(); } translate([29, -13.2 + ARM_DY, ARM_Z]) rounded_box3d([13.6, 5.8, 15.8], 2.2); }
+            cup_plug();
+            // the arm stays 0.2 off the socket boss (v0.8 had it 0.6 inside the boss), and off the cup's boss
+            difference() { bone_outer(); translate([29, -13.2 + ARM_DY, ARM_Z]) rounded_box3d([13.6, 5.8, 15.8], 2.2);
+                           box([CUP_JOINT_X, -60, -40], [90, 10, 10]); }
         }
         bone_tunnel();
+        translate([29, -13.6 + ARM_DY, ARM_Z]) rotate([90, 0, 0]) cylinder(h = 3.8, d = 2 * CABLE_R + 0.2, center = true);
+    }
+}
+// Cup (part 08): the cup and, on its -X side, a boss with the socket for the arm's plug. The boss spans the
+// cup's length (Y), so the part prints floor down with nothing hanging.
+CUP_BOSS = [CUP_JOINT_X, TRANSDUCER_CENTER[0] - CUP_OUTER_D / 2 + 2.5];   // X from the mouth into the cup wall
+module transducer_cup() {
+    difference() {
+        union() {
+            transducer_cradle();
+            hull() for (x = CUP_BOSS) translate([x, CUP_FACE_Y, CUP_JOINT[2] - CUP_PLUG[2] / 2 - CUP_PLUG_CLEAR - 1.4])
+                cube([0.01, CUP_LEN, CUP_PLUG[2] + 2 * CUP_PLUG_CLEAR + 2.8]);
+        }
         transducer_pocket();
-        translate([29, -13.6 + ARM_DY, ARM_Z]) rotate([90, 0, 0]) cylinder(h = 3.8, d = 2.8, center = true);
-        translate([64.6, -22 + ARM_DY + ARM_OUT, TRANSDUCER_CENTER[2] + 0.6]) rotate([0, 90, 0]) cylinder(h = 7.4, d = 2.8);
+        cup_socket();
     }
 }
 
@@ -858,6 +908,7 @@ module assembly() {
     color("#bdbdbd") translate([0, -EXPLODE, 0]) grille_placed();
     if (CAP) color("#3a3a3a") translate([-EXPLODE, 0, 0]) camera_cap();
     color("#1b1b1b") translate([0, -EXPLODE, 0]) bone_arm();
+    color("#2a2a2a") translate([EXPLODE / 2, -EXPLODE, 0]) transducer_cup();
     if (SHOW_HW) hardware();
 }
 
@@ -931,6 +982,8 @@ module print_cap() { translate([0, 0, -NOSE_X + 0.15]) rotate([0, -90, 0]) camer
 // every print part sits on the bed, so a change that moves the arm fails loudly)
 BONE_PRINT_Z = ARM_DY - 13.76 + 1.601;   // follows the arm when the head-side face moves
 module print_bone() { translate([0, 0, BONE_PRINT_Z]) rotate([-90, 0, 0]) bone_arm(); }
+// cup floor down, open face up
+module print_cup() { translate([-TRANSDUCER_CENTER[0], -TRANSDUCER_CENTER[2], CUP_FACE_Y + CUP_LEN]) rotate([-90, 0, 0]) transducer_cup(); }
 
 // ---------- Interference checks: every one of these must render EMPTY (or zero-volume contact) ----------
 module check(name) {
@@ -942,14 +995,17 @@ module check(name) {
     else if (name == "panel_switch") intersection() { panel_switch_pins(); union() { right_body(); hw_all(); hw_hex(); flex_keepout(); } }
     else if (name == "flex") intersection() { flex_keepout(); union() { left_body(); right_body(); hw_hat(); hw_hex(); } }
     else if (name == "hw_self") intersection() { hw_hat(); hw_pi(); }
-    else if (name == "bone") intersection() { bone_arm(); union() { left_body(); hw_transducer(); } }
+    else if (name == "bone") intersection() { bone_arm(); union() { left_body(); hw_transducer(); transducer_cup(); } }
+    else if (name == "cup") intersection() { transducer_cup(); union() { left_body(); hw_transducer(); } }
+    // the cup goes onto the arm's plug moving -X
+    else if (name == "cup_insert") intersection() { bone_arm(); union() for (dx = [0 : 0.5 : 6]) translate([dx, 0, 0]) transducer_cup(); }
     else if (name == "drawer_pi") intersection() { union() { switch_drawer_solid(); hw_switch(); } union() { hw_pi(); hw_hex(); hw_heatsink(); } }
     // assembly paths, not just the final positions. The cap goes up low in the bay (flange against the
     // backing), then steps out into its hole: those two legs are the whole path
     // the cap, then the switch, go straight into the pocket from the cavity (moving +Y)
     else if (name == "cap_insert") intersection() { right_body(); union() for (dy = [-8 : 0.5 : 0]) translate([BUTTON_X, SW_TOP_Y + dy, BUTTON_Z]) button_cap(); }
     else if (name == "switch_insert") intersection() { union() { right_body(); button_cap_placed(); } union() for (dy = [-8 : 0.5 : 0]) translate([0, dy, 0]) hw_switch(); }
-    else if (name == "grille") intersection() { grille_placed(); union() { bone_arm(); hw_transducer(); left_body(); } }
+    else if (name == "grille") intersection() { grille_placed(); union() { bone_arm(); transducer_cup(); hw_transducer(); left_body(); } }
     else if (name == "clamp") intersection() { left_body(); hw_screw_heads(); }
     // the camera goes into the right half moving +Y, then the left half closes over it (relative -Y)
     else if (name == "cap_hw" && CAP) intersection() { camera_cap(); union() { hw_all(); hw_hex(); } }
@@ -972,7 +1028,9 @@ if (PART == "left") left_body();
 else if (PART == "cap") camera_cap();
 else if (PART == "print_cap") print_cap();
 else if (PART == "right") right_body();
-else if (PART == "bone") bone_arm();
+else if (PART == "bone") union() { bone_arm(); transducer_cup(); }
+else if (PART == "cup") transducer_cup();
+else if (PART == "print_cup") print_cup();
 else if (PART == "button") button_cap();
 else if (PART == "button_placed") button_cap_placed();
 else if (PART == "print_left") print_left();
