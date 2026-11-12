@@ -1,6 +1,6 @@
 # ViroVision: hoja de ruta
 
-Plan de continuación de los tres pilares, al 2026-10-22. Se actualiza a medida que el trabajo
+Plan de continuación de los tres pilares, al 2026-11-12. Se actualiza a medida que el trabajo
 avanza. El estado vigente vive en [`PROJECT-STATUS.md`](PROJECT-STATUS.md) y la historia cronológica
 en [`SESSION-LOG.md`](SESSION-LOG.md).
 
@@ -35,14 +35,18 @@ en [`SESSION-LOG.md`](SESSION-LOG.md).
 - **App**: pestañas Inicio / Dispositivo / Ajustes; cliente BLE real con cola de operaciones GATT;
   foto del supermercado por el AP WiFi de la placa; salida de audio elegible (teléfono o dispositivo)
   para todos los sonidos y una sola voz por vez; batería de la placa; fotos del modo ómnibus en Inicio
-  (temporal, ver abajo); telemetría con errores tipados.
+  (temporal, ver abajo); telemetría con errores tipados; **modo producto y modo desarrollo**
+  (#125, #128: el producto, por defecto, oculta fotos, campos del resultado y selector de modelo).
+  Revisión de todo el código (#126). Clave fija del AP aceptada como riesgo (#127, ADR 0003).
 - **Placa** (Zero 2 W + AI Camera IMX500 + UPS HAT (C)): daemon con periférico BLE, botón calibrado,
   AP siempre prendido, modo ómnibus en vigilancia, anuncios pregrabados, batería por INA219, arranque
   que anuncia a los 16,2 s, journal persistente, evidencia.
-- **Visión**: detector de dos clases reentrenado en la V100 (~500 fotos), PP-OCRv5 en la placa,
+- **Visión**: detector de dos clases reentrenado en la V100 (casi 400 fotos, la cifra de la tesis), PP-OCRv5 en la placa,
   catálogo que completa y filtra, márgenes del cartel 18/6/6, zoom digital hasta 2x.
-- **Carcasa** VIA Clara: v0.9 en `staging`; v0.10 a v0.12 en la rama `feat/case-v0-10-slim`, con dos
-  impresiones de prueba.
+- **Placa**: reemplazada el 2026-11-07 por otra Zero 2 W, con la misma microSD.
+- **Carcasa** VIA Clara: **v0.29, final, en `staging`** (#131), impresa y armada. Pasó por la v0.20
+  (#124) y la v0.26 (#129, con la cámara girada porque el YOLO corre dentro del sensor y la imagen no se
+  puede girar por software). Impresa en una FLSUN T1 Max.
 
 ## Lo que falta, en orden
 
@@ -52,14 +56,17 @@ en [`SESSION-LOG.md`](SESSION-LOG.md).
    (`set_inference_roi_abs`).
 2. **Métricas del detector reentrenado** en la V100: épocas, mAP y la evaluación sobre las 117
    imágenes. Hoy no constan en ningún repositorio.
-3. **Carcasa**: medir con calibre lo marcado `MEASURE`, imprimir la v0.12, confirmar que la llave se
-   alcanza con los lentes puestos e integrar la rama a `staging`.
-4. **Audio en la placa**: el PWM es provisional; falta cerrar el transductor de conducción ósea.
+3. **Carcasa**: sin diseño pendiente (la v0.29 es la final). Queda, si se desea, medir con calibre lo
+   marcado `MEASURE` y probar el equipo puesto en la calle.
+4. **Audio en la placa**: el PWM es provisional y la placa nueva se oye muy bajo. El PR #130 (abierto)
+   propone pasarlo a los pines 12 y 14 (`pins_18_19`) con un auricular de 4 Ω, 260 Ω en serie y 47 a
+   100 µF; falta decidirlo, soldarlo y probarlo, y cerrar el transductor de conducción ósea.
 5. **Pruebas con usuarios** (UNCU y el usuario de validación) y la corrida de evaluación del
    supermercado sobre el conjunto de la canasta básica.
 6. **ADR 0005** (design system y accesibilidad), pendiente de escritura.
-7. **Informe**: capítulos 9 (conclusiones) y 10 (trabajo futuro), y los `PENDIENTE` que quedan en
-   el resto.
+7. **Informe**: el capítulo 9 (conclusiones, aún por redactar) y los `PENDIENTE` que quedan en el
+   resto (métricas de la V100, calle, usuarios). El capítulo 10 (trabajo futuro) y la sección 7.9
+   (limitaciones) ya están escritos.
 8. **Antes de la entrega**: sacar lo que es sólo de desarrollo (sección siguiente).
 
 ## Antes de la versión final (entrega del 30/11): sacar lo que es sólo de desarrollo

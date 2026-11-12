@@ -21,13 +21,13 @@ El sistema funciona como una máquina de estados de tres modos que se controla c
 
 | **Gesto** | **Efecto** |
 |---|---|
-| Un click | Entra en modo ómnibus desde cualquier estado |
-| Doble click | Entra en modo supermercado desde cualquier estado y solicita una lectura |
+| Un clic | Entra en modo ómnibus desde cualquier estado; si el sistema ya está en modo ómnibus, repite el último anuncio |
+| Doble clic | Entra en modo supermercado desde cualquier estado y solicita una lectura |
 | Pulsación larga | Vuelve al estado de espera |
 
-En una primera versión, pasar de un modo a otro exigía volver antes al estado de espera. Esa restricción se eliminó porque, para una persona que no ve la pantalla, presionar el botón y no obtener respuesta se interpreta como una falla del dispositivo. Desde entonces cada gesto lleva directamente a un modo. Por el mismo motivo, el doble click solicita una lectura aunque el sistema ya esté en modo supermercado: el usuario que repite el gesto está pidiendo una nueva lectura.
+En una primera versión, pasar de un modo a otro exigía volver antes al estado de espera. Esa restricción se eliminó porque, para una persona que no ve la pantalla, presionar el botón y no obtener respuesta se interpreta como una falla del dispositivo. Desde entonces cada gesto lleva directamente a un modo. Por el mismo motivo, el doble clic solicita una lectura aunque el sistema ya esté en modo supermercado: el usuario que repite el gesto está pidiendo una nueva lectura.
 
-El sistema no emite audio que el usuario no haya solicitado. En el modo supermercado la solicitud es cada doble click; en el modo ómnibus la solicitud es el propio modo, y mientras está activo el dispositivo vigila la escena y anuncia los ómnibus que aparecen (sec. 7.4.9).
+El sistema no emite audio que el usuario no haya solicitado. En el modo supermercado la solicitud es cada doble clic; en el modo ómnibus la solicitud es el propio modo, y mientras está activo el dispositivo vigila la escena y anuncia los ómnibus que aparecen (sec. 7.4.9).
 
 ### 7.1.3 Los tres flujos de reconocimiento
 
@@ -96,9 +96,11 @@ Luego de la exploración de modelos locales (sec. 7.2.8) se decidió resolver el
 |---|---|---|---|---|---|
 | qwen/qwen3.8-27b | 764 ms | 846 ms | 1087 ms | 1,4× | 5/5 |
 | gpt-5.6-luna | 1410 ms | 1668 ms | 2490 ms | 1,8× | 5/5 |
-| gemini-3.5-flash-lite | 2820 ms | 10 649 ms | 32 586 ms | 11,6× | 5/5 |
+| gemini-3.5-flash-lite | 2820 ms | 10.649 ms | 32.586 ms | 11,6× | 5/5 |
 
-Los tres modelos devolvieron correctamente los tres campos en las quince corridas, de modo que la precisión no permitió diferenciarlos. El criterio pasó a ser la latencia y, en particular, su dispersión. Un modelo cuya mediana es aceptable pero cuyo peor caso es doce veces mayor genera, para un usuario que no ve la pantalla, una espera que no se distingue de una aplicación bloqueada. Se eligió el modelo de menor latencia y menor dispersión, y se dejó el segundo como alternativa en el selector de la aplicación (sec. 7.2.7).
+Los tres modelos devolvieron correctamente los tres campos en las quince corridas, de modo que la precisión no permitió diferenciarlos. El criterio pasó a ser la latencia y, en particular, su dispersión. Un modelo cuya mediana es aceptable pero cuyo peor caso es doce veces mayor genera, para un usuario que no ve la pantalla, una espera que no se distingue de una aplicación bloqueada, lo que descartó a gemini-3.5-flash-lite.
+
+Entre los dos modelos restantes, qwen/qwen3.8-27b tiene la mitad de la latencia y menor dispersión, pero se eligió gpt-5.6-luna como modelo por defecto por la cuota de uso. qwen/qwen3.8-27b se utiliza a través de Groq, cuyo plan gratuito admite unas cuatro lecturas por minuto, y una persona que recorre una góndola realiza del orden de dos a cuatro lecturas por minuto. Con ese modelo por defecto, la lectura que excede el límite falla, y para el usuario eso es peor que una respuesta 800 ms más lenta. qwen/qwen3.8-27b se mantiene como alternativa en el selector de la aplicación (sec. 7.2.7). La justificación está registrada junto a la definición del modelo por defecto (app/src/services/vision/product.ts).
 
 El costo por lectura con el modelo seleccionado es de aproximadamente USD 0,0003 (1138 tokens de entrada y 35 de salida), por lo que mil lecturas cuestan menos de medio dólar y el costo dejó de ser una restricción. También se observó que reducir el tamaño de la imagen disminuye los tokens pero no la latencia.
 
@@ -120,7 +122,7 @@ La primera medición del ciclo completo se hizo el 15 de septiembre de 2026 sobr
 
 | **Etapa** | **Tiempo desde el gesto** |
 |---|---|
-| Click del botón; el modo cambia a ómnibus | 0 |
+| Clic del botón; el modo cambia a ómnibus | 0 |
 | Vigilancia iniciada | 5 ms |
 | El OCR devuelve la lectura | 1,27 s |
 | Se anuncia «Ómnibus 115, Luis Braille» | 1,27 s |
@@ -143,15 +145,15 @@ La ocupación del 90% del chip tiene una consecuencia: en el sensor cabe un úni
 
 ### 7.2.6 Calibración de la interacción física
 
-Los tiempos iniciales del botón se tomaron de las convenciones de interfaces de escritorio y provocaban errores en el reconocimiento de los gestos; en particular, el doble click se confundía con un click simple. Se ajustaron así:
+Los tiempos iniciales del botón se tomaron de las convenciones de interfaces de escritorio y provocaban errores en el reconocimiento de los gestos; en particular, el doble clic se confundía con un clic simple. Se ajustaron así:
 
 | **Constante** | **Antes** | **Ahora** | **Fundamento** |
 |---|---|---|---|
-| Antirrebote | 50 ms | 15 ms | Con 50 ms el doble click se interpretaba como uno solo; 15 ms cubre el rebote mecánico del pulsador utilizado |
-| Ventana de doble click | 0,4 s | 0,6 s | 0,4 s es el valor habitual para un ratón; el gesto sobre un dispositivo montado en la sien es más lento |
+| Antirrebote | 50 ms | 15 ms | Con 50 ms el doble clic se interpretaba como uno solo; 15 ms cubre el rebote mecánico del pulsador utilizado |
+| Ventana de doble clic | 0,4 s | 0,6 s | 0,4 s es el valor habitual para un ratón; el gesto sobre un dispositivo montado en la sien es más lento |
 | Umbral de pulsación larga | 0,8 s | 0,8 s | Sin cambios |
 
-Con los valores nuevos se realizaron treinta gestos consecutivos (once dobles, diez simples y nueve largos) sin errores de reconocimiento. En la misma sesión, el primer doble click desde el estado de espera cambió de modo y descargó la fotografía en 164 ms.
+Con los valores nuevos se realizaron treinta gestos consecutivos (once dobles, diez simples y nueve largos) sin errores de reconocimiento. En la misma sesión, el primer doble clic desde el estado de espera cambió de modo y descargó la fotografía en 164 ms.
 
 Estos tiempos fueron calibrados por personas videntes y con un pulsador distinto del que lleva la carcasa. El ajuste definitivo requiere las pruebas con usuarios ciegos previstas para la etapa final.
 
@@ -201,11 +203,11 @@ La elección permitió compartir la lógica de la aplicación, pero no eliminó 
 | Cómputo | Raspberry Pi Zero 2 W | En uso; reemplazada por una unidad nueva el 7 de noviembre de 2026 (sec. 7.3.6) |
 | Visión | Raspberry Pi AI Camera (sensor Sony IMX500, 12 MP, inferencia en el sensor) | Integrada |
 | Entrada | Pulsador en GPIO 5; en la carcasa, pulsador SMD de 4 × 4 × 1 mm con tecla impresa | Integrado |
-| Audio | Salida PWM por GPIO (pines físicos 12 y 14) hacia un auricular de 4 ohmios, con resistencia y capacitor en serie; destino: amplificador I2S hacia un transductor de conducción ósea de 14 mm | Provisoria; en prueba (sec. 7.3.6) |
+| Audio | Salida PWM por GPIO (señal en el pin físico 32, masa en el 34) hacia un auricular de 4 ohmios; destino: amplificador I2S hacia un transductor de conducción ósea de 14 mm | Provisoria; el traslado a los pines 12 y 14 con resistencia y capacitor en serie está propuesto en el PR #130, pendiente de soldar y probar (sec. 7.3.6) |
 | Alimentación | Waveshare UPS HAT (C) con batería LiPo 803040 de 1000 mAh; interruptor deslizante de panel pegado a la carcasa en lugar de la llave del módulo | Integrada; el nivel de batería llega a la aplicación (sec. 7.3.3) |
-| Carcasa | VIA Clara, dos mitades a presión impresas en 3D sobre la patilla, con la copa del auricular aparte | v0.26 integrada al repositorio; v0.29 con el encastre de la copa validado (sec. 7.3.5) |
+| Carcasa | VIA Clara, dos mitades a presión impresas en 3D sobre la patilla, con la copa del auricular aparte | Versión final v0.29, impresa y armada; integrada al repositorio (PR #131, sec. 7.3.5) |
 
-La salida de audio actual utiliza modulación por ancho de pulso (PWM) redirigida a pines de propósito general (hasta noviembre, señal en el pin físico 32 y masa en el 34; desde el PR #130, señal en el 12 y masa en el 14). Permitió verificar el camino completo con voz audible en un auricular, pero no es adecuada para el uso real: un pin de propósito general entrega 16 mA, mientras que un auricular requiere del orden de 100 mA continuos. El volumen se limita al 90% porque la salida PWM satura en el extremo superior y la distorsión dificulta más la comprensión que un volumen menor. La solución prevista es un conversor digital-analógico con amplificador por I2S, cuya integración exige además reubicar el pulsador, que hoy ocupa uno de los pines necesarios.
+La salida de audio actual utiliza modulación por ancho de pulso (PWM) redirigida a pines de propósito general: en la versión integrada, la señal sale por el pin físico 32 y la masa por el 34. El PR #130, todavía no integrado, propone trasladarla a los pines físicos 12 (señal) y 14 (masa) (sec. 7.3.6). Esta salida permitió verificar el camino completo con voz audible en un auricular, pero no es adecuada para el uso real: un pin de propósito general entrega 16 mA, mientras que un auricular requiere del orden de 100 mA continuos. El volumen se limita al 90% porque la salida PWM satura en el extremo superior y la distorsión dificulta más la comprensión que un volumen menor. La solución prevista es un conversor digital-analógico con amplificador por I2S. El pulsador, en GPIO 5, no ocupa ninguno de los pines de esa interfaz; en cambio, con el traslado propuesto en el PR #130 la salida PWM pasa a usar GPIO 18 y 19, que son pines de I2S, por lo que esa salida se retiraría al incorporar el conversor.
 
 El sensor tiene enfoque manual y las primeras capturas salieron desenfocadas. El ajuste quedó documentado como paso obligatorio de la puesta en marcha, con una herramienta auxiliar que calcula un puntaje de nitidez mientras se gira el anillo frente a un cartel ubicado a 10 o 20 metros.
 
@@ -289,7 +291,8 @@ El principal problema fue que las verificaciones del modelo se hacen contra maqu
 | v0.25 (9 de noviembre) | Los conectores de la placa sobresalen 2,0 mm y no 0,8; la patilla del lente pasaba sobre el brazo del auricular | Carcasa más alta (39,8 mm); botón centrado; alojamientos de 5,5 mm; brazo y elástico reubicados; trabas más anchas |
 | v0.26 (9 de noviembre) | La patilla todavía tocaba el brazo | 11 mm entre el elástico y el brazo, el máximo que admite la cara plana; se integra al repositorio (PR #129) |
 | v0.27 (10 de noviembre) | Se separa la copa del auricular del brazo, para imprimirla como pieza aparte | Copa que se encastra en el brazo, con un canal interno para el cable; impresa con buen resultado salvo el encastre |
-| v0.28 y v0.29 (11 y 12 de noviembre) | El encastre entre el brazo y la copa quedaba flojo | Se probaron enchufes de 5,8, 6,0 y 6,2 mm; el de 6,0 mm calzó correctamente y queda como medida |
+| v0.28 (11 de noviembre) | El encastre entre el brazo y la copa de la v0.27 quedaba flojo | Por error se supuso lo contrario y el enchufe se achicó a 5,1 mm, con lo que quedó todavía más flojo |
+| v0.29 (12 de noviembre) | Se probaron enchufes de 5,8, 6,0 y 6,2 mm; el de 6,0 mm calzó correctamente | Versión final: impresa y armada con el enchufe de 6,0 mm; se integra al repositorio (PR #131) |
 
 Varios hallazgos de esa secuencia cambiaron el diseño y no sólo una medida.
 
@@ -305,7 +308,7 @@ Las primeras versiones se imprimieron en una Creality Ender 3 V3 y las siguiente
 
 El equipo sometió el modelo al flujo de revisión multimodelo tackle-ticket, en el que revisores basados en distintos modelos (Opus, Sonnet, Haiku y Codex) examinan el mismo cambio por separado. En la v0.9 la revisión llevó las trabas al plano de la cama, reservó el volumen del cable plano de la cámara, que no tenía por dónde pasar, y agregó las verificaciones de los caminos de armado; en la v0.11 encontró que los apoyos que debían sujetar el conjunto no lo tocaban y que el lente no pasaba por el plano de la junta.
 
-Los archivos de impresión de las versiones v0.9 a v0.26 están en el repositorio (hardware/case-via-clara/versions/). Quedan pendientes integrar las versiones v0.27 a v0.29, imprimir y armar la carcasa completa con la copa del auricular aparte, y verificar con ella los tiempos del botón (sec. 7.2.6).
+Los archivos de impresión de las versiones v0.9 a v0.29 están en el repositorio (hardware/case-via-clara/versions/). Con la carcasa final armada, queda pendiente verificar con ella los tiempos del botón (sec. 7.2.6).
 
 ### 7.3.6 Fallas de hardware durante el desarrollo
 
@@ -315,7 +318,7 @@ El conector de cámara de la primera Raspberry Pi Zero 2 W se dañó en septiemb
 
 El 28 de octubre, al cerrar la carcasa, el sensor de la cámara se desconectó de su propio módulo (el conector pequeño entre el sensor y la placa de la cámara, no el cable plano). El síntoma era que la placa dejaba de detectar la cámara. Volver a asentar el conector lo resolvió, y se tuvo en cuenta en las versiones siguientes de la carcasa para que no presione esa zona.
 
-A comienzos de noviembre la Zero 2 W en uso volvió a dañarse y se reemplazó por una nueva. Como la tarjeta de memoria era la misma, la placa nueva arrancó con toda la configuración y el servicio instalado, y el sistema volvió a funcionar desde la aplicación, incluida la lectura de supermercado. La única diferencia fue el audio: en la placa nueva el auricular se escuchaba con un volumen casi nulo. Se descartó una causa de software (la configuración de audio estaba cargada, el pin correcto entregaba la señal PWM y la reproducción no daba errores). Al medir el auricular resultó ser de 4 ohmios y no de 16 a 32, como se había supuesto: con la resistencia de 100 ohmios en serie le llegaba aproximadamente el 4% de la tensión, y el pico de corriente (unos 32 mA) duplicaba lo que admite un pin de propósito general. Se definió una resistencia de 260 ohmios, que limita el pico a unos 12,5 mA, y un capacitor de acoplamiento de 47 a 100 µF que elimina la componente continua de la señal PWM. Para que ambos componentes entren en la carcasa, la salida se trasladó a los pines físicos 12 (señal) y 14 (masa), el otro par del conector con salida PWM y el más cercano a la tarjeta de memoria (PR #130). Al 12 de noviembre falta soldar el auricular con esos componentes y probarlo. Aun así, un pin de propósito general no puede entregar el volumen que necesita un auricular de 4 ohmios, por lo que la solución definitiva requiere un amplificador (sec. 10.1).
+A comienzos de noviembre la Zero 2 W en uso volvió a dañarse y se reemplazó por una nueva. Como la tarjeta de memoria era la misma, la placa nueva arrancó con toda la configuración y el servicio instalado, y el sistema volvió a funcionar desde la aplicación, incluida la lectura de supermercado. La única diferencia fue el audio: en la placa nueva el auricular se escuchaba con un volumen casi nulo. Se descartó una causa de software (la configuración de audio estaba cargada, el pin correcto entregaba la señal PWM y la reproducción no daba errores). Al medir el auricular resultó ser de 4 ohmios y no de 16 a 32, como se había supuesto: con la resistencia de 100 ohmios en serie le llegaba aproximadamente el 4% de la tensión, y el pico de corriente (unos 32 mA) duplicaba lo que admite un pin de propósito general. Se propuso una resistencia de 260 ohmios, que limita el pico a unos 12,5 mA, y un capacitor de acoplamiento de 47 a 100 µF que elimina la componente continua de la señal PWM. Para que ambos componentes entren en la carcasa, el PR #130 propone trasladar la salida a los pines físicos 12 (señal) y 14 (masa), el otro par del conector con salida PWM y el más cercano a la tarjeta de memoria. El PR no está integrado: la configuración de la tarjeta de la placa ya se cambió a esos pines, pero al 12 de noviembre falta soldar el auricular con esos componentes y probarlo. Aun así, un pin de propósito general no puede entregar el volumen que necesita un auricular de 4 ohmios, por lo que la solución definitiva requiere un amplificador (sec. 10.1).
 
 ## 7.4 El pipeline de reconocimiento de líneas de ómnibus
 
@@ -372,7 +375,7 @@ Cada fila registra la imagen, el número y el destino esperados, la presencia de
 
 Los tres videos de origen provienen de redes sociales y no de la cámara del dispositivo, por lo que todas las métricas de esta sección corresponden a imágenes distintas de las de uso real. La construcción de un conjunto de evaluación con fotografías tomadas por el propio dispositivo es la principal tarea pendiente de este componente; la evidencia que guarda el modo ómnibus (sec. 7.4.9) se incorporó para ese fin.
 
-Se construyó además un catálogo de líneas a partir de los datos abiertos del Sistema de Transporte Metropolitano de la Intendencia de Montevideo (data/catalog_stm.csv): 504 filas, de las cuales 502 son pares de número y destino entre 145 números de línea y 255 destinos, más dos carteles sin línea (COCHE ESCUELA y FUERA DE SERVICIO). El catálogo se usa para corregir la salida del OCR, para decidir qué se puede anunciar y completar la parte del cartel que no se leyó (sec. 7.4.8), y para generar los anuncios pregrabados (sec. 7.4.12).
+Se construyó además un catálogo de líneas a partir de los datos abiertos del Sistema de Transporte Metropolitano de la Intendencia de Montevideo (data/catalog_stm.csv): 504 filas con 257 destinos distintos, de las cuales 502 son pares de número y destino entre 145 números de línea y las dos restantes son carteles sin línea (COCHE ESCUELA y FUERA DE SERVICIO). El catálogo se usa para corregir la salida del OCR, para decidir qué se puede anunciar y completar la parte del cartel que no se leyó (sec. 7.4.8), y para generar los anuncios pregrabados (sec. 7.4.12).
 
 ### 7.4.3 El entrenamiento del detector
 
@@ -424,7 +427,7 @@ Una comparación anterior, de septiembre de 2026 y previa a las reglas del catá
 
 El esquema de dos etapas lee mejor: en la medición vigente supera al de una etapa en 4,2 puntos de lectura completa y en 3,6 puntos de destino, con el mismo resultado en el número. En la medición anterior, el ajuste de los márgenes había reducido aproximadamente a la mitad la diferencia en lectura completa, pero no la del destino. Los errores de destino restantes provienen del reconocedor, que confunde el texto de la matriz de LEDs, y no de letras que quedan fuera del recorte.
 
-A pesar de esa diferencia se eligió el detector de una etapa, porque el sensor sólo admite un modelo: con uno solo la ocupación llega al 90% (sec. 7.2.5) y el segundo no entra. El esquema de dos etapas obligaría a ejecutar al menos una de las inferencias en el procesador de la placa, lo que impediría la detección continua sin costo de procesador en la que se basa el modo vigilancia y aumentaría el tiempo por cuadro. En la práctica, la alternativa al detector de una etapa no era el de dos etapas sino prescindir de la detección continua. Se aceptó una pérdida acotada de precisión en el destino a cambio de que el sistema pueda vigilar la escena sin intervención del usuario.
+A pesar de esa diferencia se eligió el detector de una etapa, porque el sensor sólo admite un modelo: con uno solo la ocupación llega al 90% (sec. 7.2.5) y el segundo no entra. El esquema de dos etapas obligaría a ejecutar al menos una de las inferencias en el procesador de la placa, lo que impediría la detección continua sin costo de procesador en la que se basa el modo vigilancia y aumentaría el tiempo por cuadro. Por lo tanto, adoptar el esquema de dos etapas implicaba prescindir de la detección continua. Se aceptó una pérdida acotada de precisión en el destino a cambio de que el sistema pueda vigilar la escena sin intervención del usuario.
 
 El esquema de dos etapas se conserva implementado en el repositorio como referencia para un equipo sin restricción de memoria, y permite medir cuánto cuesta la limitación del hardware.
 
@@ -478,7 +481,7 @@ Dos ajustes de configuración tuvieron un efecto mayor que el cambio de modelo. 
 
 ### 7.4.8 Interpretación y reparación contra el catálogo
 
-La salida del OCR se interpreta buscando al comienzo un código de línea, formado por hasta cuatro dígitos con un prefijo de letras opcional, y tomando el resto del texto como destino. Los prefijos admitidos (CE, BT, D, E, G y L) se tomaron del catálogo de la STM, en el que 55 de los 147 códigos de línea llevan letras (por ejemplo L12, D10, G8 o CE1). Al interpretar el código, las letras que el OCR confunde con dígitos (O por 0, I por 1) se corrigen sólo después del prefijo. Luego la lectura se valida contra el catálogo (sec. 7.4.2).
+La salida del OCR se interpreta buscando al comienzo un código de línea, formado por hasta cuatro dígitos con un prefijo de letras opcional, y tomando el resto del texto como destino. Los prefijos admitidos (CE, BT, D, E, G y L) se tomaron del catálogo de la STM, en el que 54 de los 145 códigos de línea llevan letras (por ejemplo L12, D10, G8 o CE1). Dos códigos del catálogo, G y PA, no tienen dígitos, por lo que el intérprete no los reconoce. Al interpretar el código, las letras que el OCR confunde con dígitos (O por 0, I por 1) se corrigen sólo después del prefijo. Luego la lectura se valida contra el catálogo (sec. 7.4.2).
 
 El catálogo corrige primero los errores sistemáticos del reconocedor. En la primera ejecución sobre la placa, el registro muestra la entrada 15 LUIS BRALLE y la salida 115, LUIS BRAILLE. La comparación tolera dígitos confundidos con letras y espacios perdidos (MEMID0ZAE y ME MDOZA E se reconocen como MENDOZA), con resguardos para no elegir un destino real pero equivocado: un mínimo de cuatro letras y un margen de 0,05 sobre el siguiente lugar distinto. Las variantes ortográficas de un mismo lugar en los datos abiertos no compiten entre sí.
 
@@ -548,7 +551,7 @@ Las líneas de otros sistemas, como las suburbanas e interdepartamentales operad
 ### 7.5.1 Estructura
 
 ```
-[Doble click en el botón]
+[Doble clic en el botón]
 ├─ 1. la placa captura y publica la fotografía  (HTTP sobre el punto de acceso)
 ├─ 2. la aplicación la descarga                 (~50 ms)
 ├─ 3. la envía al intermediario y de allí al modelo (~0,85 a 1,7 s)

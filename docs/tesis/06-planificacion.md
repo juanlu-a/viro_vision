@@ -59,6 +59,7 @@ La etapa en la que el sistema pasó de componentes separados a un producto que f
 1. Camino de ómnibus integrado desde el repositorio de visión hasta la placa.
 1. ADR 0009 (idioma del código) y ADR 0010 (un solo tema).
 1. Hito principal de la etapa (15 de septiembre): el modo ómnibus corre entero en la placa, con 1,27 segundos entre el gesto del usuario y la línea anunciada.
+
 ## 6.6 Etapa 4: validación en campo y cierre (octubre a noviembre de 2026)
 
 La etapa final comprende:
@@ -68,10 +69,11 @@ La etapa final comprende:
 - Medición del costo de la cuantización INT8 del detector, que todavía no se pudo realizar porque el modelo convertido sólo se carga en el entorno del fabricante (sec. 7.4.5).
 - Entrenamiento del detector en la GPU puesta a disposición por Arnaldo Castro. Realizado en octubre, con casi 400 fotografías (el primer ajuste fino, en CPU, había usado unas 140). Sus métricas quedan \[PENDIENTE\] de documentar (sec. 7.4).
 - Alcance de lectura del cartel: zoom digital del procesador de imagen sobre el cartel (19 de octubre, probado en la placa el 22) y ajuste de los márgenes del recorte (21 y 22 de octubre).
-- Cierre del hardware: la lectura del monitor de batería quedó integrada el 6 de octubre y el arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en OpenSCAD y se iteró sobre impresiones de prueba desde el 14 de octubre; la versión 0.20 se imprimió y se armó con todo el hardware el 30 de octubre, la 0.24 corrigió la orientación de la cámara y la 0.25 está en desarrollo (sec. 7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un transductor de conducción ósea previsto) y la medición del consumo real.
+- Cierre del hardware: la lectura del monitor de batería quedó integrada el 6 de octubre y el arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en OpenSCAD y se iteró sobre impresiones de prueba desde el 14 de octubre; la versión 0.20 se imprimió y se armó con todo el hardware el 30 de octubre, y la versión final, la 0.29, se imprimió y se armó (sec. 7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un transductor de conducción ósea previsto) y la medición del consumo real.
 - Pruebas de usabilidad con usuarios ciegos y ajuste de los tiempos de interacción.
 - Documentación final, presentación y demostración.
 - Dos semanas de reserva antes del 30 de noviembre para integración, corrección y pruebas conjuntas.
+
 ## 6.7 Riesgos identificados y su tratamiento
 
 | **Riesgo** | **Estado** | **Mitigación adoptada** |

@@ -4,13 +4,13 @@ Este capítulo reúne las líneas de trabajo que surgen de las limitaciones del 
 
 ## 10.1 Hardware
 
-El tamaño y el peso del dispositivo actual están determinados por componentes de propósito general: una Raspberry Pi Zero 2 W, un módulo de alimentación que se apila sobre ella con sus propios conectores, separadores y tornillos, y una cámara unida por un cable plano. La carcasa mide unos 86 × 29 × 40 mm (sec. 7.3.5) y buena parte de ese volumen corresponde a conectores, separadores y espacios de montaje que el dispositivo no necesita. El paso siguiente es diseñar una placa dedicada, que integre en un solo circuito el procesador (o un módulo de cómputo compacto), la gestión de la batería, la salida de audio y el pulsador, y que reciba la cámara sin el recorrido actual del cable. Con ella el dispositivo podría ser más liviano y compacto, y la carcasa podría diseñarse en torno a la forma de la patilla y no del conjunto de placas.
+El tamaño y el peso del dispositivo actual están determinados por componentes de propósito general: una Raspberry Pi Zero 2 W, un módulo de alimentación que se apila sobre ella con sus propios conectores, separadores y tornillos, y una cámara unida por un cable plano. La carcasa mide 89,2 × 28,5 × 39,8 mm sin el brazo del auricular (sec. 7.3.5) y buena parte de ese volumen corresponde a conectores, separadores y espacios de montaje que el dispositivo no necesita. El paso siguiente es diseñar una placa dedicada, que integre en un solo circuito el procesador (o un módulo de cómputo compacto), la gestión de la batería, la salida de audio y el pulsador, y que reciba la cámara sin el recorrido actual del cable. Con ella el dispositivo podría ser más liviano y compacto, y la carcasa podría diseñarse en torno a la forma de la patilla y no del conjunto de placas.
 
 La autonomía estimada con la batería actual de 1000 mAh es de 1,5 a 2 horas de uso activo (sec. 7.3.3), lo que alcanza para pruebas pero no para una jornada. Una celda de 2000 mAh duplicaría la autonomía estimada, a cambio de unos 16 g más; con una placa dedicada, el espacio liberado podría destinarse a una batería mayor sin aumentar el tamaño total. Antes de elegirla conviene medir el consumo real con un medidor en serie, que reemplace las estimaciones de terceros con las que se trabajó.
 
-La salida de audio debe pasar de la señal PWM de un pin de propósito general a un amplificador digital por I2S (por ejemplo, un MAX98357A) o a un amplificador analógico pequeño (como un PAM8302), capaz de entregar la corriente que requiere el auricular (sec. 7.3.6). Con esa etapa resuelta puede incorporarse el transductor de conducción ósea de 14 mm previsto en la carcasa, que deja los oídos libres para los sonidos del entorno, un aspecto importante para una persona ciega en la vía pública.
+La salida de audio debe pasar de la señal PWM de un pin de propósito general a un amplificador digital por I2S (por ejemplo, un MAX98357A) o a un amplificador analógico pequeño (como un PAM8302), capaz de entregar la corriente que requiere el auricular (sec. 7.3.6). El traslado de la salida PWM a los pines 12 y 14 con una resistencia y un capacitor en serie, propuesto en el PR #130 y pendiente de prueba, protege el pin pero no resuelve el volumen. Con esa etapa resuelta puede incorporarse el transductor de conducción ósea de 14 mm previsto en la carcasa, que deja los oídos libres para los sonidos del entorno, un aspecto importante para una persona ciega en la vía pública.
 
-En la carcasa quedan pendientes integrar al repositorio las versiones con la copa del auricular aparte, imprimirla completa y evaluar materiales más resistentes que el PLA para un uso diario.
+Para un uso diario, queda evaluar materiales más resistentes que el PLA para la carcasa.
 
 ## 10.2 Reconocimiento de líneas de ómnibus
 
@@ -28,7 +28,7 @@ El alcance puede ampliarse de los alimentos al resto de los productos de superme
 
 ## 10.4 Objetivos opcionales
 
-Dos funcionalidades opcionales planteadas al inicio del proyecto no se implementaron y quedan como trabajo futuro: la selección por señalamiento (sec. 2.2.3) y la lectura de etiquetas, que figuraba entre los objetivos de la propuesta original.
+Quedan como trabajo futuro dos funcionalidades que no se implementaron: el único objetivo opcional del proyecto, la selección por señalamiento (sec. 2.2.3), y la lectura de etiquetas, que figuraba en la propuesta original.
 
 El primero es la selección por señalamiento: que, ante varios productos en la imagen, el sistema anuncie sólo el que el usuario señala o toca con el dedo índice. Requiere detectar la mano y la punta del dedo en la imagen y relacionarla con el producto más cercano, y reduce la cantidad de información que el usuario debe escuchar en una góndola con muchos productos.
 

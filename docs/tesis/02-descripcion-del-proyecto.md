@@ -12,7 +12,7 @@ El alcance incluye el desarrollo del prototipo funcional, el entrenamiento o aju
 
 ### 2.2.1 Objetivo general
 
-Desarrollar un dispositivo de asistencia para personas con baja visión que permita reconocer líneas de ómnibus metropolitanos y productos del supermercado mediante técnicas de Computer Vision, Machine Learning e Inteligencia Artificial, brindando feedback auditivo y acoplándose a una aplicación móvil para mejorar la conectividad, el procesamiento y la experiencia de uso.
+Desarrollar un dispositivo de asistencia para personas con baja visión que permita reconocer líneas de ómnibus metropolitanos y productos del supermercado mediante técnicas de Computer Vision, Machine Learning e Inteligencia Artificial, brindando retroalimentación auditiva y acoplándose a una aplicación móvil para mejorar la conectividad, el procesamiento y la experiencia de uso.
 
 ### 2.2.2 Objetivos específicos
 
@@ -30,6 +30,7 @@ Desarrollar un dispositivo de asistencia para personas con baja visión que perm
 1. Evaluar el funcionamiento del prototipo en escenarios de uso representativos, considerando precisión de reconocimiento, tiempo de respuesta y utilidad para el usuario.
 
 1. Diseñar e implementar un criterio de priorización para la retroalimentación auditiva en escenarios con múltiples ómnibus detectados, de modo que el sistema comunique en primer lugar la línea más relevante según su posición o proximidad, pudiendo informar adicionalmente la presencia de otras líneas sin generar sobrecarga auditiva en el usuario.
+
 ### 2.2.3 Objetivos opcionales
 
 1. Implementar una funcionalidad de selección por señalamiento que permita que, en el caso de los productos de supermercado, la respuesta auditiva comunique únicamente el objeto que el usuario esté apuntando o tocando con su dedo índice entre los elementos detectados, a fin de reducir respuestas innecesarias y mejorar la experiencia de uso.
@@ -54,13 +55,14 @@ El proyecto contempla los siguientes entregables:
 1. **Documentación técnica y manual de usuario**  Documentación del sistema y guía de uso.
 1. **Informe final de tesis**  Documento completo que describe el proyecto, desarrollo y resultados.
 1. **Presentación y demo**  Exposición final del proyecto y demostración funcional del sistema.
+
 ### 2.3.1 Planilla de seguimiento y cronograma
 
 Como soporte de la planificación y seguimiento del proyecto, el equipo mantiene una planilla de trabajo compartida (enlace) organizada en dos hojas complementarias. La primera detalla el desglose completo del proyecto por épicas (Tareas generales, Desarrollo de dispositivo físico, Desarrollo de sistema de reconocimiento y Desarrollo de aplicación móvil), especificando para cada subtarea su descripción y estado de avance actual. La segunda hoja traduce este desglose en un diagrama de Gantt, que ubica cada tarea en el tiempo y permite visualizar la carga de trabajo en paralelo entre los integrantes del equipo.
 
-Entre los principales hitos planificados se encuentran: la compra y validación del hardware (cámara, microcontrolador y auricular) junto con el modelado 3D de la carcasa; la generación de los datasets y el entrenamiento del modelo de reconocimiento de líneas de ómnibus y productos; y el desarrollo e integración de la aplicación móvil, incluyendo las pruebas de accesibilidad con lectores de pantalla nativos y de usabilidad con usuarios ciegos. El cronograma proyecta la finalización del desarrollo hacia mediados de noviembre de 2026, dejando un margen de aproximadamente dos semanas antes de la fecha límite (30 de noviembre) para integración final, corrección de errores y pruebas de conjunto.
+Entre los principales hitos planificados se encuentran: la compra y validación del hardware (cámara, computadora de placa única y auricular) junto con el modelado 3D de la carcasa; la generación de los datasets y el entrenamiento del modelo de reconocimiento de líneas de ómnibus y productos; y el desarrollo e integración de la aplicación móvil, incluyendo las pruebas de accesibilidad con lectores de pantalla nativos y de usabilidad con usuarios ciegos. El cronograma proyecta la finalización del desarrollo hacia mediados de noviembre de 2026, dejando un margen de aproximadamente dos semanas antes de la fecha límite (30 de noviembre) para integración final, corrección de errores y pruebas de conjunto.
 
-Al 9 de noviembre de 2026, la carcasa se imprimió y se armó completa con todo el hardware en su versión 0.20 (30 de octubre), la versión 0.24 corrigió la orientación de la cámara y la 0.25 está en desarrollo; el detalle está en sec. 7.3.5.
+Al 12 de noviembre de 2026, la carcasa está terminada: su versión final, la 0.29, se imprimió y se armó con todo el hardware (sec. 7.3.5).
 
 ## 2.4 Antecedentes y contexto
 

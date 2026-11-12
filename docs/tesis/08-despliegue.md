@@ -28,17 +28,18 @@ Esta correspondencia tiene una consecuencia deliberada: no existe un paso manual
 
 ## 8.3 Integración continua
 
-El flujo de integración se ejecuta en cada *pull request* dirigido a staging o a main y en cada empuje a cualquier otra rama, y tiene dos etapas (los empujes a staging y main los cubre el flujo de publicación, que repite los mismos controles antes de compilar):
+El flujo de integración se ejecuta en cada *pull request* dirigido a staging o a main y en cada envío (*push*) a cualquier otra rama, y tiene dos etapas (los envíos a staging y main los cubre el flujo de publicación, que repite los mismos controles antes de compilar):
 
 1. Calidad: instalación determinista de dependencias, análisis estático, verificación de tipos y la suite completa de pruebas.
 1. Compilación de verificación: exportación del paquete para ambas plataformas, que confirma que el proyecto compila de punta a punta antes de invertir treinta minutos en un build real.
+
 ### 8.3.1 Verificación de las credenciales del despliegue
 
 Además de los controles habituales, el flujo ejecuta una verificación de correspondencia entre los modelos ofrecidos y las credenciales configuradas. Existe por un fallo real: cuando un proveedor salió del selector de modelos, la única credencial que el repositorio tenía configurada dejó de corresponder a un modelo del registro. La compilación fue exitosa, el paquete se publicó al canal de pruebas, y el modo supermercado quedó sin ningún modelo disponible. La aplicación degradó correctamente (anunció que no estaba configurada y no falló) pero nadie se enteró hasta abrirla.
 
-El control compara los proveedores que el código ofrece contra las credenciales presentes en el entorno y detiene la publicación antes del build. Las pruebas unitarias no detectan este tipo de defecto, porque no está en el código sino en la relación entre el código y su configuración de despliegue.
+El control compara los proveedores que el código ofrece contra las credenciales presentes en el entorno y detiene la publicación antes del build. Las pruebas unitarias no detectan este tipo de defecto, porque el defecto reside en la relación entre el código y su configuración de despliegue.
 
-El repositorio codifica además una regla de seguridad explícita sobre credenciales: una credencial de un servicio gratuito sin tarjeta asociada puede viajar en el paquete; una credencial de un servicio pago, no. El peor caso de la primera es una cuota consumida que se repone; el de la segunda es el medio de pago del proyecto.
+El repositorio codifica además una regla de seguridad explícita sobre credenciales: una credencial de un servicio gratuito sin tarjeta asociada puede viajar en el paquete: su peor caso es una cuota consumida que se repone. En cambio, una credencial de un servicio con cobro asociado no puede incluirse: su peor caso es el medio de pago del proyecto.
 
 ## 8.4 Distribución iOS
 
@@ -65,8 +66,8 @@ Los artefactos se nombran con versión y número de compilación: un nombre gen�
 Desplegada y activa desde el 2 de septiembre de 2026. Su diseño está descrito en sec. 7.2.3. Desde el punto de vista del despliegue interesan tres aspectos:
 
 1. Las credenciales viven en el almacén de secretos del proyecto, nunca en el repositorio ni en el paquete de la aplicación. La dirección del proxy es el único valor de configuración que el binario necesita, y no es sensible.
-1. Los códigos de error se eligieron para que el cliente pueda reaccionar: 400 ante un destino que no figura en la lista blanca, 405 ante un método incorrecto, 502 si no se alcanza al proveedor, y 503 (y no 500) cuando falta una credencial, porque el servicio no está roto sino sin configurar, y el mensaje nombra cuál falta. El limitador devuelve 429 con el mismo código de error que usan los proveedores, de modo que el cliente ya sabe esperar en lugar de abortar.
-1. Limitación conocida: el limitador por dirección de origen mantiene su contador en memoria del proceso, y la plataforma ejecuta varias instancias simultáneas, cada una con su propio contador. Está documentado como un obstáculo y no como una barrera.
+1. Los códigos de error se eligieron para que el cliente pueda reaccionar: 400 ante un destino que no figura en la lista blanca, 405 ante un método incorrecto, 502 si no se alcanza al proveedor, y 503 (y no 500) cuando falta una credencial, porque el servicio se encuentra sin configurar, y el mensaje nombra cuál falta. El limitador devuelve 429 con el mismo código de error que usan los proveedores, de modo que el cliente ya sabe esperar en lugar de abortar.
+1. Limitación conocida: el limitador por dirección de origen mantiene su contador en memoria del proceso, y la plataforma ejecuta varias instancias simultáneas, cada una con su propio contador. Está documentado como un obstáculo conocido y no como una barrera.
 ### 8.6.2 Función de telemetría y base de datos
 
 Recibe lotes de eventos y los inserta en la tabla correspondiente utilizando una credencial de servicio, de modo que la aplicación nunca posee acceso directo a la base. Aplica dos topes: cien eventos por lote y un tamaño máximo por detalle, que al superarse se reemplaza por completo y no parcialmente, porque un detalle sobredimensionado es la señal de que algo no debería estar enviándose por ese canal.
@@ -77,7 +78,7 @@ El esquema se gestiona por migraciones que se agregan y no se editan. La migraci
 
 ### 8.6.3 Función de evidencia y su almacenamiento
 
-Desplegada el 2026-10-12, es la tercera función. Recibe las fotos del modo ómnibus (el cuadro en que se detectó cada ómnibus y cada recorte del cartel que leyó el OCR, sec. 7.7.3) y las guarda en un contenedor de almacenamiento privado, creado por su propia migración. El camino tiene tres pasos: el dispositivo guarda las imágenes y avisa por Bluetooth; la aplicación las baja por WiFi y registra en el momento un evento de telemetría con lo que leyó el OCR y la ruta de cada imagen; las imágenes quedan en cola en el teléfono y se suben cuando hay internet.
+Desplegada el 12 de octubre de 2026, es la tercera función. Recibe las fotos del modo ómnibus (el cuadro en que se detectó cada ómnibus y cada recorte del cartel que leyó el OCR, sec. 7.7.3) y las guarda en un contenedor de almacenamiento privado, creado por su propia migración. El camino tiene tres pasos: el dispositivo guarda las imágenes y avisa por Bluetooth; la aplicación las baja por WiFi y registra en el momento un evento de telemetría con lo que leyó el OCR y la ruta de cada imagen; las imágenes quedan en cola en el teléfono y se suben cuando hay internet.
 
 Las rutas son deterministas: el evento es correcto aunque la imagen llegue una hora después, y ningún lado tiene que avisarle al otro dónde quedó nada. Como la telemetría, la función no exige sesión (ADR 0008) y aplica topes: cuatro archivos por pedido, 2 MB por archivo y sólo imágenes JPEG, verificadas por sus primeros bytes (docs/supabase.md). Es una herramienta de desarrollo y temporal: son fotos de la calle, con personas, y se retira antes de la versión final.
 
@@ -93,7 +94,7 @@ Instalar software en un dispositivo embebido sin pantalla y sin teclado es un pr
 
 La tarjeta que corre en el dispositivo tiene una partición de arranque en formato FAT, legible y escribible desde cualquier computadora. El proyecto la usa deliberadamente como superficie de administración: el modo de red, los perfiles de red inalámbrica y los archivos de audio de los avisos de sistema se instalan dejando archivos en esa partición, que un servicio lee en cada arranque.
 
-La razón es la restricción de sec. 7.3.4: un dispositivo en modo producto no tiene acceso remoto por la red conocida, de modo que si la única vía de administración fuera la red, cualquier error de configuración dejaría al dispositivo irrecuperable sin desarmarlo. Desde septiembre existe además la vía por Bluetooth de sec. 8.7.2, que evita retirar la tarjeta en el caso habitual; la tarjeta sigue siendo el recurso que no depende de que el servicio esté funcionando.
+Esto responde a la restricción de la sec. 7.3.4: un dispositivo en modo producto no tiene acceso remoto por la red conocida, de modo que si la única vía de administración fuera la red, cualquier error de configuración dejaría al dispositivo irrecuperable sin desarmarlo. Desde septiembre existe además la vía por Bluetooth de sec. 8.7.2, que evita retirar la tarjeta en el caso habitual; la tarjeta sigue siendo el recurso que no depende de que el servicio esté funcionando.
 
 | **Se deja en la partición de arranque** | **Efecto en el siguiente arranque** |
 |---|---|
@@ -111,14 +112,14 @@ Existen cuatro formas de alcanzar el dispositivo, y no son equivalentes:
 |---|---|---|
 | Apagar el punto de acceso por Bluetooth (hardware/raspi/tools/ap.py) | La vía principal, incluso en modo producto: en unos 5 s el dispositivo vuelve a la red inalámbrica conocida y queda accesible por SSH, sin abrir la carcasa ni tocar la tarjeta | Dura hasta el siguiente reinicio; exige que la aplicación del teléfono esté cerrada, porque con una central conectada el dispositivo deja de anunciarse |
 | Red inalámbrica conocida (modo desarrollo, desde la tarjeta) | Sesiones largas de despliegue | Exige apagar el dispositivo y retirar la tarjeta para cambiar de modo |
-| Cable de red | Siempre, incluso en modo producto | Sólo en una placa con conector RJ45, como la de reemplazo que se usó en septiembre; la Raspberry Pi Zero 2 W, placa vigente desde el 2026-09-19, no lo tiene |
+| Cable de red | Siempre, incluso en modo producto | Sólo en una placa con conector RJ45, como la de reemplazo que se usó en septiembre; la Raspberry Pi Zero 2 W, placa vigente desde el 19 de septiembre de 2026, no lo tiene |
 | Unirse al punto de acceso del dispositivo | Cualquier modo | Desaconsejado, ver abajo |
 
 La herramienta de Bluetooth existe para no depender de la tarjeta: en modo producto el dispositivo levanta su punto de acceso y abandona la red conocida, de modo que no hay acceso remoto, y retirar la tarjeta obliga a apagarlo y abrir la carcasa. La herramienta escribe en la característica de control del perfil GATT, la misma que usa la aplicación, y no requiere emparejamiento.
 
-La regla operativa que el proyecto adoptó, después de perder sesiones a mitad de una copia de archivos, es: no desplegar desde una máquina con una sola interfaz de red. Un equipo que sólo tiene radio inalámbrica, al unirse al punto de acceso del dispositivo, se queda sin salida a internet; y el sistema operativo, al detectar una red sin salida, vuelve solo a la red conocida, de modo que la conexión no se sostiene. Una transferencia cortada por la mitad deja el servicio del dispositivo en un estado inconsistente.
+La regla operativa que el proyecto adoptó, después de perder sesiones a mitad de una copia de archivos, es: no desplegar desde una máquina con una sola interfaz de red. Un equipo que sólo tiene radio inalámbrica, al unirse al punto de acceso del dispositivo, se queda sin salida a internet; y el sistema operativo, al detectar una red sin salida, vuelve por sí mismo a la red conocida, de modo que la conexión no se sostiene. Una transferencia cortada por la mitad deja el servicio del dispositivo en un estado inconsistente.
 
-El punto de acceso sí acepta conexiones remotas: lo que se pierde al unirse a él no es el acceso al dispositivo sino el acceso a internet de la máquina, porque la red se publica deliberadamente sin anunciar puerta de enlace ni servidor de nombres (sec. 8.7.5).
+El punto de acceso sí acepta conexiones remotas: lo que se pierde al unirse a él es el acceso a internet de la máquina y no el acceso al dispositivo, porque la red se publica deliberadamente sin anunciar puerta de enlace ni servidor de nombres (sec. 8.7.5).
 
 En las placas con conector RJ45, la interfaz de red del dispositivo tiene dirección fija, y la computadora actúa como encaminador mediante una regla de traducción de direcciones. Se optó por dirección fija y no por asignación dinámica porque, si el dispositivo solicita configuración y nadie responde, el gestor de red da la conexión por fallida y el dispositivo desaparece del enlace hasta que se vuelve a conectar el cable físicamente.
 
@@ -132,10 +133,10 @@ El procedimiento verificado consta de cinco pasos y su orden importa:
 1. Actualizar la configuración de arranque y dejar el paquete también en la partición de la tarjeta, de modo que una instalación desde cero no necesite conectividad.
 1. Verificar contra el punto de consulta de salud del dispositivo y volver a modo producto.
 
-Tres restricciones de este procedimiento se descubrieron a fuerza de tropezar con ellas:
+Tres restricciones de este procedimiento se descubrieron identificadas durante las pruebas:
 
 - El instalador automático no se vuelve a ejecutar. Está protegido por un archivo centinela que ya existe, y ese centinela vive en la partición del sistema, no en la de arranque, por lo que no se puede borrar desde otra computadora con la tarjeta puesta. Dejar una versión nueva del paquete en la tarjeta no alcanza: hay que instalarla por acceso remoto.
-- El paquete debe llevar el árbol completo, y no sólo el módulo de la aplicación. Un paquete incompleto instala un servicio a medias, y el síntoma aparece mucho después, sin nada que lo vincule con el día en que se armó mal.
+- El paquete debe llevar el árbol completo, y no sólo el módulo de la aplicación. Un paquete incompleto instala un servicio a medias, y el síntoma aparece mucho después, sin nada que lo vincule con el día en que se ensambló de forma incorrecta.
 - Una bandera de configuración puede estar repetida en dos archivos distintos. Al renombrar las banderas por el cambio de idioma (ADR 0009), se corrigió la ocurrencia evidente y la otra volvió a imponerse en el arranque siguiente. Desde entonces, al cambiar una bandera se busca en toda la partición y no sólo en el archivo principal.
 
 Adicionalmente, el dispositivo no tiene reloj de tiempo real: arranca creyendo que es la hora del último apagado. Hasta que el reloj se sincroniza por red, el gestor de paquetes rechaza operaciones por considerar los metadatos no vigentes. Por eso el procedimiento evita instalar dependencias mientras no cambien, y se apoya en el entorno virtual ya construido en el dispositivo.
@@ -144,17 +145,17 @@ Adicionalmente, el dispositivo no tiene reloj de tiempo real: arranca creyendo q
 
 El registro del servicio es el único diagnóstico disponible del dispositivo en uso real: no hay pantalla, y el usuario no puede describir lo que vio.
 
-Durante buena parte del desarrollo el registro no sobrevivía a un reinicio, y así se perdió el registro de la primera prueba realizada en modo producto. La hipótesis inicial atribuyó el problema a la ausencia de reloj de tiempo real; la causa real era otra: el sistema operativo de la placa trae una configuración que guarda el registro sólo en memoria, aunque el directorio del registro persistente exista. Desde el 2026-09-23 una configuración propia lo hace persistente (con un tope de 64 MB), forma parte del script de instalación y está aplicada en la placa. En la misma sesión se comprobó su utilidad: una prueba del usuario se leyó entera después de reiniciar, con tres arranques en el registro (docs/SESSION-LOG.md, 2026-09-23).
+Durante buena parte del desarrollo el registro no sobrevivía a un reinicio, y así se perdió el registro de la primera prueba realizada en modo producto. La hipótesis inicial atribuyó el problema a la ausencia de reloj de tiempo real; la causa real era otra: el sistema operativo de la placa trae una configuración que guarda el registro sólo en memoria, aunque el directorio del registro persistente exista. Desde el 23 de septiembre de 2026 una configuración propia lo hace persistente (con un tope de 64 MB), forma parte del script de instalación y está aplicada en la placa. En la misma sesión se comprobó su utilidad: una prueba del usuario se leyó entera después de reiniciar, con tres arranques en el registro (docs/SESSION-LOG.md, 2026-09-23).
 
 El registro tiene dos complementos: la telemetría que envía la aplicación móvil (sec. 7.8.4), fechada del lado del servidor, y una herramienta que reproduce todos los avisos de sistema en secuencia para verificar el repertorio de audio sin necesidad del teléfono. La falta de reloj de tiempo real sigue vigente y afecta las marcas de tiempo hasta que el reloj se sincroniza por red (sec. 8.7.3).
 
-Una precaución adicional, registrada porque costó tiempo: el servicio toma la cámara al arrancar, de modo que cualquier prueba manual de la cámara exige detenerlo primero y volver a iniciarlo al terminar.
+Una precaución adicional, registrada por el tiempo que demandó: el servicio toma la cámara al arrancar, de modo que cualquier prueba manual de la cámara exige detenerlo primero y volver a iniciarlo al terminar.
 
 ### 8.7.5 El punto de acceso y la conectividad del teléfono
 
 El dispositivo publica una red propia protegida con clave compartida. Una corrección necesaria fue eliminar de su configuración las opciones que anuncian puerta de enlace y servidor de nombres: sin ese ajuste, el teléfono que se unía a la red del dispositivo enrutaba todo su tráfico por ella y quedaba sin acceso a internet, lo que impedía alcanzar la nube en el modo supermercado. La red queda así declarada como de alcance estrictamente local, y el teléfono conserva su conexión de datos.
 
-Por la misma razón, el punto de acceso tampoco sirve como vía de administración desde una máquina de una sola interfaz (sec. 8.7.2): el comportamiento que protege al teléfono es el que deja sin internet a la computadora.
+Ese mismo aislamiento impide que una computadora de una sola interfaz llegue a internet mientras está unida a la red del dispositivo (sec. 8.7.2).
 
 ### 8.7.6 El pipeline de visión como dependencia
 
@@ -180,6 +181,6 @@ El procedimiento descrito es reproducible pero no está terminado, y las brechas
 | Google Play | Configurado y apagado; pendiente de activar la cuenta de la tienda |
 | Proxy de visión | Desplegado y activo |
 | Telemetría y base de datos | Desplegadas |
-| Evidencia del modo ómnibus (función y almacenamiento privado) | Desplegada desde el 2026-10-12; temporal, se retira antes de la versión final |
+| Evidencia del modo ómnibus (función y almacenamiento privado) | Desplegada desde el 12 de octubre de 2026; temporal, se retira antes de la versión final |
 | Servicio del dispositivo | Instalado y operativo; la placa se reemplazó el 7 de noviembre de 2026 y funcionó con la misma tarjeta de memoria |
 | Imagen de tarjeta reproducible del dispositivo | Parcial: la tarjeta en uso no se instaló con el script |
