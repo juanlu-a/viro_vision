@@ -4512,7 +4512,8 @@ de supermercado y la skill.
 
 ### Pendientes
 
-- Cambiar el `config.txt` de la tarjeta de la placa (todavía en `pins_12_13`, con `audio_pwm_mode=2` sin
-  veredicto) y soldar el auricular en los pines 12 y 14 con la resistencia y el capacitor.
+- La tarjeta de la placa ya tiene `pins_18_19` (cambiado desde la Mac, copia en `config.txt.antes-pins18`;
+  `audio_pwm_mode=2` sigue sin veredicto). Falta soldar el auricular en los pines 12 y 14 con la
+  resistencia y el capacitor, y probar.
 - El pin 35 (GPIO 19) pasa a ser salida: tiene que quedar libre.
 - Volumen real con 4 Ω: amplificador (MAX98357A por I2S o PAM8302).
