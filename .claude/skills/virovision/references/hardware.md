@@ -48,12 +48,12 @@ estimación de terceros hasta medir el daemon real con un medidor USB en línea 
 `hardware/README.md`, *Alimentación*).
 
 ### Audio: PWM provisional por GPIO; transductor de conducción ósea en la carcasa
-La Zero 2 W no tiene jack: el audio PWM sale por `dtoverlay=audremap,pins_12_13` + `audio_pwm_mode=1`
-(señal en el pin 32, masa en el 34). Tonos y voz son audibles en un auricular (2026-09-11), pero es
+La Zero 2 W no tiene jack: el audio PWM sale por `dtoverlay=audremap,pins_18_19`
+(señal en el pin 12, masa en el 14; hasta el 2026-11-12 era `pins_12_13`, pines 32/34). Tonos y voz son audibles en un auricular (2026-09-11), pero es
 **provisional**: un GPIO da 16 mA, un piezo no sirve para voz y un auricular de 16 a 32 Ω necesita una
 resistencia en serie de 100 a 330 Ω. La carcasa aloja un **transductor de conducción ósea de 14 mm**;
 la etapa que lo maneje está pendiente. El **DAC I2S** (MAX98357A, GPIO 18/19/21) sigue siendo el
-destino y **no está instalado**; usaría los GPIO 18/19/21, libres hoy (el botón de modos está en el GPIO 5).
+destino y **no está instalado**; usaría los GPIO 18/19/21, hoy con el PWM provisional en el 18 y el 19 (el botón de modos está en el GPIO 5).
 
 ### Entrada: un botón en GPIO 5 (pin 29, masa en el 30)
 `button.py`, con los gestos del ADR 0007 y tiempos calibrados el 2026-09-13 (antirrebote 15 ms,

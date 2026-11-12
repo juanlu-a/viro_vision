@@ -4494,3 +4494,25 @@ viejo de la rama `fix/case-v0-21` quedó en un `git stash` del worktree.
 - Imprimir y armar la v0.26: probar la patilla con el brazo, los conectores de la Pi, los zócalos de 5,5 y
   las trabas nuevas.
 - Probar la 01 boca abajo sin fuzzy skin en el borde; si sigue sin enganchar, un chaflán de 0,4 en la junta.
+
+## 2026-11-12: el audio PWM pasa al pin 12, del lado de la microSD
+
+**Qué.** El auricular resultó ser de **4 Ω**, no de 16 a 32 Ω. Con los 100 Ω en serie le llegaba un 4 % de
+la tensión, lo que alcanza para explicar el volumen casi nulo de la placa nueva, y el pico de corriente
+(3,3 V / 104 Ω, unos 32 mA) superaba los 16 mA que admite un GPIO. Se definió una resistencia de 260 Ω
+(unos 12,5 mA de pico) más un capacitor de acople de 47 a 100 µF en serie, que corta la continua de 1,65 V
+del PWM en silencio. Para que esos dos componentes entren en la carcasa, la salida se mudó de
+`pins_12_13` (señal en el pin 32, masa en el 34) a **`pins_18_19`: señal en el pin 12, masa en el 14**. Es
+el único otro par con PWM en el header y el más cercano a la microSD; el pin 6 se descartó como masa porque
+cae en la zona que tocan los pogo pins.
+
+**En el repo.** `setup.sh` escribe ahora el `dtoverlay=audremap,pins_18_19` (antes se ponía a mano) y borra
+cualquier línea `audremap` anterior. Se actualizaron el README de `raspi/` y el de `hardware/`, la guía de QA
+de supermercado y la skill.
+
+### Pendientes
+
+- Cambiar el `config.txt` de la tarjeta de la placa (todavía en `pins_12_13`, con `audio_pwm_mode=2` sin
+  veredicto) y soldar el auricular en los pines 12 y 14 con la resistencia y el capacitor.
+- El pin 35 (GPIO 19) pasa a ser salida: tiene que quedar libre.
+- Volumen real con 4 Ω: amplificador (MAX98357A por I2S o PAM8302).
