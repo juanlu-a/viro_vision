@@ -18,7 +18,7 @@ hardware/
 | Cómputo | **Raspberry Pi Zero 2 W** | En uso. Volvió el 2026-09-19, después de diez días con una Pi 3 B+ prestada (2026-09-09 a 2026-09-18) por el CSI roto de la unidad anterior. **Reemplazada el 2026-11-07** por otra Zero 2 W, con la misma microSD. Sin Ethernet, WiFi sólo de 2,4 GHz, radio BCM43438 (Bluetooth 4.2, sin Data Length Extension): el mismo chip sobre el que se midió el ADR 0003 |
 | Cámara y acelerador | **Raspberry Pi AI Camera (Sony IMX500)**, CSI, 12 MP, enfoque manual | En la placa desde el 2026-09-05. El detector de ómnibus corre **dentro del sensor** (ADR 0006, enmienda 2026-09-07). El **Coral TPU salió del diseño** el 2026-09-07 y la Camera Module 3 no se usa |
 | Alimentación | **Waveshare UPS HAT (C)** con su LiPo 803040 de 1000 mAh | Comprada el 2026-09-07. El INA219 (I2C 1, dirección 0x43) se lee y la batería llega a la app desde el 2026-10-06 (#110). Consumo real: pendiente de medir |
-| Audio | **PWM por GPIO** con `audremap`, **provisional**: en `staging`, señal en el pin 32 y masa en el 34. **Propuesta abierta (PR #130, sin integrar)**: señal en el pin 12 y masa en el 14 (`pins_18_19`), con un auricular de 4 Ω, 260 Ω en serie y 47 a 100 µF | Tonos y voz audibles en un auricular (2026-09-11); la placa nueva suena muy bajo y falta soldar y probar los pines nuevos. En la carcasa va un **transductor de conducción ósea de 14 mm**. El DAC I2S (MAX98357A) sigue como destino y no está instalado |
+| Audio | **PWM por GPIO** con `audremap` (señal en el pin 12, masa en el 14), con 260 Ω y 47 µF en serie y **sin amplificador** ([ADR 0012](../docs/architecture/adr/0012-audio-del-prototipo-sin-amplificador.md)) | Funciona con volumen bajo en el transductor de conducción ósea de 4 Ω (2026-11-12); queda así en el prototipo y la amplificación es trabajo futuro (MAX98357A recomendado, no instalado) |
 | Entrada | **Un botón** en GPIO 5 (pin 29, masa en el 30) | Hecho (2026-09-07), con tiempos calibrados el 2026-09-13. En la carcasa: pulsador SMD de 4 × 4 × 1 mm con una tecla impresa pegada encima (ADR 0007) |
 | Carcasa | **VIA Clara**, dos mitades a presión, impresa en 3D | **v0.29, final**, impresa y armada (#131). Ver [Carcasa](#carcasa) |
 
@@ -135,8 +135,7 @@ márgenes del cartel 18/6/6 para el OCR (#122, 2026-10-22) y evidencia de cada c
 
 Hecho además: carcasa v0.29 final, impresa y armada (#131).
 
-Falta: medir el consumo real; la prueba del modo ómnibus en la calle, con y sin zoom; cerrar el audio
-(el PR #130 propone `pins_18_19` con resistencia y capacitor, sin integrar y sin probar en la placa) y el
-DAC I2S o la etapa que maneje el transductor óseo.
+Falta: medir el consumo real; la prueba del modo ómnibus en la calle, con y sin zoom; amplificar el audio,
+que en el prototipo sale del pin 12 sin amplificador y se oye bajo (ADR 0012; destino recomendado: MAX98357A).
 
 Detalle y razonamiento en `.claude/skills/virovision/references/hardware.md`.

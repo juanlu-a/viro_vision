@@ -14,10 +14,8 @@ en [`SESSION-LOG.md`](SESSION-LOG.md), y el plan en [`ROADMAP.md`](ROADMAP.md).
   interno de TestFlight y deja un `.apk` como artefacto. `main` es producción y sólo recibe PRs
   `staging → main` (= release), que publican al link público de TestFlight. El último release a
   producción fue el PR #115 (2026-10-13).
-- Ramas con trabajo abierto fuera de `staging` (`git branch -r`, 2026-11-12):
-  - `fix/audio-pwm-pins-18-19`: el PR #130, **abierto y sin integrar**, mueve el audio PWM a los pines
-    físicos 12 y 14 (ver *Placa y daemon*).
-  - Las demás ramas remotas (`feat/case-v0-*`, `feat/bus-*`, `fix/*`, `perf/*`, etc.) corresponden a PRs
+- Ramas con trabajo abierto fuera de `staging` (`git branch -r`, 2026-11-12): ninguna; el audio en los
+  pines 12 y 14 (PR #130, ADR 0012) ya está integrado. Las ramas remotas (`feat/case-v0-*`, `feat/bus-*`, `fix/*`, `perf/*`, etc.) corresponden a PRs
     que ya llegaron a `staging` (no se revisó rama por rama) y quedan como historia. `feat/volume-button` y `feat/carcasa-modelo-3d` ya no
     existen en el remoto.
 - El pipeline de ómnibus vive en el repo de Magalí, `bus-banner-recognizer`, entero en un solo PR (#7,
@@ -113,10 +111,9 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
   - vigilante de la cámara; journal persistente (2026-09-23).
 - **Arranque**: la placa anuncia a los 16,2 s, la cámara está lista a los 21,3 s y el OCR a los
   33,6 s (2026-10-06).
-- **Audio en la placa**: PWM por `audremap`, provisional. En `staging` sigue en `pins_12_13` (señal en el
-  pin físico 32, masa en el 34). **Propuesta abierta, PR #130**: `pins_18_19` (señal en el pin 12, masa
-  en el 14) con un auricular de 4 Ω, 260 Ω en serie y 47 a 100 µF; la tarjeta de la placa nueva ya está
-  así (`audio_pwm_mode=2`), se oye muy bajo y falta soldar y probar.
+- **Audio en la placa**: PWM por `audremap` en el pin 12 (GPIO 18), con 260 Ω y 47 µF en serie con el
+  transductor de 4 Ω, **sin amplificador** (ADR 0012, 2026-11-12). Funciona con volumen bajo; la
+  amplificación queda como trabajo futuro.
 - **Seguridad del AP**: la clave fija del AP se acepta como riesgo (#127, actualización del ADR 0003).
 - **Pruebas**: 197 tests pasan y 2 se omiten (2026-11-09).
 
@@ -211,7 +208,8 @@ En orden de prioridad, ver [`ROADMAP.md`](ROADMAP.md):
 
 1. Probar el modo ómnibus en la calle, con y sin zoom.
 2. Documentar las métricas del detector reentrenado.
-3. Cerrar el audio de la placa (integrar o descartar el PR #130 y probarlo soldado).
+3. Medir la corriente del audio y el consumo general de la placa (el audio quedó cerrado sin
+   amplificador, ADR 0012).
 4. Hacer las pruebas con usuarios y la corrida de evaluación del supermercado.
 5. Antes de la entrega, sacar la evidencia del ómnibus.
 

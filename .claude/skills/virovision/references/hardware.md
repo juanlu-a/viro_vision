@@ -51,19 +51,15 @@ campo `battery` de `status` (`state.py`), que lo muestra en la pestaña Disposit
 estimación de terceros hasta medir el daemon real con un medidor USB en línea (ver
 `hardware/README.md`, *Alimentación*).
 
-### Audio: PWM provisional por GPIO; transductor de conducción ósea en la carcasa
-La Zero 2 W no tiene jack: el audio PWM sale por `dtoverlay=audremap,pins_12_13` + `audio_pwm_mode=1`
-(señal en el pin 32, masa en el 34); así está en `staging`, y `setup.sh` no escribe esa línea (se
-configura a mano en `config.txt`). Tonos y voz son audibles en un auricular (2026-09-11), pero es
-**provisional**: un GPIO da 16 mA, un piezo no sirve para voz y un auricular de 16 a 32 Ω necesita una
-resistencia en serie de 100 a 330 Ω. La carcasa aloja un **transductor de conducción ósea de 14 mm**;
-la etapa que lo maneje está pendiente. **Propuesta abierta, no integrada (PR #130)**: pasar a
-`pins_18_19` (señal en el pin físico 12, masa en el 14, del lado de la microSD) con un auricular de 4 Ω,
-una resistencia de 260 Ω en serie y un capacitor de acople de 47 a 100 µF; `setup.sh` escribiría la
-línea. Desde el 2026-11-07 la tarjeta de la placa ya está en `pins_18_19` y `audio_pwm_mode=2` (con el
-audio todavía muy bajo). Falta soldar y probar. Esos pines son los del futuro DAC I2S: al instalarlo, el
-`audremap` se saca. El **DAC I2S** (MAX98357A, GPIO 18/19/21) sigue siendo el
-destino y **no está instalado**; usaría los GPIO 18/19/21, libres hoy (el botón de modos está en el GPIO 5).
+### Audio: PWM por GPIO, sin amplificador (ADR 0012)
+La Zero 2 W no tiene jack: el audio PWM sale por `dtoverlay=audremap,pins_18_19` (señal en el pin 12,
+masa en el 14; hasta el 2026-11-12 era `pins_12_13`, pines 32/34), con `setup.sh` escribiendo la
+línea. El transductor de conducción ósea es de **4 Ω** y va directo con **260 Ω y 47 µF en serie**
+(+ hacia el pin): el pico queda en ~12,5 mA, dentro de los 16 mA de un GPIO, y el capacitor corta la
+continua del PWM. Se oye **bajo**; con el tutor se decidió dejarlo así en el prototipo (2026-11-12).
+Consume ~10 mW al sonar, menos del 1 % de la placa (calculado). El pin 35 queda como salida: nada
+conectado ahí. La amplificación es trabajo futuro: el destino recomendado es el **MAX98357A** en los
+mismos pines (GPIO 18/19/21); el ADR 0012 compara las alternativas y el espacio libre en la carcasa.
 
 ### Entrada: un botón en GPIO 5 (pin 29, masa en el 30)
 `button.py`, con los gestos del ADR 0007 y tiempos calibrados el 2026-09-13 (antirrebote 15 ms,
@@ -205,6 +201,6 @@ lo marcado `MEASURE` y probar el equipo puesto en la calle junto con el resto de
   en la Zero 2 W, 1,6 s desde que el sensor ve el ómnibus, 2026-09-22), catálogo de la STM que completa lo que el OCR no leyó (2026-10-07), **evidencia** de cada
   corrida (#114, 2026-10-12; temporal), **zoom digital** (#121, 2026-10-19; probado en la placa el
   2026-10-22), márgenes del cartel 18/6/6 (#122, 2026-10-22) y el arranque que anuncia a los 16,2 s.
-- **Falta**: la prueba del modo ómnibus en la calle con y sin zoom; medir el consumo real; el DAC I2S
-  o la etapa del transductor óseo; cerrar el audio (PR #130 abierto); dónde quedaron
+- **Falta**: la prueba del modo ómnibus en la calle con y sin zoom; medir el consumo real; amplificar
+  el audio (ADR 0012: sin amplificador en el prototipo, MAX98357A como destino); dónde quedaron
   los pesos del detector reentrenado (épocas y métricas: PENDIENTE).

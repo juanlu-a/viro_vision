@@ -94,3 +94,26 @@ simplicidad, nunca como único camino.
    Camera + Apple Vision como opción concreta.
 4. **Validar el perfil de usuario objetivo: iOS vs. Android**: confirmar con datos si el segmento
    adulto mayor usa mayormente iPhone o Android, antes de cerrar plataforma.
+
+---
+
+## 2026-11-12: El audio del prototipo
+
+Consulta puntual sobre la salida de audio del dispositivo. Con la salida corregida (pin 12, 260 Ω y
+47 µF en serie con el transductor de 4 Ω) el audio funciona pero se oye muy bajo, y ninguno de los
+amplificadores evaluados llegaba ese día ni podía exigir reimprimir la carcasa.
+
+**Decisión:** por tratarse de un prototipo, **el transductor queda conectado directo al pin, sin
+amplificador**, aunque el volumen sea bajo. La amplificación se documenta en la tesis como trabajo
+futuro, con las alternativas evaluadas y su consumo. Quedó registrado en el
+[ADR 0012](architecture/adr/0012-audio-del-prototipo-sin-amplificador.md) y en la sec. 10.1 de la
+tesis.
+
+**Dato para el informe:** la salida directa no es la que más batería gasta sino la que menos. Según
+el cálculo del ADR 0012, todavía sin medir, consume unos 10 mW mientras suena, menos del 1 % de la
+placa en modo activo. Todos los amplificadores consumen más, en proporción al volumen que entregan.
+
+**Próximos pasos:**
+1. Medir con un multímetro en serie la corriente del transductor durante una lectura, para
+   reemplazar el cálculo por una medición.
+2. Verificar si el PWM se detiene cuando no hay nada sonando.

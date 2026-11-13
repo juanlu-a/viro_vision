@@ -58,9 +58,9 @@ en [`SESSION-LOG.md`](SESSION-LOG.md).
    imágenes. Hoy no constan en ningún repositorio.
 3. **Carcasa**: sin diseño pendiente (la v0.29 es la final). Queda, si se desea, medir con calibre lo
    marcado `MEASURE` y probar el equipo puesto en la calle.
-4. **Audio en la placa**: el PWM es provisional y la placa nueva se oye muy bajo. El PR #130 (abierto)
-   propone pasarlo a los pines 12 y 14 (`pins_18_19`) con un auricular de 4 Ω, 260 Ω en serie y 47 a
-   100 µF; falta decidirlo, soldarlo y probarlo, y cerrar el transductor de conducción ósea.
+4. **Audio en la placa**: cerrado para el prototipo (ADR 0012, 2026-11-12, con el tutor). El
+   transductor de conducción ósea de 4 Ω sale del pin 12 con 260 Ω y 47 µF en serie, sin amplificador:
+   funciona con volumen bajo. Falta medir su corriente; amplificarlo (MAX98357A) es trabajo futuro.
 5. **Pruebas con usuarios** (UNCU y el usuario de validación) y la corrida de evaluación del
    supermercado sobre el conjunto de la canasta básica.
 6. **ADR 0005** (design system y accesibilidad), pendiente de escritura.

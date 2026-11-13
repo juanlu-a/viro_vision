@@ -303,6 +303,20 @@ hacer, o nada si es una falla interna (avisos de la placa, escritura de modo). S
 indistinguible de un dispositivo roto. **Regla para código nuevo**: nunca concatenar `err.message`
 en una cadena que el usuario ve u oye; `record(...)` con `errorDetail(err)` y una clave de `es.ts`.
 
+### ADR 0012: El audio del prototipo sale del GPIO sin amplificador · **Accepted (2026-11-12)**
+
+Antes el destino del audio era un MAX98357A por I2S, nunca instalado, y el transductor (que resultó
+ser de **4 Ω**) iba al pin 32 con 100 Ω en serie: casi no se oía y el pico superaba el límite del
+pin. **Qué cambió**: la salida pasa al pin 12 (GPIO 18, `pins_18_19`, masa en el 14) con **260 Ω y
+47 µF en serie**, y el prototipo **queda sin amplificador** (decidido con el tutor). La salida directa
+consume ~10 mW al sonar, menos del 1 % de la placa (calculado, sin medir). El ADR tiene la tabla de
+alternativas (transistores, LM386, PAM8403, PAM8302, MAX98357A, la placa de los auriculares) con
+potencia, reposo, tamaño y disponibilidad en Uruguay.
+
+**Qué NO cambió**: el MAX98357A sigue siendo el destino recomendado, en los mismos pines. **Regla**:
+nada conectado al pin 35 (el overlay lo deja como salida); ningún borne del transductor a masa si se
+pone un amplificador clase D.
+
 ## Decisiones sin ADR, pero vigentes
 
 **Ojo al medir cualquier cosa contra estas APIs: hay que espaciar las corridas.** Sostener pedidos

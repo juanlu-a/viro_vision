@@ -35,7 +35,7 @@ Desarrollar un dispositivo de asistencia para personas con baja visión que perm
 
 1. Implementar una funcionalidad de selección por señalamiento que permita que, en el caso de los productos de supermercado, la respuesta auditiva comunique únicamente el objeto que el usuario esté apuntando o tocando con su dedo índice entre los elementos detectados, a fin de reducir respuestas innecesarias y mejorar la experiencia de uso.
 
-Este objetivo no se implementó en el prototipo y se retoma como trabajo futuro (sec. 10.4).
+Este objetivo no se implementó en el prototipo y se retoma como trabajo futuro (sec. 10.5).
 
 ## 2.3 Entregables del proyecto
 

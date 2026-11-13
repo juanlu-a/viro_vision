@@ -4610,3 +4610,66 @@ interruptor, cámara girada, modo producto, audio, limitaciones y trabajo futuro
 - La bibliografía todavía no tiene la documentación de Ultralytics (YOLO11) ni la de RapidOCR.
 - Actualizar el índice del Doc a mano.
 - PR de `docs/thesis-team-review` a `staging`.
+
+## 2026-11-12: el audio PWM pasa al pin 12, del lado de la microSD
+
+**Qué.** El auricular resultó ser de **4 Ω**, no de 16 a 32 Ω. Con los 100 Ω en serie le llegaba un 4 % de
+la tensión, lo que alcanza para explicar el volumen casi nulo de la placa nueva, y el pico de corriente
+(3,3 V / 104 Ω, unos 32 mA) superaba los 16 mA que admite un GPIO. Se definió una resistencia de 260 Ω
+(unos 12,5 mA de pico) más un capacitor de acople de 47 a 100 µF en serie, que corta la continua de 1,65 V
+del PWM en silencio. Para que esos dos componentes entren en la carcasa, la salida se mudó de
+`pins_12_13` (señal en el pin 32, masa en el 34) a **`pins_18_19`: señal en el pin 12, masa en el 14**. Es
+el único otro par con PWM en el header y el más cercano a la microSD; el pin 6 se descartó como masa porque
+cae en la zona que tocan los pogo pins.
+
+**En el repo.** `setup.sh` escribe ahora el `dtoverlay=audremap,pins_18_19` (antes se ponía a mano) y borra
+cualquier línea `audremap` anterior. Se actualizaron el README de `raspi/` y el de `hardware/`, la guía de QA
+de supermercado y la skill.
+
+### Pendientes
+
+- La tarjeta de la placa ya tiene `pins_18_19` (cambiado desde la Mac, copia en `config.txt.antes-pins18`;
+  `audio_pwm_mode=2` sigue sin veredicto). Falta soldar el auricular en los pines 12 y 14 con la
+  resistencia y el capacitor, y probar.
+- El pin 35 (GPIO 19) pasa a ser salida: tiene que quedar libre.
+
+**Después, en la misma sesión.** Soldado en los pines 12 y 14, el audio funcionó pero muy bajo. Se
+evaluaron alternativas de amplificación: la placa original de los auriculares (descartada: el
+amplificador está dentro de un chip JieLi con Bluetooth, cargador y lector de microSD, y por USB no se
+enumeró en la Mac), un seguidor de dos transistores, LM386 (electronica.uy), PAM8403 mini
+(MercadoLibre), PAM8302 y MAX98357A, con el espacio libre en la carcasa v0.29 calculado desde el modelo
+(~26 × 24 × 7 mm junto al header). **Con el tutor se decidió dejar el prototipo sin amplificador** y
+documentarlo como trabajo futuro. Un hallazgo para el informe: la salida directa es la que **menos**
+consume (~10 mW al sonar, menos del 1 % de la placa), no la que más. También quedó documentada la
+prueba del circuito RC (260 Ω + 47 µF: funciona, volumen muy bajo) y por qué el volumen la vuelve
+inviable para la calle: desde un GPIO de 16 mA, ningún circuito pasivo entrega más de ~1 mW en 4 Ω
+(el RC da ~0,16 mW; un clase D a 5 V, hasta 3 W).
+
+Quedó en el [ADR 0012](architecture/adr/0012-audio-del-prototipo-sin-amplificador.md), en la tesis
+(sec. 7.3.1, 7.3.3 y la nueva sec. 10.1), en `REUNIONES-TUTOR.md`, en `PROJECT-STATUS.md`, en los README
+de hardware y en la skill.
+
+### Pendientes (actualizado)
+
+- Medir con un multímetro en serie la corriente del transductor durante una lectura, y verificar si
+  el PWM se detiene en silencio.
+- Amplificación (trabajo futuro): MAX98357A en los mismos pines.
+
+## 2026-11-12 (cont.): el audio sin amplificador, el camino del modelo de nube y el audio de la app, en la tesis
+
+- **PR #130 integrado con `staging`** (merge de `staging` en la rama, no rebase, para no reescribir una
+  rama que otra sesión tiene en su checkout). Los conflictos venían de que el PR editaba la tesis y los
+  README de antes del #132. En los README, la skill y PROJECT-STATUS se tomó la versión del PR (ADR 0012:
+  el transductor de 4 Ω sale del pin 12 con 260 Ω y 47 µF, sin amplificador, decidido con el tutor) y se
+  quitaron las menciones del #132 que lo daban por «propuesta abierta».
+- **Corrección de fondo**: lo que tiene 4 Ω es el propio transductor de conducción ósea, sacado de unos
+  auriculares comerciales; la tesis hablaba de «un auricular de 4 ohmios» aparte.
+- **Tesis**: 7.3.1 (fila y párrafo del audio), 7.3.3 (consumo del audio, ~10 mW), 7.3.6 (las dos
+  pruebas, 7 y 12 de noviembre), 7.9 y una nueva **10.2 «Amplificación del audio del dispositivo»** con
+  el techo de ~1 mW de un GPIO y la tabla de alternativas (MAX98357A recomendado); las 10.2 a 10.5
+  pasan a 10.3 a 10.6.
+- **7.2.2** cuenta ahora las tres etapas: Gemma en el teléfono (ago-12/13), la nube con la restricción
+  de gratuidad para el usuario (ADR 0006, 30/8) y el paso de Flash a Flash Lite, y la medición del 2/9
+  que dejó luna por defecto y qwen como alternativa.
+- **Nueva 7.6.8 «Retroalimentación auditiva continua»**: el catálogo de avisos de la app, quién dice
+  cada uno y por qué.

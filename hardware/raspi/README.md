@@ -650,34 +650,32 @@ La Zero 2 W **no tiene jack**, así que el audio PWM se redirige a dos GPIO con 
 comportándose como una Zero 2 W: la prueba es real, no una simulación.
 
 ```
-dtoverlay=audremap,pins_12_13    # GPIO 12 = pin 32, GPIO 13 = pin 33
-audio_pwm_mode=1                 # legacy: conmuta menos (ver abajo)
+dtoverlay=audremap,pins_18_19    # GPIO 18 = pin 12, GPIO 19 = pin 35 (lo escribe setup.sh)
 ```
 
 | Cable | Pin físico | |
 |---|---|---|
-| señal | **32** | GPIO 12, canal izquierdo |
-| masa | **34** | GND, el de al lado |
+| señal | **12** | GPIO 18, canal izquierdo, con resistencia y capacitor en serie |
+| masa | **14** | GND, el de al lado |
 
-> **Propuesta abierta, sin integrar (PR #130, 2026-11-12).** Pasar a `pins_18_19`: **señal en el pin
-> físico 12 (GPIO 18) y masa en el 14**, del lado de la microSD, donde la carcasa tiene lugar para la
-> resistencia en serie (260 Ω) y el capacitor de acople (47 a 100 µF) que necesita el **auricular de
-> 4 Ω**. En `staging`, `setup.sh` no escribe ninguna línea `audremap` (se pone a mano en `config.txt`) y
-> sigue vigente lo de arriba; el PR haría que `setup.sh` escriba `pins_18_19` y borre cualquier
-> `audremap` anterior. El overlay deja además el pin 35 (GPIO 19) como salida, así que ahí no puede
-> haber nada conectado, y son los pines del futuro DAC I2S: al instalarlo, el `audremap` se saca. La
-> tarjeta de la placa nueva ya está en `pins_18_19` con `audio_pwm_mode=2` (2026-11-07); el audio se
-> oye muy bajo y falta soldar en los pines 12 y 14 y probar.
->
-> ⚠️ **Antes de elegir los pines, mirar qué hay soldado.** El overlay convierte esos pines en
-> **salidas**: un botón a masa en uno de ellos, al apretarlo, es un cortocircuito contra el pad. Por
-> eso 12/13 se eligió recién después de confirmar que el pin 33 estaba libre. La alternativa es
-> `pins_18_19`, pero ésos son los del futuro DAC I2S (18 BCLK, 19 LRC, 21 DIN).
+Hasta el 2026-11-12 el audio salía por `pins_12_13` (señal en el pin 32, masa en el 34). Se pasó a
+18/19 porque el pin 12 queda del lado de la microSD, donde la carcasa tiene lugar para la resistencia
+y el capacitor. Sólo esos dos pares de GPIO del header sacan PWM, y el 12 es el más cercano a la
+microSD. La masa va en el 14 y no en el 6, que cae en la zona de los pines 1 a 6 que tocan los pogo
+pins.
+
+> ⚠️ **Antes de elegir los pines, mirar qué hay soldado.** El overlay convierte **los dos** pines en
+> **salidas**, también el 35 (GPIO 19) aunque no se use: un botón a masa en uno de ellos, al
+> apretarlo, es un cortocircuito contra el pad. El pin 35 tiene que quedar libre. Son también los
+> pines del futuro DAC I2S (18 BCLK, 19 LRC, 21 DIN); al instalarlo, el `audremap` se saca.
 >
 > ⚠️ **Y el transductor.** Un GPIO da **16 mA**. Un piezo es un capacitor: no pasa continua, sólo
 > picos en cada flanco, y va directo (con `audio_pwm_mode=1`, que conmuta menos, el pico es menor).
 > Un **auricular o parlante de 16-32 Ω es resistivo**: pediría ~100 mA continuos, seis veces el
-> límite, y **necesita una resistencia en serie de 100-330 Ω** o el DAC.
+> límite, y **necesita una resistencia en serie de 100-330 Ω** o el DAC. Con uno de **4 Ω** (el
+> actual) la resistencia es la que fija la corriente: 260 Ω dan unos 12,5 mA de pico. Va además un
+> **capacitor electrolítico de 47 µF en serie (ADR 0012)** (el + hacia el GPIO): el PWM en silencio queda
+> en 50 % de ciclo, una continua de 1,65 V que sin el capacitor consume todo el tiempo.
 >
 > Un piezo alcanza para verificar el camino, **no para voz**: resuena en una banda angosta y el habla
 > sale apenas inteligible. Eso no es una falla del PWM.
@@ -770,13 +768,10 @@ con CoreBluetooth, arrancando el emulador.
 1. **La prueba del modo ómnibus en la calle**, con y sin zoom (`--no-bus-zoom`): a qué distancia se
    anuncia la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, la fase
    2 es mover también su zona de entrada (`set_inference_roi_abs`).
-2. **El transductor definitivo** (el PR #130, abierto, propone `pins_18_19` con 260 Ω y 47 a 100 µF
-   para un auricular de 4 Ω; falta soldarlo y probarlo). El camino de audio está (`audio.py` + `audremap`, y 386 anuncios de
-   ómnibus más los avisos de sistema en la SD), pero la salida PWM es provisional: un piezo verifica
-   pero no sirve para voz, un auricular de 16-32 Ω necesita una resistencia en serie de 100-330 Ω, y la
-   carcasa aloja un transductor de conducción ósea de 14 mm que necesita una etapa que lo maneje. El
-   DAC I2S (MAX98357A, GPIO 18/19/21) sigue siendo el destino; esos pines están libres hoy (el botón
-   de modos está en el GPIO 5).
+2. **Amplificar el audio** (trabajo futuro, [ADR 0012](../../docs/architecture/adr/0012-audio-del-prototipo-sin-amplificador.md)).
+   El prototipo queda con el transductor de conducción ósea de 4 Ω directo al pin 12, con 260 Ω y
+   47 µF en serie: funciona, con volumen bajo. El destino recomendado es el MAX98357A en los mismos
+   pines (GPIO 18/19/21); el ADR compara las demás alternativas.
 3. **Medir el consumo real** con un medidor USB en línea, y con eso la autonomía.
 4. Copiar acá el contenido exacto de `/etc/default/virovision` (ver *Cambiar el detector*).
 5. Calibrar los tiempos del botón con usuarios ciegos (ver *Botón físico*): los actuales son una

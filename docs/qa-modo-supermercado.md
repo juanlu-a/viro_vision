@@ -282,7 +282,7 @@ teléfono, y se elige en **Ajustes → Dónde se escucha**. Razonamiento en la a
 
 **Requisitos**: `EXPO_PUBLIC_AUDIO_FILE_ENABLED=1` en `app/.env` (la placa necesita el archivo
 sintetizado) más clave de OpenAI o el proxy; la placa con el daemon que reproduce (PR #82), el
-`audremap` en `config.txt` y un transductor en los **pines 32 y 34**.
+`audremap` en `config.txt` y un transductor en los **pines 12 y 14**.
 
 ### 16. Que el ajuste cambie de verdad el destino
 

@@ -9,7 +9,7 @@ desarrollo del botón.
 
 La salida de audio es **elegible**: teléfono o dispositivo, para todo lo que suena (lecturas,
 avisos de sistema, «Probar audio»; #83, #89, #90). En el dispositivo, el audio sale hoy por PWM
-(`audremap`, pines 32/34 en `staging`, provisional; el PR #130, abierto, propone los pines 12/14) hacia un transductor de conducción ósea de 14 mm en la
+(`audremap`, pines 12/14, sin amplificador, ADR 0012) hacia un transductor de conducción ósea de 14 mm en la
 carcasa; no hay DAC I2S. Separar canales también es una decisión de accesibilidad: el lector de
 pantalla del sistema sigue en el teléfono y ViroVision puede hablar por el dispositivo.
 

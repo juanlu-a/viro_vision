@@ -50,6 +50,14 @@ sed -i 's/^#dtparam=i2c_arm=on/dtparam=i2c_arm=on/' /boot/firmware/config.txt
 grep -q '^dtparam=i2c_arm=on' /boot/firmware/config.txt || echo 'dtparam=i2c_arm=on' >> /boot/firmware/config.txt
 echo i2c-dev > /etc/modules-load.d/i2c.conf
 
+echo "→ PWM audio on GPIO 18 (physical pin 12, ground on pin 14)"
+# The Zero 2 W has no jack, so audremap routes PWM audio to the header. pins_18_19 instead of
+# pins_12_13 (2026-11-12): pin 12 sits at the microSD end, where the case has room for the series
+# resistor and coupling capacitor. GPIO 19 (pin 35) also becomes an output: nothing may be wired to
+# it. Replaces any earlier audremap line, so re-running setup moves an old card over. Next boot.
+sed -i '/^dtoverlay=audremap/d' /boot/firmware/config.txt
+echo 'dtoverlay=audremap,pins_18_19' >> /boot/firmware/config.txt
+
 echo "→ Bluetooth: powered on and with the adapter's power saving off"
 # Through sysfs: the `rfkill` binary is not installed on Raspberry Pi OS Lite. The unit repeats this on
 # every start, because systemd-rfkill restores a saved block on each boot (2026-10-05).

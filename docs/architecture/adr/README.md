@@ -16,6 +16,7 @@ reescribe: los cambios se agregan como secciones "Actualización AAAA-MM-DD" al 
 | [0009](0009-idioma-del-codigo.md) | El código en inglés, la app y la tesis en español | Accepted |
 | [0010](0010-modo-oscuro-unico.md) | Un solo tema (oscuro) y una sola línea de estado del dispositivo | Accepted |
 | [0011](0011-errores-solo-en-telemetria.md) | Los errores van a la telemetría, nunca al usuario | Accepted |
+| [0012](0012-audio-del-prototipo-sin-amplificador.md) | El audio del prototipo sale del GPIO sin amplificador | Accepted (2026-11-12) |
 
 ### Por escribir (decisiones ya tomadas, todavía sin ADR)
 
