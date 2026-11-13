@@ -674,7 +674,7 @@ pins.
 > Un **auricular o parlante de 16-32 Ω es resistivo**: pediría ~100 mA continuos, seis veces el
 > límite, y **necesita una resistencia en serie de 100-330 Ω** o el DAC. Con uno de **4 Ω** (el
 > actual) la resistencia es la que fija la corriente: 260 Ω dan unos 12,5 mA de pico. Va además un
-> **capacitor electrolítico de 47-100 µF en serie** (el + hacia el GPIO): el PWM en silencio queda
+> **capacitor electrolítico de 47 µF en serie (ADR 0012)** (el + hacia el GPIO): el PWM en silencio queda
 > en 50 % de ciclo, una continua de 1,65 V que sin el capacitor consume todo el tiempo.
 >
 > Un piezo alcanza para verificar el camino, **no para voz**: resuena en una banda angosta y el habla

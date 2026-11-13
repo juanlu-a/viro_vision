@@ -104,7 +104,7 @@ eficaz de 6,25 mA.
 | **Peso de la salida de audio sobre el total** | **0,4 a 0,6 %** |
 
 Con la batería de 1000 mAh (3,7 Wh) y un consumo de 2,5 W, la autonomía estimada es de unos 89
-minutos. Aun si el audio sonara de forma continua, los 13 mW la reducirían en **menos de un minuto**.
+minutos, el extremo inferior del rango de 1,5 a 2 h que estima la tesis (sec. 7.3.3). Aun si el audio sonara de forma continua, los 13 mW la reducirían en **menos de un minuto**.
 Como el audio sólo suena durante los anuncios, el efecto real es todavía menor.
 
 **El dato contraintuitivo:** la salida directa es la opción **que menos consume**, no la que más. Su

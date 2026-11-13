@@ -14,9 +14,8 @@ en [`SESSION-LOG.md`](SESSION-LOG.md), y el plan en [`ROADMAP.md`](ROADMAP.md).
   interno de TestFlight y deja un `.apk` como artefacto. `main` es producción y sólo recibe PRs
   `staging → main` (= release), que publican al link público de TestFlight. El último release a
   producción fue el PR #115 (2026-10-13).
-- Ramas con trabajo abierto fuera de `staging` (`git branch -r`, 2026-11-12): ninguna con trabajo
-  pendiente; el audio en los pines 12 y 14 (PR #130, ADR 0012) ya está integrado.
-  - Las demás ramas remotas (`feat/case-v0-*`, `feat/bus-*`, `fix/*`, `perf/*`, etc.) corresponden a PRs
+- Ramas con trabajo abierto fuera de `staging` (`git branch -r`, 2026-11-12): ninguna; el audio en los
+  pines 12 y 14 (PR #130, ADR 0012) ya está integrado. Las ramas remotas (`feat/case-v0-*`, `feat/bus-*`, `fix/*`, `perf/*`, etc.) corresponden a PRs
     que ya llegaron a `staging` (no se revisó rama por rama) y quedan como historia. `feat/volume-button` y `feat/carcasa-modelo-3d` ya no
     existen en el remoto.
 - El pipeline de ómnibus vive en el repo de Magalí, `bus-banner-recognizer`, entero en un solo PR (#7,
