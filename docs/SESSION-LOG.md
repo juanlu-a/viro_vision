@@ -4524,7 +4524,10 @@ enumeró en la Mac), un seguidor de dos transistores, LM386 (electronica.uy), PA
 (MercadoLibre), PAM8302 y MAX98357A, con el espacio libre en la carcasa v0.29 calculado desde el modelo
 (~26 × 24 × 7 mm junto al header). **Con el tutor se decidió dejar el prototipo sin amplificador** y
 documentarlo como trabajo futuro. Un hallazgo para el informe: la salida directa es la que **menos**
-consume (~10 mW al sonar, menos del 1 % de la placa), no la que más.
+consume (~10 mW al sonar, menos del 1 % de la placa), no la que más. También quedó documentada la
+prueba del circuito RC (260 Ω + 47 µF: funciona, volumen muy bajo) y por qué el volumen la vuelve
+inviable para la calle: desde un GPIO de 16 mA, ningún circuito pasivo entrega más de ~1 mW en 4 Ω
+(el RC da ~0,16 mW; un clase D a 5 V, hasta 3 W).
 
 Quedó en el [ADR 0012](architecture/adr/0012-audio-del-prototipo-sin-amplificador.md), en la tesis
 (sec. 7.3.1, 7.3.3 y la nueva sec. 10.1), en `REUNIONES-TUTOR.md`, en `PROJECT-STATUS.md`, en los README

@@ -368,7 +368,9 @@ serie una **resistencia de 260 Ω**, que limita el pico a unos 12,5 mA, y un **c
 que bloquea la componente continua del PWM (1,65 V en silencio) y con ella el consumo en reposo. El
 resultado es audible pero de **volumen bajo**: al transductor llega una fracción de milivatio. Con la
 carcasa ya impresa, el equipo y el tutor decidieron mantener esta salida directa en el prototipo y
-documentar la amplificación como trabajo futuro (ADR 0012, sec. 10.1). El volumen se limita al 90 % y
+documentar la amplificación como trabajo futuro (ADR 0012, sec. 10.1). Un circuito pasivo desde un
+pin GPIO no puede entregar más de alrededor de 1 mW en 4 Ω, lo que vuelve esta salida inviable para el
+uso en la calle; la prueba y el cálculo se detallan en sec. 10.1. El volumen se limita al 90 % y
 no al 100 % porque la salida PWM satura en el extremo superior, y la distorsión es peor que un volumen
 menor.
 

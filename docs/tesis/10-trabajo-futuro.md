@@ -14,6 +14,21 @@ medido, la rama disipa unos 10 mW mientras suena, entre el 0,4 y el 0,6 % del co
 modo activo, y de esa potencia sólo 0,16 mW llegan al transductor; el resto se disipa en la
 resistencia que protege el pin.
 
+**La prueba del circuito RC y su límite.** Se probaron dos circuitos con el mismo transductor y el
+mismo software. El primero, una resistencia de 100 Ω sin capacitor, produjo apenas un pitido
+perceptible, con un pico de corriente que además superaba el límite del pin. El segundo, el circuito
+RC en serie que quedó en el prototipo (260 Ω y 47 µF), funciona: la voz se oye y se entiende, pero sólo
+con el transductor apoyado y en un ambiente silencioso. El límite no es de ajuste sino de fondo.
+Cualquier circuito pasivo alimentado por un pin GPIO está acotado por la corriente del pin: con 16 mA
+sobre 4 Ω, la potencia máxima que puede llegar al transductor es de (0,016 A)² · 4 Ω ≈ 1 mW, aun sin
+resistencia en serie. El circuito actual entrega unos 0,16 mW, de modo que optimizar sus componentes
+ganaría como mucho unos 8 dB, mientras que un amplificador clase D alimentado a 5 V entrega hasta 3 W,
+unos 40 dB más. Un transductor de conducción ósea, menos eficiente que un parlante en el oído, no
+alcanza con menos de un milivatio a hacerse oír sobre el ruido del tránsito, que es el ambiente de uso
+del modo ómnibus. Por eso la salida directa es **inviable para el uso real** y sólo se justifica en
+el prototipo; la conclusión no depende del valor de los componentes (ADR 0012). Las potencias son
+calculadas y el volumen se evaluó de oído, sin medición de nivel sonoro.
+
 Se evaluaron las siguientes alternativas. Las cifras provienen de hojas de datos y de vendedores, y
 están pendientes de medición propia:
 

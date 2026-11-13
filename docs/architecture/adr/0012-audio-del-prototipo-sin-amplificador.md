@@ -26,6 +26,49 @@ carcasa tiene lugar para los componentes en serie (PR #130). Con el circuito cor
 funciona, pero **se oye muy bajo**. Se evaluaron cinco formas de amplificarlo (ver *Alternativas*).
 Ninguna llegaba el mismo día con la carcasa ya impresa, y el equipo lo consultó con el tutor.
 
+## Pruebas realizadas
+
+Las dos pruebas usaron el mismo transductor de 4 Ω y el mismo software (`audremap`, PCM al 100 %,
+`speaker-test`, `aplay` y la prueba de audio de la aplicación). La única variable fue el circuito
+entre el pin y el transductor.
+
+| Fecha | Circuito | Resultado |
+|---|---|---|
+| 2026-11-07 | pin 32 (GPIO 12) → 100 Ω → transductor → pin 34 (GND), sin capacitor | Sólo un pitido apenas perceptible. El software quedó descartado como causa (overlay cargado, GPIO 12 en función PWM0, reproducción sin errores en ambos canales). |
+| 2026-11-12 | pin 12 (GPIO 18) → 260 Ω → 47 µF → transductor → pin 14 (GND): **circuito RC en serie** | **Funciona**: la voz se oye y se entiende, pero con volumen muy bajo, sólo con el transductor apoyado y en un ambiente silencioso. |
+
+El circuito RC resolvió los dos defectos del primero: el pico de corriente queda dentro del límite
+del pin y la continua deja de circular. Lo que **no puede resolver es el volumen**, y la razón es de
+fondo, no de ajuste.
+
+### La limitante del volumen: un techo de alrededor de 1 mW
+
+Cualquier circuito pasivo entre un pin GPIO y el transductor está acotado por la corriente que el pin
+puede entregar. Con el límite de 16 mA de un pin de propósito general, la potencia máxima que podría
+llegar a una carga de 4 Ω, aun con una resistencia en serie nula, es:
+
+P = I² · R = (0,016 A)² · 4 Ω ≈ **1 mW**
+
+Ése es el techo teórico; el circuito RC entrega unos **0,16 mW** porque la corriente alterna de la
+rama es de ±6,25 mA, no de 16 mA. Ajustar la resistencia acerca al techo, pero el techo mismo queda
+lejos de lo necesario:
+
+| Fuente | Potencia en el transductor (estimada) |
+|---|---|
+| Circuito RC actual (260 Ω + 47 µF) | ~0,16 mW |
+| Techo de cualquier circuito pasivo desde un GPIO (16 mA en 4 Ω) | ~1 mW, unos 8 dB más que el actual |
+| Amplificador clase D a 5 V (PAM8403, MAX98357A) | hasta 2,5 a 3,2 W, unos 40 dB más que el actual |
+
+Un transductor de conducción ósea transmite el sonido por vibración del hueso y es menos eficiente
+que un parlante en el oído: los auriculares de los que se extrajo lo manejan con un amplificador
+integrado, y con ese amplificador se oía con claridad. Con menos de un milivatio, el transductor
+queda **inviable para el uso real** del dispositivo: el modo ómnibus se usa en la calle, junto al
+ruido del tránsito y de los propios ómnibus, que es precisamente el ambiente donde el anuncio no puede
+perderse. Ningún valor de resistencia ni de capacitor cambia esa conclusión: hace falta una etapa
+con alimentación propia que entregue potencia, es decir, un amplificador.
+
+Las cifras de potencia son calculadas; el volumen se evaluó de oído, sin medición de nivel sonoro.
+
 ## Decisión
 
 **El prototipo queda con el transductor conectado directo al pin, sin amplificador**:
