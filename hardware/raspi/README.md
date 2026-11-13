@@ -768,12 +768,10 @@ con CoreBluetooth, arrancando el emulador.
 1. **La prueba del modo ómnibus en la calle**, con y sin zoom (`--no-bus-zoom`): a qué distancia se
    anuncia la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, la fase
    2 es mover también su zona de entrada (`set_inference_roi_abs`).
-2. **El transductor definitivo.** El camino de audio está (`audio.py` + `audremap`, y 386 anuncios de
-   ómnibus más los avisos de sistema en la SD), pero la salida PWM es provisional: un piezo verifica
-   pero no sirve para voz, un auricular de 16-32 Ω necesita una resistencia en serie de 100-330 Ω, y la
-   carcasa aloja un transductor de conducción ósea de 14 mm que necesita una etapa que lo maneje. El
-   DAC I2S (MAX98357A, GPIO 18/19/21) sigue siendo el destino; hoy el 18 y el 19 los ocupa el PWM
-   provisional, que se saca al instalarlo (el botón de modos está en el GPIO 5).
+2. **Amplificar el audio** (trabajo futuro, [ADR 0012](../../docs/architecture/adr/0012-audio-del-prototipo-sin-amplificador.md)).
+   El prototipo queda con el transductor de conducción ósea de 4 Ω directo al pin 12, con 260 Ω y
+   47 µF en serie: funciona, con volumen bajo. El destino recomendado es el MAX98357A en los mismos
+   pines (GPIO 18/19/21); el ADR compara las demás alternativas.
 3. **Medir el consumo real** con un medidor USB en línea, y con eso la autonomía.
 4. Copiar acá el contenido exacto de `/etc/default/virovision` (ver *Cambiar el detector*).
 5. Calibrar los tiempos del botón con usuarios ciegos (ver *Botón físico*): los actuales son una

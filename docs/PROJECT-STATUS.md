@@ -108,7 +108,9 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
   - vigilante de la cámara; journal persistente (2026-09-23).
 - **Arranque**: la placa anuncia a los 16,2 s, la cámara está lista a los 21,3 s y el OCR a los
   33,6 s (2026-10-06).
-- **Audio en la placa**: PWM por `audremap`, provisional.
+- **Audio en la placa**: PWM por `audremap` en el pin 12 (GPIO 18), con 260 Ω y 47 µF en serie con el
+  transductor de 4 Ω, **sin amplificador** (ADR 0012, 2026-11-12). Funciona con volumen bajo; la
+  amplificación queda como trabajo futuro.
 - **Pruebas**: 195 tests pasan y 2 se omiten (2026-10-22).
 
 ### Visión (`bus-banner-recognizer` y la placa)
@@ -203,7 +205,8 @@ En orden de prioridad, ver [`ROADMAP.md`](ROADMAP.md):
 1. Probar el modo ómnibus en la calle, con y sin zoom.
 2. Documentar las métricas del detector reentrenado.
 3. Imprimir y armar la carcasa v0.26.
-4. Cerrar el audio de la placa.
+4. Medir la corriente del audio y el consumo general de la placa (el audio quedó cerrado sin
+   amplificador, ADR 0012).
 5. Hacer las pruebas con usuarios y la corrida de evaluación del supermercado.
 6. Antes de la entrega, sacar la evidencia del ómnibus.
 

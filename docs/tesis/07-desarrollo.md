@@ -343,7 +343,7 @@ aplicación destinada a personas que no la ven. Esa información no se perdió: 
 | Cómputo | Raspberry Pi Zero 2 W | En uso (desde el 19 de septiembre de 2026, ver abajo) |
 | Visión | Raspberry Pi AI Camera (sensor Sony IMX500, 12 MP, inferencia en el sensor) | Integrada |
 | Entrada | Pulsador en GPIO 5; en la carcasa, pulsador SMD de 4 × 4 × 1 mm con tecla impresa | Integrado y verificado; el de la carcasa, pendiente de verificar |
-| Audio | Salida PWM por GPIO (provisoria) hacia un transductor de conducción ósea de 14 mm; destino: conversor digital-analógico I2S | **Pendiente** la etapa definitiva |
+| Audio | Salida PWM por GPIO hacia un transductor de conducción ósea de 4 Ω, sin amplificador (ADR 0012) | Integrado, con volumen bajo; la amplificación queda como trabajo futuro (sec. 10.1) |
 | Alimentación | Waveshare UPS HAT (C) + batería LiPo 803040 de 1000 mAh | Integrada; el nivel de batería llega a la aplicación (sec. 7.3.3) |
 | Carcasa | VIA Clara, dos mitades a presión impresas en 3D sobre la patilla | v0.9 integrada al repositorio; v0.12 en desarrollo (sec. 7.3.5) |
 
@@ -358,16 +358,19 @@ cifras tomadas sobre la Pi 3 B+ se identifican como tales donde aparecen; en par
 arranque en frío del modo ómnibus de sec. 7.2.4 (47 segundos) es de esa placa, y las cifras vigentes de
 la Zero 2 W están en sec. 7.3.2.
 
-**Sobre el audio.** La salida actual es audio por modulación de ancho de pulso redirigida a pines de
-propósito general (señal en el pin físico 32, masa en el 34), suficiente para verificar el camino
-completo, con voz audible en un auricular, pero no para uso real. La limitación es eléctrica y está
-documentada: un pin de propósito general entrega **16 mA**, mientras que un auricular de 16 a 32
-ohmios demanda del orden de **100 mA continuos**, seis veces el límite. La carcasa aloja un
-**transductor de conducción ósea de 14 mm**, que es el destino físico del sonido; la etapa que lo
-maneje está pendiente. El destino electrónico es un conversor digital-analógico I2S, cuya integración
-exige además reubicar el pulsador, que hoy ocupa uno de los pines necesarios. El volumen se limita al
-90 % y no al 100 % porque la salida PWM satura en el extremo superior, y la distorsión es peor que un
-volumen menor.
+**Sobre el audio.** La placa no tiene salida analógica: el audio sale por modulación de ancho de
+pulso (PWM) redirigida a un pin de propósito general, el pin físico 12 (GPIO 18), con masa en el 14.
+Hasta el 12 de noviembre de 2026 salía por el pin 32; se mudó al 12 porque queda del lado de la
+microSD, donde la carcasa tiene lugar para los componentes en serie. El transductor de conducción
+ósea, extraído de unos auriculares comerciales, tiene una impedancia de **4 Ω**. Un pin de propósito
+general entrega como máximo **16 mA**, así que el transductor no puede conectarse directo: lleva en
+serie una **resistencia de 260 Ω**, que limita el pico a unos 12,5 mA, y un **capacitor de 47 µF**,
+que bloquea la componente continua del PWM (1,65 V en silencio) y con ella el consumo en reposo. El
+resultado es audible pero de **volumen bajo**: al transductor llega una fracción de milivatio. Con la
+carcasa ya impresa, el equipo y el tutor decidieron mantener esta salida directa en el prototipo y
+documentar la amplificación como trabajo futuro (ADR 0012, sec. 10.1). El volumen se limita al 90 % y
+no al 100 % porque la salida PWM satura en el extremo superior, y la distorsión es peor que un volumen
+menor.
 
 **Sobre el enfoque.** El sensor tiene **enfoque manual**. Las primeras capturas salieron
 desenfocadas; el procedimiento quedó documentado como paso obligatorio de puesta en marcha, con una
@@ -436,6 +439,7 @@ El presupuesto energético está estimado a partir de mediciones de terceros sob
 |---|---|
 | Espera (BLE anunciando, sin video) | 0,5 a 0,6 W |
 | Activo (cámara, punto de acceso y detección en el sensor) | 2 a 3 W, pico ~0,6 A |
+| Salida de audio, mientras suena (calculado, ADR 0012) | ~10 mW en el pin, ~13 mW desde la batería: menos del 1 % del total |
 
 | Celda | Dimensiones | Autonomía estimada |
 |---|---|---|

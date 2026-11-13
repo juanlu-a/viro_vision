@@ -4516,4 +4516,22 @@ de supermercado y la skill.
   `audio_pwm_mode=2` sigue sin veredicto). Falta soldar el auricular en los pines 12 y 14 con la
   resistencia y el capacitor, y probar.
 - El pin 35 (GPIO 19) pasa a ser salida: tiene que quedar libre.
-- Volumen real con 4 Ω: amplificador (MAX98357A por I2S o PAM8302).
+
+**Después, en la misma sesión.** Soldado en los pines 12 y 14, el audio funcionó pero muy bajo. Se
+evaluaron alternativas de amplificación: la placa original de los auriculares (descartada: el
+amplificador está dentro de un chip JieLi con Bluetooth, cargador y lector de microSD, y por USB no se
+enumeró en la Mac), un seguidor de dos transistores, LM386 (electronica.uy), PAM8403 mini
+(MercadoLibre), PAM8302 y MAX98357A, con el espacio libre en la carcasa v0.29 calculado desde el modelo
+(~26 × 24 × 7 mm junto al header). **Con el tutor se decidió dejar el prototipo sin amplificador** y
+documentarlo como trabajo futuro. Un hallazgo para el informe: la salida directa es la que **menos**
+consume (~10 mW al sonar, menos del 1 % de la placa), no la que más.
+
+Quedó en el [ADR 0012](architecture/adr/0012-audio-del-prototipo-sin-amplificador.md), en la tesis
+(sec. 7.3.1, 7.3.3 y la nueva sec. 10.1), en `REUNIONES-TUTOR.md`, en `PROJECT-STATUS.md`, en los README
+de hardware y en la skill.
+
+### Pendientes (actualizado)
+
+- Medir con un multímetro en serie la corriente del transductor durante una lectura, y verificar si
+  el PWM se detiene en silencio.
+- Amplificación (trabajo futuro): MAX98357A en los mismos pines.
