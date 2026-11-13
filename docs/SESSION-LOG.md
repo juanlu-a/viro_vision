@@ -4495,6 +4495,122 @@ viejo de la rama `fix/case-v0-21` quedó en un `git stash` del worktree.
   las trabas nuevas.
 - Probar la 01 boca abajo sin fuzzy skin en el borde; si sigue sin enganchar, un chaflán de 0,4 en la junta.
 
+## 2026-11-09 — La tesis, revisada con los comentarios del equipo
+
+**Pedido**: el equipo comentó y corrigió el Doc, sobre todo las partes escritas con IA (negritas,
+tono). Iterar sobre eso, con foco en el desarrollo propio (OCR, YOLO, app, carcasa), benchmarks al
+día, problemas con su solución y alternativas, y el cambio de alcance de supermercado.
+
+- **El Doc estaba adelante del repo.** Desde el 22 de octubre el equipo reescribió en el Doc el marco
+  teórico (que pasó a ser el capítulo 3, antes que el estado del arte), sacó negritas y frases de
+  remate, agregó citas numeradas y la sec. 7.2.9. Se importó el Doc entero al repo antes de tocar
+  nada (commit propio; `03-marco-teorico.md` y `04-estado-del-arte.md` cambiaron de número). El
+  conversor (en el scratchpad, no versionado) arma el Markdown desde `read_doc`; quedó verificado con
+  `sync_doc.py --report` en `ops=0`. Se perdió y se repuso la fila del riesgo de la clave fija del AP
+  (#127), que nunca había llegado al Doc.
+- **Capítulo 7 reescrito**: prosa llana, sin negritas en el cuerpo ni etiquetas tipo «Problema.»; en
+  cada componente, problema, alternativas y solución. Nuevo: 7.3.6 (fallas de hardware: conector de
+  cámara, sensor suelto al cerrar la carcasa, placa reemplazada el 7 de noviembre, audio bajo), 7.6.7
+  (modo producto y desarrollo), 7.8.2 (la revisión de toda la base, #126), la tabla de la carcasa
+  hasta la v0.25, y 7.5.4 con el alcance en tres pasos (canasta básica, alimentos, todo producto
+  alimenticio; la canasta queda como conjunto de evaluación). Cifras al 9 de noviembre: 345 pruebas
+  en la app, 197 en la placa, 122 PRs. Trece títulos renombrados en el Doc con `replaceAllText` antes
+  del sync, para que no quedaran secciones duplicadas.
+- **Comentarios atendidos**: tamaños de YOLO11 (3.4), Gemma para el respaldo (3.6), 3.9 escrita, 4.1
+  en tercera persona, 4.3.1 coherente con el enlace real, 4.4 con Tesseract, PaddleOCR y RapidOCR,
+  ADR 0005 (5.3), cifras de 5.4, «hoy no cuantificado» (6.6). En 2.1 se menciona el cambio de alcance.
+- **Sin dato, quedó PENDIENTE**: las métricas del reentrenamiento en la V100 (no están en ningún repo
+  ni en el Drive) y el resultado de Tesseract sobre las 117 imágenes.
+
+### Pendientes
+
+- Métricas del reentrenamiento en la V100 (7.4.3, 12.7): las tiene quien corrió el entrenamiento.
+- Comentarios que son decisión del equipo: objetivos opcionales a trabajo futuro (2.2.3, 10), rehacer
+  los diagramas de 7.1.3, el manual de usuario como audio en la app, el registro de reuniones (5.6).
+- Agregar a la bibliografía la documentación de YOLO11 de Ultralytics y RapidOCR (se citan en 3.4 y 4.4).
+- Actualizar el índice del Doc a mano (la API no lo refresca).
+
+## 2026-11-10 — Carcasa v0.27: la copa del auricular, aparte
+
+Pedidos del usuario para el brazo del auricular, para que el cable pase más fácil:
+
+- **La copa, separada del brazo.** Es una pieza nueva (08) que se encastra en la punta del brazo igual
+  que el brazo en la carcasa: un enchufe de 5,6 × 5,6 × 4,4 en el brazo, un zócalo con 0,35 de luz por
+  lado en un saliente de la copa, y gotita si queda flojo. La copa se imprime con el piso abajo, sin
+  soportes, porque el saliente ocupa todo su largo.
+- **El canal ya no dobla a 90°.** Dentro del enchufe de la carcasa el cable bajaba recto y doblaba en
+  esquina hacia el tubo; ahora dobla con 3 mm de radio. El paso por la pared de la carcasa pasa a Ø 3,8 y se
+  abre en embudo hacia adentro. Se interpretó así «el encastre a la placa por dentro»; a confirmar con el
+  usuario.
+- **Pared del tubo más fina**: canal de Ø 3,4 (era 2,6), pared de 1 mm.
+
+Al principio, el brazo salió en dos sólidos: el enchufe nuevo sólo tocaba la punta del tubo. Además, el
+redondeo del zócalo estrechaba la boca y el enchufe chocaba al entrar. Se corrigieron las dos cosas, y se
+sumaron dos verificaciones: `cup`, la copa contra la carcasa y el transductor, y `cup_insert`, la copa
+deslizándose sobre el enchufe. `export.sh`: 40 ok. Cambian la 01 (el paso del cable), la 03 y la 08 nueva;
+la 02 es igual a la de la v0.26. Rama `feat/case-v0-27`, sin commitear; STL en
+`~/Desktop/Modelos 3D/VIA_CLARA_v0_27/` y en `versions/v0_27/`.
+
+### 2026-11-11: v0.28, el brazo con más luz en la copa
+
+El usuario imprimió la v0.27: todo salió bien salvo el brazo, que no calzaba en la copa, sobre todo el
+enchufe rectangular. En el modelo el encastre estaba centrado y con 0,35 de luz por lado (se verificó con un
+corte). La causa es la impresión: el zócalo de la copa queda acostado y su techo sale en puente, así que el
+hueco se achica. Como el usuario sólo reimprime el brazo, la copa queda igual y el enchufe del brazo pasa a
+5,1 × 5,1 (`CUP_PLUG_FIT`, 0,6 de luz por lado). Se confirmó que la copa, las mitades, el botón y la tapa
+dan la misma geometría que en la v0.27: mismos triángulos y mismo volumen. `export.sh`: 40 ok. STL en
+`~/Desktop/Modelos 3D/VIA_CLARA_v0_28/` y `versions/v0_28/`.
+
+### 2026-11-12: v0.29, el encastre de la copa al revés
+
+El usuario avisó que la parte del brazo que entra en la copa es demasiado chica. La v0.28 se había hecho
+sobre un supuesto equivocado: que en la v0.27 el brazo no entraba. En realidad quedaba flojo, y achicar el
+enchufe a 5,1 lo empeoró. La v0.29 lo agranda a 6,0 × 6,0, con esquinas de 0,8 (la luz queda en 0,15 por
+lado en el zócalo de 6,3 de la copa ya impresa). Suma tres puntas de prueba (5,8, 6,0 y 6,2), sólo el
+enchufe impreso acostado como el brazo, para probar en la copa antes de imprimir el brazo entero.
+`export.sh`: 40 ok. Lección: ante «no calza bien», preguntar si entra justo o queda flojo antes de cambiar
+la medida.
+
+### Pendientes
+
+- ~~Probar las puntas `test_cup_plug_*` de la v0.29 en la copa~~: el enchufe de 6,0 calzó perfecto (confirmado por el usuario el 2026-11-12). La v0.29 es la carcasa final, impresa.
+- Commit y PR de la v0.27 a la v0.29 (rama `feat/case-v0-27`).
+- ~~Lo pendiente de la v0.26~~: el usuario confirmó el 2026-11-12 que no queda nada por probar; la carcasa
+  está impresa y es la versión final.
+
+## 2026-11-12 — Tesis: alcance, periferia, carcasa hasta la v0.29 y trabajo futuro
+
+**Pedido**: reescribir el alcance del modo supermercado como una ampliación de la canasta básica (se
+cumplía con margen y sin costo de latencia), contar que el modo ómnibus sin conexión importa sobre todo
+en la periferia y el interior, donde las líneas llevan letras, y volcar lo nuevo: carcasa, impresoras,
+interruptor, cámara girada, modo producto, audio, limitaciones y trabajo futuro.
+
+- **El equipo seguía editando el capítulo 3 en el Doc** (YOLO y OCR pasaron a 3.3.2 y 3.3.3, más
+  ajustes en 2.4.2, 4.1.1 y 4.1.2). Se trajeron al repo antes de publicar y en esta pasada no se tocaron
+  los capítulos 3 y 4. Se comparó el Doc contra el estado publicado el 2026-11-09 (`git archive` de ese
+  commit) para separar lo del equipo de lo propio.
+- **7.5.4** pasa a «Ampliación del alcance»: la canasta básica se cumplió, el modelo daba para más
+  (yerba suelta), la latencia y el costo no cambiaron, y la canasta queda como conjunto de evaluación. Se
+  dice además que el texto de la app («productos de supermercado») es más amplio que el prompt (sólo
+  alimentos). En 2.1, la canasta básica queda como alcance original.
+- **Periferia**: 7.2.4 da el motivo del modo sin conexión; 7.4.8 describe los prefijos que acepta el
+  intérprete (CE, BT, D, E, G, L; 55 de 147 códigos del catálogo); la nueva 7.4.13 cuenta qué está
+  soportado, qué casi no está medido (en las 117 imágenes hay sólo una línea con letras, la G) y qué no
+  se anuncia (las líneas fuera del STM).
+- **Carcasa** hasta la v0.29, con el cambio de la Ender 3 V3 a la FLSUN T1 Max, el interruptor de panel
+  pegado y la cámara girada (el YOLO corre en el sensor). **Audio**: el auricular de 4 Ω, 260 Ω + 47 µF
+  y los pines 12/14 (#130).
+- **Nuevas**: 7.9 (limitaciones del prototipo) y el capítulo 10 (trabajo futuro): placa dedicada,
+  batería mayor, amplificador, prueba en la calle, líneas periféricas e interior, respaldo local de
+  supermercado, objetivos opcionales, seguridad y Google Play.
+
+### Pendientes
+
+- Las métricas de la V100 siguen sin dato.
+- La bibliografía todavía no tiene la documentación de Ultralytics (YOLO11) ni la de RapidOCR.
+- Actualizar el índice del Doc a mano.
+- PR de `docs/thesis-team-review` a `staging`.
+
 ## 2026-11-12: el audio PWM pasa al pin 12, del lado de la microSD
 
 **Qué.** El auricular resultó ser de **4 Ω**, no de 16 a 32 Ω. Con los 100 Ω en serie le llegaba un 4 % de
@@ -4538,3 +4654,22 @@ de hardware y en la skill.
 - Medir con un multímetro en serie la corriente del transductor durante una lectura, y verificar si
   el PWM se detiene en silencio.
 - Amplificación (trabajo futuro): MAX98357A en los mismos pines.
+
+## 2026-11-12 (cont.): el audio sin amplificador, el camino del modelo de nube y el audio de la app, en la tesis
+
+- **PR #130 integrado con `staging`** (merge de `staging` en la rama, no rebase, para no reescribir una
+  rama que otra sesión tiene en su checkout). Los conflictos venían de que el PR editaba la tesis y los
+  README de antes del #132. En los README, la skill y PROJECT-STATUS se tomó la versión del PR (ADR 0012:
+  el transductor de 4 Ω sale del pin 12 con 260 Ω y 47 µF, sin amplificador, decidido con el tutor) y se
+  quitaron las menciones del #132 que lo daban por «propuesta abierta».
+- **Corrección de fondo**: lo que tiene 4 Ω es el propio transductor de conducción ósea, sacado de unos
+  auriculares comerciales; la tesis hablaba de «un auricular de 4 ohmios» aparte.
+- **Tesis**: 7.3.1 (fila y párrafo del audio), 7.3.3 (consumo del audio, ~10 mW), 7.3.6 (las dos
+  pruebas, 7 y 12 de noviembre), 7.9 y una nueva **10.2 «Amplificación del audio del dispositivo»** con
+  el techo de ~1 mW de un GPIO y la tabla de alternativas (MAX98357A recomendado); las 10.2 a 10.5
+  pasan a 10.3 a 10.6.
+- **7.2.2** cuenta ahora las tres etapas: Gemma en el teléfono (ago-12/13), la nube con la restricción
+  de gratuidad para el usuario (ADR 0006, 30/8) y el paso de Flash a Flash Lite, y la medición del 2/9
+  que dejó luna por defecto y qwen como alternativa.
+- **Nueva 7.6.8 «Retroalimentación auditiva continua»**: el catálogo de avisos de la app, quién dice
+  cada uno y por qué.

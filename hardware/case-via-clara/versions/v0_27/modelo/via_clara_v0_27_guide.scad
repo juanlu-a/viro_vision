@@ -4,11 +4,11 @@
 //
 // VIEW = outer | head | left_inside | right_inside | exploded
 // Render with an orthographic projection and the eye along view_dir(VIEW), for example:
-//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_26_guide.scad
+//   openscad -D 'PART="none"' -D 'VIEW="head"' --projection=o --camera=<eye>,<center> ... via_clara_v0_27_guide.scad
 
 // Always render with -D 'PART="none"' (export.sh does): the model's own dispatch must draw nothing.
 // Setting PART here would not work, because the included file reassigns it.
-include <via_clara_v0_26.scad>
+include <via_clara_v0_27.scad>
 
 VIEW = "head";                   // set with -D
 // export.sh renders the parts once to meshes in the model frame and passes their folder here: preview

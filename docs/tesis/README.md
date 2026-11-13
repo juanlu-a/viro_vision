@@ -15,8 +15,8 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 |---|---|
 | `01-introduccion.md` | Del documento original |
 | `02-descripcion-del-proyecto.md` | Del documento original: alcance, objetivos, entregables, antecedentes |
-| `03-estado-del-arte.md` | Del original, más los cuatro apartados que estaban vacíos |
-| `04-marco-teorico.md` | Del original, más métricas, YOLO, OCR, Edge AI, comunicación inalámbrica, audio y WCAG |
+| `03-marco-teorico.md` | Reescrito por el equipo en el Doc (noviembre de 2026): IA, métricas, YOLO, OCR, Edge AI, comunicación inalámbrica, audio y WCAG |
+| `04-estado-del-arte.md` | Del original, más los apartados que estaban vacíos |
 | `05-metodologia.md` | Nuevo |
 | `06-planificacion.md` | Nuevo |
 | `07-desarrollo.md` | Nuevo, el capítulo central |
@@ -93,6 +93,15 @@ ni los comentarios de las secciones que no cambian. El ciclo es:
 El script salta a propósito las secciones que todavía no hay que pisar (hoy, la 12.2.3, que en el Doc
 tiene una copia de la tabla agregada a mano: ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
 abajo: traer primero al repo lo que se haya editado directo en el Doc.
+
+### Traer el Doc al repo cuando el equipo editó mucho
+
+Si el equipo reescribió secciones enteras en el Doc, conviene importar el Doc completo antes de
+editar: se arma el Markdown de cada capítulo desde `read_doc` y se verifica con
+`sync_doc.py --report` que no quede ninguna sección distinta. Así se hizo el 2026-11-09 (ver la
+bitácora). Si después se renombra un título, hay que renombrarlo primero en el Doc (`replaceAllText`):
+el script empareja secciones por título y, con un título nuevo, insertaría la sección sin borrar la
+vieja.
 
 ## Trabajar en paralelo
 

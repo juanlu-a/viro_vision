@@ -25,6 +25,10 @@ Extension)**: el mismo sobre el que se midió el ADR 0003, así que esas medicio
 Algunas cifras viejas de la documentación (el arranque en frío de 47 s del modo ómnibus, por ejemplo)
 son de la 3 B+.
 
+**Placa reemplazada el 2026-11-07**: la Zero 2 W se rompió de nuevo y se compró otra; se conservó la
+**misma microSD**, así que arrancó con todo lo instalado (misma imagen, mismo daemon). Es la tercera
+unidad; la dirección BLE cambia y el audio de esta placa se oye bajo (ver *Audio*).
+
 ### Cámara: Raspberry Pi AI Camera (Sony IMX500), la que se compró (dos unidades; en la placa desde 2026-09-05)
 12 MP, acelerador de inferencia en el sensor, CSI. Los documentos viejos decían Camera Module 3
 (IMX708, autofoco); la que llegó es la AI Camera, y eso cambió el pilar de ML: la detección corre en
@@ -91,7 +95,7 @@ pegada encima.
   Supermercado reproduce el MP3 que sintetiza el teléfono; ómnibus usa 386 anuncios **pregrabados** en
   la SD.
 - **Software de la placa**: Raspberry Pi OS Lite 64-bit + un servicio systemd con un daemon Python
-  asyncio (22 archivos en `virovision/`, 4915 líneas, 195 tests al 2026-10-22). No hay bare-metal:
+  asyncio (22 archivos en `virovision/`, 4981 líneas, 197 tests pasan y 2 se omiten al 2026-11-09). No hay bare-metal:
   libcamera y BlueZ exigen Linux.
 - **Arranque (2026-10-05/06, #106, #107, #108, #109, #111)**: la placa **anuncia antes** de la cámara y
   del AP; rfkill se levanta en `ExecStartPre`; la unidad depende sólo de `bluetooth.target`; dnsmasq
@@ -124,16 +128,16 @@ Zero 2 W con el header soldado, UPS HAT (C) unida a su batería 803040 (la bater
 Pi, del lado de los pogo pins), AI Camera y transductor óseo de 14 mm. Parte del modelo **v0.8**, que
 llegó por mail y se versionó sin tocar (`hardware/case-via-clara/via_clara_v0_8.scad`).
 
-**Dónde está cada versión (2026-10-22):**
+**Dónde está cada versión (2026-11-12):** todo en `staging`. `hardware/case-via-clara/` trae el modelo
+vigente (`via_clara_v0_29.scad` y su guía), `export.sh`, el README de la v0.29 y `versions/` con los STL
+de **todas** las versiones, de la v0.9 a la v0.29 (la v0.8 se conserva como referencia). Hitos:
+**#120** (v0.9), **#124** (v0.20, impresa y armada el 2026-10-30), **#129** (v0.26, cámara girada) y
+**#131** (v0.29, **final**, impresa y armada). Las ramas remotas `feat/case-v0-9-snap-fit`, `feat/case-v0-10-slim`,
+`feat/case-v0-26` y `feat/case-v0-27` quedan como historia (el modelo vigente está en `staging`).
 
-- `staging`: v0.8 y **v0.9** (#120). El `README.md` de `hardware/case-via-clara/` en `staging`
-  describe la v0.9.
-- Rama local **`feat/case-v0-10-slim`** (sale de `564ba82`, **nunca pusheada**), en el worktree
-  `viro_vision-case`, junto al checkout principal: v0.10 (`f636e6a`, `502bf7a`) y v0.11
-  (`aee8922`, `a758899`). La **v0.12 está sin commitear** ahí (los `via_clara_v0_11*.scad` renombrados a
-  `_v0_12`, más cambios a `export.sh`, el README, las imágenes, PROJECT-STATUS y SESSION-LOG). Las
-  entradas de bitácora del 2026-10-17, 10-21 y 10-22 sobre la carcasa sólo existen en ese worktree.
-  No integrar nada de eso desde otra rama: el trabajo es de esa sesión.
+**Impresora**: las primeras versiones en una Creality Ender 3 V3 y las siguientes en una **FLSUN T1
+Max** (bordes más definidos, mejor terminación y soportes que se retiran con menos marcas), en PLA con
+*fuzzy skin* en el exterior.
 
 **Historia, impresión por impresión:**
 
@@ -142,39 +146,32 @@ llegó por mail y se versionó sin tocar (`hardware/case-via-clara/via_clara_v0_
 | v0.9 (2026-10-14) | 91,9 × 31,4 × 37,6 | Impresa el 2026-10-17, «casi perfecta». Los separadores hexagonales de bronce quedaron **del lado de la Pi** y bajo la HAT sólo cabezas Phillips; la microSD no entraba (hubo que cortar con una Dremel); paredes gruesas; la imagen salía girada 90°; el soporte cuadrado del lente no entraba; el pulsador real era un 6 × 6 de ~5 mm y no un SMD de 2,5. Tenía 5 trabas y 14 verificaciones |
 | v0.10 (2026-10-17) | 92,9 × 28,7 × 36,6 | El conjunto pasa a la **mitad derecha**; lugar para la microSD; paredes de 1,6 a los costados; **cámara girada 90°** en su plano (flex derecho al CSI); 6 trabas; 15 verificaciones. Impresión evaluada el 2026-10-21: «salió mal». La ventana de la llave era demasiado larga, las guías de la cámara (nervios de 0,65 y de aplastamiento de 0,6) no se podían imprimir, el botón chocaba con el disipador de la Pi, la ranura de la microSD estaba en espejo, el brazo del auricular no entraba, y los pernos traseros se rompían |
 | v0.11 (2026-10-21) | 83,4 × 28,5 × 37,2 (nariz 32,2) | Con las medidas reales: disipador 12 × 12 × 4; hexágonos de 2,2 entre caras que asoman **sólo 1,2** sobre la Pi, así que **ya no se termofijan** (se calentaría la placa): los ubican postes con alojamiento holgado en la mitad derecha y la pared de la izquierda apoya en las cabezas de los tornillos; soporte del lente 11 × 11 × 3 más lente de Ø 8 × 1; **pulsador SMD 4 × 4 × 1** con tecla impresa pegada y una tapita (pieza 06) detrás. Ventana de la llave de 4,2 × 7,4; nervios de la cámara de 1,2; botón en x −14, lejos del disipador; microSD que entra y sale por el extremo trasero con la carcasa cerrada (pinza: la punta queda ~2 mm adentro); **8 trabas** (las traseras reemplazan a los pernos). Dos variantes: `integrated` y `cap` (tapa de cámara aparte, pieza 07). Las dos impresiones se evaluaron el 2026-10-22 |
-| **v0.12 (2026-10-22, vigente)** | **85,8 × 28,5 × 37,2** (nariz 32,2) | La variante `cap` necesitaba muchos más ajustes y **se descarta** (`export.sh` ya no la genera; su código queda por limpiar). En la integrada: el lente no entraba, así que del centro de la guía delantera a la pared del frente hay **5,0 mm** (`CAM_GUIDE_TO_FRONT`; antes 2,65) y la nariz crece 2,35; las **trabas delanteras** estaban encima de las guías, fundidas a ellas, no flexionaban y se partieron: el gancho pasó detrás de las guías (x −33) con 0,6 de luz debajo de la viga (`SNAP_UNDER_GAP`); los **zócalos hexagonales** salieron llenos y ahora son agujeros redondos de Ø 3,4 × 1,5; la ventana de la corredera, 1 mm más ancha (5,2). Botón y brazo del auricular: perfectos, sin cambios |
+| v0.12 (2026-10-22) | 85,8 × 28,5 × 37,2 (nariz 32,2) | La variante `cap` se descartó. El lente no entraba: del centro de la guía delantera a la pared del frente, 5,0 mm; las trabas delanteras pasaron detrás de las guías; los zócalos hexagonales llenos pasaron a agujeros redondos. Botón y brazo: perfectos |
+| v0.13 a v0.19 | | Piezas de prueba y ajustes: ranura de la cámara, zócalos hexagonales (5,0 entre caras, 5,5 de profundidad, medidos con `test_hex_sizes`), copa del auricular de Ø 17 × 6, botón de Ø 5 y **switch deslizante de panel** (ventana de 4,2 × 7,4 y dos pernos de Ø 2,3 a 14,8 entre centros), pegado a la carcasa en lugar de la llave propia de la HAT y la corredera impresa |
+| v0.20 (#124) | | Impresa y armada completa el 2026-10-30, quedó perfecta. Puesta, **la foto salía girada 90°**. El detector YOLO corre dentro del sensor IMX500 y la imagen no se puede girar por software |
+| v0.21, v0.22 | | v0.21: la carcasa entera girada, descartada. **v0.22**: la v0.20 con sólo la cámara girada, el conector del flex hacia la junta |
+| v0.23 a v0.26 (#129) | alto 39,8 | Cámara 2 mm más lejos de las placas (flex enrollado), tapa del auricular 1,5 mm más alta, hueco interior 1,2 mm más alto de cada lado (conectores de la Pi que sobresalen 2 mm), botón centrado, trabas más anchas, patilla 5,5 mm arriba y brazo 5,5 mm abajo |
+| v0.27 | | La copa del auricular pasa a ser una pieza aparte (08), encastrada en el brazo; canal del cable más ancho y sin curvas de 90°. Impresa: todo bien salvo el encastre de la copa, que quedaba flojo |
+| v0.28 | | Achicó el enchufe del brazo a 5,1 por un error de diagnóstico (el problema era que quedaba flojo, no que no entraba) |
+| **v0.29 (#131, final)** | **89,2 × 39,8** (sin el brazo) | Enchufe de 6,0 × 6,0 con 0,15 mm de luz por lado. Impresa y armada, **calzó perfecto**; el equipo confirmó el 2026-11-12 que no queda nada por probar |
 
-Las medidas son del `.scad` (largo de `NOSE_X` = −44,6 a la cola en x = 41,2; ancho `OUT_W` = 28,45;
-alto `OUT_H` = 37,2); con los puentes del elástico y el zócalo del brazo, que sobresalen de la cara
-cabeza, el ancho total es ~32,2. No cuentan el brazo del auricular.
+Las medidas de la v0.9 a la v0.11 son del `.scad` de cada una (largo de la nariz a la cola, ancho,
+alto); las de la v0.29 son las del README de la carcasa y no cuentan el brazo del auricular.
 
-**Parámetros fijos de la v0.12** (`via_clara_v0_12.scad`): paredes de 1,6 a los costados y 2,7 arriba
-y abajo (`WALL`, `WALL_TB`; ahí viven las vigas de las trabas, con ≥ 1,0 de piel); separación HAT-Pi de
-11,3 (`BOARD_GAP`, entró bien en la v0.9); nervios de la cámara de 1,2 (`RIB_T`) con 0,15 de luz por
-lado (`RIB_GAP`); agujero del lente de Ø 9,4 (para que el lente de Ø 8 pase por la junta); 8 trabas
-(viga de 1,2 de espesor, enganche de 0,4 menos 0,05, puente de 0,4 que se corta después de imprimir);
-botón en x −14 con agujero de Ø 5,4 para una cabeza de Ø 5,0; transductor de 14 + 0,2 de luz por
-lado; dos puentes para un elástico plano de 6 mm.
+**Piezas imprimibles de la v0.29** (`*_v0_29.stl`): 01 mitad izquierda (cara cabeza, con el switch de
+panel), 02 mitad derecha (cara externa), 03 brazo del auricular, 04 tecla del botón, 07 tapa a click
+del auricular, **08 copa del auricular** y `00_assembly_check` (no se imprime, sirve para revisar en el
+laminador). Ya no existen la corredera (05) ni la tapita del pulsador (06). Detalle de orientaciones y
+soportes en el README de `hardware/case-via-clara/`.
 
-**Piezas imprimibles** (`*_v0_12.stl`): 01 mitad izquierda (cara cabeza), 02 mitad derecha (cara
-externa), 03 brazo del auricular, 04 tecla del botón, 05 corredera de la llave ON/OFF, 06 tapita del
-pulsador, y `00_assembly_check` (no se imprime, sirve para revisar en el laminador). Piezas de
-prueba: `test_nose_left/right` (la nariz cortada en x −28), las mismas con la ranura de la cámara
-0,2 más ancha (`*_slot_plus02`, `RIB_GAP` 0,25) para comparar, y `test_pads` (la pared con los 4
-postes).
-
-**Lo que falta medir con calibre** (marcado `MEASURE` en el `.scad`): cabezas de los tornillos bajo la
-HAT (`SCREW_HEAD_D/H`, 4,5 / 1,8), lo que asoma la microSD y su centro (`SD_CARD_OUT`, `SD_ZC`, 3,5 /
-1,9), la palanca de la llave (`LEVER_Y`, `LEVER_TRAVEL`, `SW_BODY_H`), el voladizo de los conectores
-de la Pi (`PI_PORT_OVERHANG`, 0,8), la altura de lo bajo de la Pi (`PI_PARTS_LOW`), el centro del
-disipador (`HEATSINK_C`), el pulsador con el actuador y sus patas (`SWITCH_T`, `SWITCH_LEG_SPAN`, 1,5 /
-5,8), el transductor (`TRANSDUCER_SIZE`, 14) y el rigidizador del flex de la cámara (1,4 mm para
-doblar). Además: confirmar si el flex que tapaba la llave en la v0.11 fue la cámara montada al revés.
+**Medidas sin confirmar con calibre**: quedan 11 valores marcados `MEASURE` en el `.scad` (cabezas de
+los tornillos bajo la HAT, lo que asoma la microSD, el disipador, la palanca del switch, el pulsador).
+El conjunto armado encajó con la v0.29, pero esos valores siguen siendo supuestos.
 
 **Cómo se verifica**: `./export.sh` regenera los STL (en `stl/`, que git ignora) y las imágenes
-(`img/` y la guía con flechas `img/guide/`, desde `via_clara_v0_12_guide.scad`), comprueba que cada
+(`img/` y la guía con flechas `img/guide/`, desde `via_clara_v0_29_guide.scad`), comprueba que cada
 pieza imprimible sea **un solo sólido** apoyado en la cama, y corre **18 verificaciones de
-interferencia** con OpenSCAD (backend manifold): las mitades entre sí; cada mitad contra placas,
+interferencia** (lista `checks` de `export.sh`) con OpenSCAD (backend manifold): las mitades entre sí; cada mitad contra placas,
 batería, llave, cámara, pulsador, cabezas de tornillos y separadores; postes contra hexágonos; botón;
 corredera en ON y en OFF; recorrido del flex; maquetas entre sí; brazo; cajón; caminos de armado
 (tecla, pulsador y tapita entrando al bolsillo, conjunto bajando a los postes, palanca entrando a la
@@ -182,9 +179,9 @@ horquilla, cámara entrando a su ranura) y la pared contra las cabezas de los to
 que dar vacío o un contacto de volumen cero; sale con error si no. **Valen contra maquetas**: tanto como
 las medidas. Mandar a imprimir la v0.10 con medidas supuestas es lo que la hizo fallar.
 
-**Los STL van al Drive** de ViroVision, carpeta `Tesis: ViroVision / modelo_3d`, una subcarpeta por
-versión (la de v0.9 existe). Al sacar una versión: subir `stl/`, `img/guide/` y el README. Subir las
-de v0.10 en adelante está **pendiente**.
+**Los STL viven en el repo**: `versions/` guarda los de cada versión, con su `LEEME` (desde #124); `stl/`
+(lo que regenera `export.sh`) lo ignora git. La carpeta del Drive de ViroVision, `Tesis: ViroVision /
+modelo_3d`, tenía sólo la v0.9; la copia del repo es la vigente.
 
 **Revisión del modelo**: el equipo sometió el modelo 3D al flujo de revisión multi-modelo
 **tackle-ticket** (`tackle-review`, con revisores Opus, Sonnet, Haiku y Codex) en la v0.9 (bitácora del
@@ -192,11 +189,10 @@ de v0.10 en adelante está **pendiente**.
 Lo que encontró se corrigió con verificaciones nuevas (por ejemplo `cam_insert`, cuando el lente de
 Ø 8 no pasaba por la junta).
 
-**Pendiente de la carcasa**: imprimir y evaluar las piezas de prueba de la v0.12 y elegir el
-`RIB_GAP`; sacar el código de la variante `cap`; actualizar el README del worktree a la v0.12 (todavía
-describe la v0.11); medir lo marcado `MEASURE`; subir los STL al Drive; integrar la rama a `staging`.
+**Pendiente de la carcasa**: nada de diseño; la v0.29 es la final. Queda, si se desea, medir con calibre
+lo marcado `MEASURE` y probar el equipo puesto en la calle junto con el resto del sistema.
 
-## Estado (2026-10-22)
+## Estado (2026-11-12)
 
 - **Hecho**: firmware completo en `hardware/raspi/`: periférico BLE con el perfil GATT, servidor HTTP
   con cinco rutas, AP siempre prendido, máquina de modos, **botón físico** (2026-09-07, calibrado el
@@ -205,6 +201,6 @@ describe la v0.11); medir lo marcado `MEASURE`; subir los STL al Drive; integrar
   en la Zero 2 W, 1,6 s desde que el sensor ve el ómnibus, 2026-09-22), catálogo de la STM que completa lo que el OCR no leyó (2026-10-07), **evidencia** de cada
   corrida (#114, 2026-10-12; temporal), **zoom digital** (#121, 2026-10-19; probado en la placa el
   2026-10-22), márgenes del cartel 18/6/6 (#122, 2026-10-22) y el arranque que anuncia a los 16,2 s.
-- **Falta**: la prueba del modo ómnibus en la calle con y sin zoom; medir el consumo real; el DAC I2S
-  o la etapa del transductor óseo; terminar la carcasa v0.12 e integrarla a `staging`; dónde quedaron
+- **Falta**: la prueba del modo ómnibus en la calle con y sin zoom; medir el consumo real; amplificar
+  el audio (ADR 0012: sin amplificador en el prototipo, MAX98357A como destino); dónde quedaron
   los pesos del detector reentrenado (épocas y métricas: PENDIENTE).

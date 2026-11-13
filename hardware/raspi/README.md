@@ -9,7 +9,7 @@ cerró el 2026-09-05: la foto va por WiFi.
 
 Software mínimo a propósito: Raspberry Pi OS **Lite** 64-bit (Bookworm), BlueZ que ya viene, un venv,
 un servicio de systemd. No hay camino sin Linux: la cámara necesita libcamera y el BLE, BlueZ. La placa
-es una **Raspberry Pi Zero 2 W** (de vuelta desde el 2026-09-19; entre el 2026-09-09 y el 2026-09-18
+es una **Raspberry Pi Zero 2 W** (reemplazada el 2026-11-07 por otra unidad, con la misma microSD; de vuelta desde el 2026-09-19; entre el 2026-09-09 y el 2026-09-18
 se trabajó sobre una Pi 3 B+ prestada, y algunas cifras viejas son de ella): 415 MB de RAM útiles,
 sin Ethernet, WiFi sólo de 2,4 GHz.
 
@@ -756,8 +756,8 @@ cd hardware/raspi && pip install -r requirements-dev.txt && python3 -m pytest
 # o, con el venv de la Mac: .venv-mac/bin/python -m pytest -q
 ```
 
-Al 2026-10-22: **195 pasan y 2 se saltean**, en 18 archivos `tests/test_*.py`. El daemon son 22
-archivos en `virovision/` (4915 líneas). Se prueba lo que no necesita hardware: el partido en chunks,
+Al 2026-11-09: **197 pasan y 2 se saltean** (corrido otra vez el 2026-11-12), en 18 archivos
+`tests/test_*.py`. El daemon son 22 archivos en `virovision/` (4981 líneas). Se prueba lo que no necesita hardware: el partido en chunks,
 la máquina de modos, el núcleo de comandos (que es el mismo código en la placa y en el emulador), el
 botón, el audio, la batería, el AP, el servidor HTTP, el modo ómnibus contra motores de OCR falsos, el
 zoom, la evidencia y el proceso del OCR. Lo que habla con BlueZ se prueba en la placa; lo que habla

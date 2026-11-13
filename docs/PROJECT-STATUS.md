@@ -1,6 +1,6 @@
 # ViroVision: estado del proyecto y traspaso entre sesiones
 
-_Documento vivo del estado vigente. Última actualización: 2026-10-22._
+_Documento vivo del estado vigente. Última actualización: 2026-11-12._
 
 Resume dónde está el proyecto para que cualquiera (una persona nueva o una sesión nueva con la skill
 `virovision`) pueda continuar. Describe el presente; la historia, con el porqué de cada cambio, vive
@@ -14,12 +14,11 @@ en [`SESSION-LOG.md`](SESSION-LOG.md), y el plan en [`ROADMAP.md`](ROADMAP.md).
   interno de TestFlight y deja un `.apk` como artefacto. `main` es producción y sólo recibe PRs
   `staging → main` (= release), que publican al link público de TestFlight. El último release a
   producción fue el PR #115 (2026-10-13).
-- Ramas con trabajo real fuera de `staging`:
-  - `feat/case-v0-26`: la carcasa v0.21 a v0.26 (la cámara girada), con PR a `staging`; vive en el
-    worktree `viro_vision-case`.
-  - `feat/volume-button`: un segundo botón de volumen, con un "ADR 0010" que choca con el 0010 vigente
-    (tema oscuro); habría que renumerarlo.
-  - `feat/carcasa-modelo-3d`: la carcasa v1, reemplazada por VIA Clara; se puede archivar.
+- Ramas con trabajo abierto fuera de `staging` (`git branch -r`, 2026-11-12): ninguna con trabajo
+  pendiente; el audio en los pines 12 y 14 (PR #130, ADR 0012) ya está integrado.
+  - Las demás ramas remotas (`feat/case-v0-*`, `feat/bus-*`, `fix/*`, `perf/*`, etc.) corresponden a PRs
+    que ya llegaron a `staging` (no se revisó rama por rama) y quedan como historia. `feat/volume-button` y `feat/carcasa-modelo-3d` ya no
+    existen en el remoto.
 - El pipeline de ómnibus vive en el repo de Magalí, `bus-banner-recognizer`, entero en un solo PR (#7,
   rama `feat/bus-line-reader`). La placa se instala desde un checkout de esa rama.
 
@@ -40,7 +39,7 @@ app/          aplicación React Native (Expo)
 hardware/     Raspberry Pi Zero 2 W + AI Camera (IMX500) + Waveshare UPS HAT (C)
   raspi/        daemon Python: periférico BLE, cámara, modos, ómnibus, AP, batería (ADR 0003)
   raspi/boot/   scripts de arranque de la microSD
-  case-via-clara/  carcasa en OpenSCAD (v0.20 en staging; v0.26 en su rama)
+  case-via-clara/  carcasa en OpenSCAD (v0.29 final, en staging; STL de la v0.9 a la v0.29)
 ml/           sólo un README: el pipeline de ómnibus vive en bus-banner-recognizer
 supabase/     funciones vision (proxy de claves), telemetry y evidence
 docs/         tesis, arquitectura, ADRs, mediciones, guías de QA y operación
@@ -60,7 +59,7 @@ docs/tesis/   capítulos del informe (fuente de verdad del texto)
 - **0004 Runtime on-device**: superado por el 0006.
 - **0006 Pipelines por caso de uso**:
   - Ómnibus corre entero en la placa: detector YOLO11n de dos clases dentro del sensor IMX500,
-    reentrenado en la V100 con ~500 fotos, zoom digital, recorte con márgenes 18/6/6, OCR PP-OCRv5
+    reentrenado en la V100 con casi 400 fotos, zoom digital, recorte con márgenes 18/6/6, OCR PP-OCRv5
     por ONNX y catálogo del STM.
   - Supermercado usa un LLM con visión en la nube: `gpt-5.6-luna` por defecto y `qwen/qwen3.8-27b`
     en Groq.
@@ -94,12 +93,17 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
   BLE.
 - **Evidencia del ómnibus**: Inicio muestra exactamente el recorte que leyó el OCR, margen incluido
   (#118). Es temporal y se saca antes de la entrega.
-- **Pruebas**: 332 tests en 36 suites (2026-10-22).
+- **Modo de la app** (#125, #128): en Ajustes, el desplegable «Modo de la app» elige entre **modo
+  producto** (por defecto) y **modo desarrollo**. El modo producto oculta los campos del resultado, las
+  fotos del dispositivo y de los ómnibus, el selector de modelo y las líneas de estado; queda la última
+  frase dicha. La telemetría no cambia (`features/reader/homeView.ts`, preferencia `appMode`).
+- **Revisión de todo el código** (#126, 2026-11-03).
+- **Pruebas**: 345 tests en 38 suites (2026-11-09).
 
 ### Placa y daemon (`hardware/raspi/`)
 
-- **Hardware**: Raspberry Pi Zero 2 W (en uso otra vez desde el 2026-09-19; sin Ethernet, WiFi sólo
-  de 2,4 GHz), AI Camera (IMX500), Waveshare UPS HAT (C) con LiPo, y un botón en GPIO 5.
+- **Hardware**: Raspberry Pi Zero 2 W (en uso otra vez desde el 2026-09-19 y **reemplazada el
+  2026-11-07** por otra unidad, con la misma microSD; sin Ethernet, WiFi sólo de 2,4 GHz), AI Camera (IMX500), Waveshare UPS HAT (C) con LiPo, y un botón en GPIO 5.
 - **Entrada a la placa**: con `tools/ap.py` por BLE o con el archivo `SIN-AP` en la microSD. Guía en
   la skill, `references/placa-acceso.md`.
 - **Daemon**:
@@ -111,7 +115,8 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
 - **Audio en la placa**: PWM por `audremap` en el pin 12 (GPIO 18), con 260 Ω y 47 µF en serie con el
   transductor de 4 Ω, **sin amplificador** (ADR 0012, 2026-11-12). Funciona con volumen bajo; la
   amplificación queda como trabajo futuro.
-- **Pruebas**: 195 tests pasan y 2 se omiten (2026-10-22).
+- **Seguridad del AP**: la clave fija del AP se acepta como riesgo (#127, actualización del ADR 0003).
+- **Pruebas**: 197 tests pasan y 2 se omiten (2026-11-09).
 
 ### Visión (`bus-banner-recognizer` y la placa)
 
@@ -135,8 +140,9 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
   - Causa: el detector es de cajas, el box se ajusta a los LEDs y el número está a la izquierda, así
     que el borde del recorte cae sobre el trazo fino del "1". No es un problema de keypoints.
   - Con zoom, una lectura se descarta si el margen cae fuera del recorte.
-- **Reentrenamiento en la V100** con ~500 fotos: hecho. Faltan épocas, métricas y la ubicación de los
-  pesos.
+- **Reentrenamiento en la V100** con casi 400 fotos (cifra de los compañeros, la que usa la tesis; una
+  estimación anterior de este documento decía ~500): hecho. Faltan épocas, métricas y la ubicación de
+  los pesos.
 - **Supermercado**: funciona de punta a punta contra el proxy desde el 2026-09-02. El respaldo local
   sigue abierto.
 
@@ -147,23 +153,22 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
     un brazo con copa de Ø 17 y tapa a click para el transductor óseo de 14 mm.
   - La AI Camera va con el conector hacia abajo, para que la foto salga derecha con el equipo puesto.
   - Un solo botón: un pulsador SMD de 4×4×1 mm con un cilindro pegado.
-- **En `staging`**: la v0.20 (PR #124). Las impresiones de prueba se evaluaron así: la v0.9 el
-  2026-10-17, la v0.10 el 2026-10-21 (falló) y la v0.11 el 2026-10-22. Detalle en la tesis, §7.3.5.
-- **v0.20**: impresa y armada completa el 2026-10-30, pero puesta la foto salía girada 90°.
-- **Vigente: v0.26** (rama `feat/case-v0-26`), sin imprimir. Es la v0.20 con sólo la cámara girada (la
-  v0.22, elegida sobre la v0.21, que giraba la carcasa entera) y lo que mostró la impresión de la v0.24:
-  - cámara 2 mm más lejos de las placas, para el flex enrollado;
-  - tapa del auricular 1,5 mm más alta;
-  - hueco interior 1,2 mm más alto de cada lado, por los conectores de la Pi (39,8 mm de alto);
-  - botón centrado, trabas más anchas;
-  - patilla 5,5 mm arriba y brazo 5,5 abajo, porque la patilla pasaba sobre el brazo.
-- Desde la v0.12 se ajustaron, con piezas de prueba:
-  - la cámara;
-  - los zócalos hexagonales de los separadores (5,0 entre caras, 5,5 de profundidad);
-  - la copa del auricular;
-  - los pernos del switch (Ø 2,3 a 14,8).
-- **Verificación**: `export.sh` corre 16 verificaciones de interferencia contra maquetas.
-- **Archivos**: los STL de todas las versiones, de la v0.9 a la v0.26, están en
+- **Final: v0.29** (#131, 2026-11-12, en `staging`), impresa y armada; el equipo confirmó que no queda
+  nada por probar. Es la v0.26 con la copa del auricular como pieza aparte (08), encastrada en el brazo
+  con un enchufe de 6,0 mm (la v0.28 lo había achicado por error y la v0.27 quedaba floja), y un canal del
+  cable más ancho y sin curvas de 90°.
+- **Camino hasta ahí**: v0.9 (#120), v0.20 (#124, impresa y armada el 2026-10-30; puesta, la foto salía
+  girada 90°) y v0.26 (#129), que gira sólo la cámara porque el YOLO corre dentro del sensor IMX500 y la
+  imagen no se puede girar por software. Lo que cambió de la v0.22 a la v0.26: cámara 2 mm más lejos de las
+  placas, tapa del auricular 1,5 mm más alta, hueco interior 1,2 mm más alto por los conectores de la Pi
+  (39,8 mm de alto), botón centrado, trabas más anchas, patilla 5,5 mm arriba y brazo 5,5 abajo.
+- **Impresión**: de la Creality Ender 3 V3 a una FLSUN T1 Max (mejores bordes, terminación y soportes),
+  en PLA con *fuzzy skin*. El switch de encendido es un switch deslizante de panel pegado a la carcasa,
+  en lugar del de la HAT.
+- Con piezas de prueba se ajustaron la cámara, los zócalos hexagonales (5,0 entre caras, 5,5 de
+  profundidad), la copa del auricular y los pernos del switch (Ø 2,3 a 14,8).
+- **Verificación**: `export.sh` corre 18 verificaciones de interferencia contra maquetas.
+- **Archivos**: los STL de todas las versiones, de la v0.9 a la v0.29, están en
   `hardware/case-via-clara/versions/`.
 
 ### Nube (`supabase/`)
@@ -185,9 +190,9 @@ Detalle en [`ci-cd.md`](ci-cd.md).
 
 ### Tesis (`docs/tesis/`)
 
-Capítulos 1 a 8, 11 y 12 escritos y al día al 2026-10-22. Faltan los capítulos 9 (conclusiones) y
-10 (trabajo futuro), y los `PENDIENTE` declarados en el resto: métricas de la V100, prueba en la
-calle y pruebas con usuarios.
+Capítulos 1 a 8, 10, 11 y 12 escritos, con el capítulo 10 (trabajo futuro) y la sección 7.9
+(limitaciones del prototipo) nuevos. Falta el capítulo 9 (conclusiones, hoy un marcador de lugar) y los
+`PENDIENTE` declarados en el resto: métricas de la V100, prueba en la calle y pruebas con usuarios.
 
 ## Pendientes de cuentas y configuración (sólo los puede hacer el equipo)
 
@@ -204,11 +209,10 @@ En orden de prioridad, ver [`ROADMAP.md`](ROADMAP.md):
 
 1. Probar el modo ómnibus en la calle, con y sin zoom.
 2. Documentar las métricas del detector reentrenado.
-3. Imprimir y armar la carcasa v0.26.
-4. Medir la corriente del audio y el consumo general de la placa (el audio quedó cerrado sin
+3. Medir la corriente del audio y el consumo general de la placa (el audio quedó cerrado sin
    amplificador, ADR 0012).
-5. Hacer las pruebas con usuarios y la corrida de evaluación del supermercado.
-6. Antes de la entrega, sacar la evidencia del ómnibus.
+4. Hacer las pruebas con usuarios y la corrida de evaluación del supermercado.
+5. Antes de la entrega, sacar la evidencia del ómnibus.
 
 ## Cómo continuar en una sesión nueva
 

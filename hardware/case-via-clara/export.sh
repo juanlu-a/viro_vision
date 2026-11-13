@@ -5,7 +5,7 @@
 # Exits non-zero if any export fails or any check does not pass.
 set -euo pipefail
 cd "$(dirname "$0")"
-SCAD=via_clara_v0_26.scad
+SCAD=via_clara_v0_29.scad
 OS=(openscad -q --backend=manifold)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -16,10 +16,10 @@ run() { "$@" & pids+=($!); }
 join() { local f=0; for p in "${pids[@]}"; do wait "$p" || f=1; done; pids=(); return $f; }
 
 parts=(print_left:01_left_half print_right:02_right_half print_bone:03_bone_arm
-       print_button:04_mode_button print_grille:07_transducer_cover assembly:00_assembly_check
+       print_button:04_mode_button print_grille:07_transducer_cover print_cup:08_transducer_cup assembly:00_assembly_check
        print_nose_left:test_nose_left print_nose_right:test_nose_right print_pads_test:test_pads print_hex_sizes:test_hex_sizes print_panel_switch_test:test_panel_switch)
 for p in "${parts[@]}"; do
-  run "${OS[@]}" --export-format=binstl -D "PART=\"${p%%:*}\"" -D 'SHOW_HW=false' -o "stl/${p#*:}_v0_26.stl" "$SCAD"
+  run "${OS[@]}" --export-format=binstl -D "PART=\"${p%%:*}\"" -D 'SHOW_HW=false' -o "stl/${p#*:}_v0_29.stl" "$SCAD"
 done
 join || { echo "STL export failed"; exit 1; }
 
@@ -54,7 +54,7 @@ for g in "${guide_views[@]}"; do
   IFS=, read -r dx dy dz <<<"$dir"
   eye=$(python3 -I -c "import math;d=[$dx,$dy,$dz];n=math.sqrt(sum(c*c for c in d));print(','.join(f'{$cx+$scale*d[0]/n:.2f}' if i==0 else f'{$scale*d[1]/n:.2f}' if i==1 else f'{-2+$scale*d[2]/n:.2f}' for i in range(3)))")
   run openscad -q -D 'PART="none"' -D "VIEW=\"$view\"" -D "CENTER_X=$cx" -D "MESH_DIR=\"$tmp/mesh\"" --projection=o --camera="$eye,$cx,0,-2" \
-    --imgsize=1800,1000 --colorscheme=Tomorrow -o "img/guide/$view.png" via_clara_v0_26_guide.scad
+    --imgsize=1800,1000 --colorscheme=Tomorrow -o "img/guide/$view.png" via_clara_v0_29_guide.scad
 done
 join || { echo "guide render failed"; exit 1; }
 
@@ -91,7 +91,7 @@ for f in stl/*.stl; do
 done
 
 checks=(halves left_hw right_hw pads_hex button panel_switch flex hw_self bone drawer_pi
-        cap_insert switch_insert grille stack_insert clamp cam_insert)
+        cap_insert switch_insert grille stack_insert clamp cam_insert cup cup_insert)
 for vc in "${checks[@]/#/integrated:}"; do
   variant=${vc%%:*}; c=${vc#*:}
   out="$tmp/$variant-$c.stl"

@@ -13,14 +13,14 @@ hardware/
 
 ## Componentes
 
-| Parte | Elección | Estado al 2026-10-22 |
+| Parte | Elección | Estado al 2026-11-12 |
 |------|--------|-----|
-| Cómputo | **Raspberry Pi Zero 2 W** | En uso. Volvió el 2026-09-19, después de diez días con una Pi 3 B+ prestada (2026-09-09 a 2026-09-18) por el CSI roto de la unidad anterior. Sin Ethernet, WiFi sólo de 2,4 GHz, radio BCM43438 (Bluetooth 4.2, sin Data Length Extension): el mismo chip sobre el que se midió el ADR 0003 |
+| Cómputo | **Raspberry Pi Zero 2 W** | En uso. Volvió el 2026-09-19, después de diez días con una Pi 3 B+ prestada (2026-09-09 a 2026-09-18) por el CSI roto de la unidad anterior. **Reemplazada el 2026-11-07** por otra Zero 2 W, con la misma microSD. Sin Ethernet, WiFi sólo de 2,4 GHz, radio BCM43438 (Bluetooth 4.2, sin Data Length Extension): el mismo chip sobre el que se midió el ADR 0003 |
 | Cámara y acelerador | **Raspberry Pi AI Camera (Sony IMX500)**, CSI, 12 MP, enfoque manual | En la placa desde el 2026-09-05. El detector de ómnibus corre **dentro del sensor** (ADR 0006, enmienda 2026-09-07). El **Coral TPU salió del diseño** el 2026-09-07 y la Camera Module 3 no se usa |
 | Alimentación | **Waveshare UPS HAT (C)** con su LiPo 803040 de 1000 mAh | Comprada el 2026-09-07. El INA219 (I2C 1, dirección 0x43) se lee y la batería llega a la app desde el 2026-10-06 (#110). Consumo real: pendiente de medir |
 | Audio | **PWM por GPIO** con `audremap` (señal en el pin 12, masa en el 14), con 260 Ω y 47 µF en serie y **sin amplificador** ([ADR 0012](../docs/architecture/adr/0012-audio-del-prototipo-sin-amplificador.md)) | Tonos y voz audibles en un auricular (2026-09-11). En la carcasa va un **transductor de conducción ósea de 14 mm**. El DAC I2S (MAX98357A) sigue como destino y no está instalado |
 | Entrada | **Un botón** en GPIO 5 (pin 29, masa en el 30) | Hecho (2026-09-07), con tiempos calibrados el 2026-09-13. En la carcasa: pulsador SMD de 4 × 4 × 1 mm con una tecla impresa pegada encima (ADR 0007) |
-| Carcasa | **VIA Clara**, dos mitades a presión, impresa en 3D | v0.9 en `staging`; v0.12 en desarrollo. Ver [Carcasa](#carcasa) |
+| Carcasa | **VIA Clara**, dos mitades a presión, impresa en 3D | **v0.29, final**, impresa y armada (#131). Ver [Carcasa](#carcasa) |
 
 Descartados: ESP32 (cómputo y RAM insuficientes), Jetson Nano (grande, caro, consume), cámaras ESP32
 (baja calidad, foco fijo), cámaras USB (consumo), Coral TPU (reemplazado por la inferencia en el
@@ -97,33 +97,35 @@ Modelo paramétrico en **OpenSCAD**, en `case-via-clara/`. Dos mitades con cierr
 tornillos, montadas sobre la patilla de los lentes, alrededor del conjunto real: Zero 2 W con el header
 soldado, UPS HAT (C) unida a su batería 803040, AI Camera y transductor óseo de 14 mm.
 
-**Qué versión está dónde (2026-10-22):**
+**Estado de la carcasa (2026-11-12):** el modelo vigente es la **v0.29**, en `staging` (#131), impresa y
+armada; el equipo confirmó que no queda nada por probar. Todo está en `staging`: el modelo, `export.sh`
+y `versions/` con los STL de cada versión, de la v0.9 a la v0.29.
 
-| Versión | Dónde | Estado |
+| Hito | PR | Qué trajo |
 |---|---|---|
-| v0.8 | `staging`, `case-via-clara/via_clara_v0_8.scad` | punto de partida (llegó por mail), se conserva sin tocar |
-| v0.9 | `staging` (#120) | impresión evaluada el 2026-10-17; es la que documenta `case-via-clara/README.md` en esta rama |
-| v0.10, v0.11 | rama local `feat/case-v0-10-slim`, sin pushear | impresiones evaluadas el 2026-10-21 (v0.10) y el 2026-10-22 (v0.11) |
-| **v0.12 (vigente)** | la misma rama, **sin commitear**, en el worktree `viro_vision-case` | en desarrollo; **no está integrada a `staging`** |
+| v0.9 | #120 | primera impresión evaluada (2026-10-17) |
+| v0.20 | #124 | impresa y armada completa el 2026-10-30; puesta, la foto salía girada 90° |
+| v0.26 | #129 | la cámara girada: el YOLO corre dentro del sensor IMX500 y la imagen no se puede girar por software |
+| **v0.29 (final)** | #131 | la copa del auricular como pieza aparte (08), con un enchufe de 6,0 mm que calza perfecto (la v0.28 lo había achicado por error) |
 
 La historia completa, las medidas y lo que falta medir están en la sección de la carcasa de
-`.claude/skills/virovision/references/hardware.md` y en `docs/tesis/07-desarrollo.md` (§7.3.5).
-En corto:
+`.claude/skills/virovision/references/hardware.md`, en `case-via-clara/README.md` y en
+`docs/tesis/07-desarrollo.md` (§7.3.5). En corto:
 
-- **Medidas de la v0.12**: 85,8 × 28,5 × 37,2 mm (largo × ancho × alto) el cuerpo, con la nariz de
-  32,2 de alto. La v0.9 medía 91,9 × 31,4 × 37,6.
+- **Medidas de la v0.29**: 89,2 mm de largo y 39,8 de alto, sin contar el brazo del auricular.
 - **Cada impresión corrigió algo real**: la v0.9 mostró que los separadores de bronce estaban del lado
-  de la Pi y que la microSD no entraba; la v0.10, que las guías de la cámara eran demasiado finas para
-  imprimirse y que el botón chocaba con el disipador; la v0.11, que el lente no entraba y que las trabas
-  delanteras no podían flexionar.
+  de la Pi y que la microSD no entraba; la v0.11, que el lente no entraba; la v0.20, que la foto salía
+  girada; la v0.24, que los conectores de la Pi sobresalen 2 mm y el flex necesita lugar; la v0.27, que el
+  encastre de la copa quedaba flojo.
+- **Impresión**: FLSUN T1 Max (las primeras versiones, Creality Ender 3 V3), PLA con *fuzzy skin*. El
+  switch de encendido es un **switch deslizante de panel pegado a la carcasa**, no el de la HAT.
 - **Verificación**: `export.sh` regenera los STL y las imágenes, comprueba que cada pieza sea un solo
-  sólido apoyado en la cama y corre verificaciones de interferencia contra maquetas de las placas
-  (14 en el `export.sh` de la v0.9 que está en `staging`, 18 en el de la v0.12 de la rama de la carcasa); sale con error si algo falla. Las verificaciones valen tanto como las medidas de las
-  maquetas: lo marcado `MEASURE` en el `.scad` se mide con calibre antes de imprimir.
-- **Los STL no viven en el repo**: van al Drive de ViroVision, carpeta `Tesis: ViroVision / modelo_3d`,
-  una subcarpeta por versión (la de v0.9 existe; subir las siguientes está pendiente).
+  sólido apoyado en la cama y corre **18 verificaciones** de interferencia contra maquetas de las placas;
+  sale con error si algo falla. Valen tanto como las medidas de las maquetas: lo marcado `MEASURE` en el
+  `.scad` (11 valores) no se midió con calibre.
+- **Los STL** viven en `case-via-clara/versions/`, una carpeta por versión con su `LEEME`.
 
-## Estado (2026-10-22)
+## Estado (2026-11-12)
 
 Hecho: firmware completo en `raspi/` (BLE, HTTP, AP siempre prendido, botón, audio PWM, anuncios
 pregrabados, batería), **modo ómnibus en la placa** (2026-09-15), arranque que anuncia por BLE a los
@@ -131,8 +133,9 @@ pregrabados, batería), **modo ómnibus en la placa** (2026-09-15), arranque que
 márgenes del cartel 18/6/6 para el OCR (#122, 2026-10-22) y evidencia de cada corrida del modo ómnibus
 (#114).
 
-Falta: medir el consumo real; la prueba del modo ómnibus en la calle, con y sin zoom; el DAC I2S o
-la etapa que maneje el transductor óseo; terminar e imprimir la carcasa v0.12 e integrarla a
-`staging`.
+Hecho además: carcasa v0.29 final, impresa y armada (#131).
+
+Falta: medir el consumo real; la prueba del modo ómnibus en la calle, con y sin zoom; amplificar el audio,
+que en el prototipo sale del pin 12 sin amplificador y se oye bajo (ADR 0012; destino recomendado: MAX98357A).
 
 Detalle y razonamiento en `.claude/skills/virovision/references/hardware.md`.

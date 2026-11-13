@@ -150,10 +150,10 @@ presente en el repo pero **sin montar** (`AuthProvider` no figura en `app/_layou
 vuelve, es **email y contraseña** de Supabase (nunca Google ni OAuth). Ver ADR 0002. Supabase sí se
 usa como infraestructura, sin cuentas: proxy de visión, telemetría y evidencia.
 
-## Estado (2026-10-22)
+## Estado (2026-11-12)
 
 - **Tres pestañas nativas**: Inicio, Dispositivo, Ajustes. No hay rutas sueltas de desarrollo.
-  - **Inicio**: modo actual en texto, los dos botones de modo (mutan, no se reemplazan), «Leer»,
+  - **Inicio** (completo en modo desarrollo; el modo producto lo recorta, ver abajo): modo actual en texto, los dos botones de modo (mutan, no se reemplazan), «Leer»,
     resultado campo por campo y la foto del dispositivo. En modo ómnibus, las fotos de cada ómnibus
     (#118, `features/device/BusShots.tsx`): el cuadro donde se detectó y cada recorte del cartel con
     lo que leyó el OCR, que es exactamente el recorte que leyó, margen incluido. Temporal, de
@@ -161,6 +161,15 @@ usa como infraestructura, sin cuentas: proxy de visión, telemetría y evidencia
   - **Dispositivo**: estado de la conexión, nombre y **batería en texto** (#110,
     `DeviceSummary.tsx`; aviso explícito bajo 20 %), leída del INA219 de la UPS HAT.
   - **Ajustes**: modelo de supermercado, salida de audio, qué reconoce el sistema y «Probar audio».
+- **Modo producto y modo desarrollo** (#125, #128). Ajustes tiene un desplegable «Modo de la app»
+  (`components/dropdown-select.tsx`, el mismo del selector de modelo). **Producto** es el predeterminado:
+  Inicio oculta los campos del resultado, las fotos del dispositivo, las fotos de los ómnibus, el
+  selector de modelo y las líneas de estado; queda la última frase dicha y el aviso de que el dispositivo
+  no pudo sacar la foto. **Desarrollo** muestra todo, como antes. La telemetría es igual en los dos. El
+  cambio se anuncia en voz alta («Modo producto.», con 600 ms de espera para no pisar a VoiceOver). Código:
+  `features/reader/homeView.ts` (pura, con tests) y `services/storage/appModePreference.ts`
+  (`virovision.appMode`; cualquier valor que no sea `development` cae en producto).
+- **Revisión de todo el código** (#126, 2026-11-03): app, placa, Supabase y CI.
 - **Design system con tokens verificados por tests.** `constants/theme.ts` y `theme.test.ts`
   comprueban contraste WCAG. Identidad según el manual de marca (skill `virovision-marca`),
   tipografías embebidas en el binario.
@@ -171,4 +180,4 @@ usa como infraestructura, sin cuentas: proxy de visión, telemetría y evidencia
   (#114, `docs/supabase.md`).
 - **Publicación**: PRs a `staging` (TestFlight interno y `.apk` por `android-apk.yml`); `main` es
   producción (TestFlight externo con enlace público). Google Play apagado (`PLAY_ENABLED`).
-- **332 tests en 36 suites**, tsc y lint en verde (`npx jest`, al 2026-10-22).
+- **345 tests en 38 suites**, tsc y lint en verde (`npx jest`, al 2026-11-09).
