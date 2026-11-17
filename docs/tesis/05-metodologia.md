@@ -115,8 +115,6 @@ Nunca se hacen *commits* directos sobre ninguna de las dos. Se adoptó además u
 
 Con el director: el seguimiento con el Ing. MSc. Sebastián García Parra se realizó mediante reuniones de avance, en las que se presentaban los resultados medidos y se validaban los cambios de rumbo. La reunión del 10 de agosto de 2026 fue determinante: de ella surgió la propuesta de permitir la nube como acelerador opcional del camino de reconocimiento, que se formalizó como enmienda al ADR 0001 el mismo día.
 
-\[PENDIENTE: el registro de reuniones del repositorio (docs/REUNIONES-TUTOR.md) sólo documenta la instancia del 10 de agosto de 2026. Completar con el resto de las reuniones realizadas, su fecha y los acuerdos alcanzados en cada una.\]
-
 Con el usuario: la validación con Luciano, usuario ciego, funcionó como contraparte del proyecto: aportó el relevamiento inicial mediante una entrevista en profundidad (transcripta íntegramente en el anexo) y es la referencia contra la que se contrastan las decisiones de interacción.
 
 Con las organizaciones de apoyo: la Unión Nacional de Ciegos del Uruguay (UNCU) facilitó el acceso a la población objetivo para la encuesta de relevamiento (26 respuestas). La empresa Arnaldo Castro S.A. apoya el proyecto y puso a disposición un servidor con GPU NVIDIA Tesla V100 para el entrenamiento de modelos, además de la compra de los materiales para la realización del dispositivo físico.

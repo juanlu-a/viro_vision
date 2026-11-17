@@ -35,11 +35,15 @@ El proyecto evaluó dos arquitecturas de procesamiento: resolver todo en el disp
 
 <!-- imagen del Doc -->
 
-Figura: Arquitectura en modo ómnibus
+Figura 15: Arquitectura en modo ómnibus.
+
+Fuente: elaboración propia.
 
 <!-- imagen del Doc -->
 
-Figura: Arquitectura en modo supermercado
+Figura 16: Arquitectura en modo supermercado.
+
+Fuente: elaboración propia.
 
 ### 7.1.4 Comunicación entre componentes
 
@@ -356,7 +360,9 @@ Este pipeline es el componente de mayor complejidad técnica del proyecto y el �
 
 <!-- imagen del Doc -->
 
-(placeholder)
+Figura 17: Los pasos del pipeline de reconocimiento de líneas de ómnibus, del cuadro de la cámara al anuncio de voz.
+
+Fuente: elaboración propia.
 
 El cartel se recorta antes de leerlo porque, si el OCR recibiera el cuadro completo, leería también la matrícula, los carteles laterales y la publicidad del vehículo, y sería necesario decidir cuál de esos textos corresponde a la línea. El recorte reduce ese problema de interpretación a un problema geométrico.
 
@@ -378,7 +384,7 @@ El conjunto de entrenamiento del detector fue construido y etiquetado manualment
 | Aumentación en el export | Ninguna |
 | Licencia | Dominio público |
 
-Para el detector de dos clases (sec. 7.4.4) se necesitaba además la clase bus. En lugar de volver a etiquetar a mano las 140 imágenes, las cajas de ómnibus se generaron por pseudoetiquetado con un modelo YOLO11x preentrenado sobre COCO, que ya incluye la categoría bus, y se revisaron manualmente una por una. Se conservó la misma partición. Para el reentrenamiento en GPU (sec. 7.4.3) el conjunto se amplió a casi 400 fotografías.
+Para el detector de dos clases (sec. 7.4.4) se necesitaba además la clase bus. En lugar de volver a etiquetar a mano las 140 imágenes, las cajas de ómnibus se generaron por pseudoetiquetado con un modelo YOLO11x preentrenado sobre COCO, que ya incluye la categoría bus, y se revisaron manualmente una por una. Se conservó la misma partición. Para el reentrenamiento en GPU (sec. 7.4.3) el conjunto se amplió a 395 fotografías, en la versión 7 del mismo proyecto de Roboflow.
 
 Para evaluar el pipeline completo se construyó un conjunto propio, independiente del de entrenamiento, anotado con lo que el sistema debe decir:
 
@@ -401,7 +407,7 @@ Se construyó además un catálogo de líneas a partir de los datos abiertos del
 
 El detector es un YOLO11n ajustado por aprendizaje por transferencia (*fine-tuning*) a partir de los pesos preentrenados sobre COCO. La familia YOLO11 ofrece cinco tamaños (sec. 3.3.2); se eligió el más pequeño, nano, porque es el único que entra en la memoria del sensor de la cámara una vez convertido.
 
-Los hiperparámetros están escritos en el script de entrenamiento del repositorio, con su justificación:
+El script de entrenamiento del repositorio fija los siguientes hiperparámetros, cada uno con su justificación:
 
 | **Hiperparámetro** | **Valor** | **Fundamento** |
 |---|---|---|
@@ -416,9 +422,17 @@ Los hiperparámetros están escritos en el script de entrenamiento del repositor
 | degrees / shear / perspective | 5,0 / 2,0 / 0,0005 | Modelan el ángulo de captura desde la vereda |
 | mixup | 0,05 |  |
 
-El equipo no contó con una GPU durante buena parte del desarrollo. Las dos primeras corridas (el detector de una clase y el de dos clases, este último el 15 de septiembre de 2026) se entrenaron en CPU con una configuración reducida: 40 épocas y lote de 16, sobre las 140 imágenes de la sección 7.4.2. Más adelante la empresa Arnaldo Castro S.A. facilitó un servidor con GPU NVIDIA Tesla V100, y en octubre el detector de dos clases se reentrenó allí con casi 400 fotografías.
+El equipo no contó con una GPU durante buena parte del desarrollo. Las dos primeras corridas (el detector de una clase y el de dos clases, este último el 15 de septiembre de 2026) se entrenaron en CPU con una configuración reducida: 40 épocas y lote de 16, sobre las 140 imágenes de la sección 7.4.2. Con tan pocas épocas el entrenamiento se detenía antes de que las métricas dejaran de mejorar, y con tan pocas imágenes el detector dejaba escapar uno de cada tres carteles del conjunto de prueba (sec. 7.4.5).
 
-\[PENDIENTE: épocas y configuración efectivamente usadas, métricas de validación y evaluación sobre las 395 imágenes del reentrenamiento en la V100.\] Mientas esas cifras no se incorporen las métricas de las secciones 7.4.4 y 7.4.5 corresponden a los modelos entrenados en CPU con 40 épocas, y deben leerse como un valor mínimo.
+Para superar las dos limitaciones a la vez, la empresa Arnaldo Castro S.A. facilitó un servidor con una GPU NVIDIA Tesla V100, y el 15 de octubre de 2026 el detector de dos clases se reentrenó allí, partiendo otra vez de los pesos de YOLO11n preentrenados sobre COCO. El conjunto pasó a tener 395 imágenes y el entrenamiento completó las 120 épocas previstas, con lote de 16 imágenes de 640×640 píxeles, en unos cuatro minutos y medio. Esa corrida no aplicó todos los valores de la tabla anterior. Conservó la decisión que más importa para este problema, no reflejar las imágenes, pero dejó el resto de la aumentación en los valores por defecto de la biblioteca (tono 0,015, saturación 0,7, brillo 0,4, sin rotación, corte ni mezcla de imágenes), y el optimizador lo eligió la propia biblioteca: AdamW, con una tasa de aprendizaje inicial de 0,001667. Los registros de la corrida se conservan en el repositorio (docs/mediciones/2026-10-15-reentreno-v100/).
+
+<!-- imagen del Doc -->
+
+Figura 18: Pérdidas de entrenamiento y de validación, y métricas de validación, a lo largo de las 120 épocas del reentrenamiento en la V100.
+
+Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
+
+La figura muestra que las pérdidas de validación descienden hasta las últimas épocas sin volver a subir, por lo que el modelo no llegó a sobreajustarse, y que las métricas se estabilizan a partir de la época 80, aproximadamente. La mejor época, medida por el mAP@0,5:0,95 de validación, fue la 105, y sus pesos son los que se convirtieron para el sensor. El efecto del reentrenamiento sobre las métricas del detector se analiza en la sección 7.4.5.
 
 ### 7.4.4 Elección entre detector de dos etapas y de una etapa
 
@@ -434,7 +448,7 @@ La comparación vigente sobre las 117 imágenes de evaluación se realizó el 12
 | Dos etapas | 91,7% | 89,3% | 91,7% | 35 ms |
 | Una etapa (dos clases) | 91,7% | 85,7% | 87,5% | 18 ms |
 
-Una sola imagen, el cartel nocturno de la línea 109, modifica el número en unos dos puntos: según un píxel de recorte se lee 109 o 10, y el resultado cambia entre versiones de onnxruntime y OpenCV. Son cifras del modelo entrenado en CPU.
+Una sola imagen, el cartel nocturno de la línea 109, modifica el número en unos dos puntos: según un píxel de recorte se lee 109 o 10, y el resultado cambia entre versiones de onnxruntime y OpenCV. Son cifras del modelo entrenado en CPU: la comparación no se repitió con el detector reentrenado (sec. 7.4.5).
 
 Una comparación anterior, de septiembre de 2026 y previa a las reglas del catálogo, muestra además el efecto del margen vertical del recorte (sec. 7.4.6):
 
@@ -453,13 +467,35 @@ El esquema de dos etapas se conserva implementado en el repositorio como referen
 
 ### 7.4.5 Métricas del detector y costo de la cuantización
 
-Las métricas de detección del modelo en precisión flotante de 32 bits, sobre el conjunto de prueba (14 imágenes, 24 carteles), son:
+La primera versión del detector, entrenada en CPU, se evaluó en precisión flotante de 32 bits sobre la partición de prueba de su conjunto (14 imágenes, 24 carteles). Su precisión era aceptable, 0,838, pero la exhaustividad de 0,667 indicaba que no encontraba uno de cada tres carteles, y el mAP@0,5:0,95 de 0,391 mostraba que, aun cuando los encontraba, las cajas se ajustaban mal a ellos. En el modo vigilancia, un cartel que no se detecta es un ómnibus que no se anuncia, y una caja mal ajustada es un recorte que puede dejar afuera el primer dígito del número (sec. 7.4.6). Esos dos problemas, junto con la evidencia de que 40 épocas no alcanzaban para que el entrenamiento terminara de mejorar, fueron los que justificaron el reentrenamiento en la V100 (sec. 7.4.3).
 
-| **Precisión** | **Exhaustividad** | **mAP@0,5** | **mAP@0,5:0,95** |
-|---|---|---|---|
-| 0,838 | 0,667 | 0,781 | 0,391 |
+La tabla compara las dos versiones:
 
-\[FIGURA 7.7: Curva precisión-exhaustividad del detector y matriz de confusión normalizada, sobre el conjunto de prueba.\]
+| **Versión** | **Datos y entrenamiento** | **Evaluación** | **Precisión** | **Exhaustividad** | **mAP@0,5** | **mAP@0,5:0,95** |
+|---|---|---|---|---|---|---|
+| CPU, septiembre de 2026 | 140 imágenes, 40 épocas | Prueba (14 imágenes) | 0,838 | 0,667 | 0,781 | 0,391 |
+| V100, 15 de octubre de 2026 | 395 imágenes, 120 épocas | Validación, época 105 | 0,940 | 0,926 | 0,967 | 0,739 |
+| V100, 15 de octubre de 2026 | 395 imágenes, 120 épocas | Validación, época 120 | 0,938 | 0,936 | 0,952 | 0,730 |
+
+Fuente: registros de entrenamiento de Ultralytics de cada corrida (docs/mediciones/2026-10-15-reentreno-v100/results.csv para la V100).
+
+La mejora alcanza a todas las métricas. La exhaustividad pasa de 0,667 a 0,926, de modo que el detector deja de perder un tercio de los carteles, y el mAP@0,5:0,95 casi se duplica, de 0,391 a 0,739, lo que indica cajas mucho mejor ajustadas al cartel. La comparación es, sin embargo, indicativa y no exacta, porque las dos versiones no se evaluaron sobre las mismas imágenes: la primera sobre la partición de prueba de su conjunto, y la segunda sobre la partición de validación del conjunto ampliado, que es además la que se usó para elegir la mejor época. Esa elección no explica la diferencia: en la última época, que no se eligió por su resultado, las métricas son prácticamente las mismas.
+
+Por clase, el ómnibus se detecta algo mejor que el cartel, con un mAP@0,5 de 0,979 frente a 0,955, lo que es esperable porque el cartel es un objeto más pequeño y su aspecto cambia con el brillo de los LED. La matriz de confusión confirma que el detector casi no confunde una clase con la otra: detecta con la clase correcta el 99% de los ómnibus y el 91% de los carteles de validación. Sus errores son, sobre todo, detecciones donde no hay nada: de los falsos positivos, el 62% son carteles y el 38% ómnibus. Un cartel falso no llega por sí solo a un anuncio, porque su lectura tiene que coincidir con el catálogo de líneas (sec. 7.4.8).
+
+<!-- imagen del Doc -->
+
+Figura 19: Curva precisión-exhaustividad del detector reentrenado, por clase y para ambas clases, sobre la partición de validación.
+
+Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
+
+<!-- imagen del Doc -->
+
+Figura 20: Matriz de confusión normalizada del detector reentrenado sobre la partición de validación. Cada columna corresponde a la clase real y cada fila a la clase predicha.
+
+Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
+
+Estas métricas miden al detector solo. La evaluación del pipeline completo sobre las 117 imágenes de evaluación (sec. 7.4.4) no se repitió con el detector reentrenado, por lo que el efecto de la mejora sobre la lectura del número y del destino no está cuantificado.
 
 Para cargarlo en el sensor, el modelo se convierte a enteros de 8 bits mediante cuantización posterior al entrenamiento: los pesos se redondean a enteros con factores de escala por canal y algunas activaciones se conservan en 16 bits. La calibración utiliza las 28 imágenes de validación y no implica reentrenamiento. El supresor de no máximos queda incorporado en el modelo convertido, con umbrales fijos de confianza 0,25 e intersección sobre unión 0,7. El tamaño pasa de 5,2 MB a 2,64 MB.
 
@@ -493,7 +529,7 @@ Para leer el recorte se compararon motores de OCR detrás de una misma interfaz,
 | PaddleOCR 3.x con su entorno de ejecución nativo | 89,6% | 76,8% | 79,2% | 118 ms |
 | PP-OCRv4 vía ONNX (RapidOCR) | 87,5% | 73,2% | 75,0% | 81 ms |
 
-Tesseract se consideró como línea de base clásica. \[PENDIENTE: su resultado sobre el conjunto de 117 imágenes no quedó registrado.\]
+Tesseract, el motor clásico de referencia, no se incluyó en la comparación: está orientado a texto impreso en documentos y no a caracteres formados por puntos de LED (sec. 4.4).
 
 La métrica no fue el único criterio. El entorno nativo de PaddleOCR no tiene una distribución compilada para la placa: las versiones disponibles para ARM de 64 bits llegan hasta Python 3.12 y el sistema operativo de la placa usa Python 3.13. Ejecutar los mismos modelos exportados a ONNX resolvió a la vez la disponibilidad, la precisión y la latencia. El OCR ocupa unos 140 MB de memoria en la placa.
 
@@ -709,7 +745,7 @@ La retroalimentación auditiva convive con el lector de pantalla del teléfono, 
 
 ### 7.7.1 Fundamento
 
-La elección de React Native se apoya en el trabajo de Mascetti et al. (2020) sobre accesibilidad en frameworks multiplataforma, que documenta que estos exponen sólo una parte de las capacidades de accesibilidad nativas. De ese resultado se derivaron tres reglas de trabajo:
+La elección de React Native se apoya en el trabajo de Mascetti et al. \[56\] sobre accesibilidad en frameworks multiplataforma, que documenta que estos exponen sólo una parte de las capacidades de accesibilidad nativas. De ese resultado se derivaron tres reglas de trabajo:
 
 1. Preferir componentes estándar correctamente anotados, que heredan el comportamiento del sistema operativo.
 1. Evitar interfaces muy personalizadas, que son el punto débil identificado en ese trabajo.
@@ -778,7 +814,7 @@ La aplicación registra eventos de ejecución en el servidor propio, con el tiem
 El prototipo cumple los dos casos de uso de punta a punta, pero con limitaciones que condicionan la lectura de los resultados de este capítulo:
 
 - La evaluación del modo ómnibus se hizo sobre videos reproducidos en pantalla y sobre imágenes de redes sociales, no con el dispositivo en una parada real. La prueba en la calle, con y sin zoom, está pendiente (sec. 7.4.10).
-- Las métricas del detector corresponden al modelo entrenado en CPU con 140 imágenes. Las del reentrenamiento en la GPU V100 no están documentadas, y el costo en precisión de la cuantización a 8 bits no se pudo medir (sec. 7.4.3 y 7.4.5).
+- Las métricas del detector reentrenado provienen de la partición de validación de su propio conjunto. La evaluación del pipeline completo sobre las 117 imágenes no se repitió con ese detector, y el costo en precisión de la cuantización a 8 bits no se pudo medir (sec. 7.4.4 y 7.4.5).
 - El reconocimiento de líneas con letras prácticamente no está medido, y las líneas fuera del sistema metropolitano no se anuncian (sec. 7.4.13).
 - El modo supermercado depende de la nube: no tiene respaldo local (sec. 7.5.5), y su precisión se midió con una sola imagen, porque el conjunto de evaluación con fotografías del dispositivo no está construido (sec. 7.2.2 y 7.5.4).
 - El audio sale de un pin de propósito general sin amplificador, con un volumen suficiente en un ambiente silencioso pero probablemente insuficiente en la calle (sec. 7.3.1 y 10.2).

@@ -4700,3 +4700,59 @@ de hardware y en la skill.
 - Audio por PWM y filtro (teoría para 3.7) y el amplificador comprado: probarlo y documentarlo.
 - 7.3.6: costo de la impresión de la carcasa, número de figura y la referencia a conclusiones.
 - Índice del Doc a mano (3.1.3, 3.3.4, 3.5.1, 3.5.2, 7.3.6, 7.3.7).
+
+## 2026-11-17 (cont.): reentreno de la V100, bibliografía única, figuras en el cuerpo y comentarios de Pancho
+
+- **Importado del Doc** lo que el equipo editó en el día (36 secciones):
+  - comillas “”, cita antes del punto y citas nuevas en 3.1;
+  - costos de 7.3.6 (impresión 0,86 USD, total 211,12 USD);
+  - el diagrama de Pancho en 7.4.1;
+  - 2.4.4, que se integró en la introducción;
+  - 2.3 sin el entregable de documentación técnica.
+  
+  Con un conversor nuevo de Doc a Markdown (en el scratchpad). `sync_doc.py` ahora trata las imágenes
+  flotantes (posicionadas) como imágenes, porque antes habría borrado el diagrama de 7.4.1.
+- **Reentreno de la V100**, con los datos sacados de `best.pt` y `results.csv`, que el usuario dejó en el
+  Escritorio:
+  - corrida del 15/10, 395 fotos (`find-bus-sign-7`), 120 épocas, lote 16;
+  - AdamW automático, con casi toda la aumentación por defecto: no es la tabla del script, y la tesis lo
+    aclara;
+  - validación, época 105: P 0,940, R 0,926, mAP50 0,967, mAP50-95 0,739.
+  
+  En la tesis:
+  - 7.4.3 cuenta la corrida, con la Figura 18;
+  - 7.4.5 compara CPU contra V100 sin borrar las métricas viejas, avisa que las particiones son
+    distintas y suma las Figuras 19 y 20;
+  - 6.6, 7.9 y el anexo 12.7 quedaron actualizados, con las Figuras 21 a 23.
+  
+  Los archivos quedaron en `docs/mediciones/2026-10-15-reentreno-v100/`. Queda abierto evaluar el
+  pipeline completo con este detector sobre las 117 imágenes.
+- **Comentarios de Pancho**:
+  - 4.5 escrita: conjuntos de datos, por qué un detector entrenado no escala a un supermercado, apps de
+    asistencia y VLM. También se escribió 4.6, que tenía una sola frase.
+  - 7.4.7: se sacó el pendiente de Tesseract.
+  - 5.6: se sacó el pendiente del registro de reuniones.
+  - Quedan para el equipo: el título de la portada (“discapacidad visual”), los diagramas de 7.1.3 y los
+    colores de 7.4.1.
+- **Bibliografía**:
+  - una sola lista numerada del 1 al 98, sin subtítulos (en el Doc cada tema reiniciaba en 1);
+  - la documentación interna va con viñetas;
+  - las citas de autor y año de 4.4 y 7.6 pasaron a número;
+  - 30 entradas nunca se citan en el texto.
+- **Figuras en el cuerpo**, con numeración global:
+  - capítulo 2: los gráficos de la encuesta que cita el texto (Figuras 1 a 13). Antes «Figura N» era el
+    número de pregunta; ahora las preguntas sin gráfico se citan como «pregunta N, anexo 12.2.x»;
+  - 4.7: el RTT promedio por protocolo (Figura 14), con aviso de que las condiciones de la medición no
+    quedaron registradas;
+  - 7.1.3: Figuras 15 y 16;
+  - 7.4.1: Figura 17;
+  - reentreno: Figuras 18 a 23.
+  
+  Copias en `docs/tesis/figuras/`. Convenciones nuevas en `docs/tesis/README.md` y en la skill.
+
+### Pendientes
+
+- Evaluar el pipeline sobre las 117 imágenes con el detector de la V100.
+- Condiciones de la medición de RTT por protocolo (Pancho).
+- 7.3.6: “(referencia a conclusiones)” y el capítulo 9.
+- Índice del Doc a mano.

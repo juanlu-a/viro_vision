@@ -38,10 +38,20 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
   un resultado guardado del repositorio de visión.
 - **Lo pendiente se declara.** Lo que no está hecho o no está medido se dice, no se omite.
 - **Ninguna credencial se transcribe.** Se nombra la deuda, no el valor.
+- **Comillas “” y cita antes del punto** (convención del equipo en el Doc, 2026-11-17): “así”, y
+  «… del proyecto \[45\].». Las citas son numéricas, \[n\], y remiten a la lista única del capítulo 11.
+- **La bibliografía es una sola lista numerada**, sin subtítulos por tema: si se agrupara, el Doc
+  reiniciaría la numeración en cada grupo y las citas dejarían de coincidir. Una fuente nueva se
+  agrega al final, para no correr la numeración de las que ya se citan.
+- **Las figuras van en el cuerpo**, junto al párrafo que las cita, con numeración global y
+  correlativa: «Figura N: título.» debajo de la imagen y, en el párrafo siguiente, «Fuente: …». Sólo
+  las muy grandes o las complementarias van además, o únicamente, en el anexo. En el Markdown la
+  imagen se marca con `<!-- imagen del Doc: ruta -->`; las fuentes de las figuras nuevas están en
+  `figuras/` o en la campaña de `docs/mediciones/` que corresponda.
 
 ## Marcadores
 
-- `[FIGURA N: …]` marca una figura por producir, con la descripción de qué debe mostrar.
+- `[FIGURA: …]` marca una figura por producir, con la descripción de qué debe mostrar.
 - `[PENDIENTE: …]` marca un dato que falta y que debe completarse antes de la entrega.
 
 ## Publicar en el Doc

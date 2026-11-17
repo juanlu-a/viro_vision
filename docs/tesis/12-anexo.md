@@ -367,7 +367,37 @@ perspective=0.0005, mosaic=1.0, mixup=0.05, copy_paste=0.0,
 
 )
 
-**Corridas efectivamente ejecutadas:** 40 épocas, lote de 16, sobre CPU, con Ultralytics 8.4.37 (detector de una clase y detector de dos clases, sobre unas 140 fotografías). En octubre de 2026 el detector se reentrenó en el servidor con GPU NVIDIA Tesla V100 sobre unas 500 fotografías. \[PENDIENTE: épocas, tamaño de lote, métricas de validación y ubicación de los pesos de esa corrida, que no constan en ningún repositorio al 22 de octubre de 2026.\]
+**Corridas efectivamente ejecutadas:** las dos primeras, en CPU, con 40 épocas y lote de 16, con Ultralytics 8.4.37 (detector de una clase y detector de dos clases, sobre 140 fotografías). El 15 de octubre de 2026 el detector de dos clases se reentrenó en el servidor con GPU NVIDIA Tesla V100 sobre 395 fotografías (versión 7 del conjunto find-bus-sign), con la siguiente configuración, que difiere de la del script en la aumentación y el optimizador:
+
+| **Parámetro** | **Valor** |
+|---|---|
+| Modelo de partida | yolo11n.pt, preentrenado sobre COCO |
+| Épocas / paciencia | 120 / 100 |
+| Lote / tamaño de imagen | 16 / 640 |
+| Optimizador | AdamW, elegido por la biblioteca (optimizer="auto"), lr0 = 0,001667, lrf = 0,01, sin programación coseno |
+| close_mosaic | 10 |
+| hsv_h / hsv_s / hsv_v | 0,015 / 0,7 / 0,4 |
+| degrees / shear / perspective | 0 / 0 / 0 |
+| translate / scale / mosaic / mixup | 0,1 / 0,5 / 1,0 / 0 |
+| fliplr / flipud | 0 / 0 |
+
+Fuente: argumentos de entrenamiento guardados en los pesos de la corrida (best.pt). Las métricas por época están en docs/mediciones/2026-10-15-reentreno-v100/results.csv, y los pesos, fuera del repositorio por su tamaño, en poder del equipo.
+
+Las curvas de precisión, exhaustividad y F1 en función del umbral de confianza complementan las figuras de la sección 7.4.5:
+
+<!-- imagen del Doc -->
+
+Figura 21: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+
+<!-- imagen del Doc -->
+
+Figura 22: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+
+<!-- imagen del Doc -->
+
+Figura 23: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+
+Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
 **Export al sensor:** cuantización posterior al entrenamiento a enteros de 8 bits, calibrada con las 28 imágenes de la partición de validación; supresión de no máximos incorporada al modelo con confianza 0,25 e IoU 0,7. Tamaño resultante: 2,64 MB. Ocupación del chip: 2,64 MB de modelo más 4,48 MB de runtime, es decir 7,12 MB sobre 8 MB disponibles (90%).
 
