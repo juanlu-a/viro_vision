@@ -172,7 +172,9 @@ def doc_sections(doc):
                 continue
         if started and secs and "startIndex" in el:
             secs[-1]["els"].append(el)
-            if p and any("inlineObjectElement" in e for e in p["elements"]):
+            # inline images and floating ones (positioned objects, anchored to a paragraph) alike: a
+            # replace would delete them, so these sections are never rewritten
+            if p and (p.get("positionedObjectIds") or any("inlineObjectElement" in e for e in p["elements"])):
                 secs[-1]["img"] = True
     for i, s in enumerate(secs):
         s["end"] = secs[i + 1]["hs"] if i + 1 < len(secs) else None

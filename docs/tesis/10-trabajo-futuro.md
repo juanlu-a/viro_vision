@@ -58,6 +58,7 @@ El segundo es la lectura de etiquetas mediante OCR, para obtener información co
 
 ## 10.6 Preparación para el uso real
 
-Antes de que el sistema pueda ser usado por personas ajenas al equipo, deben realizarse las pruebas de usabilidad con personas ciegas o con baja visión, que permitan ajustar los tiempos del botón, el contenido y el orden de los anuncios y el volumen (sec. 7.2.6). Las instrucciones de uso deben ofrecerse en un formato accesible, por ejemplo como un audio dentro de la aplicación.
+Antes de que el sistema pueda ser usado por personas ajenas al equipo, deben realizarse las pruebas de usabilidad con personas ciegas o con baja visión, que permitan ajustar los tiempos del botón, el contenido y el orden de los anuncios y el volumen (sec. 7.2.6). Las instrucciones de uso deben ofrecerse en un formato accesible, por ejemplo como un audio embebido en la aplicación.
 
 En cuanto a la seguridad, una versión distribuible necesita una clave de red distinta para cada unidad y un token por sesión en el servidor HTTP del dispositivo (sec. 7.3.2), y deben rotarse las credenciales que circularon durante el desarrollo (sec. 8.7.7). Por último, la distribución en Android requiere activar la cuenta de Google Play, cuyo flujo de publicación ya está configurado (sec. 8.5), y la tarjeta de memoria del dispositivo debe poder reconstruirse desde una imagen reproducible (sec. 8.7.7).
+

@@ -270,8 +270,6 @@ F: Bueno, eso vendría ser lo último con el tema de la entrevista, así que muc
 
 ## 12.5 Manual de marca
 
-\[FIGURA A.1: Símbolo de ViroVision, versiones a color y monocroma.\]
-
 El proyecto cuenta con una identidad visual propia, documentada en un manual de marca que cubre el símbolo y su construcción geométrica, la paleta de color, la tipografía, las reglas de uso y el espacio de protección. La paleta se definió atendiendo a las relaciones de contraste exigidas por WCAG, criterio que se verifica de forma automatizada en la aplicación (sec. 7.8.1).
 
 El manual completo se incluye como documento adjunto.

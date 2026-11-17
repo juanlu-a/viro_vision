@@ -12,13 +12,13 @@ Una característica del proceso es que ninguna decisión técnica relevante se t
 
 ### 5.2.1 División de tareas
 
-El equipo se organizó por pilar, y no por capas horizontales, porque cada uno de los tres pilares exige un entorno de trabajo distinto (un teléfono con *development build*, una placa accesible por SSH, una GPU para entrenar):
+El equipo se organizó por pilar, y no por capas horizontales, porque cada uno de los tres pilares exige un entorno de trabajo distinto (un teléfono con development build, una placa accesible por SSH, una GPU para entrenar):
 
 | **Integrante** | **Responsabilidad principal** |
 |---|---|
 | Juan Lucas Abreu | Aplicación móvil, daemon de la placa, integración y despliegue |
-| Magalí Dellapiazza | Desarrollo de detector del cartel de ómnibus, construcción y etiquetado del dataset, comparación de motores de OCR |
-| Francisco Tauber | Verificación en Android, entrenamiento de modelos en máquina virtual, etiquetado de pruebas de usuario y relevamiento |
+| Magalí Dellapiazza | Desarrollo de detectores del ómnibus y de los carteles, construcción y etiquetado del dataset, comparación de motores de OCR |
+| Francisco Tauber | Entrenamiento de modelos en máquina virtual, construcción y etiquetado de dataset, pruebas de usuario y relevamiento |
 
 La división por pilar tuvo un costo conocido y aceptado: el conocimiento profundo de cada pilar quedó concentrado en una persona. El mecanismo que se adoptó para compensarlo fue documental (sec. 5.3): todo lo que un integrante aprendía sobre su pilar se escribía en el repositorio, de modo que el resto del equipo pudiera retomarlo sin depender de una transferencia oral.
 
@@ -31,7 +31,7 @@ El desarrollo avanzó de manera incremental, con una regla de prioridad que se m
 Los tres ejemplos más claros de este patrón:
 
 1. El transporte de la foto. Se diseñó el enlace suponiendo que BLE alcanzaría para mover una imagen de 53 KB. Se escribió el umbral *antes* de medir (53 KB en menos de 2 s) y la medición lo incumplió por un factor de 2,2. El resultado fue rediseñar el enlace en dos planos: BLE para control, WiFi para datos (sec. 7.2).
-1. El runtime de inferencia en el teléfono. El ADR 0004 proponía embeber un modelo multimodal en la aplicación. Un *spike* de dos días midió los cuatro caminos posibles y mostró que la limitación estaba en la librería y no en el teléfono; el ADR quedó superado en la práctica por el ADR 0006, que reemplazó «un runtime para todo» por «un pipeline por caso de uso».
+1. El runtime de inferencia en el teléfono. El ADR 0004 proponía embeber un modelo multimodal en la aplicación. Un *spike* de dos días midió los cuatro caminos posibles y mostró que la limitación estaba en la librería y no en el teléfono; el ADR quedó superado en la práctica por el ADR 0006, que reemplazó “un runtime para todo” por “un pipeline por caso de uso”.
 1. El acelerador de hardware. El diseño original incluía un Coral TPU por USB. La llegada de la AI Camera con sensor Sony IMX500 (que ejecuta el detector dentro del propio sensor) lo dejó sin función, y el Coral salió del diseño.
 
 ### 5.2.3 Priorización de tareas

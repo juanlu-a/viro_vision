@@ -133,7 +133,7 @@ La primera medición del ciclo completo se hizo el 15 de septiembre de 2026 sobr
 | Clic del botón; el modo cambia a ómnibus | 0 |
 | Vigilancia iniciada | 5 ms |
 | El OCR devuelve la lectura | 1,27 s |
-| Se anuncia «Ómnibus 115, Luis Braille» | 1,27 s |
+| Se anuncia “Ómnibus 115, Luis Braille” | 1,27 s |
 
 Las lecturas siguientes demoraron 971, 1001 y 1006 ms. Sobre la Raspberry Pi Zero 2 W, el 22 de septiembre y con el mismo video de la línea 115, la línea se anunció 1,6 segundos después de que el sensor detectó el ómnibus, tras dos lecturas de OCR de 932 y 583 ms, con 75 cuadros cada 5 segundos y detecciones en el 95% de ellos (docs/SESSION-LOG.md, 2026-09-22). Las dos cifras no se miden desde el mismo punto: en la Pi 3 B+ se cuenta desde el botón y en la Zero 2 W desde que el sensor detecta el ómnibus.
 
@@ -238,7 +238,7 @@ El 5 de octubre de 2026 el dispositivo dejó de ser visible desde el teléfono. 
 | Cámara con el detector lista | 31,4 s | 21,3 s |
 | Reconocedor de texto listo (modo ómnibus operativo) | 44,0 s | 33,6 s |
 
-Fuente: bitácora del proyecto, 6 de octubre de 2026. Con el arranque nuevo el teléfono se conectó 0,3 segundos después del primer anuncio. Si el usuario activa el modo ómnibus antes de que el reconocedor esté listo, el dispositivo dice «preparando la lectura» y comienza a vigilar cuando puede.
+Fuente: bitácora del proyecto, 6 de octubre de 2026. Con el arranque nuevo el teléfono se conectó 0,3 segundos después del primer anuncio. Si el usuario activa el modo ómnibus antes de que el reconocedor esté listo, el dispositivo dice  “preparando la lectura” y comienza a vigilar cuando puede.
 
 Las opciones de ejecución se guardan en un archivo de configuración del sistema, fuera del paquete del servicio, para que se conserven tanto en las actualizaciones como al cambiar entre los dos modos de operación del dispositivo (sec. 7.3.4).
 
@@ -271,7 +271,7 @@ Dejar el dispositivo siempre en un modo de desarrollo habría sido más cómodo,
 
 | **Estado del interruptor** | **Modo** | **Consecuencia** |
 |---|---|---|
-| Presente | Desarrollo | La placa se une a una red conocida. Hay acceso remoto e internet. La aplicación informa «red apagada» |
+| Presente | Desarrollo | La placa se une a una red conocida. Hay acceso remoto e internet. La aplicación informa “red apagada” |
 | Ausente | Producto | La placa crea su punto de acceso al arrancar (ADR 0003). No hay acceso remoto por la red doméstica |
 
 El interruptor es un archivo en la partición de arranque de la tarjeta de memoria, que usa el sistema de archivos FAT y puede leerse y escribirse desde cualquier computadora sin herramientas especiales. Esta elección surgió después de que el equipo perdiera el acceso a la placa en más de una ocasión: un dispositivo sin pantalla debe poder configurarse sin entrar en él. En cada arranque un servicio lee el interruptor y genera la configuración con la que inicia el servicio principal, por lo que esa configuración no se edita a mano.
@@ -284,7 +284,7 @@ En modo producto, el dispositivo sólo puede actualizarse desde la tarjeta o a t
 
 La carcasa debe alojar el conjunto real de componentes sobre la patilla de unos lentes, cerrarse sin tornillos para poder abrirla durante el desarrollo, proteger el cable plano de la cámara, dejar accesibles el encendido y la carga, y ofrecer un único botón que pueda encontrarse al tacto. Para quien la usa, que no puede ver dónde está el botón ni de qué lado está el encendido, la forma de la carcasa es parte de la accesibilidad del sistema.
 
-Se partió de un modelo de un tercero (v0.8) y se rediseñó como modelo paramétrico en OpenSCAD (proyecto «VIA Clara», en hardware/case-via-clara/). Cada medida exterior se deriva de las del conjunto interior, de modo que corregir una medida real actualiza toda la carcasa. El conjunto, de la cara que apoya en la cabeza hacia afuera, está formado por las cabezas de los tornillos bajo el módulo de alimentación, el módulo, la batería de 40 × 30 × 8 mm, la Raspberry Pi Zero 2 W y, sobre ella, el conector de pines soldado y los separadores hexagonales. El cuerpo son dos mitades unidas por trabas a presión. Cada traba es una viga que corre a lo largo de la junta, dentro de la pared, y flexiona en el plano de la cama de impresión y no a través de las capas, que es la dirección en la que una pieza impresa se rompe. Completan el diseño un brazo que sostiene el transductor de 14 mm contra la cabeza, con una tapa que se fija a presión, dos puentes para un elástico plano de 6 mm y el botón, rodeado por un anillo en bajorrelieve.
+Se partió de un modelo de un tercero (v0.8) y se rediseñó como modelo paramétrico en OpenSCAD (proyecto “VIA Clara”, en hardware/case-via-clara/). Cada medida exterior se deriva de las del conjunto interior, de modo que corregir una medida real actualiza toda la carcasa. El conjunto, de la cara que apoya en la cabeza hacia afuera, está formado por las cabezas de los tornillos bajo el módulo de alimentación, el módulo, la batería de 40 × 30 × 8 mm, la Raspberry Pi Zero 2 W y, sobre ella, el conector de pines soldado y los separadores hexagonales. El cuerpo son dos mitades unidas por trabas a presión. Cada traba es una viga que corre a lo largo de la junta, dentro de la pared, y flexiona en el plano de la cama de impresión y no a través de las capas, que es la dirección en la que una pieza impresa se rompe. Completan el diseño un brazo que sostiene el transductor de 14 mm contra la cabeza, con una tapa que se fija a presión, dos puentes para un elástico plano de 6 mm y el botón, rodeado por un anillo en bajorrelieve.
 
 El principal problema fue que las verificaciones del modelo se hacen contra maquetas de los componentes, y cada impresión mostró algo que las maquetas no tenían. La carcasa avanzó, por lo tanto, en ciclos de impresión, armado y corrección. La tabla resume la secuencia (bitácora del proyecto, 14 de octubre a 12 de noviembre de 2026):
 
@@ -323,7 +323,7 @@ Los archivos de impresión de las versiones v0.9 a v0.29 están en el repositori
 
 ### 7.3.6 Desglose de costos
 
-Si bien durante el desarrollo del proyecto se adquirieron y evaluaron distintos componentes de hardware para determinar su viabilidad y adecuación a los requerimientos del dispositivo, el desglose de costos presentado en la Figura *número* contempla exclusivamente los elementos que forman parte de la versión final del prototipo. Por lo tanto, no se incluyen los gastos asociados a componentes que fueron descartados durante las etapas de investigación y experimentación, ya que estos no serían necesarios para reproducir el dispositivo.
+Si bien durante el desarrollo del proyecto se adquirieron y evaluaron distintos componentes de hardware para determinar su viabilidad y adecuación a los requerimientos del dispositivo, el desglose de costos contempla exclusivamente los elementos que forman parte de la versión final del prototipo. Por lo tanto, no se incluyen los gastos asociados a componentes que fueron descartados durante las etapas de investigación y experimentación, ya que estos no serían necesarios para reproducir el dispositivo.
 
 Asimismo, se excluyen los costos asociados al entrenamiento de los modelos de reconocimiento por visión artificial utilizados, dado que estos ya se encuentran entrenados y su implementación únicamente requiere la carga de los modelos desarrollados. Por último, en lo que respecta a la fabricación mediante impresión 3D, se considera únicamente el costo de impresión del diseño definitivo, sin contabilizar las impresiones realizadas durante las iteraciones de diseño y prueba.
 
@@ -335,10 +335,8 @@ De esta manera, se obtiene una estimación del costo de reproducción del protot
 | Raspberry Pi AI Camera | 75,95 |
 | WaveShare UPS Hat | 23,99 |
 | Auricular óseo | 10,37 |
-| Impresión de la carcasa | ??? pesos (???/40 USD) |
-| TOTAL | 210,26 |
-
-Figura *número*: Tabla de desglose de costos de elementos finales.
+| Impresión de la carcasa | 0,86 |
+| TOTAL | 211,12 |
 
 ### 7.3.7 Fallas de hardware durante el desarrollo
 
@@ -356,17 +354,9 @@ Este pipeline es el componente de mayor complejidad técnica del proyecto y el �
 
 ### 7.4.1 Estructura general
 
-\[FIGURA 7.6: Los cinco pasos del pipeline de ómnibus, del cuadro de cámara al anuncio de voz.\]
+<!-- imagen del Doc -->
 
-```
-cuadro de la cámara
-├─ 1. detección del ómnibus            (YOLO)
-├─ 2. detección del cartel frontal     (YOLO)
-├─ 3. recorte del cartel               (geometría)
-├─ 4. lectura del recorte              (OCR)
-└─ 5. interpretación y reparación      (parseo + catálogo de líneas)
-→ anuncio de voz pregrabado
-```
+(placeholder)
 
 El cartel se recorta antes de leerlo porque, si el OCR recibiera el cuadro completo, leería también la matrícula, los carteles laterales y la publicidad del vehículo, y sería necesario decidir cuál de esos textos corresponde a la línea. El recorte reduce ese problema de interpretación a un problema geométrico.
 
@@ -428,7 +418,7 @@ Los hiperparámetros están escritos en el script de entrenamiento del repositor
 
 El equipo no contó con una GPU durante buena parte del desarrollo. Las dos primeras corridas (el detector de una clase y el de dos clases, este último el 15 de septiembre de 2026) se entrenaron en CPU con una configuración reducida: 40 épocas y lote de 16, sobre las 140 imágenes de la sección 7.4.2. Más adelante la empresa Arnaldo Castro S.A. facilitó un servidor con GPU NVIDIA Tesla V100, y en octubre el detector de dos clases se reentrenó allí con casi 400 fotografías.
 
-\[PENDIENTE: épocas y configuración efectivamente usadas, métricas de validación y evaluación sobre las 117 imágenes del reentrenamiento en la V100.\] Mientras esas cifras no se incorporen, las métricas de las secciones 7.4.4 y 7.4.5 corresponden a los modelos entrenados en CPU con 40 épocas, y deben leerse como un valor mínimo.
+\[PENDIENTE: épocas y configuración efectivamente usadas, métricas de validación y evaluación sobre las 395 imágenes del reentrenamiento en la V100.\] Mientas esas cifras no se incorporen las métricas de las secciones 7.4.4 y 7.4.5 corresponden a los modelos entrenados en CPU con 40 épocas, y deben leerse como un valor mínimo.
 
 ### 7.4.4 Elección entre detector de dos etapas y de una etapa
 
@@ -477,7 +467,7 @@ El costo en precisión de esa cuantización no se pudo medir. El modelo converti
 
 ### 7.4.6 Ajuste de la geometría del recorte
 
-El detector devuelve un rectángulo por objeto, ajustado durante el entrenamiento a los LEDs del cartel. En los carteles de Montevideo el número de línea está a la izquierda y el dígito «1» es un trazo vertical fino. Cuando el borde izquierdo del recorte cae sobre él, el OCR lo pierde o lo confunde con el borde de la imagen: en la placa, el 15 de septiembre, se leyó dos veces 15 donde el cartel decía 115 (sec. 7.4.11). Para evitarlo, el recorte se amplía alrededor de la caja con tres márgenes relativos: izquierdo, derecho y vertical. Se evaluó una grilla de 72 combinaciones sobre las 117 imágenes de evaluación.
+El detector devuelve un rectángulo por objeto, ajustado durante el entrenamiento a los LEDs del cartel. En los carteles de Montevideo el número de línea está a la izquierda y el dígito “1” es un trazo vertical fino. Cuando el borde izquierdo del recorte cae sobre él, el OCR lo pierde o lo confunde con el borde de la imagen: en la placa, el 15 de septiembre, se leyó dos veces 15 donde el cartel decía 115 (sec. 7.4.11). Para evitarlo, el recorte se amplía alrededor de la caja con tres márgenes relativos: izquierdo, derecho y vertical. Se evaluó una grilla de 72 combinaciones sobre las 117 imágenes de evaluación.
 
 El efecto del margen vertical, promediado sobre el resto de la grilla, es monótono:
 
@@ -491,7 +481,7 @@ Los márgenes laterales son asimétricos, 0,18 a la izquierda y 0,06 a la derech
 
 Los valores vigentes son SIGN_MARGINS = (0.18, 0.06, 0.06), como fracción de la caja (hardware/raspi/virovision/bus.py). Son los valores por defecto del pipeline, pero el dispositivo los pasa explícitamente porque dependen del modelo que dibuja la caja, y el modelo se elige en el dispositivo.
 
-El 21 de octubre se probó usar la caja del detector reentrenado sin márgenes, con la hipótesis de que un detector mejor entrenado ya no los necesitaba. Contra un video en pantalla el «1» quedó dentro del recorte, pero en otras pruebas se siguió perdiendo, y el 22 de octubre se volvió a los márgenes medidos (PR #122). Con el zoom digital (sec. 7.4.10), una lectura se descarta si la caja con márgenes queda fuera del cuadro ampliado, ya que de lo contrario el margen izquierdo se cortaría en el borde y el primer dígito volvería a perderse.
+El 21 de octubre se probó usar la caja del detector reentrenado sin márgenes, con la hipótesis de que un detector mejor entrenado ya no los necesitaba. Contra un video en pantalla el “1” quedó dentro del recorte, pero en otras pruebas se siguió perdiendo, y el 22 de octubre se volvió a los márgenes medidos (PR #122). Con el zoom digital (sec. 7.4.10), una lectura se descarta si la caja con márgenes queda fuera del cuadro ampliado, ya que de lo contrario el margen izquierdo se cortaría en el borde y el primer dígito volvería a perderse.
 
 ### 7.4.7 La lectura: comparación de motores de OCR
 
@@ -515,7 +505,7 @@ La salida del OCR se interpreta buscando al comienzo un código de línea, forma
 
 El catálogo corrige primero los errores sistemáticos del reconocedor. En la primera ejecución sobre la placa, el registro muestra la entrada 15 LUIS BRALLE y la salida 115, LUIS BRAILLE. La comparación tolera dígitos confundidos con letras y espacios perdidos (MEMID0ZAE y ME MDOZA E se reconocen como MENDOZA), con resguardos para no elegir un destino real pero equivocado: un mínimo de cuatro letras y un margen de 0,05 sobre el siguiente lugar distinto. Las variantes ortográficas de un mismo lugar en los datos abiertos no compiten entre sí.
 
-El catálogo decide también qué se anuncia. En una prueba sobre la placa el sistema anunció «Bus 1» a partir de lecturas sin sentido (1M12) y deletreó destinos ilegibles (U2 NOEVR). Desde el 6 de octubre de 2026 sólo se anuncia lo que el catálogo conoce: una línea que no existe no se anuncia, y un destino que no coincide con ninguno no se dice. Para una persona que no ve, «línea 330» sin destino es una respuesta útil, mientras que un destino deletreado no lo es. Sobre las 117 imágenes, el acierto del destino pasó de 76,8% a 89,3% (docs/SESSION-LOG.md, 2026-10-06).
+El catálogo decide también qué se anuncia. En una prueba sobre la placa el sistema anunció “Bus 1” a partir de lecturas sin sentido (1M12) y deletreó destinos ilegibles (U2 NOEVR). Desde el 6 de octubre de 2026 sólo se anuncia lo que el catálogo conoce: una línea que no existe no se anuncia, y un destino que no coincide con ninguno no se dice. Para una persona que no ve, “línea 330” sin destino es una respuesta útil, mientras que un destino deletreado no lo es. Sobre las 117 imágenes, el acierto del destino pasó de 76,8% a 89,3% (docs/SESSION-LOG.md, 2026-10-06).
 
 Por último, el catálogo completa la parte del cartel que no se leyó. Desde el 7 de octubre, cuando la confianza del OCR es menor a 0,8, se completa la mitad faltante sólo si no es ambigua: un destino que corresponde a una única línea da esa línea (116 de los 257 destinos) y una línea con un único terminal da ese destino. Lo inferido se registra por separado de lo leído, no cuenta como voto (la misma lectura dudosa se repetiría cuadro a cuadro y se confirmaría a sí misma) y nunca reemplaza dígitos que el OCR sí leyó.
 
@@ -557,7 +547,7 @@ En el modo de sensor que usa la placa el máximo práctico es 2x; el modo de sen
 La primera ejecución del pipeline completo sobre la placa reveló cinco defectos que las pruebas en la computadora de desarrollo no habían mostrado, lo que confirmó la regla metodológica de la sección 5.2.2 de validar sobre el hardware real:
 
 1. Un mismo ómnibus se anunció dos veces en un segundo. Al moverse la cámara, el seguidor perdió el vehículo y lo volvió a registrar como uno nuevo. Se agregó la supresión temporal por línea.
-1. El OCR leía 15 donde el cartel decía 115, porque el borde izquierdo de la caja caía sobre el «1», un trazo fino que además queda junto al símbolo de accesibilidad para silla de ruedas que precede al número. Se aplicaron tres medidas: un margen izquierdo tres veces mayor que el derecho, medio voto para las líneas fuera del catálogo y la corrección por similitud.
+1. El OCR leía 15 donde el cartel decía 115, porque el borde izquierdo de la caja caía sobre el “1”, un trazo fino que además queda junto al símbolo de accesibilidad para silla de ruedas que precede al número. Se aplicaron tres medidas: un margen izquierdo tres veces mayor que el derecho, medio voto para las líneas fuera del catálogo y la corrección por similitud.
 1. El OCR no podía ejecutarse en el mismo hilo que la cámara. La biblioteca de captura da el sensor por perdido si nadie consume cuadros durante aproximadamente un segundo, y una lectura demora cerca de un segundo. Se separaron dos hilos comunicados por colas, lo que eliminó los errores de tiempo de espera del sensor.
 1. La reproducción encadenada de audio fallaba: al solicitar dos archivos en una misma llamada al reproductor, el segundo no sonaba, y el destino nunca se escuchaba. Se pasó a una llamada por archivo, en cola.
 1. El segundo intento de lectura, con la detección de texto del OCR activada, demoraba de 2 a 3 segundos en la placa. Se restringió a los casos en que la primera lectura no devolvió ni número ni destino.
@@ -595,25 +585,25 @@ El tiempo total es de aproximadamente 3 segundos, dentro del objetivo de 3 a 4 s
 
 ### 7.5.2 La respuesta estructurada y el orden de la frase
 
-El modelo no devuelve un texto libre sino tres campos: tipo de producto, marca y detalle. La aplicación arma con ellos la frase que se pronuncia. El orden responde a la accesibilidad: el usuario escucha la frase completa antes de poder decidir, por lo que el dato que más distingue al producto va primero. Se dice «arroz Saman, Blue Patna 1 kg» y no «Blue Patna 1 kg, arroz». Además, cada campo puede faltar por separado, y una respuesta con dos de los tres datos sigue siendo útil.
+El modelo no devuelve un texto libre sino tres campos: tipo de producto, marca y detalle. La aplicación arma con ellos la frase que se pronuncia. El orden responde a la accesibilidad: el usuario escucha la frase completa antes de poder decidir, por lo que el dato que más distingue al producto va primero. Se dice “arroz Saman, Blue Patna 1 kg” y no “Blue Patna 1 kg, arroz”. Además, cada campo puede faltar por separado, y una respuesta con dos de los tres datos sigue siendo útil.
 
-En una prueba sobre la placa el dispositivo pronunció la palabra «null». Ocurrió al apuntar a algo que no era un alimento: el modelo respondió con un valor nulo, la aplicación no lo reconoció como respuesta válida y lo trató como texto libre. La corrección se hizo en los dos extremos: la instrucción al modelo exige devolver siempre el objeto con los tres campos, aunque estén vacíos, y la aplicación distingue el texto libre de una estructura de datos antes de enviar nada a la voz, de modo que un valor nulo, un objeto vacío o una respuesta con los nombres de los campos en otro idioma nunca se leen en voz alta.
+En una prueba sobre la placa el dispositivo pronunció la palabra “null”. Ocurrió al apuntar a algo que no era un alimento: el modelo respondió con un valor nulo, la aplicación no lo reconoció como respuesta válida y lo trató como texto libre. La corrección se hizo en los dos extremos: la instrucción al modelo exige devolver siempre el objeto con los tres campos, aunque estén vacíos, y la aplicación distingue el texto libre de una estructura de datos antes de enviar nada a la voz, de modo que un valor nulo, un objeto vacío o una respuesta con los nombres de los campos en otro idioma nunca se leen en voz alta.
 
 ### 7.5.3 Síntesis de voz
 
-La síntesis utiliza por defecto la voz del sistema operativo. Cuando hay conexión puede usarse un servicio de síntesis en la nube, que genera un archivo de audio con instrucciones de pronunciación en español rioplatense. La necesidad de esas instrucciones se verificó en la placa: sin ellas, «Macarrones Adria» se pronunciaba con fonética inglesa.
+La síntesis utiliza por defecto la voz del sistema operativo. Cuando hay conexión puede usarse un servicio de síntesis en la nube, que genera un archivo de audio con instrucciones de pronunciación en español rioplatense. La necesidad de esas instrucciones se verificó en la placa: sin ellas, “Macarrones Adria” se pronunciaba con fonética inglesa.
 
 ### 7.5.4 Ampliación del alcance del modo supermercado
 
 El alcance original del modo supermercado, fijado en la propuesta del proyecto, fueron los productos de la canasta básica. La delimitación respondía a que la precisión alcanzable era desconocida: un repertorio acotado permitía medir el problema y, si los modelos disponibles no alcanzaban, entrenar uno propio sobre un conjunto cerrado de productos.
 
-Ese objetivo se cumplió. En la primera prueba con el dispositivo real, el 11 de septiembre de 2026, el modelo de nube identificó correctamente los productos de la canasta básica y también alimentos que no pertenecían a ella, entre ellos yerba suelta, sin que fuera necesario restringirlo. Mantener la canasta como límite implicaba pedirle al modelo menos de lo que podía hacer, por lo que se decidió ampliar el alcance a cualquier alimento, envasado, suelto, fresco o a granel, y a los productos de almacén (ADR 0006, actualización del 11 de septiembre de 2026). La instrucción al modelo se reescribió en ese sentido y el mensaje para cuando no se reconoce nada cambió de «no pude identificar el producto» a «Elemento no reconocible», porque el modo ya no se limita a productos envasados.
+Ese objetivo se cumplió. En la primera prueba con el dispositivo real, el 11 de septiembre de 2026, el modelo de nube identificó correctamente los productos de la canasta básica y también alimentos que no pertenecían a ella, entre ellos yerba suelta, sin que fuera necesario restringirlo. Mantener la canasta como límite implicaba pedirle al modelo menos de lo que podía hacer, por lo que se decidió ampliar el alcance a cualquier alimento, envasado, suelto, fresco o a granel, y a los productos de almacén (ADR 0006, actualización del 11 de septiembre de 2026). La instrucción al modelo se reescribió en ese sentido y el mensaje para cuando no se reconoce nada cambió de “no pude identificar el producto” a “Elemento no reconocible”, porque el modo ya no se limita a productos envasados.
 
 La ampliación no afectó los requisitos que el modo ya cumplía. El tiempo de respuesta sigue dentro del objetivo de 3 a 4 segundos (sec. 7.5.1), porque la latencia depende del modelo y del tamaño de la imagen y no de la amplitud de la pregunta (sec. 7.2.2), y el costo por lectura se mantiene en el orden de USD 0,0003. La estructura de la respuesta, con tipo, marca y detalle, tampoco cambió.
 
 Con la ampliación se separaron dos conceptos que en la propuesta estaban unidos: lo que el sistema responde y lo que el sistema mide. El modo responde sobre cualquier alimento, mientras que la canasta básica se mantiene como conjunto de evaluación, es decir, como el repertorio contra el cual se reportan exhaustividad, precisión, exactitud y F1. Un conjunto acotado y reproducible es lo que permite comparar modelos entre sí, y no tiene por qué coincidir con lo que el usuario puede preguntar. Ese conjunto todavía no está construido con fotografías tomadas por el propio dispositivo (sec. 7.9).
 
-La descripción del modo en la aplicación dice «Identifica alimentos y productos de supermercado», que es más amplia que lo que el modelo responde: ante un producto que no es un alimento, como uno de limpieza, el modelo devuelve los campos vacíos y el usuario escucha «Elemento no reconocible». Extender el modo al resto de los productos de supermercado es una ampliación posible (sec. 10.4).
+La descripción del modo en la aplicación dice “Identifica alimentos y productos de supermercado”, que es más amplia que lo que el modelo responde: ante un producto que no es un alimento, como uno de limpieza, el modelo devuelve los campos vacíos y el usuario escucha “Elemento no reconocible”. Extender el modo al resto de los productos de supermercado es una ampliación posible (sec. 10.4).
 
 ### 7.5.5 Respaldo local del modo supermercado
 
@@ -692,7 +682,7 @@ La autenticación contra el servidor está implementada (correo electrónico y c
 
 A medida que el sistema se probó, la pantalla de inicio acumuló información útil para el equipo pero innecesaria para el usuario: los campos de cada lectura, la fotografía del dispositivo, los ómnibus detectados con sus recortes y los mensajes de estado. Retirarla por completo habría eliminado una herramienta de trabajo del equipo, y mantenerla agregaba elementos que el lector de pantalla recorre antes de llegar al botón de lectura.
 
-Desde el 2 de noviembre de 2026 (PR #125) la aplicación tiene dos modos, seleccionables en ajustes. En el modo producto, que es el predeterminado, la pantalla de inicio muestra el modo, sus botones y la última frase pronunciada, para que el lector de pantalla pueda volver a ella; el único mensaje de falla que se muestra es «El dispositivo no pudo sacar la foto», porque es el único que el usuario puede resolver en el momento. En el modo desarrollo se muestran además los campos de la lectura, las fotografías, los ómnibus detectados y el selector de modelo. En el modo producto la pestaña del dispositivo tampoco muestra la línea de estado de la conexión, que se comunica por voz. El modo se elige con una lista desplegable (PR #128), porque dos botones ocupaban demasiado espacio para una opción que sólo usa el equipo; al elegirlo, la aplicación lo anuncia («Modo producto»), con una demora de 600 ms para que no se superponga con el lector de pantalla que vuelve al botón. La elección se guarda en el teléfono, y cualquier valor desconocido o una falla de lectura llevan al modo producto. La decisión de qué se muestra en cada modo es una función pura con sus pruebas (app/src/features/reader/homeView.ts). La telemetría y la evidencia se registran igual en los dos modos, de modo que el equipo no pierde información al usar la aplicación como la usaría una persona ciega.
+Desde el 2 de noviembre de 2026 (PR #125) la aplicación tiene dos modos, seleccionables en ajustes. En el modo producto, que es el predeterminado, la pantalla de inicio muestra el modo, sus botones y la última frase pronunciada, para que el lector de pantalla pueda volver a ella; el único mensaje de falla que se muestra es “El dispositivo no pudo sacar la foto”, porque es el único que el usuario puede resolver en el momento. En el modo desarrollo se muestran además los campos de la lectura, las fotografías, los ómnibus detectados y el selector de modelo. En el modo producto la pestaña del dispositivo tampoco muestra la línea de estado de la conexión, que se comunica por voz. El modo se elige con una lista desplegable (PR #128), porque dos botones ocupaban demasiado espacio para una opción que sólo usa el equipo; al elegirlo, la aplicación lo anuncia (“Modo producto”), con una demora de 600 ms para que no se superponga con el lector de pantalla que vuelve al botón. La elección se guarda en el teléfono, y cualquier valor desconocido o una falla de lectura llevan al modo producto. La decisión de qué se muestra en cada modo es una función pura con sus pruebas (app/src/features/reader/homeView.ts). La telemetría y la evidencia se registran igual en los dos modos, de modo que el equipo no pierde información al usar la aplicación como la usaría una persona ciega.
 
 ### 7.6.8 Retroalimentación auditiva continua
 
@@ -700,13 +690,13 @@ Como el usuario no ve la pantalla, todo cambio de estado del sistema que le impo
 
 | **Situación** | **Lo que se escucha** | **Quién lo reproduce** |
 |---|---|---|
-| Se establece o se pierde el enlace con el dispositivo | «Dispositivo conectado» o «Se perdió la conexión con el dispositivo. Buscalo de nuevo» | Siempre el teléfono |
-| La red WiFi del dispositivo queda lista, falla o no sirve | «Red con el dispositivo lista» o un aviso de que se sigue intentando | Siempre el teléfono |
-| Cambio de modo con el botón | «Esperando. Reconocimiento apagado», «Modo ómnibus activado» o «Modo supermercado activado» | El teléfono o el dispositivo, según la salida elegida |
-| Modo ómnibus pedido antes de que el OCR esté cargado | «Modo ómnibus. Preparando la lectura, esperá unos segundos» | Ídem |
+| Se establece o se pierde el enlace con el dispositivo | “Dispositivo conectado” o “Se perdió la conexión con el dispositivo. Buscalo de nuevo” | Siempre el teléfono |
+| La red WiFi del dispositivo queda lista, falla o no sirve | “Red con el dispositivo lista” o un aviso de que se sigue intentando | Siempre el teléfono |
+| Cambio de modo con el botón | “Esperando. Reconocimiento apagado”, “Modo ómnibus activado” o “Modo supermercado activado” | El teléfono o el dispositivo, según la salida elegida |
+| Modo ómnibus pedido antes de que el OCR esté cargado | “Modo ómnibus. Preparando la lectura, esperá unos segundos” | Ídem |
 | Pedido de una lectura de supermercado | Un tono breve de confirmación | Ídem |
 | Resultado de una lectura | La frase del producto o de la línea y el destino | Ídem |
-| Cambio de la salida de audio y prueba de audio | «Dónde se escucha: en el dispositivo» (o en el teléfono) y una frase de prueba | Ídem |
+| Cambio de la salida de audio y prueba de audio | “Dónde se escucha: en el dispositivo” (o en el teléfono) y una frase de prueba | Ídem |
 | Un error o una espera por cuota | Una frase fija en lenguaje llano, sin el texto técnico del error (ADR 0011) | Siempre el teléfono |
 
 La división entre los dos reproductores responde a cuándo ocurre cada aviso. Los relacionados con el enlace y la red se escuchan mientras el usuario está emparejando el dispositivo, con el teléfono en la mano, y además el dispositivo no puede anunciar su propia ausencia; por eso los dice siempre el teléfono. Las frases de error y de espera también las dice el teléfono, porque se generan con la síntesis de voz del sistema y no tienen un archivo pregrabado en el dispositivo. El resto se escucha con los lentes puestos y el teléfono guardado, y sale por donde el usuario eligió (sec. 7.6.3). Los avisos de sistema y los anuncios de líneas están pregrabados en la tarjeta de memoria del dispositivo (sec. 7.4.12), de modo que se escuchan sin conexión a internet. El resultado de una lectura de supermercado, en cambio, se sintetiza en la nube cuando la salida elegida es el dispositivo; si esa síntesis no está disponible, se dice por el teléfono.
@@ -751,7 +741,7 @@ Otras decisiones puntuales fueron:
 
 En el modo desarrollo la aplicación muestra la fotografía capturada por el dispositivo después de los campos del resultado. El orden responde a que la voz ya pronunció el resultado y el lector de pantalla debe llegar primero a lo que puede leer. La imagen sirve para que un usuario con resto visual o un acompañante verifique el resultado, y permite distinguir un error del modelo de una fotografía mal tomada.
 
-El modo ómnibus no tenía un equivalente, porque el dispositivo lee de forma autónoma y por Bluetooth sólo llegaba el resultado. Desde el 12 de octubre de 2026 el dispositivo guarda, por cada ómnibus, el cuadro en que lo detectó y cada recorte del cartel que pasó al OCR, y la aplicación los descarga por WiFi (sec. 8.6.3). Desde el 13 de octubre la pantalla de inicio los muestra agrupados por ómnibus: el cuadro y, debajo de cada lectura, su texto y el recorte. El recorte es exactamente el que leyó el OCR, con sus márgenes, de modo que si el «1» de una línea quedó fuera o junto al borde, se ve en la imagen. Desde el 2 de noviembre estas imágenes sólo se muestran en el modo desarrollo (sec. 7.6.7) y, como el resto de la evidencia, se retirarán antes de la versión final.
+El modo ómnibus no tenía un equivalente, porque el dispositivo lee de forma autónoma y por Bluetooth sólo llegaba el resultado. Desde el 12 de octubre de 2026 el dispositivo guarda, por cada ómnibus, el cuadro en que lo detectó y cada recorte del cartel que pasó al OCR, y la aplicación los descarga por WiFi (sec. 8.6.3). Desde el 13 de octubre la pantalla de inicio los muestra agrupados por ómnibus: el cuadro y, debajo de cada lectura, su texto y el recorte. El recorte es exactamente el que leyó el OCR, con sus márgenes, de modo que si el “1” de una línea quedó fuera o junto al borde, se ve en la imagen. Desde el 2 de noviembre estas imágenes sólo se muestran en el modo desarrollo (sec. 7.6.7) y, como el resto de la evidencia, se retirarán antes de la versión final.
 
 ## 7.8 Verificación
 
@@ -772,7 +762,7 @@ Entre las pruebas, cuatro grupos reflejan mejor la orientación del proyecto. El
 Entre el 2 y el 3 de noviembre de 2026 se revisó la base de código completa con el flujo de revisión multimodelo (PR #126): cinco revisores en paralelo, cada uno sobre una parte (servicios de la aplicación, servicio del dispositivo, interfaz y servidor, contratos entre componentes, y pruebas e integración continua), seguidos de cuatro rondas de revisión sobre lo corregido. Los defectos encontrados no habían aparecido en las pruebas porque dependían de condiciones de uso poco frecuentes. Entre ellos:
 
 - En la aplicación, el envío de audio a la placa no respetaba el plazo de 8 segundos; la copia de una lectura de ómnibus a la placa se enviaba aunque la salida elegida fuera el teléfono, y se escuchaban dos voces; al reconectarse, la aplicación no volvía a leer el modo del dispositivo, que podía haberse reiniciado; y sin red, la telemetría descartaba lotes completos de eventos.
-- En el dispositivo, una pulsación del botón durante la carga del OCR no anunciaba «preparando la lectura»; el zoom del modo ómnibus no se deshacía antes de una foto de supermercado, que salía recortada; y una excepción al guardar la evidencia detenía la lectura.
+- En el dispositivo, una pulsación del botón durante la carga del OCR no anunciaba “preparando la lectura”; el zoom del modo ómnibus no se deshacía antes de una foto de supermercado, que salía recortada; y una excepción al guardar la evidencia detenía la lectura.
 - En el servidor, el intermediario de visión validaba el proveedor pero no la ruta, lo que permitía enviar la credencial a cualquier dirección del proveedor; además se agregaron límites de tamaño y de tiempo y un límite de solicitudes en la función de evidencia.
 
 ### 7.8.3 Pruebas dependientes del entorno de ejecución
