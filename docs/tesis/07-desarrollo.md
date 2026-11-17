@@ -33,18 +33,6 @@ El sistema no emite audio que el usuario no haya solicitado. En el modo supermer
 
 El proyecto evaluó dos arquitecturas de procesamiento: resolver todo en el dispositivo, como producto autónomo, o derivar el procesamiento de imagen al teléfono. La Raspberry Pi se eligió, entre otras razones, porque permite implementar y comparar ambas. El resultado de esa comparación es que cada caso de uso terminó en un extremo distinto: en el modo ómnibus se resuelve todo en el dispositivo, en el modo supermercado se deriva al teléfono y de allí a la nube.
 
-<!-- imagen del Doc -->
-
-Figura 15: Arquitectura en modo ómnibus.
-
-Fuente: elaboración propia.
-
-<!-- imagen del Doc -->
-
-Figura 16: Arquitectura en modo supermercado.
-
-Fuente: elaboración propia.
-
 ### 7.1.4 Comunicación entre componentes
 
 La comunicación entre el dispositivo y el teléfono utiliza dos canales. La medición del enlace Bluetooth de baja energía (BLE, sec. 7.2.1) mostró que ese enlace no puede transportar una fotografía en el tiempo disponible, pero resulta adecuado para los mensajes que deben llegar siempre y con baja latencia: la pulsación del botón, el cambio de modo y el estado del dispositivo. Por ello se separaron dos planos:
@@ -360,7 +348,7 @@ Este pipeline es el componente de mayor complejidad técnica del proyecto y el �
 
 <!-- imagen del Doc -->
 
-Figura 17: Los pasos del pipeline de reconocimiento de líneas de ómnibus, del cuadro de la cámara al anuncio de voz.
+Figura 15: Los pasos del pipeline de reconocimiento de líneas de ómnibus, del cuadro de la cámara al anuncio de voz.
 
 Fuente: elaboración propia.
 
@@ -428,7 +416,7 @@ Para superar las dos limitaciones a la vez, la empresa Arnaldo Castro S.A. facil
 
 <!-- imagen del Doc -->
 
-Figura 18: Pérdidas de entrenamiento y de validación, y métricas de validación, a lo largo de las 120 épocas del reentrenamiento en la V100.
+Figura 16: Pérdidas de entrenamiento y de validación, y métricas de validación, a lo largo de las 120 épocas del reentrenamiento en la V100.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
@@ -485,13 +473,13 @@ Por clase, el ómnibus se detecta algo mejor que el cartel, con un mAP@0,5 de 0,
 
 <!-- imagen del Doc -->
 
-Figura 19: Curva precisión-exhaustividad del detector reentrenado, por clase y para ambas clases, sobre la partición de validación.
+Figura 17: Curva precisión-exhaustividad del detector reentrenado, por clase y para ambas clases, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
 <!-- imagen del Doc -->
 
-Figura 20: Matriz de confusión normalizada del detector reentrenado sobre la partición de validación. Cada columna corresponde a la clase real y cada fila a la clase predicha.
+Figura 18: Matriz de confusión normalizada del detector reentrenado sobre la partición de validación. Cada columna corresponde a la clase real y cada fila a la clase predicha.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 

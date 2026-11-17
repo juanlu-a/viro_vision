@@ -4720,10 +4720,10 @@ de hardware y en la skill.
   - validación, época 105: P 0,940, R 0,926, mAP50 0,967, mAP50-95 0,739.
   
   En la tesis:
-  - 7.4.3 cuenta la corrida, con la Figura 18;
+  - 7.4.3 cuenta la corrida, con la Figura 16;
   - 7.4.5 compara CPU contra V100 sin borrar las métricas viejas, avisa que las particiones son
-    distintas y suma las Figuras 19 y 20;
-  - 6.6, 7.9 y el anexo 12.7 quedaron actualizados, con las Figuras 21 a 23.
+    distintas y suma las Figuras 17 y 18;
+  - 6.6, 7.9 y el anexo 12.7 quedaron actualizados, con las Figuras 19 a 21.
   
   Los archivos quedaron en `docs/mediciones/2026-10-15-reentreno-v100/`. Queda abierto evaluar el
   pipeline completo con este detector sobre las 117 imágenes.
@@ -4744,9 +4744,11 @@ de hardware y en la skill.
     número de pregunta; ahora las preguntas sin gráfico se citan como «pregunta N, anexo 12.2.x»;
   - 4.7: el RTT promedio por protocolo (Figura 14), con aviso de que las condiciones de la medición no
     quedaron registradas;
-  - 7.1.3: Figuras 15 y 16;
-  - 7.4.1: Figura 17;
-  - reentreno: Figuras 18 a 23.
+  - 7.4.1: Figura 15;
+  - reentreno: Figuras 16 a 21.
+  
+  Pancho sacó del Doc los diagramas de 7.1.3 para rehacerlos. Cuando vuelvan, pasan a ser las Figuras 15
+  y 16, y las siguientes se corren dos lugares.
   
   Copias en `docs/tesis/figuras/`. Convenciones nuevas en `docs/tesis/README.md` y en la skill.
 

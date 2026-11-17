@@ -387,15 +387,15 @@ Las curvas de precisión, exhaustividad y F1 en función del umbral de confianza
 
 <!-- imagen del Doc -->
 
-Figura 21: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 19: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 <!-- imagen del Doc -->
 
-Figura 22: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 20: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 <!-- imagen del Doc -->
 
-Figura 23: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 21: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
