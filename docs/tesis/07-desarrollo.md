@@ -86,7 +86,7 @@ El resultado quedó 2,2 veces por debajo del criterio, y la radio WiFi no influy
 
 Como alternativa se transfirió el mismo archivo por HTTP sobre la radio WiFi del dispositivo, con una mediana de 46 ms, unas cien veces más rápido. Se decidió entonces mantener BLE como plano de control y usar WiFi como plano de datos (ADR 0003). Con este enlace híbrido, el tiempo estimado de una lectura de supermercado pasó de 6 a 9 segundos a entre 3 y 3,5 segundos.
 
-Las mediciones se realizaron sobre una Raspberry Pi Zero 2 W. Entre el 9 y el 18 de septiembre de 2026 el desarrollo continuó sobre una Raspberry Pi 3 B+ prestada, con otro controlador de radio, y las mediciones de radio de ese período no son comparables con estas. Desde el 19 de septiembre el dispositivo volvió a ser una Zero 2 W, con el mismo controlador (BCM43438), por lo que estas cifras vuelven a ser representativas (sec. 7.3.6).
+Las mediciones se realizaron sobre una Raspberry Pi Zero 2 W. Entre el 9 y el 18 de septiembre de 2026 el desarrollo continuó sobre una Raspberry Pi 3 B+ prestada, con otro controlador de radio, y las mediciones de radio de ese período no son comparables con estas. Desde el 19 de septiembre el dispositivo volvió a ser una Zero 2 W, con el mismo controlador (BCM43438), por lo que estas cifras vuelven a ser representativas (sec. 7.3.7).
 
 ### 7.2.2 Selección del modelo de visión para el modo supermercado
 
@@ -208,12 +208,14 @@ La elección permitió compartir la lógica de la aplicación, pero no eliminó 
 
 | **Función** | **Componente** | **Estado** |
 |---|---|---|
-| Cómputo | Raspberry Pi Zero 2 W | En uso; reemplazada por una unidad nueva el 7 de noviembre de 2026 (sec. 7.3.6) |
+| Cómputo | Raspberry Pi Zero 2 W | En uso; reemplazada por una unidad nueva el 7 de noviembre de 2026 (sec. 7.3.7) |
 | Visión | Raspberry Pi AI Camera (sensor Sony IMX500, 12 MP, inferencia en el sensor) | Integrada |
 | Entrada | Pulsador en GPIO 5; en la carcasa, pulsador SMD de 4 × 4 × 1 mm con tecla impresa | Integrado |
 | Audio | Salida PWM por GPIO (señal en el pin físico 12, masa en el 14) hacia el transductor de conducción ósea de 4 ohmios, con una resistencia de 260 ohmios y un capacitor de 47 µF en serie y sin amplificador (ADR 0012) | Integrada; funciona con volumen bajo; la amplificación queda como trabajo futuro (sec. 10.2) |
 | Alimentación | Waveshare UPS HAT (C) con batería LiPo 803040 de 1000 mAh; interruptor deslizante de panel pegado a la carcasa en lugar de la llave del módulo | Integrada; el nivel de batería llega a la aplicación (sec. 7.3.3) |
 | Carcasa | VIA Clara, dos mitades a presión impresas en 3D sobre la patilla, con la copa del auricular aparte | Versión final v0.29, impresa y armada; integrada al repositorio (PR #131, sec. 7.3.5) |
+
+Se seleccionó la plataforma Raspberry Pi Zero 2 W debido a que ofrece un equilibrio adecuado entre costo, tamaño, consumo energético y capacidad de procesamiento, y porque su conectividad WiFi y BLE posibilita comparar el procesamiento local con alternativas basadas en un teléfono móvil. La cámara elegida es la Raspberry Pi AI Camera (Sony IMX500): se conecta por la interfaz CSI dedicada y ejecuta el detector dentro del sensor, lo que cubre el papel que en el diseño original tenía el acelerador Coral TPU. Con eso el acelerador externo dejó de hacer falta y salió del diseño (ADR 0006, 2026-09-07; sec. 7.2.5), con un componente, un costo y un consumo menor. La compra de la AI Camera se decidió para evaluar la potencia del módulo y evitar sumar el Coral TPU al producto final, de modo de obtener un dispositivo más compacto y barato. La Camera Module 3 queda como alternativa evaluada y no se usa.
 
 La placa no tiene salida de audio analógica: el sonido sale por modulación de ancho de pulso (PWM) redirigida a un pin de propósito general, el pin físico 12 (GPIO 18), con masa en el 14. Hasta el 12 de noviembre de 2026 salía por el pin 32; se trasladó al 12 porque queda del lado de la tarjeta de memoria, donde la carcasa tiene lugar para los componentes en serie (PR #130). El transductor de conducción ósea, extraído de unos auriculares comerciales, tiene una impedancia de 4 ohmios. Un pin de propósito general entrega como máximo 16 mA, por lo que el transductor no puede conectarse directamente: lleva en serie una resistencia de 260 ohmios, que limita el pico de corriente a unos 12,5 mA, y un capacitor de 47 µF, que bloquea la componente continua de la señal PWM (1,65 V en silencio) y con ella el consumo en reposo. Con el capacitor, el circuito forma un filtro pasa altos con corte en unos 13 Hz, muy por debajo de la voz. El resultado es audible pero de volumen bajo, porque al transductor llega una fracción de milivatio. Con la carcasa ya impresa y sin un amplificador disponible, el equipo y el director decidieron el 12 de noviembre mantener esta salida directa en el prototipo y documentar la amplificación como trabajo futuro (ADR 0012, sec. 10.2). El volumen del sistema se limita al 90% porque la salida PWM satura en el extremo superior y la distorsión dificulta más la comprensión que un volumen menor. El overlay deja además el pin 35 (GPIO 19) configurado como salida, por lo que no puede conectarse nada en él.
 
@@ -223,7 +225,7 @@ El sensor tiene enfoque manual y las primeras capturas salieron desenfocadas. El
 
 El software del dispositivo es un servicio en Python de 4981 líneas repartidas en 22 archivos, con 197 pruebas automatizadas que pasan y 2 que se omiten fuera de la placa (recuento del 9 de noviembre de 2026 sobre hardware/raspi/). Su diseño separa un núcleo independiente del transporte, que conoce los comandos, los modos y las transferencias, de los adaptadores que lo conectan con el exterior: el periférico BLE sobre BlueZ, el servidor HTTP, la cámara y el audio.
 
-Esa separación permitió construir un emulador que ejecuta el mismo núcleo sobre la pila Bluetooth de macOS. Con él se pudo desarrollar y probar la aplicación contra un dispositivo simulado, sin depender de que la placa estuviera disponible, lo que resultó importante en los períodos en que la placa estuvo dañada (sec. 7.3.6).
+Esa separación permitió construir un emulador que ejecuta el mismo núcleo sobre la pila Bluetooth de macOS. Con él se pudo desarrollar y probar la aplicación contra un dispositivo simulado, sin depender de que la placa estuviera disponible, lo que resultó importante en los períodos en que la placa estuvo dañada (sec. 7.3.7).
 
 El servicio expone un servidor HTTP en el punto de acceso propio, con cinco rutas: consulta de estado, generación de datos de prueba, captura y entrega de la última fotografía (1024 píxeles de lado mayor y calidad 70, unos 35 KB en 200 a 235 ms incluyendo la captura), recepción de audio para reproducir y entrega de la evidencia del modo ómnibus (sec. 7.4.9). Esta última ruta es una herramienta de desarrollo y se retirará antes de la versión final, porque se trata de fotografías de la vía pública que incluyen personas.
 
@@ -319,7 +321,26 @@ El equipo sometió el modelo al flujo de revisión multimodelo tackle-ticket, en
 
 Los archivos de impresión de las versiones v0.9 a v0.29 están en el repositorio (hardware/case-via-clara/versions/). Con la carcasa final armada, queda pendiente verificar con ella los tiempos del botón (sec. 7.2.6).
 
-### 7.3.6 Fallas de hardware durante el desarrollo
+### 7.3.6 Desglose de costos
+
+Si bien durante el desarrollo del proyecto se adquirieron y evaluaron distintos componentes de hardware para determinar su viabilidad y adecuación a los requerimientos del dispositivo, el desglose de costos presentado en la Figura *número* contempla exclusivamente los elementos que forman parte de la versión final del prototipo. Por lo tanto, no se incluyen los gastos asociados a componentes que fueron descartados durante las etapas de investigación y experimentación, ya que estos no serían necesarios para reproducir el dispositivo.
+
+Asimismo, se excluyen los costos asociados al entrenamiento de los modelos de reconocimiento por visión artificial utilizados, dado que estos ya se encuentran entrenados y su implementación únicamente requiere la carga de los modelos desarrollados. Por último, en lo que respecta a la fabricación mediante impresión 3D, se considera únicamente el costo de impresión del diseño definitivo, sin contabilizar las impresiones realizadas durante las iteraciones de diseño y prueba.
+
+De esta manera, se obtiene una estimación del costo de reproducción del prototipo final, que servirá como referencia para su comparación con las soluciones existentes (referencia a conclusiones).
+
+| **Elemento** | **Costo (USD)** |
+|---|---|
+| Raspberry Pi Zero 2W | 99,95 |
+| Raspberry Pi AI Camera | 75,95 |
+| WaveShare UPS Hat | 23,99 |
+| Auricular óseo | 10,37 |
+| Impresión de la carcasa | ??? pesos (???/40 USD) |
+| TOTAL | 210,26 |
+
+Figura *número*: Tabla de desglose de costos de elementos finales.
+
+### 7.3.7 Fallas de hardware durante el desarrollo
 
 Varias fallas de hardware condicionaron el trabajo y se registran porque explican algunas de las mediciones de este capítulo.
 
@@ -509,7 +530,7 @@ La lógica de anuncio es la siguiente:
 1. Una lectura confirmada por el catálogo en ambos campos se anuncia de inmediato; en caso contrario, se espera a que dos lecturas coincidan. Si sólo se leyó el número o el destino, se esperan algunas lecturas más a que aparezca la otra parte.
 1. Cada ómnibus se anuncia una sola vez.
 
-Un seguidor de objetos mantiene la identidad de cada vehículo entre cuadros y estima si se acerca o se aleja, comparando el área en el último tercio de su trayectoria con la del primero. Hay dos temporizadores de supresión, de 15 segundos para el anuncio de presencia y de 10 segundos para una línea recién anunciada, que se incorporaron por un defecto observado en la primera ejecución sobre la placa (sec. 7.4.11).
+Un seguidor de objetos (sec. 3.3.4) mantiene la identidad de cada vehículo entre cuadros y estima si se acerca o se aleja, comparando el área en el último tercio de su trayectoria con la del primero. Asocia las cajas de forma voraz, empezando por la de mayor área, con la pista de mayor superposición, siempre que la IoU alcance 0,3, y no predice el movimiento. Una pista sin detecciones durante medio segundo se da por perdida, pero se recuerda durante 5 segundos: si en ese plazo aparece una caja con IoU de al menos 0,2 con ella, la recupera con su identidad y sus anuncios. Los plazos se fijan en tiempo y se convierten a cuadros según la tasa de captura (bus_banner/tracking.py, repositorio bus-banner-recognizer; hardware/raspi/virovision/bus.py). Hay dos temporizadores de supresión, de 15 segundos para el anuncio de presencia y de 10 segundos para una línea recién anunciada, que se incorporaron por un defecto observado en la primera ejecución sobre la placa (sec. 7.4.11).
 
 Desde el 12 de octubre de 2026 (PR #114) el modo guarda el cuadro y el recorte exacto que leyó el OCR, asociados al registro de telemetría de esa lectura, en un almacenamiento privado del servidor. Permiten revisar qué vio el sistema cuando anunció, o no anunció, una línea, y son la base del conjunto de evaluación con fotografías del propio dispositivo (sec. 7.4.2).
 

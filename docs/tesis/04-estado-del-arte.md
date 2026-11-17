@@ -6,7 +6,7 @@ En esta sección se realiza una revisión de trabajos académicos y soluciones t
 
 En esta sección se analizan las opciones consideradas para construir el dispositivo, tanto desde el punto de vista del procesamiento como de la interacción entre el usuario y el producto final. Se evaluaron dos arquitecturas: utilizar el celular para procesar la imagen, limitando el dispositivo a la captura, la comunicación con el celular y la reproducción del audio, o realizar todo el procesamiento en el dispositivo, como un producto autónomo. Como se describe en la sección 7.1.3, el proyecto terminó utilizando ambas: el modo ómnibus se procesa por completo en el dispositivo y el modo supermercado se deriva al celular y de allí a la nube.
 
-### 4.1.1 Microprocesador y microcontrolador
+### 4.1.1 Microprocesador/microcontrolador
 
 **ESP32**
 
@@ -38,21 +38,23 @@ Las cámaras USB ofrecen una amplia variedad de resoluciones y calidades, conect
 
 La Camera Module 3 es la cámara oficial de Raspberry Pi basada en el sensor Sony IMX708 de 12 MP e incorpora enfoque automático. Esto proporcionaría una excelente calidad de imagen y compatibilidad con la Raspberry Zero 2 W, ya que tiene integración directa mediante el conector CSI, sin ocupar el puerto USB. Al ser parte del ecosistema de Raspberry, cuenta con buena documentación y soporte.\[48\] Si bien el precio de este módulo es más caro que las cámaras de la ESP32, no es prohibitivo, y no está demás decir que el cable flex requiere cierto cuidado mecánico en el diseño del dispositivo, pero no son obstáculos que no se puedan sortear al momento de diseñar la estructura que lo encapsule todo.
 
-**Raspberry Pi AI Camera (Sony IMX500)**
+**Raspberry Pi AI Camera (Sensor Sony IMX500)**
 
 La AI Camera es una cámara oficial de Raspberry Pi basada en el sensor Sony IMX500 de 12,3 MP, que integra un acelerador de redes neuronales en el propio sensor, con 8 MB de memoria para el modelo\[37\], \[38\]. El detector corre ahí, a la frecuencia de cuadro de la cámara, y la placa recibe directamente las cajas detectadas junto con la imagen, sin gastar CPU ni memoria propias. Se conecta por puerto CSI (*Camera Serial Interface* o Interfaz de cámara serial), como la Camera Module 3, y no ocupa el puerto USB. Sus límites son dos: el enfoque es manual (un anillo que se ajusta una vez) y en el sensor cabe una sola red, ya que un YOLO11n ocupa el 90% de esa memoria (sec. 7.2.5). Su integración con el conjunto de software de cámara de Raspberry Pi permite implementar modelos de redes neuronales propios con un esfuerzo mínimo. El precio es mayor que el de la Camera Module 3, pero esta última necesitaba el Coral TPU para ejecutar la inferencia, mientras que la AI Camera funciona por sí misma, sin agregados.\[38\]
 
-### 4.1.3 Conclusiones
-
-Se seleccionó la plataforma Raspberry Pi Zero 2 W debido a que ofrece un equilibrio adecuado entre costo, tamaño, consumo energético y capacidad de procesamiento, y porque su conectividad WiFi y BLE posibilita comparar el procesamiento local con alternativas basadas en un teléfono móvil. La cámara elegida es la Raspberry Pi AI Camera (Sony IMX500): se conecta por la interfaz CSI dedicada y ejecuta el detector dentro del sensor, lo que cubre el papel que en el diseño original tenía el acelerador Coral TPU. Con eso el acelerador externo dejó de hacer falta y salió del diseño (ADR 0006, 2026-09-07; sec. 7.2.5), con un componente, un costo y un consumo menor. La compra de la AI Camera se decidió para evaluar la potencia del módulo y evitar sumar el Coral TPU al producto final, de modo de obtener un dispositivo más compacto y barato. La Camera Module 3 queda como alternativa evaluada y no se usa.
-
 ## 4.2 Dispositivos de asistencia para personas con discapacidad visual
 
-**Microsoft Seeing AI** es una aplicación gratuita concebida para personas ciegas o con baja visión. Su documentación describe funciones de lectura, descripción de fotografías e identificación de productos. Representa un enfoque centrado en aprovechar la cámara y las capacidades del teléfono para comunicar información visual.\[53\]
+**Microsoft Seeing AI**
 
-**Google Lookout** utiliza la cámara y los sensores de dispositivos Android para reconocer texto y objetos. Incluye modos destinados a texto, documentos, exploración y etiquetas de alimentos. Sus funciones varían según idioma, región y modo; por ejemplo, el reconocimiento de etiquetas de alimentos contempla una descarga de datos para funcionamiento sin conexión en los países donde está disponible. Por ello, no corresponde describir toda la aplicación como dependiente permanentemente de Internet.\[54\]
+Es una aplicación gratuita concebida para personas ciegas o con baja visión. Su documentación describe funciones de lectura, descripción de fotografías e identificación de productos. Representa un enfoque centrado en aprovechar la cámara y las capacidades del teléfono para comunicar información visual.\[53\]
 
-**OrCam MyEye** representa un enfoque basado en un dispositivo de asistencia dedicado. Su manual describe lectura de texto y funciones de reconocimiento de caras y productos, con activación mediante gestos o controles. Estas capacidades deben atribuirse a la versión documentada, sin extrapolar precios o funciones entre todos los modelos comerciales.\[55\]
+**Google Lookout**
+
+Utiliza la cámara y los sensores de dispositivos Android para reconocer texto y objetos. Incluye modos destinados a texto, documentos, exploración y etiquetas de alimentos. Sus funciones varían según idioma, región y modo; por ejemplo, el reconocimiento de etiquetas de alimentos contempla una descarga de datos para funcionamiento sin conexión en los países donde está disponible. Por ello, no corresponde describir toda la aplicación como dependiente permanentemente de Internet.\[54\]
+
+**OrCam MyEye**
+
+Representa un enfoque basado en un dispositivo de asistencia dedicado. Su manual describe lectura de texto y funciones de reconocimiento de caras y productos, con activación mediante gestos o controles. Estas capacidades deben atribuirse a la versión documentada, sin extrapolar precios o funciones entre todos los modelos comerciales.\[55\]
 
 Los antecedentes muestran que la asistencia visual puede resolverse mediante un teléfono o mediante hardware dedicado. Sin embargo, sus funciones generales no demuestran por sí solas un desempeño adecuado para identificar líneas y destinos del transporte público uruguayo. Esa adecuación requiere pruebas específicas. La oportunidad de especialización de ViroVision se sitúa en los casos de uso locales y en la integración de reconocimiento y respuesta auditiva, no en afirmar que los antecedentes carecen de OCR o reconocimiento de productos \[53\], \[54\], \[55\].
 

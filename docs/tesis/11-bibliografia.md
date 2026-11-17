@@ -99,6 +99,31 @@
 
 1. Intendencia de Montevideo. Catálogo de datos abiertos: Sistema de Transporte Metropolitano (STM), líneas y destinos. Consultado en 2026.
 1. Unión Nacional de Ciegos del Uruguay (UNCU). Relevamiento realizado por el equipo con apoyo de la organización, 26 respuestas. 2026.
+## Seguimiento de objetos, modelos de lenguaje y otros fundamentos
+
+1. Everingham, M., Van Gool, L., Williams, C. K. I., Winn, J. y Zisserman, A. (2010). *The PASCAL Visual Object Classes (VOC) Challenge*. International Journal of Computer Vision, 88(2), 303-338.
+1. Neubeck, A. y Van Gool, L. (2006). *Efficient Non-Maximum Suppression*. International Conference on Pattern Recognition (ICPR).
+1. Bewley, A., Ge, Z., Ott, L., Ramos, F. y Upcroft, B. (2016). *Simple Online and Realtime Tracking*. IEEE International Conference on Image Processing (ICIP). [https://arxiv.org/abs/1602.00763](https://arxiv.org/abs/1602.00763)
+1. Zhang, Y., Sun, P., Jiang, Y., Yu, D., Weng, F., Yuan, Z., Luo, P., Liu, W. y Wang, X. (2022). *ByteTrack: Multi-Object Tracking by Associating Every Detection Box*. European Conference on Computer Vision (ECCV). [https://arxiv.org/abs/2110.06864](https://arxiv.org/abs/2110.06864)
+1. Kalman, R. E. (1960). *A New Approach to Linear Filtering and Prediction Problems*. Journal of Basic Engineering, 82(1), 35-45.
+1. Kuhn, H. W. (1955). *The Hungarian Method for the Assignment Problem*. Naval Research Logistics Quarterly, 2(1-2), 83-97.
+1. Krishnamoorthi, R. (2018). *Quantizing Deep Convolutional Networks for Efficient Inference: A Whitepaper*. arXiv:1806.08342. [https://arxiv.org/abs/1806.08342](https://arxiv.org/abs/1806.08342)
+1. Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł. y Polosukhin, I. (2017). *Attention Is All You Need*. Advances in Neural Information Processing Systems (NeurIPS). [https://arxiv.org/abs/1706.03762](https://arxiv.org/abs/1706.03762)
+1. Radford, A., Kim, J. W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., Krueger, G. y Sutskever, I. (2021). *Learning Transferable Visual Models From Natural Language Supervision*. International Conference on Machine Learning (ICML). [https://arxiv.org/abs/2103.00020](https://arxiv.org/abs/2103.00020)
+1. Alayrac, J.-B. et al. (2022). *Flamingo: a Visual Language Model for Few-Shot Learning*. Advances in Neural Information Processing Systems (NeurIPS). [https://arxiv.org/abs/2204.14198](https://arxiv.org/abs/2204.14198)
+1. Ji, Z., Lee, N., Frieske, R., Yu, T., Su, D., Xu, Y., Ishii, E., Bang, Y. J., Madotto, A. y Fung, P. (2023). *Survey of Hallucination in Natural Language Generation*. ACM Computing Surveys, 55(12). [https://arxiv.org/abs/2202.03629](https://arxiv.org/abs/2202.03629)
+1. OpenAI. (s. f.). *Structured model outputs*. OpenAI Platform. [https://platform.openai.com/docs/guides/structured-outputs](https://platform.openai.com/docs/guides/structured-outputs)
+1. Levenshtein, V. I. (1966). *Binary Codes Capable of Correcting Deletions, Insertions, and Reversals*. Soviet Physics Doklady, 10(8), 707-710.
+1. Ratcliff, J. W. y Metzener, D. E. (1988). *Pattern Matching: The Gestalt Approach*. Dr. Dobb's Journal, 13(7).
+1. Python Software Foundation. (s. f.). *difflib: Helpers for computing deltas*. [https://docs.python.org/3/library/difflib.html](https://docs.python.org/3/library/difflib.html)
+1. Pech-Pacheco, J. L., Cristóbal, G., Chamorro-Martínez, J. y Fernández-Valdivia, J. (2000). *Diatom Autofocusing in Brightfield Microscopy: A Comparative Study*. International Conference on Pattern Recognition (ICPR).
+1. Shorten, C. y Khoshgoftaar, T. M. (2019). *A Survey on Image Data Augmentation for Deep Learning*. Journal of Big Data, 6, 60. [https://doi.org/10.1186/s40537-019-0197-0](https://doi.org/10.1186/s40537-019-0197-0)
+1. Lee, D.-H. (2013). *Pseudo-Label: The Simple and Efficient Semi-Supervised Learning Method for Deep Neural Networks*. ICML Workshop on Challenges in Representation Learning.
+1. Shi, W., Cao, J., Zhang, Q., Li, Y. y Xu, L. (2016). *Edge Computing: Vision and Challenges*. IEEE Internet of Things Journal, 3(5), 637-646.
+1. IEEE. (2021). *IEEE 802.11-2020: Wireless LAN Medium Access Control (MAC) and Physical Layer (PHY) Specifications*.
+1. Fielding, R., Nottingham, M. y Reschke, J. (2022). *RFC 9110: HTTP Semantics*. IETF. [https://www.rfc-editor.org/rfc/rfc9110](https://www.rfc-editor.org/rfc/rfc9110)
+1. React Native. (2024, 23 de octubre). *React Native 0.76: New Architecture by default*. [https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture](https://reactnative.dev/blog/2024/10/23/release-0.76-new-architecture)
+
 ## Documentación interna del proyecto
 
 Los siguientes documentos del repositorio del proyecto constituyen las fuentes primarias de los capítulos 5 a 8 y se incluyen, en lo pertinente, en el anexo:

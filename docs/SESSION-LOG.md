@@ -4673,3 +4673,30 @@ de hardware y en la skill.
   que dejó luna por defecto y qwen como alternativa.
 - **Nueva 7.6.8 «Retroalimentación auditiva continua»**: el catálogo de avisos de la app, quién dice
   cada uno y por qué.
+
+## 2026-11-17: marco teórico completo (seguimiento, mAP, cuantización, VLM, BLE y WiFi)
+
+- **Importado del Doc** lo que el equipo editó desde el 12/11: 4.1 y 4.2 (la conclusión de 4.1.3 pasó
+  a 7.3.1; los productos de 4.2 con su nombre como subtítulo) y una sección nueva **7.3.6 «Desglose de
+  costos»** (borrador del equipo, con la impresión de la carcasa sin costo todavía). «Fallas de
+  hardware» pasa a 7.3.7 y se actualizaron sus referencias (7.3.1, 7.2.1, 7.3.2, 6.7).
+- **Capítulo 3** (Magui no llegó a terminarlo; lo completó Juan Lucas):
+  - nuevas **3.1.3** (modelos de lenguaje y multimodales: tókenes, transformer, VLM, prompt, salida
+    estructurada, alucinación), **3.3.4** (seguimiento por detección: IoU, método húngaro, SORT con
+    Kalman, ByteTrack, ciclo de vida de la pista, fragmentación, votos y ventanas de supresión),
+    **3.5.1** (BLE: GAP, GATT, UUID, notificación, ATT MTU) y **3.5.2** (WiFi, punto de acceso, HTTP);
+  - en 3.1.1, particiones, hiperparámetros, aumentación y pseudoetiquetado; en 3.2, IoU, AP y mAP
+    (mAP@0,5 y @0,5:0,95 se usaban sin definir); en 3.3.1, supresión de no máximos; en 3.3.3, nitidez
+    por varianza del laplaciano y similitud de cadenas (Levenshtein, Ratcliff/Obershelp);
+  - **3.4 reescrita** como teoría (borde y nube, cuantización PTQ/QAT, aceleradores, inferencia en el
+    sensor, formatos de intercambio); el relato del spike de Gemma ya está en 7.2.2;
+  - referencias rotas de la reestructuración arregladas (4.1.1→3.1.1, 3.4/3.5→3.3.2/3.3.3, estado del
+    arte 3.6/3.4→4.6/4.4, 4.3), negritas fuera del cuerpo, erratas, y «desde 2024» con fuente (RN 0.76).
+- **7.4.9**: los parámetros del seguidor (IoU 0,3, perdida a los 0,5 s, recuperable 5 s con IoU 0,2).
+- **Bibliografía**: 22 fuentes nuevas, 77 a 98, en una sección al final para no correr la numeración.
+
+### Pendientes
+
+- Audio por PWM y filtro (teoría para 3.7) y el amplificador comprado: probarlo y documentarlo.
+- 7.3.6: costo de la impresión de la carcasa, número de figura y la referencia a conclusiones.
+- Índice del Doc a mano (3.1.3, 3.3.4, 3.5.1, 3.5.2, 7.3.6, 7.3.7).
