@@ -112,6 +112,20 @@ El script salta a propósito las secciones que todavía no hay que pisar (hoy, l
 tiene una copia de la tabla agregada a mano: ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
 abajo: traer primero al repo lo que se haya editado directo en el Doc.
 
+### Actualizar el índice
+
+La API de Docs no puede actualizar el índice. Se actualiza desde Chrome, con el perfil jlabreu24:
+se hace clic dentro del índice y se pulsa el botón "Actualizar índice" que aparece a su izquierda.
+La actualización mezcla fuentes (las líneas nuevas quedan en Arial 11 y el resto en Times New Roman
+12), por lo que después hay que uniformarlas:
+
+1. Leer el Doc con `read_doc` y quedarse con el objeto `content`.
+2. `python3 toc_style.py doc.json batch.json` arma la tanda. Por defecto toma la fuente y el tamaño
+   mayoritarios en el índice; con `--font` y `--size` se fijan a mano. Sólo cambia la fuente y el
+   tamaño, y vuelve a poner la negrita donde estaba, porque el cambio de fuente la borra.
+3. Mandar `batch.json` con `update_doc`, con su `writeControl`. Si el script informa `ops=0`, el
+   índice ya está uniforme.
+
 ### Traer el Doc al repo cuando el equipo editó mucho
 
 Si el equipo reescribió secciones enteras en el Doc, conviene importar el Doc completo antes de
