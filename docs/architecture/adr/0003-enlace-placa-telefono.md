@@ -875,6 +875,22 @@ instalación y publicada sólo por la característica `wifi`, que ya la transpor
 sesión, leído por BLE, que el servidor HTTP exija en cada pedido. Queda como trabajo futuro (tesis,
 cap. 10).
 
+## Actualización 2026-11-18: el volumen del parlante se elige desde la app
+
+Con el amplificador PAM8403 (ADR 0012, actualización del 2026-11-18) el nivel fijo con que arrancaba
+la placa resultó demasiado fuerte, y el dispositivo no tiene botones de volumen. El protocolo suma:
+
+- **Comando** `{"cmd":"volume","value":0-100}` en `control`, escrito **con** respuesta (es un ajuste,
+  como `audio`). La placa lo acota, lo aplica con `amixer` fuera del bucle de BLE y lo guarda en
+  `/var/lib/virovision/volume`; en cada arranque ese valor gana sobre `--volume`.
+- **Campo** `vol` en `status`: el nivel vigente, o `null` sin mezclador. Después de cada cambio la
+  placa publica un `status` nuevo, de modo que la app muestra el nivel que la placa tiene y no el que
+  pidió.
+
+La app lo expone en Ajustes como un único control ajustable para el lector de pantalla, en pasos de
+10, y manda una sola escritura al terminar el gesto. La placa sigue siendo la fuente de verdad: la
+app no guarda el nivel.
+
 ## Ver también
 
 - Diagrama canónico y flujos por caso de uso: [`architecture/README.md`](../README.md).

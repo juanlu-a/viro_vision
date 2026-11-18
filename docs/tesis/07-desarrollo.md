@@ -49,7 +49,7 @@ El dispositivo expone un servicio con identificador 4380c500-7ca3-4e37-b27d-f60e
 | **Característica** | **Propiedades** | **Contenido** |
 |---|---|---|
 | mode | lectura, notificación, escritura | Entero sin signo de 8 bits: 0 espera, 1 ómnibus, 2 supermercado |
-| control | escritura, escritura sin respuesta | Comando en JSON (photo, mode, status, ap, audio con su destino, dispositivo o teléfono, say, hush, restart_camera, measure) |
+| control | escritura, escritura sin respuesta | Comando en JSON (photo, mode, status, ap, audio con su destino, dispositivo o teléfono, volume, say, hush, restart_camera, measure) |
 | event | notificación | Evento en JSON, máximo 180 bytes |
 | transfer | notificación | Transferencia binaria fragmentada (en desuso desde el rediseño del enlace) |
 | status | lectura, notificación | Estado del dispositivo: versión, temperatura, tiempo de actividad, batería, cámara, red y punto de acceso |

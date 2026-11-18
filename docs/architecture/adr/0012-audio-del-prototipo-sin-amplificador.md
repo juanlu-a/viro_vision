@@ -180,3 +180,36 @@ apagado manejado por el daemon, el costo en reposo es despreciable.
 - [PAM8403 en MercadoLibre Uruguay](https://listado.mercadolibre.com.uy/pam-8403)
 - Consumo de la placa: `hardware/README.md`, sección de alimentación (fuentes de terceros, pendiente
   de medir).
+
+## Actualización 2026-11-18: PAM8403 instalado
+
+**El prototipo ya no queda sin amplificador.** Con el volumen de la salida directa inviable para el
+uso real (ver *La limitante del volumen*), el equipo consiguió dos módulos **PAM8403 mini** (uno de
+repuesto) y el 2026-11-18 instaló uno entre la placa y el transductor:
+
+| PAM8403 | Raspberry Pi |
+|---|---|
+| 5V | pin 2 (5 V) |
+| GND de alimentación | pin 6 |
+| entrada (un canal) | pin 12 (GPIO 18) |
+| GND de entrada | pin 14 |
+| salida + y − del mismo canal | los dos cables del transductor, ninguno a masa |
+
+La **resistencia de 260 Ω y el capacitor de 47 µF se retiraron**: el módulo trae sus propios
+capacitores de entrada. El otro canal queda sin conectar. El software no cambia: la señal sigue
+saliendo por PWM del pin 12.
+
+**Resultado:** el problema se invirtió. Al nivel con que arrancaba el daemon (90 %, elegido para la
+salida directa) el transductor sonaba **demasiado fuerte**. Como el dispositivo no tiene botones de
+volumen, se agregaron:
+
+- un parche para bajarlo desde la microSD sin SSH (archivo `VOLUMEN` en `bootfs`, `boot/modo-red.sh`);
+- el **control de volumen en Ajustes de la app**, con el nivel guardado en la placa (comando
+  `volume`, campo `vol` de `status`; ADR 0003, actualización del 2026-11-18);
+- un nivel por defecto de **50 %** en lugar de 90 % para una placa a la que nadie le eligió uno.
+
+**Consumo:** el PAM8403 suma unos 10 mA en reposo (~50 mW, alrededor del 2 % de la placa en modo
+activo), porque la versión mini no expone el pin de apagado, más lo que entrega al hablar, que crece
+con el volumen. Sigue sin medir. El ruido de cuantización del PWM se amplifica junto con la voz; el
+MAX98357A sigue siendo el destino para eliminarlo.
+
