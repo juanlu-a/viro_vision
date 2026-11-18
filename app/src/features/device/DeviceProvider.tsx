@@ -61,6 +61,13 @@ interface DeviceValue {
   writeMode: (mode: DeviceMode) => Promise<void>;
   /** Tells the device where bus readings should be heard. Best-effort: it never throws. */
   writeAudioTarget: (target: AudioOutput) => Promise<void>;
+  /**
+   * The level of the device's speaker as the device last reported it (0-100), or null when there is
+   * no device or it cannot be changed. The board is the source of truth: the app keeps no copy.
+   */
+  deviceVolume: number | null;
+  /** Sets the device's speaker level. Best-effort: it never throws. */
+  writeVolume: (percent: number) => Promise<void>;
   downloadPhoto: (options?: { timeoutMs?: number }) => Promise<DevicePhoto>;
   /** Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. */
   sendAudio: (uri: string, signal?: AbortSignal) => Promise<boolean>;
@@ -104,6 +111,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [ap, setAp] = useState(false);
   const [wifi, setWifi] = useState<WifiState>('off');
   const [deviceMode, setDeviceMode] = useState<DeviceMode | null>(null);
+  const [deviceVolume, setDeviceVolume] = useState<number | null>(null);
 
   const credentials = useRef<WifiCredentials | null>(null);
   const autoConnect = useRef(true);
@@ -265,6 +273,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         record('device.status', { detail: { ...status } });
       }
       setAp(status.ap);
+      setDeviceVolume(typeof status.vol === 'number' ? status.vol : null);
       // The previous object is kept when nothing changed. A fresh one every 15 s re-rendered every
       // consumer of this context — Home, the reader bridge, the Device tab — on each heartbeat, and
       // recreated the callbacks that close over the address.
@@ -395,6 +404,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // the link was down never reached it, and keeping it here would show a mode nothing is
         // running.
         setDeviceMode(null);
+        // No link, no level to show: the slider goes inert instead of claiming a stale one.
+        setDeviceVolume(null);
         scheduleRetry();
       }),
       client.onStatus(applyStatus),
@@ -466,6 +477,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     setAp(false);
     setWifi('off');
     setDeviceMode(null);
+    setDeviceVolume(null);
   }, []);
 
   const writeAudioTarget = useCallback(
@@ -478,6 +490,20 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // Not worth interrupting the user for, and not worth hiding either: this is exactly the bug
         // that made a reading come out of the board with the setting on "phone" (2026-09-15).
         record('device.audioTargetFailed', { detail: { target, message: errorDetail(err) } });
+      }
+    },
+    [connection.status]
+  );
+
+  const writeVolume = useCallback(
+    async (percent: number) => {
+      if (connection.status !== 'connected') return;
+      try {
+        await getBleClient().writeVolume(percent);
+      } catch (err) {
+        // The board kept its previous level, and its next `status` puts the slider back there: the
+        // user sees and hears that it did not take. The table says why.
+        record('device.volumeFailed', { detail: { percent, message: errorDetail(err) } });
       }
     },
     [connection.status]
@@ -542,8 +568,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<DeviceValue>(
-    () => ({ connection, address, wifi, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio }),
-    [connection, address, wifi, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio]
+    () => ({ connection, address, wifi, photoAvailable, ap, deviceMode, deviceVolume, connect, disconnect, writeMode, writeAudioTarget, writeVolume, downloadPhoto, sendAudio }),
+    [connection, address, wifi, photoAvailable, ap, deviceMode, deviceVolume, connect, disconnect, writeMode, writeAudioTarget, writeVolume, downloadPhoto, sendAudio]
   );
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;

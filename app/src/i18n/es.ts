@@ -155,6 +155,12 @@ export const es = {
       'Para el equipo: muestra las fotos del dispositivo, los campos de cada lectura y el selector de modelo.',
     appModeSetToProduct: 'Modo producto.',
     appModeSetToDevelopment: 'Modo desarrollo.',
+    // The level of the device's speaker (2026-11-18). The device has no volume buttons, so this is
+    // the only place to change it; without a device the card says so instead of showing a level.
+    deviceVolume: 'Volumen del dispositivo',
+    deviceVolumeHint: 'Deslizá hacia arriba o hacia abajo para subir o bajar el volumen del parlante del dispositivo.',
+    deviceVolumeNoDevice: 'Conectá el dispositivo para cambiar su volumen.',
+    deviceVolumeUnsupported: 'Este dispositivo no permite cambiar el volumen desde la app.',
   },
   auth: {
     loading: 'Cargando sesión…',

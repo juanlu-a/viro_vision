@@ -17,7 +17,7 @@ from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
 from .ap import AP_IP, AccessPoint
-from .audio import DEFAULT_VOLUME_PERCENT, Player, set_output_volume
+from .audio import DEFAULT_VOLUME_PERCENT, VOLUME_FILE, Player, Volume
 from .button import DEBOUNCE_S, DEFAULT_GPIO, DOUBLE_CLICK_WINDOW_S, LONG_PRESS_S, try_connect
 from .bus import DEFAULT_ANNOUNCEMENTS as BUS_DEFAULT_ANNOUNCEMENTS
 from .bus import DEFAULT_CATALOG as BUS_DEFAULT_CATALOG
@@ -49,7 +49,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="HTTP server port (plan B)")
     parser.add_argument("--no-http", action="store_true", help="do not bring the HTTP server up")
     parser.add_argument("--no-audio", action="store_true", help="receive the reading's audio but do not play it (only store it)")
-    parser.add_argument("--volume", type=int, default=DEFAULT_VOLUME_PERCENT, help=f"output level 0-100, applied at startup (default {DEFAULT_VOLUME_PERCENT})")
+    parser.add_argument("--volume", type=int, default=DEFAULT_VOLUME_PERCENT, help=f"output level 0-100 for a board the app never set one on (default {DEFAULT_VOLUME_PERCENT}); the level chosen in the app, kept in {VOLUME_FILE}, wins")
     parser.add_argument("--no-ap", action="store_true", help="do not bring the access point up at startup (development on the home network)")
     parser.add_argument(
         "--bus-model",
@@ -158,14 +158,19 @@ async def _main(args: argparse.Namespace) -> None:
         startup: if a capture hangs the camera restarts, and if it does not come back, the status has
         to say so."""
         name, ip = network.current
-        return read_status(camera=camera.available, http_port=None if args.no_http else args.port, ap=ap.on, network=name, ip=ip)
+        return read_status(
+            camera=camera.available, http_port=None if args.no_http else args.port, ap=ap.on, network=name, ip=ip,
+            volume=None if args.no_audio else volume.current,
+        )
 
     # The device's speaker. It is built even with `--no-http`, so the log says at startup whether
     # there is anything on this board able to play a reading. The level is set here and not left to
     # whatever `amixer` was last told by hand: on 2026-09-11 the first real reading came out too quiet
     # to use, and a level that depends on who ran what is not a level.
     player = Player()
-    set_output_volume(args.volume)
+    # The level the user last chose in the app wins over `--volume` (2026-11-18): see `audio.Volume`.
+    volume = Volume(default=args.volume)
+    volume.apply_current()
 
     def say(clip: str) -> bool:
         """Play a system notice the app asked for over BLE (`cmd: 'say'`). True if the file was there.
@@ -223,6 +228,7 @@ async def _main(args: argparse.Namespace) -> None:
         say=None if args.no_audio else say,
         hush=None if args.no_audio else player.stop,
         restart_camera=camera.restart if wants_camera else None,
+        set_volume=None if args.no_audio else volume.set,
     )
     await service.register(bus, adapter=adapter)
     relay.attach(service.core.emit_event)

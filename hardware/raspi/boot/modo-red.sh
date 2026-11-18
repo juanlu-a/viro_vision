@@ -85,7 +85,33 @@ if [ -d "$SRC" ]; then
   echo "avisos de sistema actualizados: $n en $DST"
 fi
 
-# Sólo si el drop-in cambió (se cambió de modo): sin eso systemd no lo ve, y con él son 2,4 s.
+# Volumen fijado desde la tarjeta (2026-11-18): con el amplificador PAM8403 el 90 % del daemon es
+# demasiado fuerte y una placa en modo producto no tiene SSH para bajarlo. Si existe
+# /boot/firmware/VOLUMEN con un número de 0 a 100, un drop-in reaplica ese nivel 40 s después de que
+# arranca el daemon (que fija el suyo al iniciar). Es un parche hasta que el volumen se elija desde
+# la app: al borrar el archivo, el drop-in se retira.
+VOLDROPIN=/etc/systemd/system/virovision.service.d/20-volumen.conf
+VOL=$(tr -cd '0-9' < /boot/firmware/VOLUMEN 2>/dev/null)
+if [ -n "$VOL" ] && [ "$VOL" -le 100 ]; then
+  mkdir -p "$(dirname "$VOLDROPIN")"
+  NEW=$(mktemp)
+  cat > "$NEW" <<EOF
+[Service]
+ExecStartPost=/bin/sh -c '(sleep 40; amixer -M -q set PCM ${VOL}%%) >/dev/null 2>&1 &'
+EOF
+  if cmp -s "$NEW" "$VOLDROPIN"; then
+    rm -f "$NEW"
+  else
+    install -m 644 "$NEW" "$VOLDROPIN" && rm -f "$NEW"
+    RELOAD_UNITS=1
+  fi
+  echo "volumen fijado desde la tarjeta: ${VOL}%"
+elif [ -e "$VOLDROPIN" ]; then
+  rm -f "$VOLDROPIN"
+  RELOAD_UNITS=1
+fi
+
+# Sólo si algún drop-in cambió: sin eso systemd no lo ve, y con él son 2,4 s.
 if [ "$RELOAD_UNITS" = 1 ]; then
   systemctl daemon-reload
 fi

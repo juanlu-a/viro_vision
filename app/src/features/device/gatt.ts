@@ -17,7 +17,7 @@ export const GATT = {
   characteristics: {
     /** read · notify · write — uint8: 0 idle, 1 bus, 2 supermarket (ADR 0007). */
     mode: '4380c501-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status' | 'audio' | 'say' | 'hush', ... }`. */
+    /** write — JSON `{ cmd: 'measure' | 'photo' | 'mode' | 'status' | 'audio' | 'say' | 'hush' | 'volume', ... }`. */
     control: '4380c502-7ca3-4e37-b27d-f60e8d8d73d1',
     /** notify — JSON ≤ 180 bytes: `{ t: 'start' | 'end' | 'mode' | 'read' | 'ap' | 'error' | 'result', ... }`. */
     event: '4380c503-7ca3-4e37-b27d-f60e8d8d73d1',
@@ -30,7 +30,7 @@ export const GATT = {
      * this comment exists so nobody wires it up again believing it is the photo path.
      */
     transfer: '4380c504-7ca3-4e37-b27d-f60e8d8d73d1',
-    /** read · notify — JSON: `version`, `temp`, `uptime`, `battery` (0-100 from the UPS HAT, null without one), `camera`, `wifi`, `ip`, `port`, `ap`. */
+    /** read · notify — JSON: `version`, `temp`, `uptime`, `battery` (0-100 from the UPS HAT, null without one), `camera`, `wifi`, `ip`, `port`, `ap`, `vol`. */
     status: '4380c505-7ca3-4e37-b27d-f60e8d8d73d1',
     /** read — JSON `{ ssid, password, ip, port }` of the device's access point; `{}` when it has none. */
     wifi: '4380c506-7ca3-4e37-b27d-f60e8d8d73d1',
@@ -54,6 +54,11 @@ export interface DeviceStatus {
   port: number | null;
   /** True while the device is an access point: then `ip` is the AP's (10.42.0.1). */
   ap: boolean;
+  /**
+   * The speaker's level in force, 0-100 (2026-11-18). Null when the board has no mixer to set, and
+   * absent from a board older than the volume control: both mean "the app cannot change it".
+   */
+  vol?: number | null;
 }
 
 /**
@@ -114,4 +119,16 @@ export function noticeCommand(clip: string): string {
  */
 export function hushCommand(): string {
   return JSON.stringify({ cmd: 'hush' });
+}
+
+/**
+ * The command that sets the level of the device's speaker, 0-100 (2026-11-18).
+ *
+ * It exists because the device has no volume buttons and, once the amplifier went in (ADR 0012,
+ * update of 2026-11-18), the fixed level it started at was far too loud on a transducer pressed
+ * against the head. The board clamps it too, applies it and remembers it across reboots; this side
+ * rounds it, because `int()` on the board would reject `42.5` and the user would hear nothing change.
+ */
+export function volumeCommand(percent: number): string {
+  return JSON.stringify({ cmd: 'volume', value: Math.round(Math.max(0, Math.min(100, percent))) });
 }

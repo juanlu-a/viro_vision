@@ -94,6 +94,7 @@ def read_status(
     ap: bool = False,
     network: Optional[str] = None,
     ip=_LOOK_UP,
+    volume: Optional[int] = None,
 ) -> dict:
     """`ip` comes from a `NetworkSnapshot` on the device; left out, it is looked up here (blocking),
     which is fine for the Mac emulator and nowhere near the BLE loop."""
@@ -117,4 +118,8 @@ def read_status(
         # Name of the active NetworkManager connection on wlan0 (or null): it says which network the
         # device is on without needing SSH. Diagnosis of 2026-09-06: "no network" and nobody knew why.
         "network": network,
+        # The output level in force, 0-100, or null with no mixer to set (2026-11-18). Short key
+        # because the whole status has to fit in one notification (`core.fit`). The app's slider
+        # starts from this: the board is the source of truth, not the phone.
+        "vol": volume,
     }

@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { notify } from '@/features/audio/systemNotice';
 import { AudioOutputSelector } from '@/features/audio/AudioOutputSelector';
 import { AppModeSelector } from '@/features/appMode/AppModeSelector';
+import { DeviceVolumeControl } from '@/features/device/DeviceVolumeControl';
 import { useAppMode } from '@/features/appMode/AppModeProvider';
 import { ModelSelector } from '@/features/reader/ModelSelector';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
@@ -85,6 +86,15 @@ export default function SettingsScreen() {
           {t.audioOutput.toUpperCase()}
         </ThemedText>
         <AudioOutputSelector />
+      </Card>
+
+      {/* Right below where it is heard: the level of that same speaker. The device has no volume
+          buttons (2026-11-18), so this is the only place to change it. */}
+      <Card>
+        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+          {t.deviceVolume.toUpperCase()}
+        </ThemedText>
+        <DeviceVolumeControl />
       </Card>
 
       <Card>

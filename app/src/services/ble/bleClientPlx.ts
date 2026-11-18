@@ -11,7 +11,7 @@
 import { Platform } from 'react-native';
 import { BleErrorCode, BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 
-import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, hushCommand, noticeCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
+import { DEVICE_ADVERTISED_NAME, GATT, audioCommand, hushCommand, noticeCommand, volumeCommand, type DeviceStatus, type WifiCredentials } from '@/features/device/gatt';
 import type { DeviceInfo } from '@/features/device/types';
 import type { RecognitionEvent } from '@/features/recognition/types';
 import { loadLastDeviceId, saveLastDeviceId } from '@/services/storage/lastDevice';
@@ -275,6 +275,24 @@ class BleClientPlx implements BleClient {
     const device = this.device;
     if (!device) throw new BleNotConnectedError();
     const payload = new TextEncoder().encode(audioCommand(target));
+    await this.gatt(() =>
+      this.manager.writeCharacteristicWithResponseForDevice(
+        device.id,
+        GATT.serviceUuid,
+        GATT.characteristics.control,
+        encodeBase64(payload)
+      )
+    );
+  }
+
+  /**
+   * Sets the board's speaker level. **With** response, like `writeAudioTarget`: it is a setting, and
+   * a write nobody confirmed would leave the slider claiming a level the board does not have.
+   */
+  async writeVolume(percent: number): Promise<void> {
+    const device = this.device;
+    if (!device) throw new BleNotConnectedError();
+    const payload = new TextEncoder().encode(volumeCommand(percent));
     await this.gatt(() =>
       this.manager.writeCharacteristicWithResponseForDevice(
         device.id,

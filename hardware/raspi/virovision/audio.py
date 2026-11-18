@@ -31,16 +31,25 @@ import shutil
 import subprocess
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 log = logging.getLogger(__name__)
 
 # Set at startup so the level is the same after every boot. Before this it was whatever `amixer` had
 # been left at by hand, which on 2026-09-11 meant the first real reading came out too quiet to use.
 #
-# 90 and not 100: PWM audio clips at the top, and clipping is *worse* than quieter — a distorted
-# sentence is harder to understand than a soft one, and understanding it is the entire point.
-DEFAULT_VOLUME_PERCENT = 90
+# 50 since 2026-11-18. It was 90 while the transducer hung straight off the GPIO, where the problem was
+# being heard at all (ADR 0012: under 1 mW). With the PAM8403 amplifier in between (ADR 0012, update
+# of 2026-11-18) 90 % was far too loud on a bone-conduction transducer pressed against the head. Half
+# is a starting point; the user's own level comes from the app (`cmd: 'volume'`) and is persisted, so
+# this only applies to a board that was never told one. Still under 100 for the original reason: PWM
+# audio clips at the top, and a distorted sentence is harder to understand than a soft one.
+DEFAULT_VOLUME_PERCENT = 50
+
+# Where the level the user chose survives a reboot. Under /var/lib because the daemon runs as root
+# (`virovision.service`) and this is state, not configuration: `/etc/default/virovision` is what the
+# team writes by hand, this is what the user writes from the app.
+VOLUME_FILE = Path("/var/lib/virovision/volume")
 
 # Tried in order; the first control that exists wins. `Softvol` is the one an I2S DAC will need (the
 # MAX98357A has no volume control of its own), `PCM` is what the Pi's own output is called.
@@ -71,6 +80,62 @@ def set_output_volume(percent: int = DEFAULT_VOLUME_PERCENT) -> bool:
         return False
     log.info("audio: %s at %d%%", control, percent)
     return True
+
+
+class Volume:
+    """The output level the user chose from the app, applied and remembered across reboots.
+
+    Since 2026-11-18, when the amplifier made the fixed startup level unusable and the device has no
+    volume buttons. **The persisted value wins over `--volume`**: the flag is the team's default for a
+    fresh board, the file is what the person wearing the device asked for, and a reboot that put the
+    level back to the default would be the device ignoring them.
+
+    `apply` is injectable so tests do not need `amixer`; the file path too, so they do not need root.
+    A failed write is logged and the level still applies: losing the setting at the next reboot is
+    better than refusing to change the volume now.
+    """
+
+    def __init__(self, path: Path = VOLUME_FILE, default: int = DEFAULT_VOLUME_PERCENT, apply: Optional[Callable[[int], bool]] = None) -> None:
+        self._path = Path(path)
+        self._apply = apply or set_output_volume
+        self._lock = threading.Lock()
+        self.current = _clamp(self._read(default))
+
+    def apply_current(self) -> bool:
+        """At startup: put the remembered (or default) level on the mixer."""
+        return self._apply(self.current)
+
+    def set(self, percent: int) -> int:
+        """Clamp, apply and persist. Returns the level now in force. Runs on a worker thread: `amixer`
+        is a process, and the BLE loop must not wait for it."""
+        percent = _clamp(percent)
+        with self._lock:
+            self._apply(percent)
+            self.current = percent
+            self._write(percent)
+        return percent
+
+    def _read(self, default: int) -> int:
+        try:
+            return int(self._path.read_text().strip())
+        except (OSError, ValueError):
+            # Missing on a fresh board; garbage if someone edited it by hand. Either way, the default.
+            return default
+
+    def _write(self, percent: int) -> None:
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            # Write and rename: a power cut halfway through (this board runs on a battery) must leave
+            # the old level, not an empty file.
+            tmp = self._path.with_suffix(".tmp")
+            tmp.write_text(f"{percent}\n")
+            tmp.replace(self._path)
+        except OSError as exc:
+            log.warning("audio: could not remember the volume in %s: %s", self._path, exc)
+
+
+def _clamp(percent: int) -> int:
+    return max(0, min(100, int(percent)))
 
 
 def _find_control() -> Optional[str]:

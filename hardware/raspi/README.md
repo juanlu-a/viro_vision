@@ -237,7 +237,7 @@ Servicio `4380c500-7ca3-4e37-b27d-f60e8d8d73d1`. Copiado a mano en
 | `control` | 02 | write · write w/o response | JSON con `cmd` (abajo) |
 | `event` | 03 | notify | JSON ≤ 180 bytes |
 | `transfer` | 04 | notify | binario: header 4 B (`seq` u16 LE, `total` u16 LE) + datos |
-| `status` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `battery` (0-100 del UPS HAT; null sin HAT), `camera`, `wifi`, `ip`, `port`, `ap` |
+| `status` | 05 | read · notify | JSON: `version`, `temp`, `uptime`, `battery` (0-100 del UPS HAT; null sin HAT), `camera`, `wifi`, `ip`, `port`, `ap`, `vol` (nivel del parlante 0-100; null con `--no-audio`) |
 | `wifi` | 06 | read | JSON `{ssid, password, ip, port}` del punto de acceso; la app se une sola con esto |
 
 Comandos de `control`:
@@ -251,6 +251,7 @@ Comandos de `control`:
 | `{"cmd":"ap","value":true,"minutes":10}` | enciende el punto de acceso por tiempo acotado (default 10, tope 60; `core.py:52-53`); `value:false` lo apaga. Manual: el AP ya queda prendido desde el arranque |
 | `{"cmd":"audio","target":"device"}` | dónde quiere escuchar el usuario: `device` (default) o `phone`. Lo manda la app con el ajuste de Ajustes; el modo ómnibus lo respeta |
 | `{"cmd":"say","clip":"<aviso>"}` | reproduce un aviso de sistema pregrabado (`notices.py`); un nombre fuera del catálogo cerrado responde `unknown notice`, y uno que falta en la SD, `missing notice` |
+| `{"cmd":"volume","value":40}` | fija el volumen del parlante (0-100, se acota), lo aplica con `amixer` y lo **recuerda** en `/var/lib/virovision/volume`; responde con un `status` nuevo cuyo `vol` es el nivel vigente. Lo manda el control de Ajustes de la app (2026-11-18) |
 | `{"cmd":"hush"}` | corta lo que esté sonando en la placa: el teléfono lo manda antes de hablar (una voz por vez, ADR 0003, act. 2026-09-18, #97). Sin respuesta |
 | `{"cmd":"restart_camera"}` | cierra y reabre la cámara con el mismo `Camera.restart()` del watchdog. Gancho de prueba (2026-10-06), no función de producto; `tools/restart_camera.py` lo manda desde la Mac |
 
@@ -642,6 +643,19 @@ audio: no player installed; readings will arrive and not be heard   ← el aviso
 
 `--no-audio` recibe el audio y **no** lo reproduce (guarda nada más), para depurar una lectura sin
 sonido.
+
+### El volumen
+
+La placa no tiene botones de volumen. Desde el 2026-11-18 el nivel se elige en **Ajustes → Volumen del
+dispositivo** de la app, que manda `{"cmd":"volume","value":N}`. La placa lo aplica y lo guarda en
+`/var/lib/virovision/volume`, y **ese valor gana sobre `--volume`** en cada arranque: el flag es el
+nivel de una placa a la que nadie le eligió uno (por defecto **50**; era 90 cuando el transductor
+colgaba directo del GPIO, y con el amplificador PAM8403 resultó demasiado fuerte).
+
+> ⚠️ **El archivo `VOLUMEN` de `bootfs` es un parche previo al control de la app** (2026-11-18,
+> `boot/modo-red.sh`): reaplica su nivel 40 s después de que arranca el daemon. **Una vez que el
+> volumen se elige desde la app hay que borrarlo de la tarjeta**, o pisa el nivel elegido 40 s
+> después de cada arranque. Al borrarlo, `modo-red.sh` retira el drop-in en el arranque siguiente.
 
 ### Por dónde sale el sonido físicamente
 

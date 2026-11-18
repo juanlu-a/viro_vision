@@ -4800,3 +4800,33 @@ de hardware y en la skill.
   conclusiones de Pancho y el comentario de audio de 3.7.
 - **Sigue pendiente**: el patrón híbrido BLE + WiFi de 4.7 no tiene cita, y el índice del Doc se actualiza
   a mano (todavía muestra los subtítulos viejos de la bibliografía).
+
+## 2026-11-18: PAM8403 instalado y el volumen del dispositivo desde la app
+
+**Qué.** El volumen de la salida directa (ADR 0012) era inviable para la calle, así que se compraron dos
+PAM8403 mini (uno de repuesto) y se instaló uno: 5 V en el pin 2, GND en el 6, la entrada de un canal en el
+pin 12 con su GND en el 14, y el transductor en la salida + y − del mismo canal. Se retiraron los 260 Ω y
+los 47 µF. El problema se invirtió: al 90 % con que arrancaba el daemon, **demasiado fuerte**, y la placa no
+tiene botones de volumen.
+
+**Cómo se resolvió.**
+- **Parche inmediato desde la microSD**: un archivo `VOLUMEN` en `bootfs` (0 a 100) hace que
+  `modo-red.sh` instale un drop-in que reaplica ese nivel 40 s después de que arranca el daemon.
+- **El volumen se elige en la app**: Ajustes → *Volumen del dispositivo*. Comando nuevo
+  `{"cmd":"volume","value":N}`; la placa lo aplica, lo guarda en `/var/lib/virovision/volume` (gana sobre
+  `--volume` en cada arranque) y lo publica como `vol` en `status`. El control es un único elemento
+  ajustable para VoiceOver y TalkBack (pasos de 10) con botones − y + y una barra tocable para quien ve; se
+  armó con primitivas de React Native para no sumar un módulo nativo, que obligaría a un build nuevo.
+  Manda una sola escritura al terminar el gesto (400 ms).
+- **El nivel por defecto baja de 90 a 50 %**, para una placa a la que nadie le eligió uno.
+
+Quedó en el ADR 0012 (actualización: PAM8403 instalado), el ADR 0003 (actualización: el comando y el
+campo), la tabla de comandos de la tesis (sec. 7.1.4) y los README de `raspi/` y `raspi/boot/`.
+
+### Pendientes
+
+- Desplegar el daemon nuevo en la placa y, una vez que el control de la app funcione, **borrar `VOLUMEN`
+  de `bootfs`**: si queda, pisa el nivel elegido 40 s después de cada arranque.
+- La tesis (sec. 7.3.1, 7.3.3 y 10.1) todavía describe el prototipo sin amplificador: actualizarla con el
+  PAM8403.
+- Medir el consumo del amplificador junto con el de la placa.
