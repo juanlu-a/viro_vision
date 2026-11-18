@@ -85,6 +85,31 @@ if [ -d "$SRC" ]; then
   echo "avisos de sistema actualizados: $n en $DST"
 fi
 
+# Actualización del código del daemon desde la tarjeta (2026-11-18), para cuando no hay SSH:
+# `instalar-daemon.sh` está detrás de su centinela y sólo instala la primera vez. Si existe
+# /boot/firmware/virovision-update.tgz con el paquete `virovision/` (sólo el código Python: no toca
+# el .venv ni corre apt, así que no sirve si cambian las dependencias), reemplaza el paquete
+# instalado antes de que arranque el daemon, guarda el anterior en `virovision.anterior/` y renombra
+# el tgz a `.aplicado` para no reaplicarlo en cada arranque. Volver atrás: mover
+# `virovision.anterior` a `virovision` por SSH, o dejar en la tarjeta un tgz con la versión vieja.
+UPD=/boot/firmware/virovision-update.tgz
+APP=/home/virovision/virovision
+if [ -f "$UPD" ] && [ -d "$APP/virovision" ]; then
+  TMP=$(mktemp -d)
+  if tar xzf "$UPD" -C "$TMP" && [ -f "$TMP/virovision/__main__.py" ]; then
+    find "$TMP" -name '._*' -delete
+    rm -rf "$APP/virovision.anterior"
+    mv "$APP/virovision" "$APP/virovision.anterior"
+    mv "$TMP/virovision" "$APP/virovision"
+    chown -R virovision:virovision "$APP/virovision"
+    mv "$UPD" "$UPD.aplicado"
+    echo "daemon actualizado desde la tarjeta ($(ls "$APP/virovision" | wc -l) archivos)"
+  else
+    echo "virovision-update.tgz no trae virovision/__main__.py: no se aplica"
+  fi
+  rm -rf "$TMP"
+fi
+
 # Volumen fijado desde la tarjeta (2026-11-18): con el amplificador PAM8403 el 90 % del daemon es
 # demasiado fuerte y una placa en modo producto no tiene SSH para bajarlo. Si existe
 # /boot/firmware/VOLUMEN con un número de 0 a 100, un drop-in reaplica ese nivel 40 s después de que
