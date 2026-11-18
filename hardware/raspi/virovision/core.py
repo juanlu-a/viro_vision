@@ -47,6 +47,9 @@ ApControl = Callable[[bool], None]
 Say = Callable[[str], bool]
 # Cuts off whatever the speaker is playing. None when the board has nothing to play with.
 Hush = Callable[[], None]
+# Sets, applies and remembers the output level (0-100), returning the one in force (`audio.Volume`).
+# None when the board has no mixer to set (the Mac emulator, or `--no-audio`).
+SetVolume = Callable[[int], int]
 DEFAULT_AUDIO_TARGET = "device"
 AUDIO_TARGETS = ("device", "phone")
 AP_MINUTES_DEFAULT = 10
@@ -122,6 +125,7 @@ class Core:
         say: Optional[Say] = None,
         hush: Optional[Hush] = None,
         restart_camera: Optional[Callable[[], None]] = None,
+        set_volume: Optional[SetVolume] = None,
     ) -> None:
         self._loop = loop
         self._read_status = read_status
@@ -134,6 +138,7 @@ class Core:
         self._say = say
         self._hush = hush
         self._restart_camera = restart_camera
+        self._set_volume = set_volume
         self.audio_target = DEFAULT_AUDIO_TARGET
         """Where the user wants to hear ViroVision, as last written by the app (`cmd: 'audio'`).
 
@@ -278,6 +283,8 @@ class Core:
                 if self._bus is not None:
                     self._bus.audio_target = target
                 log.info("audio → %s", target)
+        elif name == "volume":
+            self._volume(int(cmd.get("value")))
         elif name == "say":
             self._say_notice(str(cmd.get("clip", "")))
         elif name == "hush":
@@ -304,6 +311,21 @@ class Core:
             self._in_executor(self._restart_camera)
         else:
             self._event({"t": "error", "msg": f"unknown command: {name}"})
+
+    def _volume(self, percent: int) -> None:
+        """The level the user chose in the app's Settings (2026-11-18). The device has no volume
+        buttons, and with the amplifier the fixed startup level was far too loud, so this is the only
+        way the person wearing it can change it.
+
+        Clamped here and again in `Volume`: the value arrives over the air. Applied in an executor
+        because `amixer` is a process. The new `status` goes out when it is done, so the app's slider
+        settles on the level the board actually has, not on the one it asked for.
+        """
+        if self._set_volume is None:
+            self._event({"t": "error", "msg": "this device has no volume control"})
+            return
+        future = self._in_executor(self._set_volume, max(0, min(100, percent)))
+        future.add_done_callback(lambda _: self.notify_status())
 
     def _say_notice(self, clip: str) -> None:
         """Play one of the pre-recorded system notices (`notices.py`).

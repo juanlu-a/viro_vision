@@ -76,6 +76,71 @@ def test_the_default_level_leaves_headroom():
     assert DEFAULT_VOLUME_PERCENT < 100
 
 
+def test_the_default_is_not_the_old_unamplified_level():
+    """90 % was right for a transducer hanging off a bare GPIO and far too loud once the PAM8403 went
+    in (2026-11-18). A board nobody has set a level on yet must not start at that."""
+    from virovision.audio import DEFAULT_VOLUME_PERCENT
+
+    assert DEFAULT_VOLUME_PERCENT <= 60
+
+
+def test_a_chosen_volume_survives_a_reboot(tmp_path):
+    """The whole point of persisting it: the device has no volume buttons, and a reboot that put the
+    level back to the default would be the device ignoring what the user asked for."""
+    from virovision.audio import Volume
+
+    applied = []
+    path = tmp_path / "state" / "volume"
+    Volume(path=path, default=50, apply=applied.append).set(30)
+
+    after_reboot = Volume(path=path, default=50, apply=applied.append)
+    after_reboot.apply_current()
+    assert after_reboot.current == 30
+    assert applied == [30, 30]
+
+
+def test_without_a_remembered_level_the_default_applies(tmp_path):
+    from virovision.audio import Volume
+
+    applied = []
+    Volume(path=tmp_path / "volume", default=50, apply=applied.append).apply_current()
+    assert applied == [50]
+
+
+def test_a_garbled_volume_file_falls_back_to_the_default(tmp_path):
+    """Someone edits it by hand, or the battery dies mid-write on an older daemon: the board must
+    still start, at the default, rather than crash on `int()`."""
+    from virovision.audio import Volume
+
+    path = tmp_path / "volume"
+    path.write_text("loud\n")
+    assert Volume(path=path, default=50, apply=lambda _: True).current == 50
+
+
+def test_the_volume_is_clamped_before_it_is_applied_or_stored(tmp_path):
+    from virovision.audio import Volume
+
+    applied = []
+    path = tmp_path / "volume"
+    volume = Volume(path=path, default=50, apply=applied.append)
+    assert volume.set(140) == 100
+    assert volume.set(-5) == 0
+    assert applied == [100, 0]
+    assert path.read_text().strip() == "0"
+
+
+def test_a_volume_that_cannot_be_stored_still_applies(tmp_path):
+    """Losing the level at the next reboot is better than refusing to change it now."""
+    from virovision.audio import Volume
+
+    blocker = tmp_path / "not-a-dir"
+    blocker.write_text("")
+    applied = []
+    volume = Volume(path=blocker / "volume", default=50, apply=applied.append)
+    assert volume.set(20) == 20
+    assert applied == [20] and volume.current == 20
+
+
 def test_a_sequence_with_no_player_installed_does_not_raise():
     """Three clips in a row are a bus announcement. On the Mac there is no `aplay`, and the daemon has
     to survive that: the reading is lost, not the process."""

@@ -46,12 +46,13 @@ class ViroVisionService(Service):
         say: Optional[Say] = None,
         hush: Optional[Hush] = None,
         restart_camera: Optional[Callable[[], None]] = None,
+        set_volume: Optional[Callable[[int], int]] = None,
     ) -> None:
         super().__init__(SERVICE_UUID, True)
         self.core = Core(
             loop, read_status, capture, synthetic_payload, self._notify,
             ap_control=ap_control, read_wifi=read_wifi, say=say, hush=hush,
-            restart_camera=restart_camera,
+            restart_camera=restart_camera, set_volume=set_volume,
         )
         self.on_status_read: Optional[Callable[[], None]] = None
         """Called on every GATT read of `status`. The app reads it right after subscribing to the

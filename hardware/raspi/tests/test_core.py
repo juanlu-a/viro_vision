@@ -329,3 +329,38 @@ def test_restart_camera_without_a_camera_says_so(loop):
     core.write_control(b'{"cmd":"restart_camera"}')
     loop.run_until_complete(_drain(loop))
     assert [e["msg"] for e in n.events()] == ["no camera to restart"]
+
+
+def test_volume_sets_the_level_and_pushes_the_new_status(loop):
+    """The app's slider settles on what the board reports back, so the status has to follow the
+    change; otherwise the slider shows the requested level until the next 15 s heartbeat."""
+    asked = []
+    n = Notifications()
+    core = Core(loop, lambda: {"vol": asked[-1] if asked else None}, None, bytes, n, set_volume=lambda p: asked.append(p) or p)
+    core.write_control(b'{"cmd":"volume","value":35}')
+    _until(loop, lambda: any(json.loads(v).get("vol") == 35 for v in n.of(STATUS)))
+    assert asked == [35] and n.events() == []
+
+
+def test_volume_out_of_range_is_clamped_before_it_reaches_the_mixer(loop):
+    asked = []
+    n = Notifications()
+    core = Core(loop, lambda: {}, None, bytes, n, set_volume=lambda p: asked.append(p) or p)
+    core.write_control(b'{"cmd":"volume","value":250}')
+    _until(loop, lambda: asked == [100])
+
+
+def test_volume_without_a_value_is_an_error_not_a_crash(loop):
+    """`int(None)` raised inside the D-Bus setter before `write_control` caught bad fields."""
+    n = Notifications()
+    core = Core(loop, lambda: {}, None, bytes, n, set_volume=lambda p: p)
+    core.write_control(b'{"cmd":"volume"}')
+    loop.run_until_complete(_drain(loop))
+    assert [e["t"] for e in n.events()] == ["error"]
+
+
+def test_volume_on_a_board_without_a_mixer_says_so(loop):
+    core, n = build(loop)
+    core.write_control(b'{"cmd":"volume","value":40}')
+    loop.run_until_complete(_drain(loop))
+    assert [e["msg"] for e in n.events()] == ["this device has no volume control"]
