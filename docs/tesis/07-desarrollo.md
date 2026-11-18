@@ -596,16 +596,11 @@ Las líneas de otros sistemas, como las suburbanas e interdepartamentales operad
 
 ### 7.5.1 Estructura
 
-```
-[Doble clic en el botón]
-├─ 1. la placa captura y publica la fotografía  (HTTP sobre el punto de acceso)
-├─ 2. la aplicación la descarga                 (~50 ms)
-├─ 3. la envía al intermediario y de allí al modelo (~0,85 a 1,7 s)
-├─ 4. el modelo devuelve tres campos             {tipo, marca, detalle}
-├─ 5. la aplicación arma la frase en español
-├─ 6. síntesis de voz                            (~1 a 1,5 s)
-└─ 7. el audio vuelve a la placa y se reproduce   (~50 ms)
-```
+<!-- imagen del Doc -->
+
+Figura 19: Pasos de una lectura en el modo supermercado, del doble clic en el botón a la reproducción del audio en el dispositivo.
+
+Fuente: elaboración propia.
 
 El tiempo total es de aproximadamente 3 segundos, dentro del objetivo de 3 a 4 segundos fijado por el equipo.
 

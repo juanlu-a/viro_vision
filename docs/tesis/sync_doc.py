@@ -426,10 +426,73 @@ def op_pos(op):
     return op["at"] if op["t"] == "new" else op["d"]["hs"]
 
 
+def patch(d, m):
+    """Paragraph-level edit: when the section has the same sequence of paragraphs, list items and tables
+    (same rows and columns) as the Markdown, rewrite only the paragraphs and table cells whose text
+    changed, keeping their paragraph style. Much smaller batches than a full replace. Returns None when
+    the structure differs (then a full replace)."""
+    units = []
+    for el in d["els"]:
+        if "table" in el:
+            units.append(("table", el))
+        elif "paragraph" in el:
+            p = el["paragraph"]
+            text = para_text(p).rstrip("\n")
+            if not text.strip():
+                continue
+            if any("inlineObjectElement" in e for e in p["elements"]) or p.get("positionedObjectIds"):
+                return None
+            units.append(("li" if p.get("bullet") else "p", el))
+    mb = [x for x in m["blocks"] if x["k"] == "table" or runs_text(x["runs"]).strip()]
+    if len(units) != len(mb):
+        return None
+    edits = []  # (start, end, runs)
+
+    def edit(el_par, runs):
+        text = para_text(el_par["paragraph"]).rstrip("\n")
+        new = runs_text(runs)
+        if text != new:
+            edits.append((el_par["startIndex"], el_par["endIndex"], runs))
+
+    for (kind, el), blk in zip(units, mb):
+        mk = "li" if blk["k"] == "li" else ("table" if blk["k"] == "table" else "p")
+        if mk != kind:
+            return None
+        if kind != "table":
+            edit(el, blk["runs"])
+            continue
+        rows = el["table"]["tableRows"]
+        if len(rows) != len(blk["rows"]):
+            return None
+        for r, mr in zip(rows, blk["rows"]):
+            cells = r["tableCells"]
+            if len(cells) != len(mr):
+                return None
+            for c, mc in zip(cells, mr):
+                ps = [x for x in c["content"] if "paragraph" in x]
+                if len(ps) != 1:
+                    if norm(" ".join(para_text(x["paragraph"]) for x in ps)) != norm(runs_text(mc)):
+                        return None
+                    continue
+                edit(ps[0], mc)
+    b = Builder()
+    for s, e, runs in sorted(edits, key=lambda x: -x[0]):
+        new = runs_text(runs)
+        if e - 1 > s:
+            b.req.append({"deleteContentRange": {"range": b.rng(s, e - 1)}})
+        if new:
+            b.req.append({"insertText": {"location": {"index": s}, "text": new}})
+            b.text_style(s, s + u16(new), runs)
+    return b.req
+
+
 def build(op):
     b = Builder()
     if op["t"] == "replace":
         d, m = op["d"], op["m"]
+        small = patch(d, m)
+        if small is not None:
+            return small
         if d["end"] > d["he"]:
             b.req.append({"deleteContentRange": {"range": b.rng(d["he"], d["end"])}})
         b.emit_blocks(d["he"] - 1, m["blocks"])

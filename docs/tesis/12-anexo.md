@@ -284,7 +284,7 @@ A partir del manual se generaron los íconos de la aplicación para cada platafo
 
 <!-- imagen del Doc: figuras/icono-app-hd.png -->
 
-Figura 19: Ícono de la aplicación ViroVision.
+Figura 20: Ícono de la aplicación ViroVision.
 
 Fuente: manual de marca del proyecto (docs/brand/virovision-app-icon.svg).
 
@@ -384,19 +384,19 @@ Las curvas de precisión, exhaustividad y F1 en función del umbral de confianza
 
 <!-- imagen del Doc -->
 
-Figura 20: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 21: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
 <!-- imagen del Doc -->
 
-Figura 21: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 22: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
 <!-- imagen del Doc -->
 
-Figura 22: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 23: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
