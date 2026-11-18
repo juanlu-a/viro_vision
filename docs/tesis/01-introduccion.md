@@ -2,7 +2,7 @@
 
 Las personas con discapacidad visual enfrentan diariamente dificultades para desenvolverse de forma autónoma en entornos urbanos y domésticos. Actividades como identificar un ómnibus, reconocer productos en un supermercado o ubicarse dentro de un hogar pueden representar desafíos significativos.
 
-Actualmente existen diversas herramientas de asistencia para personas con discapacidad visual: las tradicionales, como el bastón blanco o los perros guía, y las tecnológicas, como lectores de pantalla, aplicaciones móviles y dispositivos *wearables* como los Ray-Ban Meta o el MyEye de OrCam \[55\]. En general, estas últimas no están adaptadas al contexto local uruguayo y pueden resultar de difícil acceso. Al mismo tiempo, el avance en técnicas de visión por computadora e inteligencia artificial ha abierto nuevas posibilidades para desarrollar dispositivos de asistencia más accesibles y adaptados a necesidades específicas.
+Actualmente existen diversas herramientas de asistencia para personas con discapacidad visual: las tradicionales, como el bastón blanco o los perros guía, y las tecnológicas, como lectores de pantalla, aplicaciones móviles y dispositivos *wearables* como el MyEye de OrCam \[55\]. En general, estas últimas no están adaptadas al contexto local uruguayo y pueden resultar de difícil acceso. Al mismo tiempo, el avance en técnicas de visión por computadora e inteligencia artificial ha abierto nuevas posibilidades para desarrollar dispositivos de asistencia más accesibles y adaptados a necesidades específicas.
 
 El proyecto contó con una entrevista inicial con un usuario ciego, con el apoyo de la empresa Arnaldo Castro S.A. y con la colaboración de la Unión Nacional de Ciegos del Uruguay (UNCU).
 

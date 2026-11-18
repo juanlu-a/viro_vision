@@ -2,7 +2,7 @@
 
 ## 2.1 Alcance
 
-El proyecto consiste en el diseño y desarrollo de un sistema de asistencia para personas con baja o nula visión, capaz de reconocer visualmente objetos de interés mediante técnicas de visión por computadora, aprendizaje automático e inteligencia artificial. El sistema está orientado a la identificación de líneas de ómnibus metropolitanos y de productos de supermercado. El alcance original del segundo caso comprendía los productos de la canasta básica. En una primera prueba con el dispositivo real, el modelo identificó los productos de la canasta básica que se probaron sin superar el tiempo de respuesta fijado, por lo que el alcance se amplió a cualquier alimento y la canasta básica se mantuvo como conjunto de evaluación; la medición sistemática sobre ese conjunto queda pendiente (sec. 7.5.4).
+El proyecto consiste en el diseño y desarrollo de un sistema de asistencia para personas con baja o nula visión, capaz de reconocer visualmente objetos de interés mediante técnicas de visión por computadora, aprendizaje automático e inteligencia artificial. El sistema está orientado a la identificación de líneas de ómnibus metropolitanos y de productos de supermercado. El alcance original del segundo caso comprendía los productos de la canasta básica. En una primera prueba con el dispositivo real, el modelo identificó, dentro del tiempo de respuesta fijado, los productos de la canasta básica que se probaron, por lo que el alcance se amplió a cualquier alimento y la canasta básica se mantuvo como conjunto de evaluación; la medición sistemática sobre ese conjunto queda pendiente (sec. 7.5.4).
 
 La solución comprende un dispositivo con cámara (acoplado a una patilla de lentes) que captura imágenes del entorno, procesa la información visual y proporciona al usuario retroalimentación auditiva en tiempo real. El dispositivo se integra con una aplicación móvil, que funciona como apoyo para la conectividad, el procesamiento y la interacción con el sistema.
 
@@ -51,7 +51,7 @@ El proyecto comprendió los siguientes entregables:
 1. Sistema de retroalimentación auditiva: implementación del mecanismo de comunicación auditiva con el usuario.
 1. Aplicación móvil: desarrollo de la aplicación para conectividad, configuración e interacción.
 1. Integración del sistema completo: integración de todos los módulos en un sistema funcional.
-1. Validación del prototipo: pruebas en escenarios reales y evaluación de desempeño.
+1. Validación del prototipo: pruebas preliminares y evaluación de desempeño; la validación sistemática en condiciones reales de uso queda pendiente (sec. 7.9).
 1. Informe final de tesis: documento completo que describe el proyecto, desarrollo y resultados.
 1. Presentación y demo: exposición final del proyecto y demostración funcional del sistema.
 
@@ -65,7 +65,7 @@ Al 12 de noviembre de 2026, la carcasa está terminada: su versión final, la 0.
 
 ## 2.4 Antecedentes y contexto
 
-La discapacidad visual representa una de las condiciones que más impacta en la autonomía cotidiana de las personas. Según el Informe mundial sobre la visión de la Organización Mundial de la Salud (2019), al menos 2.200 millones de personas en el mundo tienen alguna forma de deficiencia visual, de las cuales al menos 1.000 millones presentan una deficiencia que podría haberse prevenido o que aún no ha recibido tratamiento \[102\]. La ceguera y la baja visión limitan severamente la capacidad de las personas para desenvolverse de forma independiente en entornos urbanos y domésticos.
+La discapacidad visual representa una de las condiciones que más impacta en la autonomía cotidiana de las personas. Según el Informe mundial sobre la visión de la Organización Mundial de la Salud, al menos 2.200 millones de personas en el mundo tienen alguna forma de deficiencia visual, de las cuales al menos 1.000 millones presentan una deficiencia que podría haberse prevenido o que aún no ha recibido tratamiento \[102\]. La ceguera y la baja visión limitan severamente la capacidad de las personas para desenvolverse de forma independiente en entornos urbanos y domésticos.
 
 ### 2.4.1 Discapacidad visual en Uruguay
 
@@ -179,7 +179,7 @@ Fuente: cuestionario distribuido por la UNCU a su red de voluntarios (26 respues
 
 ## 2.5 Consideraciones adicionales
 
-La validación con usuarios consistió en el cuestionario distribuido por la UNCU y en una entrevista con un usuario ciego (anexo 12.4), que orientaron la definición de los casos de uso hacia necesidades concretas. Las pruebas de usabilidad con usuarios ciegos quedan pendientes (sec. 7.9).
+El relevamiento con usuarios consistió en el cuestionario distribuido por la UNCU y en una entrevista con un usuario ciego (anexo 12.4), que orientaron la definición de los casos de uso hacia necesidades concretas. Las pruebas de usabilidad del prototipo con usuarios ciegos quedan pendientes (sec. 7.9).
 
 Asimismo, se tuvo en cuenta el contexto local de Uruguay, buscando que la solución fuera accesible, viable y relevante para el entorno en el cual se utilizaría.
 

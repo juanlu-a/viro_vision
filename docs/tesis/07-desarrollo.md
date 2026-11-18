@@ -84,7 +84,7 @@ Las mediciones se realizaron sobre una Raspberry Pi Zero 2 W. Entre el 9 y el 18
 
 La elección del modelo pasó por cuatro etapas.
 
-La primera fue explorar modelos que se ejecutaran en el propio teléfono, que era lo que proponía el ADR 0004. El 12 y el 13 de agosto de 2026 se probaron modelos de la familia Gemma \[40\] sobre un iPhone 15 Pro (docs/spike-vision-local.md). Con LiteRT-LM \[42\], Gemma 3 1B generó texto en 910 ms, pero la visión falló con los tres modelos probados, de 756 MB a 2,5 GB. Con ExecuTorch \[44\], el modelo multimodal Gemma 4 E2B sí reconoció la imagen, pero requería 3 GB de descarga, unos 4 segundos de carga y unos 6,4 segundos por lectura, por encima del tiempo objetivo (sec. 3.4 y 7.2.8). En la misma exploración, un modelo de la nube devolvió el primer fragmento de la respuesta en menos de un segundo.
+La primera fue explorar modelos que se ejecutaran en el propio teléfono, que era lo que proponía el ADR 0004. El 12 y el 13 de agosto de 2026 se probaron modelos de la familia Gemma \[40\] sobre un iPhone 15 Pro (docs/spike-vision-local.md). Con LiteRT-LM \[42\], Gemma 3 1B generó texto en 910 ms, pero la visión falló con los tres modelos probados, de 756 MB a 2,5 GB. Con ExecuTorch \[44\], el modelo multimodal Gemma 4 E2B sí reconoció la imagen, pero requería 3 GB de descarga, unos 4 segundos de carga y unos 6,4 segundos por lectura, por encima del tiempo objetivo (sec. 5.2.3 y 7.2.8). En la misma exploración, un modelo de la nube devolvió el primer fragmento de la respuesta en menos de un segundo.
 
 La segunda etapa fue la decisión de usar la nube. Desde el planteo del ADR 0006 regía una restricción: el modelo debía ser gratuito, porque exigirle al usuario crear una cuenta y cargar credenciales propias habría contradicho la accesibilidad del producto. El 30 de agosto el equipo decidió que el modo supermercado se resolviera con un modelo de visión en la nube (ADR 0006, actualización del 30 de agosto de 2026). Fue una excepción acotada al ADR 0001: se aplica sólo a este modo, cuya latencia admite unos segundos y cuyo usuario suele estar en un lugar con cobertura, y queda pendiente un respaldo local (sec. 7.5.5). Con la restricción de gratuidad, la elección se limitaba a Gemini. El primer modelo por defecto fue gemini-3.6-flash, pero tardaba entre 34 y 47 segundos, porque los modelos de esa línea realizan un paso de razonamiento aunque la respuesta sea breve; ese mismo día se cambió por gemini-3.5-flash-lite, que en esas primeras pruebas respondió en 2 a 3 segundos con el mismo acierto.
 
@@ -135,7 +135,7 @@ El mayor costo del procesamiento local es el arranque. En la Pi 3 B+ el modo óm
 
 ### 7.2.5 Inferencia en el sensor de la cámara
 
-El diseño original incluía un acelerador Coral TPU conectado por USB \[43\], sobre el cual se ejecutaría el detector en formato TensorFlow Lite. Durante el desarrollo se incorporó la Raspberry Pi AI Camera, cuyo sensor Sony IMX500 ejecuta un modelo de detección dentro del propio sensor. El modelo convertido ocupa 2,64 MB y, con el entorno de ejecución del sensor, la ocupación total es de 7,12 MB sobre 8 MB (90%) \[37\] \[38\]; el sensor procesa 15 cuadros por segundo sin usar procesador ni memoria de la placa.
+El diseño original incluía un acelerador Coral TPU conectado por USB \[43\], sobre el cual se ejecutaría el detector en formato TensorFlow Lite. Durante el desarrollo se incorporó la Raspberry Pi AI Camera, cuyo sensor Sony IMX500 ejecuta un modelo de detección dentro del propio sensor. El modelo convertido ocupa 2,64 MB y, con el entorno de ejecución del sensor, la ocupación total es de 7,12 MB sobre 8 MB (90%) \[37\], \[38\]; el sensor procesa 15 cuadros por segundo sin usar procesador ni memoria de la placa.
 
 Se decidió retirar el Coral del diseño (ADR 0006, enmienda del 7 de septiembre de 2026). Con ello se eliminó un componente, su costo y su consumo, y se liberó el único puerto USB de la placa. El formato TensorFlow Lite se reemplazó por ONNX y por el formato propio del sensor. La decisión es especialmente relevante en la Zero 2 W, que dispone de unos 415 MB de memoria útil: al no ocupar memoria ni procesador con la detección, la placa queda disponible para el recorte y el OCR.
 
@@ -511,12 +511,12 @@ El 21 de octubre se probó usar la caja del detector reentrenado sin márgenes, 
 
 ### 7.4.7 La lectura: comparación de motores de OCR
 
-Para leer el recorte se compararon motores de OCR detrás de una misma interfaz, sobre el mismo conjunto y con los mismos recortes. La comparación se midió en la computadora de desarrollo, con el detector de dos etapas y el margen vertical de 0,12 vigente en ese momento; los tiempos corresponden sólo al OCR. En la placa, cada lectura demora entre 583 y 1.006 ms (sec. 7.2.4).
+Para leer el recorte se compararon motores de OCR detrás de una misma interfaz, sobre el mismo conjunto y con los mismos recortes. La comparación se midió en la computadora de desarrollo, con el detector de dos etapas; los tiempos corresponden sólo al OCR. En la placa, cada lectura demora entre 583 y 1.006 ms (sec. 7.2.4).
 
 | **Motor de OCR** | **Número** | **Destino** | **Lectura completa** | **Tiempo (mediana)** |
 |---|---|---|---|---|
-| PP-OCRv5 vía ONNX \[39\] \[41\] (elegido; se ejecuta en la placa) | 89,6% | 78,6% | 85,4% | 7 ms |
-| PaddleOCR 3.x con su entorno de ejecución nativo \[26\] \[27\] | 89,6% | 76,8% | 79,2% | 118 ms |
+| PP-OCRv5 vía ONNX \[39\], \[41\] (elegido; se ejecuta en la placa) | 89,6% | 78,6% | 85,4% | 7 ms |
+| PaddleOCR 3.x con su entorno de ejecución nativo \[26\], \[27\] | 89,6% | 76,8% | 79,2% | 118 ms |
 | PP-OCRv4 vía ONNX (RapidOCR \[28\]) | 87,5% | 73,2% | 75,0% | 81 ms |
 
 Tesseract, el motor clásico de referencia, no se incluyó en la comparación: está orientado a texto impreso en documentos y no a caracteres formados por puntos de LED (sec. 4.4).

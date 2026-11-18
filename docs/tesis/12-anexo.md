@@ -465,7 +465,7 @@ Corridas guardadas sobre las mismas 117 imágenes del conjunto de evaluación. S
 | Dos etapas, PaddleOCR nativo | 0,701 / 1,000 / 0,824 | 0,896 | 0,768 | 0,792 | 152,7 ms |
 | Dos etapas, con realce CLAHE | 0,701 / 1,000 / 0,824 | 0,771 | 0,643 | 0,646 | 136,6 ms |
 
-Definiciones utilizadas: Para el cartel, un verdadero positivo es una imagen anotada con cartel presente en la que el sistema lo detecta; la exactitud del número se calcula sobre las 48 imágenes con número esperado y la del destino sobre las 56 con destino esperado; la lectura completa exige acierto simultáneo en ambos campos.
+Definiciones utilizadas: para el cartel, un verdadero positivo es una imagen anotada con cartel presente en la que el sistema lo detecta; la exactitud del número se calcula sobre las 48 imágenes con número esperado y la del destino sobre las 56 con destino esperado; la lectura completa exige acierto simultáneo en ambos campos.
 
 Resultado vigente (12 de octubre de 2026), con el código final del repositorio de visión y la regla de anunciar sólo lo que el catálogo conoce:
 

@@ -2,7 +2,7 @@
 
 El proyecto se desarrolló en un período de aproximadamente nueve meses, desde marzo de 2026 hasta el 30 de noviembre de 2026, fecha límite de entrega. El desarrollo se planificó para cerrar a mediados de noviembre, reservando deliberadamente las últimas dos semanas para integración final, corrección de defectos y pruebas conjuntas de los tres pilares.
 
-Aunque la metodología de trabajo fue ágil (sec. 5.1), se complementó con una línea de referencia temporal (sec. 12.1): un desglose de entregables con estimación de complejidad y tiempo, y un cronograma de hitos que ordena las dependencias entre pilares. El sentido de esa línea de referencia en un proyecto iterativo no era fijar el contenido de cada semana, sino hacer visibles las dependencias duras (qué no puede empezar hasta que otra cosa termine) y las paralelizaciones posibles, lo que permitió que tres personas trabajaran sobre tres dominios distintos sin bloquearse.
+Aunque la metodología de trabajo fue ágil (sec. 5.1), se complementó con una línea de referencia temporal (anexo 12.1): un desglose de entregables con estimación de complejidad y tiempo, y un cronograma de hitos que ordena las dependencias entre pilares. El sentido de esa línea de referencia en un proyecto iterativo no era fijar el contenido de cada semana, sino hacer visibles las dependencias duras (qué no puede empezar hasta que otra cosa termine) y las paralelizaciones posibles, lo que permitió que tres personas trabajaran sobre tres dominios distintos sin bloquearse.
 
 ## 6.1 Estructura del desglose y medición del avance
 
