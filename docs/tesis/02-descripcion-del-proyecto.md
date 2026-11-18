@@ -44,7 +44,7 @@ El proyecto comprendió los siguientes entregables:
 1. Documento de contexto y problema: análisis de la situación de personas con discapacidad visual, incluyendo contexto en Uruguay, estadísticas y problemáticas principales.
 1. Estado del arte: revisión de trabajos y soluciones existentes hasta la fecha en visión por computadora, OCR y dispositivos asistivos.
 1. Relevamiento con usuarios: una entrevista, cuya transcripción se incluye en el anexo 12.4, y un cuestionario distribuido por la UNCU, con el análisis de las necesidades relevadas.
-1. Documento de requisitos: definición de requisitos funcionales, no funcionales, restricciones y/o riesgos del sistema.
+1. Documento de requisitos: definición de requisitos funcionales, no funcionales, restricciones y riesgos del sistema, que se incluye en el anexo 12.12.
 1. Diseño de arquitectura: descripción de la arquitectura del sistema, componentes y flujo de información.
 1. Prototipo del dispositivo físico: implementación de un dispositivo funcional con cámara y salida de audio.
 1. Sistema de visión por computadora: desarrollo e integración de modelos para reconocimiento de ómnibus y productos.

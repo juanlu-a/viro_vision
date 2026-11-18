@@ -490,3 +490,45 @@ Una sola imagen (el cuadro nocturno de la línea 109) mueve estas cifras unos do
 Columnas del archivo de verdad de terreno: identificador de imagen, número esperado, destino esperado, presencia de ómnibus, presencia de cartel y una nota con el texto literal del cartel cuando difiere de la denominación oficial.
 
 <!-- imagen del Doc -->
+
+## 12.12 Documento de requisitos
+
+Este anexo reúne los requisitos del sistema, que el proyecto incluyó entre sus entregables (sec. 2.3). Surgen de los objetivos (sec. 2.2), del relevamiento con usuarios (sec. 2.4 y anexos 12.2 y 12.4) y de las decisiones de arquitectura tomadas durante el desarrollo. Para cada requisito se indica su origen, la sección donde se desarrolla y su estado al cierre de este informe. Un requisito figura como cumplido cuando está implementado y verificado por el equipo; las pruebas con usuarios ciegos, que todavía no se realizaron (sec. 7.9), pueden modificar varios de ellos, en particular los que dependen de la percepción del usuario.
+
+### 12.12.1 Requisitos funcionales
+
+| **Código** | **Requisito** | **Origen** | **Estado** |
+|---|---|---|---|
+| RF-01 | En el modo ómnibus, el sistema detecta los ómnibus que se acercan y anuncia por voz su presencia, una sola vez por vehículo | Objetivos 3 y 5; relevamiento | Cumplido (sec. 7.4.9) |
+| RF-02 | El sistema lee el cartel del ómnibus y anuncia la línea y el destino, contrastados con el catálogo de líneas | Objetivo 3; relevamiento | Cumplido; la evaluación sistemática en la calle está pendiente (sec. 7.4 y 7.9) |
+| RF-03 | Con varios ómnibus en la escena, el sistema anuncia primero el más cercano | Objetivo 8 | Cumplido mediante el área de la caja delimitadora (sec. 7.4.1) |
+| RF-04 | En el modo supermercado, ante un pedido del usuario, el sistema identifica el producto y comunica tipo, marca y detalle, en ese orden | Objetivos 3 y 5; relevamiento | Cumplido (sec. 7.5.2) |
+| RF-05 | El usuario controla el sistema con un único botón en el dispositivo: un clic para el modo ómnibus, doble clic para una lectura de producto y pulsación larga para volver a la espera | Relevamiento; ADR 0007 | Cumplido (sec. 7.1.2 y 7.2.6) |
+| RF-06 | En el modo ómnibus, un clic repite el último anuncio | Relevamiento | Cumplido (sec. 7.1.2) |
+| RF-07 | El sistema informa por voz y en texto el nivel de batería del dispositivo, con un aviso por debajo del 20% | Accesibilidad | Cumplido (sec. 7.3.3 y 7.6.4) |
+| RF-08 | La aplicación se vincula con el dispositivo y mantiene el enlace sin que el usuario configure la red | Objetivo 6 | Cumplido (sec. 7.6.4) |
+| RF-09 | El usuario elige por dónde escucha las respuestas, en el dispositivo o en el teléfono, y puede probar el audio desde la configuración | Objetivo 5 | Cumplido (sec. 7.6.3 y 7.6.5) |
+| RF-10 | Un acompañante vidente o un usuario con resto visual puede verificar en la pantalla la imagen que originó una respuesta | Accesibilidad | Cumplido sólo en el modo desarrollo de la aplicación (sec. 7.7.3) |
+
+### 12.12.2 Requisitos no funcionales
+
+| **Código** | **Requisito** | **Origen** | **Estado** |
+|---|---|---|---|
+| RNF-01 | El modo ómnibus funciona sin conexión a internet | ADR 0001 | Cumplido: la detección corre en el sensor de la cámara y la lectura en la placa (sec. 7.2.4 y 7.2.5) |
+| RNF-02 | Una lectura del modo supermercado se responde en 3 a 4 segundos, desde el doble clic hasta el audio | Equipo | Cumplido, con unos 3 segundos (sec. 7.5.1) |
+| RNF-03 | El sistema prioriza la precisión de lo que anuncia frente a la exhaustividad: una lectura que no se confirma no se anuncia | Consecuencias de un anuncio erróneo para el usuario | Cumplido (sec. 3.2 y 7.4.9) |
+| RNF-04 | El sistema no emite audio que el usuario no haya solicitado | Accesibilidad | Cumplido (sec. 7.1.2) |
+| RNF-05 | La aplicación cumple los criterios de WCAG 2.2 de nivel AA, con contraste de nivel AAA para el texto, y es utilizable con VoiceOver y TalkBack | Accesibilidad | Contraste verificado de forma automatizada; las pruebas con usuarios ciegos están pendientes (sec. 3.8 y 7.7) |
+| RNF-06 | Las credenciales de los servicios de nube no se incorporan a la aplicación distribuida | ADR 0008 | Cumplido con el intermediario propio, salvo la excepción temporal declarada en la sec. 8.7.7 (sec. 7.2.3) |
+| RNF-07 | El costo de una lectura del modo supermercado no limita el uso | Equipo | Cumplido, con unos USD 0,0003 por lectura (sec. 7.2.2) |
+| RNF-08 | Los errores técnicos no se muestran al usuario; se registran en la telemetría | ADR 0011 | Cumplido (sec. 7.2.7) |
+| RNF-09 | El dispositivo funciona con batería propia y se lleva montado en la patilla de unos lentes | Objetivo 2 | Cumplido; la autonomía real está pendiente de medición (sec. 7.3.3 y 7.3.5) |
+| RNF-10 | Los datos personales que capta la cámara se tratan conforme a la Ley 18.331 | Normativa | Cumplido para el desarrollo; la función de evidencia debe retirarse antes de una versión pública (sec. 8.6.3) |
+
+### 12.12.3 Restricciones
+
+El proyecto se desarrolló con restricciones que condicionaron las decisiones anteriores. En cuanto al hardware, el dispositivo se construyó sobre una Raspberry Pi Zero 2 W con la cámara Raspberry Pi AI Camera, cuya radio WiFi opera sólo en la banda de 2,4 GHz y comparte antena con Bluetooth (sec. 7.3.1 y 7.2.1). El montaje en la patilla de unos lentes limita el tamaño y el peso de la carcasa y de la batería (sec. 7.3.5). En cuanto al costo, el prototipo se construyó con componentes comprados en Uruguay, y su costo de reproducción es de 211,12 USD (sec. 7.3.6). Los servicios de nube se utilizaron en sus planes gratuitos o con un tope de gasto configurado en cada proveedor (sec. 7.2.2 y 7.2.3). En cuanto al plazo, el trabajo se desarrolló entre marzo y noviembre de 2026, con un equipo de tres integrantes (cap. 6). Por último, el sistema está orientado a usuarios de Montevideo y su área metropolitana, por lo que el catálogo de líneas y la voz se restringen a ese contexto (sec. 7.4.2 y 7.5.3).
+
+### 12.12.4 Riesgos
+
+Los riesgos del proyecto, su estado y la mitigación adoptada se presentan en la sec. 6.7. Los riesgos de seguridad aceptados para el prototipo y las brechas operativas pendientes se detallan en las sec. 8.6 y 8.7.7.
