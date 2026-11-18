@@ -101,6 +101,11 @@ export interface BleClient {
    */
   hushDevice(): Promise<void>;
   /**
+   * Sets the level of the board's speaker, 0-100 (`cmd: 'volume'`). The board applies it, remembers
+   * it across reboots and answers with a new `status` whose `vol` is the level actually in force.
+   */
+  writeVolume(percent: number): Promise<void>;
+  /**
    * Whether there is a live GATT link right now.
    *
    * Synchronous and cheap on purpose: the announcement path has to know **where to speak** before it
@@ -214,6 +219,9 @@ const stubClient: BleClient = {
   },
   async hushDevice() {
     /* there is no board to hush */
+  },
+  async writeVolume() {
+    if (!SIMULATE_DEVICE) throw new BleNotImplementedError();
   },
   isLinked() {
     // False in a build with no BLE, and false in the simulated one too: the simulated device has no

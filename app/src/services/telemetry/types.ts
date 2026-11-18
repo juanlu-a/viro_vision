@@ -62,6 +62,7 @@ export type EventType =
   | 'device.mode'
   | 'device.modeFailed'
   | 'device.audioTargetFailed'
+  | 'device.volumeFailed'
   | 'device.readRequest'
   // Bus mode asked for before its OCR finished loading: how often the user meets that window
   | 'device.warmingUp'
