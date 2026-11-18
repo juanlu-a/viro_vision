@@ -9,7 +9,7 @@ se pierde, se pierde la única forma de entrar a una placa en modo producto sin 
 
 | archivo | quién lo corre | qué hace |
 |---|---|---|
-| `modo-red.sh` | `virovision-modo-red.service`, cada arranque | modo de red según exista `SIN-AP`; instala perfiles `*.nmconnection` y los avisos de sistema dejados en la tarjeta (y retira los que la tarjeta ya no trae). Sólo trabaja si algo cambió: ver abajo |
+| `modo-red.sh` | `virovision-modo-red.service`, cada arranque | modo de red según exista `SIN-AP`; instala perfiles `*.nmconnection` y los avisos de sistema dejados en la tarjeta (y retira los que la tarjeta ya no trae). Si existe `VOLUMEN` (un número de 0 a 100), instala un drop-in que reaplica ese nivel de ALSA 40 s después de que arranca el daemon; sin el archivo, lo retira (2026-11-18, parche para bajar el volumen sin SSH; **borrarlo una vez que el volumen se elige desde la app**, o pisa el nivel elegido en cada arranque). Sólo trabaja si algo cambió: ver abajo |
 | `instalar-daemon.sh` | `virovision-instalar.service`, etapa 2 | extrae `virovision-daemon.tgz` y corre `setup.sh`. **Protegido por la centinela `/var/lib/virovision-instalado`**: una vez instalado no se vuelve a ejecutar, así que un daemon nuevo se despliega por SSH |
 
 ## `modo-red.sh` está en la cadena crítica del arranque
