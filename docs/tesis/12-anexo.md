@@ -270,7 +270,19 @@ F: Bueno, eso vendría ser lo último con el tema de la entrevista, así que muc
 
 ## 12.5 Manual de marca
 
-El proyecto cuenta con una identidad visual propia, documentada en un manual de marca que cubre el símbolo y su construcción geométrica, la paleta de color, la tipografía, las reglas de uso y el espacio de protección. La paleta se definió atendiendo a las relaciones de contraste exigidas por WCAG, criterio que se verifica de forma automatizada en la aplicación (sec. 7.8.1).
+El proyecto cuenta con una identidad visual propia. Se desarrolló en agosto de 2026, cuando la aplicación empezó a instalarse en teléfonos de prueba y necesitó un ícono reconocible, y se documentó en un manual de marca que cubre el símbolo y su construcción geométrica, la paleta de color, la tipografía, las reglas de uso y el espacio de protección.
+
+El símbolo está formado por dos arcos que se encuentran en un vértice inferior y un punto central. Se lee a la vez como un ojo abstracto y como la V de ViroVision, y el punto representa tanto la pupila como el objeto que el sistema detecta. La marca no tiene logotipo: el símbolo funciona solo. Su geometría está definida sobre un lienzo de 200 por 200 unidades, con arcos de radio 96 y trazo de 18 unidades, de modo que puede reproducirse con exactitud en cualquier tamaño.
+
+La paleta combina un verde (Verde Lectura, #1FB57A), usado como color de acción, un azul (Azul Sensor, #1256D4), usado como color secundario, y un azul muy oscuro (Azul Profundo, #061D3A) para el texto y los fondos oscuros. Los colores se eligieron atendiendo a las relaciones de contraste exigidas por WCAG, criterio que se verifica de forma automatizada en la aplicación (sec. 7.8.1). Esa verificación mostró que no todos los colores del manual sirven como color de texto: el Azul Sensor sobre el Azul Profundo, por ejemplo, no alcanza el contraste mínimo, por lo que la interfaz usa variantes de la paleta que sí lo cumplen. La tipografía es Space Grotesk para los títulos e IBM Plex Sans para el texto, con un tamaño mínimo de 17 píxeles.
+
+A partir del manual se generaron los íconos de la aplicación para cada plataforma. En iOS el ícono se entrega sin esquinas redondeadas, porque el sistema aplica su propia máscara, y en Android el símbolo ocupa el 50% del lienzo en lugar del 64% que fija el manual, porque el sistema recorta los bordes del ícono. Los archivos fuente, en formato vectorial, se conservan en el repositorio (docs/brand/).
+
+<!-- imagen del Doc: figuras/icono-app-hd.png -->
+
+Figura 19: Ícono de la aplicación ViroVision.
+
+Fuente: manual de marca del proyecto (docs/brand/virovision-app-icon.svg).
 
 El manual completo se incluye como documento adjunto.
 
@@ -387,15 +399,15 @@ Las curvas de precisión, exhaustividad y F1 en función del umbral de confianza
 
 <!-- imagen del Doc -->
 
-Figura 19: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 20: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 <!-- imagen del Doc -->
 
-Figura 20: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 21: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 <!-- imagen del Doc -->
 
-Figura 21: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+Figura 22: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
