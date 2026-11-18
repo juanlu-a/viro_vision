@@ -110,23 +110,25 @@ Versión publicada de la planilla de entregables y del diagrama de Gantt: [https
 
 ## 12.3 Gráficas de análisis de protocolos de IoT
 
-### 12.3. 1 Average RTT by protocol
+Gráficas de la medición de protocolos descrita en la sec. 4.7. Fuente: mediciones del equipo.
+
+### 12.3.1 Tiempo de ida y vuelta promedio por protocolo
 
 <!-- imagen del Doc -->
 
-### 12.3.2 RTT over time
+### 12.3.2 RTT a lo largo del tiempo
 
 <!-- imagen del Doc -->
 
-### 12.3.3 RTT vs Image Size
+### 12.3.3 RTT según el tamaño de la imagen
 
 <!-- imagen del Doc -->
 
-### 12.3.4 RTT vs Audio Size
+### 12.3.4 RTT según el tamaño del audio
 
 <!-- imagen del Doc -->
 
-### 12.3.5 Upload vs Download latency
+### 12.3.5 Latencia de subida y de bajada
 
 <!-- imagen del Doc -->
 
@@ -138,7 +140,7 @@ Luciano: 20.
 
 F: 20 años, bien. ¿Cuál dirías que es tu nivel de visión?
 
-L: Nada. Según mis viejos yo tuve algo de visión hasta los 4, pero la verdad que no me acuerdo bien, así que te diría que es como se diría en un lenguaje más. ¿Cómo decirlo? Cómo se diría en un lenguaje así de gente que más conoce a la persona con discapacidad visual se dice una "ceguera congénita". Pero no, te diría que nada porque no… yo la verdad que no me acuerdo, no me acuerdo cuando cuando vi algo… Así que ta, te diría que nada.
+L: Nada. Según mis viejos yo tuve algo de visión hasta los 4, pero la verdad que no me acuerdo bien, así que te diría que es como se diría en un lenguaje más. ¿Cómo decirlo? Cómo se diría en un lenguaje así de gente que más conoce a la persona con discapacidad visual se dice una “ceguera congénita”. Pero no, te diría que nada porque no… yo la verdad que no me acuerdo, no me acuerdo cuando cuando vi algo… Así que ta, te diría que nada.
 
 F: ¿Quiénes viven acá contigo?
 
@@ -154,7 +156,7 @@ L: Analista en infraestructura informática, en la ORT.
 
 F: Vos a la ORT ¿vas presencial?
 
-L: Voy. Los lunes y miércoles voy a presenciar a una materia que es "Configuración de Windows utilitario" y los jueves tengo virtual en la otra materia, la de "pensamiento computacional".
+L: Voy. Los lunes y miércoles voy a presenciar a una materia que es “Configuración de Windows utilitario” y los jueves tengo virtual en la otra materia, la de “pensamiento computacional”.
 
 F: O sea, hacés esas dos materias en este momento. ¿Cómo te lleva la presencialidad?
 
@@ -172,7 +174,7 @@ F: Creo que tu padre me había dicho que hacías deporte ¿puede ser?
 
 L: Sí, hago. Ahora no estamos haciendo por un tema de que como que se viene el frío y ta, quisieron hacer un parate. Pero la verdad que bien, está bueno porque bueno, conozco… Estoy con otra gente que tiene la misma discapacidad que yo.
 
-F: Bien. Bueno, ahora que nos conocemos un poquito más y ya tenemos un poquito más de contexto, vamos a pasar un poco a las preguntas más de los objetivos del proyecto.  Como te dije, vamos a tratar de ayudar o de generar una ayuda con las líneas de ómnibus. ¿Vos usás el transporte público
+F: Bien. Bueno, ahora que nos conocemos un poquito más y ya tenemos un poquito más de contexto, vamos a pasar un poco a las preguntas más de los objetivos del proyecto.  Como te dije, vamos a tratar de ayudar o de generar una ayuda con las líneas de ómnibus. ¿Vos usás el transporte público?
 
 L: Más o menos, un poquito. Ocasionalmente voy en ómnibus, siempre fui acompañado.
 
@@ -182,7 +184,7 @@ L: La verdad que bien. Por lo general, la idea que siempre nos dicen es que tene
 
 F: ¿Qué herramienta usas vos cuando te tomas el ómnibus?
 
-L: Mira, todavía todavía no he usado ninguna, pero yo sé que por ejemplo, hay una que se llama "Moovit" que vos ponés un lugar y te dice las líneas que hay. Cuando le das para que arranque te dice todavía cuánto te falta, cuánto te lleva a llegar a hasta la parada, estando en el ómnibus cuándo te tenés que bajar. Pienso que me será útil cuando la use.
+L: Mira, todavía todavía no he usado ninguna, pero yo sé que por ejemplo, hay una que se llama “Moovit” que vos ponés un lugar y te dice las líneas que hay. Cuando le das para que arranque te dice todavía cuánto te falta, cuánto te lleva a llegar a hasta la parada, estando en el ómnibus cuándo te tenés que bajar. Pienso que me será útil cuando la use.
 
 F: Y mismo en el momento que estás esperando el ómnibus: Vos llegas a la parada, ¿cómo es esa situación? Contame un poco de esa experiencia.
 
@@ -190,11 +192,11 @@ L: Por lo general puede pasar que yo sé en las paradas o haya mucha gente o no 
 
 F: Y por fuera del transporte público, o sea cuando estás fuera de tu casa nomás, ¿qué herramientas tenés para para moverte?
 
-L: Conozco una aplicación que se llama "Lazarillo" que es un GPS. Lo usé poco pero lo usé y la verdad es que está muy, muy bueno. Porque te va diciendo: vos le ponés un un lugar y te y te va diciendo "dirígete hacia tal punto cardinal, hacia tal lado" y eso está muy bueno. Lo que sí estaría bueno que las herramientas que son así, accesibles, empiecen a incorporar por ejemplo, vos estás en la calle y estás parado para cruzar, algo que te diga… porque yo sé que están los semáforos inteligentes, pero que se le pueda agregar o que se pueda hacer que con algo, con algún sensor o algo, que te avise, "Bueno, está la luz roja… verde". Por más que yo estoy entrenando esto, y yo me doy cuenta cuándo cruzar y cuándo no, pero estaría buenísimo que alguna herramienta lo aplique, no sé no sé de qué manera pero si. Me preguntabas alguna herramienta que use. Bueno, esa de lazarillo está buena.  Y, bueno, después hay otra herramienta que se llama "Hear2There", o algo así. Vos descargás un mapa de un país y te va guiando mediante ese mapa, pero esta no es tan avanzada como Lazarillo, pero está bueno igual.
+L: Conozco una aplicación que se llama “Lazarillo” que es un GPS. Lo usé poco pero lo usé y la verdad es que está muy, muy bueno. Porque te va diciendo: vos le ponés un un lugar y te y te va diciendo “dirígete hacia tal punto cardinal, hacia tal lado” y eso está muy bueno. Lo que sí estaría bueno que las herramientas que son así, accesibles, empiecen a incorporar por ejemplo, vos estás en la calle y estás parado para cruzar, algo que te diga… porque yo sé que están los semáforos inteligentes, pero que se le pueda agregar o que se pueda hacer que con algo, con algún sensor o algo, que te avise, “Bueno, está la luz roja… verde”. Por más que yo estoy entrenando esto, y yo me doy cuenta cuándo cruzar y cuándo no, pero estaría buenísimo que alguna herramienta lo aplique, no sé no sé de qué manera pero si. Me preguntabas alguna herramienta que use. Bueno, esa de lazarillo está buena.  Y, bueno, después hay otra herramienta que se llama “Hear2There”, o algo así. Vos descargás un mapa de un país y te va guiando mediante ese mapa, pero esta no es tan avanzada como Lazarillo, pero está bueno igual.
 
 F: En temas no de aplicación, sino por ejemplo, de infraestructura, me hablaste del semáforo sonoro, me imagino que te movés con bastón. ¿Cómo ves esa movilidad en las calles de Montevideo?
 
-L: Mirá, yo veo que la mayoría de las veredas están rotas, o sea que es un factor a mejorar. Yo creo que se deberían hacer más, o se deberían de colocar, además de mejores veredas más indicadores. O mejor, más baldosas… están las baldosas que son podotáctiles, que bueno te guían. Creo que se deberían de colocar más. Y bueno, la verdad que la calle la veo bien. O sea, la gente, digo, por menos con nosotros, obviamente que hay gente hay gente que capaz que no mucho, pero la mayoría de la gente te pregunta "¿precisás ayuda para cruzar?" y eso creo que está bastante bien.
+L: Mirá, yo veo que la mayoría de las veredas están rotas, o sea que es un factor a mejorar. Yo creo que se deberían hacer más, o se deberían de colocar, además de mejores veredas más indicadores. O mejor, más baldosas… están las baldosas que son podotáctiles, que bueno te guían. Creo que se deberían de colocar más. Y bueno, la verdad que la calle la veo bien. O sea, la gente, digo, por menos con nosotros, obviamente que hay gente hay gente que capaz que no mucho, pero la mayoría de la gente te pregunta “¿precisás ayuda para cruzar?” y eso creo que está bastante bien.
 
 F: Te quería preguntar ahora, enfocado un poco más en el proyecto, ¿cómo te manejás si tenés que ir al supermercado? ¿Si te querés comprar, por ejemplo, una merienda? ¿Cómo resolvés esa situación?
 
@@ -204,7 +206,7 @@ F: O sea, en general, siempre acompañado y preguntándole algún empleado ahí 
 
 L: Si.
 
-F: ¿Qué herramienta conocés, o has escuchado, que digas "esto sería útil", pero que todavía no usas y por qué? Por ejemplo, me dijiste que Moovit todavía no usabas capaz porque no te movés mucho en ómnibus solo ¿pero cuál otra decís "esto estaría re bueno, y no lo puedo usar" o "no lo uso"?
+F: ¿Qué herramienta conocés, o has escuchado, que digas “esto sería útil”, pero que todavía no usas y por qué? Por ejemplo, me dijiste que Moovit todavía no usabas capaz porque no te movés mucho en ómnibus solo ¿pero cuál otra decís “esto estaría re bueno, y no lo puedo usar” o “no lo uso”?
 
 L: Yo sé que sé, hay aplicaciones que yo uso para reconocer billetes… Pero respondiendo, mirá, te diría que una herramienta que siempre quise usar son los lentes, ya sean de Orcam o los de Meta, pero bueno son caros, obviamente. Porque también una cosa que he visto es que los tendría que probar antes de comprar: Capaz que por ahí hacen cosas que yo capaz que ya hago con otra herramienta. Pero nada, la respuesta concreta de una herramienta serían eso, los lentes.
 
@@ -220,11 +222,13 @@ F: Bien. Después, ¿has viajado?
 
 L: Sí, sí.
 
-F: Bien. ¿A dónde? Y en esos lugares que conociste ¿qué cosas viste que "decís pah, qué bueno que está esto que no que hay en Uruguay?
+F: Bien. ¿A dónde? Y en esos lugares que conociste ¿qué cosas viste que “decís pah, qué bueno que está esto que no que hay en Uruguay”?
 
-L: Viajé a Chile, a Brasil, Estados Unidos, México y Argentina. En Uruguay hay, no hay muchos pero hay algún que otro restaurante que tiene un menú en braile. Hay uno que se llama "Bar TV", hace poco fui y la verdad que está muy bien el menú en braile. Pero claro, acá no se implementa mucho. Mejor me mejores verdea, por supuesto.
+L: Viajé a Chile, a Brasil, Estados Unidos, México y Argentina. En Uruguay hay, no hay muchos pero hay algún que otro restaurante que tiene un menú en braile. Hay uno que se llama “Bar TV”, hace poco fui y la verdad que está muy bien el menú en braile. Pero claro, acá no se implementa mucho. Mejor me mejores verdea, por supuesto.
 
-F: ¿El subte en algunos países? Con el tema de la ayuda.  L: Sí. En Chile. Muy bueno, la verdad. Yo me acuerdo, cuando lo experimenté en Chile, estaba bueno porque te decía la estación por la que por la que ibas.
+F: ¿El subte en algunos países? Con el tema de la ayuda.
+
+L: Sí. En Chile. Muy bueno, la verdad. Yo me acuerdo, cuando lo experimenté en Chile, estaba bueno porque te decía la estación por la que por la que ibas.
 
 F: Claro, acá con los ómnibus no te avisa por dónde vas.
 
@@ -256,7 +260,7 @@ L: Yo, por lo general, me muevo en auto, porque ta, voy acompañado. O si no, ta
 
 F: Esta es la última de todas, es bastante abierta. ¿Ok? ¿Qué sentís que la gente no sabe, o qué debería saber sobre la gente con discapacidad visual en Montevideo? ¿Qué cosas son importantes? ¿Qué hay que tener en cuenta?
 
-L: Para mí, una cosa que es importante es que si andan caminando por la calle y ven a alguien ciego, que le pregunten a ver si precisa ayuda, si precisa algo. Que no lo dejen tirado. Para mí es importantísimo.  También es importante que si ven un bastón blanco o verde que paren. Digo, que no lo lleven puesto.  Y bueno cuando yo le digo que sí a que alguien me ayude, yo le tengo que decir cómo, porque hay gente que, por ejemplo, te dice "¿Precisás ayuda?" y vos le decís que si, pero te agarra de cualquier forma y eso no está bueno.
+L: Para mí, una cosa que es importante es que si andan caminando por la calle y ven a alguien ciego, que le pregunten a ver si precisa ayuda, si precisa algo. Que no lo dejen tirado. Para mí es importantísimo.  También es importante que si ven un bastón blanco o verde que paren. Digo, que no lo lleven puesto.  Y bueno cuando yo le digo que sí a que alguien me ayude, yo le tengo que decir cómo, porque hay gente que, por ejemplo, te dice “¿Precisás ayuda?” y vos le decís que si, pero te agarra de cualquier forma y eso no está bueno.
 
 F: ¿Cómo sería lo correcto, digamos?
 
@@ -299,55 +303,41 @@ Servicio: 4380c500-7ca3-4e37-b27d-f60e8d8d73d1 Nombre anunciado: ViroVision
 | status | 4380c505-… | lectura, notificación | JSON de telemetría |
 | wifi | 4380c506-… | lectura | JSON con credenciales del punto de acceso |
 
-**Comandos aceptados por control:**
+Comandos aceptados por control:
 
+```
 {"cmd": "photo"}
-
 {"cmd": "mode",    "value": 2}
-
 {"cmd": "status"}
-
 {"cmd": "ap",      "value": true, "minutes": 10}
-
 {"cmd": "audio",   "target": "device" | "phone"}
-
-{"cmd": "say",     "clip": "\<archivo\>.wav"}
-
+{"cmd": "say",     "clip": "<archivo>.wav"}
 {"cmd": "hush"}
-
 {"cmd": "restart_camera"}
-
 {"cmd": "measure", "bytes": 53000, "chunk": 182, "interval_ms": 0}
+```
 
 hush corta el parlante de la placa cuando está por hablar el teléfono (una voz por vez); restart_camera reabre la cámara si quedó trabada.
 
-**Eventos emitidos por event:**
+Eventos emitidos por event:
 
+```
 {"t": "mode",   "value": 1}
-
 {"t": "read",   "mode": 1}
-
 {"t": "ap",     "on": true, "minutes": 10}
-
 {"t": "error",  "msg": "..."}
-
 {"t": "result", "number": "115", "name": "LUIS BRAILLE", "ms": 570}
-
 {"t": "warming"}
-
 {"t": "bus"}
-
-{"t": "evidence", "ref": "\<corrida\>/t003-r02"}
-
+{"t": "evidence", "ref": "<corrida>/t003-r02"}
 {"t": "log",    "lvl": "warning", "src": "bus", "msg": "...", "drop": 3, "ago": 42}
-
 {"t": "start",  "id": 1, "kind": "photo", "bytes": 53000, "chunks": 292, "chunk": 182}
-
 {"t": "end",    "id": 1, "bytes": 53000, "chunks": 292, "device_ms": 4100}
+```
 
 warming avisa que el modo ómnibus todavía está cargando el OCR; bus anuncia la presencia de un ómnibus antes de leer su cartel; evidence indica que hay una foto y un recorte listos para bajar (herramienta temporal de desarrollo); log reenvía al teléfono las advertencias y los errores del daemon para la telemetría (ADR 0011); start y end enmarcan una transferencia por BLE. Los valores numéricos de los ejemplos son ilustrativos.
 
-**Constantes del protocolo:** tamaño de fragmento 182 bytes (ATT MTU negociada de 185 en iOS), tamaño máximo de evento 180 bytes, notificación de estado cada 15 segundos.
+Constantes del protocolo: tamaño de fragmento 182 bytes (ATT MTU negociada de 185 en iOS), tamaño máximo de evento 180 bytes, notificación de estado cada 15 segundos.
 
 Endpoints HTTP del dispositivo (puerto 8080):
 
@@ -363,23 +353,18 @@ Endpoints HTTP del dispositivo (puerto 8080):
 
 Configuración declarada en el script de entrenamiento del repositorio bus-banner-recognizer:
 
+```
 HYPERPARAMETERS = dict(
-
 epochs=120, patience=25, imgsz=640, batch=32,
-
 optimizer="auto", cos_lr=True, close_mosaic=15,
-
 fliplr=0.0, flipud=0.0,
-
 hsv_h=0.01, hsv_s=0.5, hsv_v=0.6,
-
 degrees=5.0, translate=0.1, scale=0.5, shear=2.0,
-
 perspective=0.0005, mosaic=1.0, mixup=0.05, copy_paste=0.0,
-
 )
+```
 
-**Corridas efectivamente ejecutadas:** las dos primeras, en CPU, con 40 épocas y lote de 16, con Ultralytics 8.4.37 (detector de una clase y detector de dos clases, sobre 140 fotografías). El 15 de octubre de 2026 el detector de dos clases se reentrenó en el servidor con GPU NVIDIA Tesla V100 sobre 395 fotografías (versión 7 del conjunto find-bus-sign), con la siguiente configuración, que difiere de la del script en la aumentación y el optimizador:
+Corridas efectivamente ejecutadas: las dos primeras, en CPU, con 40 épocas y lote de 16, con Ultralytics 8.4.37 (detector de una clase y detector de dos clases, sobre 140 fotografías). El 15 de octubre de 2026 el detector de dos clases se reentrenó en el servidor con GPU NVIDIA Tesla V100 sobre 395 fotografías (versión 7 del conjunto find-bus-sign), con la siguiente configuración, que difiere de la del script en la aumentación y el optimizador:
 
 | **Parámetro** | **Valor** |
 |---|---|
@@ -395,15 +380,19 @@ perspective=0.0005, mosaic=1.0, mixup=0.05, copy_paste=0.0,
 
 Fuente: argumentos de entrenamiento guardados en los pesos de la corrida (best.pt). Las métricas por época están en docs/mediciones/2026-10-15-reentreno-v100/results.csv, y los pesos, fuera del repositorio por su tamaño, en poder del equipo.
 
-Las curvas de precisión, exhaustividad y F1 en función del umbral de confianza complementan las figuras de la sección 7.4.5:
+Las curvas de precisión, exhaustividad y F1 en función del umbral de confianza complementan las figuras de la sec. 7.4.5:
 
 <!-- imagen del Doc -->
 
 Figura 20: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
+Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
+
 <!-- imagen del Doc -->
 
 Figura 21: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
+
+Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
 <!-- imagen del Doc -->
 
@@ -411,7 +400,7 @@ Figura 22: F1 del detector reentrenado en función del umbral de confianza, sobr
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
-**Export al sensor:** cuantización posterior al entrenamiento a enteros de 8 bits, calibrada con las 28 imágenes de la partición de validación; supresión de no máximos incorporada al modelo con confianza 0,25 e IoU 0,7. Tamaño resultante: 2,64 MB. Ocupación del chip: 2,64 MB de modelo más 4,48 MB de runtime, es decir 7,12 MB sobre 8 MB disponibles (90%).
+Export al sensor: cuantización posterior al entrenamiento a enteros de 8 bits, calibrada con las 28 imágenes de la partición de validación; supresión de no máximos incorporada al modelo con confianza 0,25 e IoU 0,7. Tamaño resultante: 2,64 MB. Ocupación del chip: 2,64 MB de modelo más 4,48 MB de runtime, es decir 7,12 MB sobre 8 MB disponibles (90%).
 
 ## 12.8 Barrido de márgenes de recorte
 
@@ -444,17 +433,26 @@ Efecto aislado del margen vertical, promediado sobre el resto de la grilla:
 |---|---|---|---|---|
 | Lectura completa | 0,819 | 0,812 | 0,810 | 0,770 |
 
-**Valores adoptados en producción:** izquierdo 0,18, derecho 0,06, vertical 0,06.
+Valores adoptados en producción: izquierdo 0,18, derecho 0,06, vertical 0,06.
 
-El margen izquierdo, el triple del derecho, no sale de la grilla sino de un defecto observado en la placa el 15 de septiembre: la caja del detector se ajusta a los LEDs del cartel, el número de línea está a la izquierda, y el trazo fino del "1" quedaba sobre el borde del recorte (el OCR leyó "15" por "115"). El 21 de octubre se probó leer la caja del detector reentrenado sin ningún margen; en las pruebas del equipo el primer dígito se siguió perdiendo a veces, y el 22 de octubre volvieron los valores de esta tabla, ahora fijados por el daemon de la placa (SIGN_MARGINS en hardware/raspi/virovision/bus.py).
+El margen izquierdo, el triple del derecho, no sale de la grilla sino de un defecto observado en la placa el 15 de septiembre: la caja del detector se ajusta a los LEDs del cartel, el número de línea está a la izquierda, y el trazo fino del “1” quedaba sobre el borde del recorte (el OCR leyó “15” por “115”). El 21 de octubre se probó leer la caja del detector reentrenado sin ningún margen; en las pruebas del equipo el primer dígito se siguió perdiendo a veces, y el 22 de octubre volvieron los valores de esta tabla, ahora fijados por el daemon de la placa (SIGN_MARGINS en hardware/raspi/virovision/bus.py).
 
 ## 12.9 Datos crudos de las campañas de medición
+
+Los datos crudos y el método de cada campaña de medición se conservan en el repositorio del proyecto, en la carpeta docs/mediciones/, con un archivo o una carpeta por campaña:
+
+- 2026-09-02-modelos-supermercado.md: primera medición de los modelos de nube del modo supermercado contra las API reales de cada proveedor (2 de septiembre de 2026).
+- 2026-09-04-ble-throughput.md: caudal BLE de la placa al teléfono y tamaño de la foto (4 de septiembre de 2026).
+- 2026-09-15-omnibus-en-placa.md: primera ejecución completa del modo ómnibus en la placa (15 de septiembre de 2026).
+- 2026-10-15-reentreno-v100/: reentrenamiento del detector en la GPU V100, con las métricas por época (results.csv) y las curvas de entrenamiento (15 de octubre de 2026).
+- 2026-10-22-zoom-omnibus.md: medición de banco del zoom digital del modo ómnibus en la placa (22 de octubre de 2026).
+- README.md: descripción de la carpeta y de las reglas con que se registran las campañas.
 
 ## 12.10 Resultados completos de evaluación del pipeline de ómnibus
 
 Corridas guardadas sobre las mismas 117 imágenes del conjunto de evaluación. Se incluyen para permitir la trazabilidad de las tablas del capítulo 7.
 
-| **Configuración** | **Cartel P / R / F1** | **Número (exactitud)** | **Destino** | **Lectura completa** | **Total p50** |
+| **Configuración** | **Cartel: precisión, exhaustividad y F1** | **Acierto del número** | **Destino** | **Lectura completa** | **Total p50** |
 |---|---|---|---|---|---|
 | Dos etapas, reconocedor latino | 0,701 / 1,000 / 0,824 | 0,917 | 0,750 | 0,875 | 37,9 ms |
 | Dos etapas, reconocedor chino/inglés | 0,701 / 1,000 / 0,824 | 0,792 | 0,714 | 0,792 | 39,0 ms |
@@ -467,7 +465,7 @@ Corridas guardadas sobre las mismas 117 imágenes del conjunto de evaluación. S
 | Dos etapas, PaddleOCR nativo | 0,701 / 1,000 / 0,824 | 0,896 | 0,768 | 0,792 | 152,7 ms |
 | Dos etapas, con realce CLAHE | 0,701 / 1,000 / 0,824 | 0,771 | 0,643 | 0,646 | 136,6 ms |
 
-**Definiciones utilizadas.** Para el cartel, un verdadero positivo es una imagen anotada con cartel presente en la que el sistema lo detecta; la exactitud del número se calcula sobre las 48 imágenes con número esperado y la del destino sobre las 56 con destino esperado; la lectura completa exige acierto simultáneo en ambos campos.
+Definiciones utilizadas: Para el cartel, un verdadero positivo es una imagen anotada con cartel presente en la que el sistema lo detecta; la exactitud del número se calcula sobre las 48 imágenes con número esperado y la del destino sobre las 56 con destino esperado; la lectura completa exige acierto simultáneo en ambos campos.
 
 Resultado vigente (12 de octubre de 2026), con el código final del repositorio de visión y la regla de anunciar sólo lo que el catálogo conoce:
 
@@ -487,7 +485,7 @@ Una sola imagen (el cuadro nocturno de la línea 109) mueve estas cifras unos do
 | Con cartel legible | 68 |
 | Con número esperado | 48 |
 | Con destino esperado | 56 |
-| Procedencia | Video 1: 32 · Video 2: 45 · Video 3: 26 · Conjunto de prueba de Roboflow: 14 |
+| Procedencia | Video 1: 45 · Video 2: 32 · Video 3: 26 · Conjunto de prueba de Roboflow: 14 |
 
 Columnas del archivo de verdad de terreno: identificador de imagen, número esperado, destino esperado, presencia de ómnibus, presencia de cartel y una nota con el texto literal del cartel cuando difiere de la denominación oficial.
 

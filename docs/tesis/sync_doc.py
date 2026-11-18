@@ -178,7 +178,31 @@ def doc_sections(doc):
                 secs[-1]["img"] = True
     for i, s in enumerate(secs):
         s["end"] = secs[i + 1]["hs"] if i + 1 < len(secs) else None
+        s["img"] = s["img"] and not reinsertable(s["els"])
     return secs
+
+
+# Figures whose source image is in the repository (docs/tesis/figuras/ or docs/mediciones/): a section
+# whose only images are these, each right above its "Figura N:" caption, can be rewritten, and
+# scratchpad imgins.py puts the images back above their captions afterwards. Set with --reinsert.
+REINSERT = set()
+
+
+def reinsertable(els):
+    if not REINSERT:
+        return False
+    for i, el in enumerate(els):
+        p = el.get("paragraph")
+        if not p:
+            continue
+        if p.get("positionedObjectIds"):
+            return False
+        if any("inlineObjectElement" in e for e in p["elements"]):
+            nxt = next((x["paragraph"] for x in els[i + 1:] if "paragraph" in x), None)
+            m = nxt and re.match(r"Figura (\d+):", para_text(nxt))
+            if not m or int(m.group(1)) not in REINSERT:
+                return False
+    return True
 
 
 def doc_plain(els):
@@ -445,6 +469,10 @@ def build(op):
 
 def main():
     args = sys.argv[1:]
+    if "--reinsert" in args:
+        for part in args[args.index("--reinsert") + 1].split(","):
+            a, _, b = part.partition("-")
+            REINSERT.update(range(int(a), int(b or a) + 1))
     doc = json.load(open(args[0]))
     out = args[1]
     maxc = int(args[args.index("--max-chars") + 1]) if "--max-chars" in args else 25000
