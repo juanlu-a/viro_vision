@@ -4786,17 +4786,17 @@ de hardware y en la skill.
   reduce la carga a un tercio. Con `--reinsert` también reescribe las secciones que tienen figuras. Doc
   sincronizado con ops=0 y las 23 figuras con su imagen.
 
-### Pendientes
+### Pendientes (resueltos el mismo día con el usuario)
 
-- **Gemini en la compilación**: la compilación distribuida probablemente lleva una clave gratuita de Gemini
-  (`EXPO_PUBLIC_GEMINI_API_KEY` en los workflows de TestFlight y APK); conviene borrar ese secreto. El
-  ADR 0008 dice lo contrario.
-- **Datos personales en el anexo**: hay que decidir con el tutor si se anonimizan la entrevista de 12.4
-  (nombre, edad, estudios) y las respuestas identificables de 12.2.
-- **Costos**: los precios de 7.3.6 son los pagados en Uruguay, sin fuente ni fecha; la Zero 2 W figura a
-  99,95 USD.
-- **Pendiente de la revisión**:
-  - falta un documento de requisitos (lo pedía un entregable);
-  - el patrón híbrido BLE + WiFi de 4.7 no tiene cita;
-  - hay que confirmar que el *broker* MQTT sólo se usó para medir.
-- **Doc**: actualizar el índice a mano.
+- **Gemini en la compilación**: es deliberado mientras dure la evaluación de la tesis y se retira después;
+  queda declarado en 7.2.3, 8.7.7 y en el requisito RNF-06.
+- **Datos personales en el anexo**: el usuario decidió dejarlos como están.
+- **Costos**: los precios de 7.3.6 son los pagados en Uruguay, como ya dice el texto.
+- **Broker MQTT**: confirmado que sólo se usó para medir; 4.7 ya lo dice.
+- **Documento de requisitos**: escrito como anexo 12.12 (10 funcionales, 10 no funcionales, restricciones
+  y riesgos con remisión a 6.7 y 8.7.7), y 2.3 lo referencia.
+- **Hilos del Doc**: respondidos y resueltos desde jlabreu24 los de Tesseract (7.4.7), 5.6, métricas V100
+  (7.4.3) y el anexo de la otra corrida. Quedan abiertos portada y título, diagramas, la cita de
+  conclusiones de Pancho y el comentario de audio de 3.7.
+- **Sigue pendiente**: el patrón híbrido BLE + WiFi de 4.7 no tiene cita, y el índice del Doc se actualiza
+  a mano (todavía muestra los subtítulos viejos de la bibliografía).
