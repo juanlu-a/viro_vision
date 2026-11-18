@@ -30,6 +30,7 @@ import queue
 import shutil
 import subprocess
 import threading
+import time
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -169,10 +170,56 @@ def command_for(path: str) -> Optional[list]:
     return [*player, path]
 
 
+# The PWM pin keeps switching after a clip ends. Straight into an earphone that was inaudible; into
+# the PAM8403 amplifier (2026-11-18) it is a loud hiss that never stops. So between clips the pin is
+# taken away from the PWM block and held low, and handed back right before the next clip.
+# GPIO 18 is where `audremap,pins_18_19` puts the left channel (ADR 0012); ALT5 is PWM0 on it.
+AUDIO_GPIO = 18
+PWM_FUNCTION = "a5"
+# How long the output has to be idle before the pin is parked: a bus announcement is two or three
+# clips in a row, and parking between them would put a click in the middle of the sentence.
+PARK_AFTER_S = 1.0
+
+
+class PwmGate:
+    """Connects and disconnects the PWM audio pin with `pinctrl` (Raspberry Pi OS). Best-effort: a
+    board without `pinctrl`, or the Mac, gets a gate that does nothing, and the audio still plays."""
+
+    def __init__(self, gpio: int = AUDIO_GPIO, run: Optional[Callable[[list], None]] = None) -> None:
+        self._gpio = str(gpio)
+        self._run = run or _run_quietly
+        self._enabled = run is not None or shutil.which("pinctrl") is not None
+        self.is_open = True  # the overlay leaves the pin on PWM at boot
+        if not self._enabled:
+            log.info("audio: no pinctrl, the PWM pin stays connected between clips")
+
+    def open(self) -> None:
+        if self._enabled and not self.is_open:
+            self._run(["pinctrl", "set", self._gpio, PWM_FUNCTION])
+        self.is_open = True
+
+    def park(self) -> None:
+        if self._enabled and self.is_open:
+            # Output low and not input: a floating amplifier input picks up hum.
+            self._run(["pinctrl", "set", self._gpio, "op", "dl"])
+        self.is_open = False
+
+
+def _run_quietly(command: list) -> None:
+    try:
+        subprocess.run(command, check=True, capture_output=True, timeout=5)
+    except (OSError, subprocess.SubprocessError) as exc:
+        log.warning("audio: %s failed: %s", " ".join(command), exc)
+
+
 class Player:
     """Plays files on the device's speaker, one at a time."""
 
-    def __init__(self) -> None:
+    def __init__(self, gate: Optional[PwmGate] = None) -> None:
+        self._gate = gate
+        if gate is not None:
+            gate.park()  # nothing is playing yet, and the overlay left the pin hissing since boot
+        self._idle_since: Optional[float] = None
         self._process: Optional[subprocess.Popen] = None
         self._queue: queue.Queue = queue.Queue()
         self._queue_lock = threading.Lock()
@@ -184,6 +231,7 @@ class Player:
         self._process_lock = threading.Lock()
         # Bumped by every `stop`. A clip dequeued before a stop must not start after it.
         self._generation = 0
+        self._parker: Optional[threading.Thread] = None
         # Reported once, at startup, because it is the difference between "the audio did not arrive"
         # and "the audio arrived and there was nothing to play it with" — and on a device with no
         # screen the log is the only place anyone can tell them apart.
@@ -206,6 +254,7 @@ class Player:
             with self._process_lock:
                 # Output to DEVNULL: mpg123 and aplay write progress to stderr, and at one line per
                 # reading the journal would be mostly theirs.
+                self._open_gate()
                 process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 self._process = process
         except (OSError, subprocess.SubprocessError) as exc:
@@ -252,12 +301,45 @@ class Player:
                 with self._process_lock:
                     if generation != self._generation:
                         continue  # stopped after this clip was dequeued: it is not to be heard
+                    self._open_gate()
                     process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     self._process = process
             except (OSError, subprocess.SubprocessError) as exc:
                 log.warning("audio: could not play %s: %s", path, exc)
                 continue
             process.wait()
+
+    def _open_gate(self) -> None:
+        """Called with `_process_lock` held, right before a player starts."""
+        if self._gate is None:
+            return
+        self._gate.open()
+        self._idle_since = None
+        if self._parker is None or not self._parker.is_alive():
+            self._parker = threading.Thread(target=self._park_when_idle, name="audio-park", daemon=True)
+            self._parker.start()
+
+    def _park_when_idle(self) -> None:
+        """Parks the pin once nothing has played for `PARK_AFTER_S`, then exits; the next clip starts
+        it again. Polls instead of hooking every exit path (`play`, the queue, `stop`): three places
+        to forget one in, and a missed one is the endless hiss this exists to stop."""
+        while True:
+            time.sleep(0.2)
+            with self._process_lock:
+                process = self._process
+                busy = (process is not None and process.poll() is None) or not self._queue.empty()
+                if busy:
+                    self._idle_since = None
+                    continue
+                now = time.monotonic()
+                if self._idle_since is None:
+                    self._idle_since = now
+                    continue
+                if now - self._idle_since < PARK_AFTER_S:
+                    continue
+                self._gate.park()
+                self._parker = None
+                return
 
     def stop(self) -> None:
         """Silence whatever is playing, and drop whatever was queued behind it."""

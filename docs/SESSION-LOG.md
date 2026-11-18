@@ -4830,3 +4830,8 @@ campo), la tabla de comandos de la tesis (sec. 7.1.4) y los README de `raspi/` y
 - La tesis (sec. 7.3.1, 7.3.3 y 10.1) todavía describe el prototipo sin amplificador: actualizarla con el
   PAM8403.
 - Medir el consumo del amplificador junto con el de la placa.
+
+**El soplido que no para.** Con el daemon nuevo, después de cada audio el PAM8403 queda sonando fuerte
+indefinidamente: el PWM sigue conmutando sin audio. El daemon ahora desconecta el pin (GPIO 18 a salida
+en bajo con `pinctrl`) tras 1 s sin sonar nada y lo reconecta antes del próximo audio; también al
+arrancar. Va a la placa por la tarjeta (`virovision-update.tgz`).

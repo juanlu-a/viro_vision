@@ -694,6 +694,12 @@ pins.
 > Un piezo alcanza para verificar el camino, **no para voz**: resuena en una banda angosta y el habla
 > sale apenas inteligible. Eso no es una falla del PWM.
 
+> **El pin se desconecta entre audios (2026-11-18).** El PWM sigue conmutando cuando termina un audio:
+> con un auricular directo no se oía, pero con el PAM8403 es un soplido fuerte que no para. El daemon
+> pasa el GPIO 18 a salida en bajo (`pinctrl set 18 op dl`) cuando lleva 1 s sin sonar nada y lo
+> devuelve al PWM (`pinctrl set 18 a5`) justo antes del próximo audio (`audio.PwmGate`). Sin `pinctrl`
+> el pin queda conectado, como antes.
+
 ## El enlace: la placa no se empareja, y lo dice
 
 Desde el 2026-09-13 ([ADR 0003](../../docs/architecture/adr/0003-enlace-placa-telefono.md),
