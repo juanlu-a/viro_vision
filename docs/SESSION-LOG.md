@@ -4673,3 +4673,130 @@ de hardware y en la skill.
   que dejó luna por defecto y qwen como alternativa.
 - **Nueva 7.6.8 «Retroalimentación auditiva continua»**: el catálogo de avisos de la app, quién dice
   cada uno y por qué.
+
+## 2026-11-17: marco teórico completo (seguimiento, mAP, cuantización, VLM, BLE y WiFi)
+
+- **Importado del Doc** lo que el equipo editó desde el 12/11: 4.1 y 4.2 (la conclusión de 4.1.3 pasó
+  a 7.3.1; los productos de 4.2 con su nombre como subtítulo) y una sección nueva **7.3.6 «Desglose de
+  costos»** (borrador del equipo, con la impresión de la carcasa sin costo todavía). «Fallas de
+  hardware» pasa a 7.3.7 y se actualizaron sus referencias (7.3.1, 7.2.1, 7.3.2, 6.7).
+- **Capítulo 3** (Magui no llegó a terminarlo; lo completó Juan Lucas):
+  - nuevas **3.1.3** (modelos de lenguaje y multimodales: tókenes, transformer, VLM, prompt, salida
+    estructurada, alucinación), **3.3.4** (seguimiento por detección: IoU, método húngaro, SORT con
+    Kalman, ByteTrack, ciclo de vida de la pista, fragmentación, votos y ventanas de supresión),
+    **3.5.1** (BLE: GAP, GATT, UUID, notificación, ATT MTU) y **3.5.2** (WiFi, punto de acceso, HTTP);
+  - en 3.1.1, particiones, hiperparámetros, aumentación y pseudoetiquetado; en 3.2, IoU, AP y mAP
+    (mAP@0,5 y @0,5:0,95 se usaban sin definir); en 3.3.1, supresión de no máximos; en 3.3.3, nitidez
+    por varianza del laplaciano y similitud de cadenas (Levenshtein, Ratcliff/Obershelp);
+  - **3.4 reescrita** como teoría (borde y nube, cuantización PTQ/QAT, aceleradores, inferencia en el
+    sensor, formatos de intercambio); el relato del spike de Gemma ya está en 7.2.2;
+  - referencias rotas de la reestructuración arregladas (4.1.1→3.1.1, 3.4/3.5→3.3.2/3.3.3, estado del
+    arte 3.6/3.4→4.6/4.4, 4.3), negritas fuera del cuerpo, erratas, y «desde 2024» con fuente (RN 0.76).
+- **7.4.9**: los parámetros del seguidor (IoU 0,3, perdida a los 0,5 s, recuperable 5 s con IoU 0,2).
+- **Bibliografía**: 22 fuentes nuevas, 77 a 98, en una sección al final para no correr la numeración.
+
+### Pendientes
+
+- Audio por PWM y filtro (teoría para 3.7) y el amplificador comprado: probarlo y documentarlo.
+- 7.3.6: costo de la impresión de la carcasa, número de figura y la referencia a conclusiones.
+- Índice del Doc a mano (3.1.3, 3.3.4, 3.5.1, 3.5.2, 7.3.6, 7.3.7).
+
+## 2026-11-17 (cont.): reentreno de la V100, bibliografía única, figuras en el cuerpo y comentarios de Pancho
+
+- **Importado del Doc** lo que el equipo editó en el día (36 secciones):
+  - comillas “”, cita antes del punto y citas nuevas en 3.1;
+  - costos de 7.3.6 (impresión 0,86 USD, total 211,12 USD);
+  - el diagrama de Pancho en 7.4.1;
+  - 2.4.4, que se integró en la introducción;
+  - 2.3 sin el entregable de documentación técnica.
+  
+  Con un conversor nuevo de Doc a Markdown (en el scratchpad). `sync_doc.py` ahora trata las imágenes
+  flotantes (posicionadas) como imágenes, porque antes habría borrado el diagrama de 7.4.1.
+- **Reentreno de la V100**, con los datos sacados de `best.pt` y `results.csv`, que el usuario dejó en el
+  Escritorio:
+  - corrida del 15/10, 395 fotos (`find-bus-sign-7`), 120 épocas, lote 16;
+  - AdamW automático, con casi toda la aumentación por defecto: no es la tabla del script, y la tesis lo
+    aclara;
+  - validación, época 105: P 0,940, R 0,926, mAP50 0,967, mAP50-95 0,739.
+  
+  En la tesis:
+  - 7.4.3 cuenta la corrida, con la Figura 16;
+  - 7.4.5 compara CPU contra V100 sin borrar las métricas viejas, avisa que las particiones son
+    distintas y suma las Figuras 17 y 18;
+  - 6.6, 7.9 y el anexo 12.7 quedaron actualizados, con las Figuras 19 a 21.
+  
+  Los archivos quedaron en `docs/mediciones/2026-10-15-reentreno-v100/`. Queda abierto evaluar el
+  pipeline completo con este detector sobre las 117 imágenes.
+- **Comentarios de Pancho**:
+  - 4.5 escrita: conjuntos de datos, por qué un detector entrenado no escala a un supermercado, apps de
+    asistencia y VLM. También se escribió 4.6, que tenía una sola frase.
+  - 7.4.7: se sacó el pendiente de Tesseract.
+  - 5.6: se sacó el pendiente del registro de reuniones.
+  - Quedan para el equipo: el título de la portada (“discapacidad visual”), los diagramas de 7.1.3 y los
+    colores de 7.4.1.
+- **Bibliografía**:
+  - una sola lista numerada del 1 al 98, sin subtítulos (en el Doc cada tema reiniciaba en 1);
+  - la documentación interna va con viñetas;
+  - las citas de autor y año de 4.4 y 7.6 pasaron a número;
+  - 30 entradas nunca se citan en el texto.
+- **Figuras en el cuerpo**, con numeración global:
+  - capítulo 2: los gráficos de la encuesta que cita el texto (Figuras 1 a 13). Antes «Figura N» era el
+    número de pregunta; ahora las preguntas sin gráfico se citan como «pregunta N, anexo 12.2.x»;
+  - 4.7: el RTT promedio por protocolo (Figura 14), con aviso de que las condiciones de la medición no
+    quedaron registradas;
+  - 7.4.1: Figura 15;
+  - reentreno: Figuras 16 a 21.
+  
+  Pancho sacó del Doc los diagramas de 7.1.3 para rehacerlos. Cuando vuelvan, pasan a ser las Figuras 15
+  y 16, y las siguientes se corren dos lugares.
+  
+  Copias en `docs/tesis/figuras/`. Convenciones nuevas en `docs/tesis/README.md` y en la skill.
+
+### Pendientes
+
+- Evaluar el pipeline sobre las 117 imágenes con el detector de la V100.
+- Condiciones de la medición de RTT por protocolo (Pancho).
+- 7.3.6: “(referencia a conclusiones)” y el capítulo 9.
+- Índice del Doc a mano.
+
+## 2026-11-18: revisión del documento completo y publicación
+
+- **Revisión de toda la tesis** con `tackle-review`. La primera ronda la hicieron Opus, Sonnet, Haiku y Codex
+  sobre el documento entero; la segunda, Opus, Sonnet y Codex sobre los cambios; la tercera, Codex, que no
+  encontró nada. Las correcciones se repartieron por capítulo entre cinco agentes.
+- **Lo grave que se corrigió:**
+  - los párrafos de Bluetooth y WiFi de 4.7, copiados de blogs, se reescribieron con las especificaciones;
+  - el dato del censo (decía MIDES 2011, 7,6%) pasó a INE 2011: 15,9% de la población, con discapacidad
+    en general;
+  - se agregaron fuentes que faltaban: OMS, Turing, Deep Blue, LeCun, RFC 6455 y 7252, MQTT y la
+    Ley 18.331;
+  - se corrigió la cita \[6\] de 3.1.2;
+  - se bajaron las afirmaciones exageradas: la introducción, la canasta básica «cumplida» y la
+    validación con usuarios;
+  - se resolvieron contradicciones: el n de la encuesta por pregunta (25 o 26), la prueba de campo del
+    19/10, el recuento de ADR y de PR, la línea G, la tabla de OCR y dónde se guarda la evidencia;
+  - se sumaron los riesgos de seguridad a 6.7 y la protección de datos en 8.6.3;
+  - 4.5 y 4.6 quedaron completas y 12.9 dejó de estar vacía.
+- **Bibliografía**: 107 entradas, del 99 al 107 nuevas, en formato APA.
+- **Figuras 1 a 23** en el cuerpo:
+  - el diagrama nuevo de Pancho en 7.5.1 es la Figura 19;
+  - el ícono pasa a ser la Figura 20;
+  - las curvas del anexo, las Figuras 21 a 23.
+- **`sync_doc.py`** ahora parchea párrafos y celdas en lugar de reescribir secciones enteras, lo que
+  reduce la carga a un tercio. Con `--reinsert` también reescribe las secciones que tienen figuras. Doc
+  sincronizado con ops=0 y las 23 figuras con su imagen.
+
+### Pendientes (resueltos el mismo día con el usuario)
+
+- **Gemini en la compilación**: es deliberado mientras dure la evaluación de la tesis y se retira después;
+  queda declarado en 7.2.3, 8.7.7 y en el requisito RNF-06.
+- **Datos personales en el anexo**: el usuario decidió dejarlos como están.
+- **Costos**: los precios de 7.3.6 son los pagados en Uruguay, como ya dice el texto.
+- **Broker MQTT**: confirmado que sólo se usó para medir; 4.7 ya lo dice.
+- **Documento de requisitos**: escrito como anexo 12.12 (10 funcionales, 10 no funcionales, restricciones
+  y riesgos con remisión a 6.7 y 8.7.7), y 2.3 lo referencia.
+- **Hilos del Doc**: respondidos y resueltos desde jlabreu24 los de Tesseract (7.4.7), 5.6, métricas V100
+  (7.4.3) y el anexo de la otra corrida. Quedan abiertos portada y título, diagramas, la cita de
+  conclusiones de Pancho y el comentario de audio de 3.7.
+- **Sigue pendiente**: el patrón híbrido BLE + WiFi de 4.7 no tiene cita, y el índice del Doc se actualiza
+  a mano (todavía muestra los subtítulos viejos de la bibliografía).

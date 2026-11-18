@@ -58,7 +58,7 @@ docs/tesis/   capítulos del informe (fuente de verdad del texto)
 - **0004 Runtime on-device**: superado por el 0006.
 - **0006 Pipelines por caso de uso**:
   - Ómnibus corre entero en la placa: detector YOLO11n de dos clases dentro del sensor IMX500,
-    reentrenado en la V100 con casi 400 fotos, zoom digital, recorte con márgenes 18/6/6, OCR PP-OCRv5
+    reentrenado en la V100 el 2026-10-15 con 395 fotos, zoom digital, recorte con márgenes 18/6/6, OCR PP-OCRv5
     por ONNX y catálogo del STM.
   - Supermercado usa un LLM con visión en la nube: `gpt-5.6-luna` por defecto y `qwen/qwen3.8-27b`
     en Groq.
@@ -139,9 +139,10 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
   - Causa: el detector es de cajas, el box se ajusta a los LEDs y el número está a la izquierda, así
     que el borde del recorte cae sobre el trazo fino del "1". No es un problema de keypoints.
   - Con zoom, una lectura se descarta si el margen cae fuera del recorte.
-- **Reentrenamiento en la V100** con casi 400 fotos (cifra de los compañeros, la que usa la tesis; una
-  estimación anterior de este documento decía ~500): hecho. Faltan épocas, métricas y la ubicación de
-  los pesos.
+- **Reentrenamiento en la V100**: hecho el 2026-10-15 con 395 fotos y 120 épocas. Validación (época 105):
+  P 0,940, R 0,926, mAP50 0,967, mAP50-95 0,739, contra 0,391 del primer modelo en CPU
+  (`docs/mediciones/2026-10-15-reentreno-v100/`). Falta evaluar con él el pipeline completo sobre las 117
+  imágenes.
 - **Supermercado**: funciona de punta a punta contra el proxy desde el 2026-09-02. El respaldo local
   sigue abierto.
 
@@ -191,7 +192,8 @@ Detalle en [`ci-cd.md`](ci-cd.md).
 
 Capítulos 1 a 8, 10, 11 y 12 escritos, con el capítulo 10 (trabajo futuro) y la sección 7.9
 (limitaciones del prototipo) nuevos. Falta el capítulo 9 (conclusiones, hoy un marcador de lugar) y los
-`PENDIENTE` declarados en el resto: métricas de la V100, prueba en la calle y pruebas con usuarios.
+`PENDIENTE` declarados en el resto: prueba en la calle y pruebas con usuarios. La bibliografía es una
+sola lista numerada (1 a 98) y las figuras van numeradas en el cuerpo (2026-11-17).
 
 ## Pendientes de cuentas y configuración (sólo los puede hacer el equipo)
 

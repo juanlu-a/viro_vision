@@ -38,10 +38,20 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
   un resultado guardado del repositorio de visión.
 - **Lo pendiente se declara.** Lo que no está hecho o no está medido se dice, no se omite.
 - **Ninguna credencial se transcribe.** Se nombra la deuda, no el valor.
+- **Comillas “” y cita antes del punto** (convención del equipo en el Doc, 2026-11-17): “así”, y
+  «… del proyecto \[45\].». Las citas son numéricas, \[n\], y remiten a la lista única del capítulo 11.
+- **La bibliografía es una sola lista numerada**, sin subtítulos por tema: si se agrupara, el Doc
+  reiniciaría la numeración en cada grupo y las citas dejarían de coincidir. Una fuente nueva se
+  agrega al final, para no correr la numeración de las que ya se citan.
+- **Las figuras van en el cuerpo**, junto al párrafo que las cita, con numeración global y
+  correlativa: «Figura N: título.» debajo de la imagen y, en el párrafo siguiente, «Fuente: …». Sólo
+  las muy grandes o las complementarias van además, o únicamente, en el anexo. En el Markdown la
+  imagen se marca con `<!-- imagen del Doc: ruta -->`; las fuentes de las figuras nuevas están en
+  `figuras/` o en la campaña de `docs/mediciones/` que corresponda.
 
 ## Marcadores
 
-- `[FIGURA N: …]` marca una figura por producir, con la descripción de qué debe mostrar.
+- `[FIGURA: …]` marca una figura por producir, con la descripción de qué debe mostrar.
 - `[PENDIENTE: …]` marca un dato que falta y que debe completarse antes de la entrega.
 
 ## Publicar en el Doc
@@ -89,6 +99,14 @@ ni los comentarios de las secciones que no cambian. El ciclo es:
    en el medio, Google rechaza la tanda entera y se vuelve al paso 1.
 4. Repetir hasta que el script diga `ops=0`. Al final, actualizar el índice a mano (la API no lo
    refresca).
+
+Desde el 2026-11-18 el script reescribe sólo los párrafos y las celdas de tabla que cambiaron, cuando la
+estructura de la sección coincide (mismos párrafos, ítems y tablas). Si no coincide, reemplaza la sección
+entera. Con `--reinsert 1-14,16-18,20-23` también reescribe las secciones cuyas únicas imágenes son
+figuras con fuente en el repositorio (`figuras/` o `docs/mediciones/`), y después el script
+`imgins.py` del scratchpad las vuelve a poner sobre su epígrafe. Los diagramas que el equipo dibujó en
+el Doc (7.4.1, 7.5.1) y las imágenes del anexo nunca se reescriben. La API de Docs limita las
+escrituras por minuto: ante el error de cuota hay que esperar y reintentar.
 
 El script salta a propósito las secciones que todavía no hay que pisar (hoy, la 12.2.3, que en el Doc
 tiene una copia de la tabla agregada a mano: ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de

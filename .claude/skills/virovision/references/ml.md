@@ -31,8 +31,11 @@ por ómnibus**.
    (`bus.py:38`). El Coral TPU **salió del diseño el 2026-09-07**.
    - Primer fine-tune: ~140 fotos (Roboflow `find-bus-sign` + cajas `bus` pseudo-etiquetadas), 40
      épocas, en CPU, 2026-09-15 (`models/bus_2classes_yolo11n.pt`, commit `8b8a569` del PR #7).
-   - **Reentrenado en la V100 de Arnaldo Castro con unas 500 fotos** (SESSION-LOG 2026-10-21). Épocas,
-     métricas y ubicación de los pesos: **PENDIENTE** (no constan en ningún repo).
+   - **Reentrenado en la V100 de Arnaldo Castro el 2026-10-15**: 395 fotos (`find-bus-sign-7`), 120 épocas,
+     lote 16, AdamW automático, casi todo por defecto salvo los reflejos apagados (no es el `HYPERPARAMETERS`
+     del script). Validación, época 105: P 0,940, R 0,926, mAP50 0,967, mAP50-95 0,739 (CPU: 0,838 / 0,667 /
+     0,781 / 0,391). Gráficas, CSV y README en `docs/mediciones/2026-10-15-reentreno-v100/`; `best.pt` lo
+     tiene el usuario (no se commitea).
 2. **Zoom digital** (ADR 0006, actualización 2026-10-19; #121): `ScalerCrop` del ISP, dinámico,
    centrado en el cartel más grande entre los alargados (`widest_sign`: área máxima con relación de aspecto ≥ 2), hasta ~64 px de alto de cartel, como mucho la mitad del ancho del
    frame; se sostiene 1,5 s y vuelve a 1x. Máximo práctico 2x en la Zero 2 W (modo agrupado);
@@ -101,7 +104,7 @@ datos en `docs/mediciones/`.
 ## Pendiente
 - Prueba en la calle con y sin zoom: distancia a la que se anuncia la línea. Si el cuello es el
   detector, fase 2: mover su zona de entrada.
-- Épocas, métricas y pesos del reentrenamiento en la V100; evaluarlo sobre las 117 imágenes.
+- Evaluar el pipeline completo con el detector de la V100 sobre las 117 imágenes (la última medición, del 12/10, es con el de CPU).
 - Dataset de evaluación con fotos del dispositivo (`scripts/watch_imx500.py --save-frames`).
 - Reentrenar el reconocedor del OCR (la palanca para el destino con el modelo de dos clases).
 - Fallback local del supermercado.

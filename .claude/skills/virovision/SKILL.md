@@ -61,7 +61,7 @@ para integración final, corrección de errores y pruebas de conjunto).
 |--------|--------|---------|
 | **Aplicación móvil** | `app/` | React Native (Expo). Enlace BLE (GATT) con el dispositivo, salida de audio elegible (teléfono o dispositivo), configuración y accesibilidad de primera clase. Ver [references/app.md](references/app.md). |
 | **Hardware / IoT** | `hardware/` | Dispositivo en la patilla: Raspberry Pi Zero 2 W + Raspberry Pi AI Camera (IMX500) + Waveshare UPS HAT (C), en la carcasa VIA Clara (OpenSCAD). Ver [references/hardware.md](references/hardware.md). |
-| **ML / OCR / CV** | `ml/` (puntero) | Pipelines por caso de uso (ADR 0006). Ómnibus: YOLO11n de dos clases dentro del sensor IMX500 (el Coral salió del diseño el 2026-09-07; reentrenado en la V100 con casi 400 fotos, la cifra de la tesis) → zoom digital → recorte con márgenes → OCR PP-OCRv5 → catálogo STM. Supermercado: LLM con visión en la nube por el proxy propio (ADR 0008); el respaldo local sigue abierto. Conjuntos de evaluación con recall, precisión, accuracy y F1. Ver [references/ml.md](references/ml.md). |
+| **ML / OCR / CV** | `ml/` (puntero) | Pipelines por caso de uso (ADR 0006). Ómnibus: YOLO11n de dos clases dentro del sensor IMX500 (el Coral salió del diseño el 2026-09-07; reentrenado en la V100 el 2026-10-15 con 395 fotos, mAP50-95 de validación 0,739) → zoom digital → recorte con márgenes → OCR PP-OCRv5 → catálogo STM. Supermercado: LLM con visión en la nube por el proxy propio (ADR 0008); el respaldo local sigue abierto. Conjuntos de evaluación con recall, precisión, accuracy y F1. Ver [references/ml.md](references/ml.md). |
 
 Y referencias transversales, que aplican al trabajo diario más que cualquier otra cosa de este
 documento:
@@ -83,7 +83,10 @@ documento:
   esta skill y la tesis.
 - **Redacción de la documentación**: tono formal, tercera persona o impersonal ("el equipo", "se
   optó por"), **sin raya larga** (se usan comas, dos puntos o paréntesis), números en formato
-  español y toda cifra con su fuente. `docs/tesis/build.py` falla si aparece una raya.
+  español y toda cifra con su fuente. `docs/tesis/build.py` falla si aparece una raya. En la tesis,
+  además: prosa narrativa como la del Doc del equipo (nada de listas telegráficas), comillas “”, la
+  cita numérica antes del punto, bibliografía como una sola lista y figuras numeradas en el cuerpo
+  (ver `docs/tesis/README.md`). Las métricas nuevas no borran las viejas: se comparan.
 - **La accesibilidad es un requisito duro**, no un agregado. Cada decisión de interfaz se evalúa
   contra el uso por personas ciegas o con baja visión y los lectores de pantalla nativos (VoiceOver,
   TalkBack).
@@ -141,14 +144,14 @@ haya dos copias que se desincronicen.
 ## Pendientes abiertos de la tesis
 
 Marcados `PENDIENTE` en `docs/tesis/`; se tratan como trabajo abierto:
-- Métricas del detector reentrenado en la V100 (épocas, mAP, evaluación sobre las 117 imágenes):
-  siguen pendientes.
+- Evaluación del pipeline completo sobre las 117 imágenes con el detector de la V100 (sus métricas
+  de validación ya están en la tesis, sec. 7.4.5).
 - Prueba en la calle del modo ómnibus con y sin zoom.
 - Respaldo local del modo supermercado.
 - Las pruebas con usuarios.
 - Ya escritos al 2026-11-12: el capítulo 10 (trabajo futuro) y la sección 7.9 (limitaciones del
   prototipo). El capítulo 9 (conclusiones) sigue siendo un marcador de lugar, a escribir cuando estén las
-  métricas de la V100 y las pruebas.
+  pruebas.
 
 > Esta skill resume el estado al 2026-11-12. Antes de tratar una decisión como final, verificarla
 > contra el repo vivo y la planilla de trabajo:

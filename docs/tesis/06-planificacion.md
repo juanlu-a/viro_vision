@@ -1,12 +1,12 @@
 # 6. Planificación
 
-El proyecto se desarrolla en un período de aproximadamente nueve meses, desde marzo de 2026 hasta el 30 de noviembre de 2026, fecha límite de entrega. El desarrollo se planificó para cerrar a mediados de noviembre, reservando deliberadamente las últimas dos semanas para integración final, corrección de defectos y pruebas conjuntas de los tres pilares.
+El proyecto se desarrolló en un período de aproximadamente nueve meses, desde marzo de 2026 hasta el 30 de noviembre de 2026, fecha límite de entrega. El desarrollo se planificó para cerrar a mediados de noviembre, reservando deliberadamente las últimas dos semanas para integración final, corrección de defectos y pruebas conjuntas de los tres pilares.
 
-Aunque la metodología de trabajo es ágil (sec. 5.1), se complementó con una línea de referencia temporal (sec. 12.1): un desglose de entregables con estimación de complejidad y tiempo, y un cronograma de hitos que ordena las dependencias entre pilares. El sentido de esa línea de referencia en un proyecto iterativo no es fijar el contenido de cada semana, sino hacer visibles las dependencias duras (qué no puede empezar hasta que otra cosa termine) y las paralelizaciones posibles, que es lo que permite que tres personas trabajen sobre tres dominios distintos sin bloquearse.
+Aunque la metodología de trabajo fue ágil (sec. 5.1), se complementó con una línea de referencia temporal (anexo 12.1): un desglose de entregables con estimación de complejidad y tiempo, y un cronograma de hitos que ordena las dependencias entre pilares. El sentido de esa línea de referencia en un proyecto iterativo no era fijar el contenido de cada semana, sino hacer visibles las dependencias duras (qué no puede empezar hasta que otra cosa termine) y las paralelizaciones posibles, lo que permitió que tres personas trabajaran sobre tres dominios distintos sin bloquearse.
 
 ## 6.1 Estructura del desglose y medición del avance
 
-El desglose de entregables se organiza en épicas y subtareas. A cada subtarea se le asigna una estimación de complejidad y de tiempo, de las que se deriva un peso ponderado. El avance del proyecto se calcula entonces como la relación entre los pesos alcanzados y el total, y no como una apreciación subjetiva del equipo.
+El desglose de entregables se organizó en épicas y subtareas. A cada subtarea se le asignó una estimación de complejidad y de tiempo, de las que se derivó un peso ponderado. El avance del proyecto se calculó entonces como la relación entre los pesos alcanzados y el total, y no como una apreciación subjetiva del equipo.
 
 Esta mecánica fue la base de la instancia formal de justificación de 30% de avance: al momento de esa entrega la planilla registraba 211 puntos ponderados totales y 99 alcanzados (46,9%), cifra que el equipo utilizó para justificar un avance superior al 30% exigido, argumentando que las etapas fundacionales (validación del problema con usuarios, priorización de casos de uso, selección tecnológica y planificación) ya estaban cerradas con evidencia verificable.
 
@@ -16,7 +16,7 @@ La primera etapa estuvo orientada a validar que el problema existía antes de co
 
 Actividades principales:
 
-1. Relevamiento con la población objetivo: encuesta distribuida con apoyo de la UNCU (26 respuestas) y entrevista en profundidad a un usuario ciego.
+1. Relevamiento con la población objetivo: encuesta distribuida con apoyo de la UNCU (26 respuestas) y entrevista semiestructurada a un usuario ciego.
 1. Análisis cuantitativo y cualitativo de las respuestas. El resultado ordenó las prioridades del proyecto: en transporte, el problema más reportado fue saber qué línea se aproxima; en supermercados, la lectura de precios y vencimientos y la identificación de productos.
 1. Revisión de soluciones existentes (OrCam MyEye, Microsoft Seeing AI, Google Lookout) y de sus limitaciones en el contexto local.
 1. Redacción de la propuesta: problema, alcance, objetivos generales y específicos, entregables.
@@ -46,7 +46,7 @@ Esta etapa concentró el mayor riesgo técnico del proyecto: determinar qué se 
 1. Identidad visual y manual de marca.
 1. Primer envío a distribución interna y configuración de los dos canales de publicación.
 
-Al cierre de la etapa quedó definida la arquitectura que el proyecto sostiene hasta hoy: el modo ómnibus se resuelve localmente y el modo supermercado en la nube, cada uno con su propio pipeline.
+Al cierre de la etapa quedó definida la arquitectura que el proyecto sostuvo hasta el final: el modo ómnibus se resuelve localmente y el modo supermercado en la nube, cada uno con su propio pipeline.
 
 ## 6.5 Etapa 3: integración, hardware y medición (septiembre de 2026)
 
@@ -62,14 +62,14 @@ La etapa en la que el sistema pasó de componentes separados a un producto que f
 
 ## 6.6 Etapa 4: validación en campo y cierre (octubre a noviembre de 2026)
 
-La etapa final comprende:
+La etapa final comprendió:
 
-- Pruebas en campo reales: una parada de ómnibus con vehículos en movimiento y una góndola de supermercado. Toda la evaluación del modo ómnibus realizada hasta ahora se hizo contra video reproducido en pantalla, y cerrar esa brecha es la prioridad de la etapa.
+- Pruebas en campo reales: una parada de ómnibus con vehículos en movimiento y una góndola de supermercado. Salvo una prueba de campo preliminar el 19 de octubre de 2026 (sec. 7.4.10), la evaluación del modo ómnibus se hizo contra video reproducido en pantalla, y cerrar esa brecha fue la prioridad de la etapa.
 - Construcción del conjunto de evaluación del modo supermercado, con fotografías tomadas por el propio dispositivo.
-- Medición del costo de la cuantización INT8 del detector, que todavía no se pudo realizar porque el modelo convertido sólo se carga en el entorno del fabricante (sec. 7.4.5).
-- Entrenamiento del detector en la GPU puesta a disposición por Arnaldo Castro. Realizado en octubre, con casi 400 fotografías (el primer ajuste fino, en CPU, había usado unas 140). Sus métricas quedan \[PENDIENTE\] de documentar (sec. 7.4).
+- Medición del costo de la cuantización INT8 del detector, que no se pudo realizar porque el modelo convertido sólo se carga en el entorno del fabricante (sec. 7.4.5).
+- Entrenamiento del detector en la GPU puesta a disposición por Arnaldo Castro. Realizado el 15 de octubre, con 395 fotografías y 120 épocas; el primer ajuste fino, en CPU, había usado 140 imágenes y 40 épocas. El mAP@0,5:0,95 del detector pasó de 0,391 a 0,739 (sec. 7.4.3 y 7.4.5).
 - Alcance de lectura del cartel: zoom digital del procesador de imagen sobre el cartel (19 de octubre, probado en la placa el 22) y ajuste de los márgenes del recorte (21 y 22 de octubre).
-- Cierre del hardware: la lectura del monitor de batería quedó integrada el 6 de octubre y el arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en OpenSCAD y se iteró sobre impresiones de prueba desde el 14 de octubre; la versión 0.20 se imprimió y se armó con todo el hardware el 30 de octubre, y la versión final, la 0.29, se imprimió y se armó (sec. 7.3.5). Quedan el audio definitivo (hoy una salida PWM provisional, con un transductor de conducción ósea previsto) y la medición del consumo real.
+- Cierre del hardware: la lectura del monitor de batería quedó integrada el 6 de octubre y el arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en OpenSCAD y se iteró sobre impresiones de prueba desde el 14 de octubre; la versión 0.20 se imprimió y se armó con todo el hardware el 30 de octubre, y la versión final, la 0.29, se imprimió y se armó (sec. 7.3.5). El audio sale por PWM hacia el transductor de conducción ósea, ya instalado y conectado a través de una resistencia de 260 ohmios y un capacitor de 47 µF en serie (sec. 7.3.1); quedan pendientes la amplificación y la medición del consumo real.
 - Pruebas de usabilidad con usuarios ciegos y ajuste de los tiempos de interacción.
 - Documentación final, presentación y demostración.
 - Dos semanas de reserva antes del 30 de noviembre para integración, corrección y pruebas conjuntas.
@@ -80,9 +80,12 @@ La etapa final comprende:
 |---|---|---|
 | El enlace inalámbrico no alcanza para mover la imagen | Materializado | Medido antes de depender de él; rediseño a dos planos (sec. 7.2) |
 | La inferencia multimodal local no es viable en el teléfono | Materializado | Spike de dos días; se adoptó un pipeline por caso de uso |
-| Rotura del hardware de desarrollo | Materializado | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada (Raspberry Pi 3 B+), dejando constancia de que las mediciones de radio no son transferibles. El 19 de septiembre se volvió a la Raspberry Pi Zero 2 W, y con ella vuelven a valer las mediciones de radio originales. A comienzos de noviembre la placa volvió a dañarse y se reemplazó; como toda la configuración vive en la tarjeta de memoria, la placa nueva funcionó sin reinstalar nada (sec. 7.3.6) |
+| Rotura del hardware de desarrollo | Materializado | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada (Raspberry Pi 3 B+), dejando constancia de que las mediciones de radio no son transferibles. El 19 de septiembre se volvió a la Raspberry Pi Zero 2 W, y con ella vuelven a valer las mediciones de radio originales. A comienzos de noviembre la placa volvió a dañarse y se reemplazó; como toda la configuración vive en la tarjeta de memoria, la placa nueva funcionó sin reinstalar nada (sec. 7.3.7) |
 | Dependencia de servicios de nube con cuota gratuita | Vigente | Proxy propio que permite rotar o cortar una clave sin publicar una versión; tope de gasto configurado en cada proveedor |
 | Pausa automática del proyecto de backend por inactividad | Materializado | Documentado como riesgo operativo; requiere actividad periódica |
 | La precisión del detector cuantizado es desconocida | Vigente | Receta de validación preparada; medición pendiente (sec. 7.4) |
 | Red local del dispositivo con clave fija y servidor HTTP sin autenticación | Aceptado | Con una sola unidad y sin adversario plausible en el alcance de la tesis, no se mitiga en el prototipo; para una versión distribuible, clave por unidad y token por sesión (ADR 0003, actualización del 3 de noviembre) |
 | Evaluación realizada sobre video y no sobre la calle | Vigente | Prioridad de la etapa 4; la primera prueba de campo (19 de octubre) mostró que el cartel sólo se leía con el ómnibus muy cerca, lo que motivó el zoom digital |
+| Proxy de visión sin autenticación, con un límite de solicitudes por dirección de origen que cada instancia de la plataforma lleva por separado | Aceptado | El abuso de la cuota de los proveedores se acota con la lista de destinos permitidos y el tope de gasto configurado en cada proveedor; aceptado para el prototipo (sec. 7.2.3 y 8.6.1) |
+| Característica de control BLE sin autenticación | Aceptado | Un central cercano podría enviar comandos al dispositivo; se acepta en el prototipo, con una sola unidad, y la clave por unidad queda como trabajo futuro (sec. 7.3.2 y 10.6) |
+| Función de evidencia sin sesión que guarda fotografías de la vía pública, con personas y matrículas | Vigente | Son datos personales; la función se usa sólo durante el desarrollo, en almacenamiento privado, y debe deshabilitarse antes de la versión final (sec. 8.6.3) |
