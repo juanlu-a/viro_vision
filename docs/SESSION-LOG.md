@@ -4758,3 +4758,45 @@ de hardware y en la skill.
 - Condiciones de la medición de RTT por protocolo (Pancho).
 - 7.3.6: “(referencia a conclusiones)” y el capítulo 9.
 - Índice del Doc a mano.
+
+## 2026-11-18: revisión del documento completo y publicación
+
+- **Revisión de toda la tesis** con `tackle-review`. La primera ronda la hicieron Opus, Sonnet, Haiku y Codex
+  sobre el documento entero; la segunda, Opus, Sonnet y Codex sobre los cambios; la tercera, Codex, que no
+  encontró nada. Las correcciones se repartieron por capítulo entre cinco agentes.
+- **Lo grave que se corrigió:**
+  - los párrafos de Bluetooth y WiFi de 4.7, copiados de blogs, se reescribieron con las especificaciones;
+  - el dato del censo (decía MIDES 2011, 7,6%) pasó a INE 2011: 15,9% de la población, con discapacidad
+    en general;
+  - se agregaron fuentes que faltaban: OMS, Turing, Deep Blue, LeCun, RFC 6455 y 7252, MQTT y la
+    Ley 18.331;
+  - se corrigió la cita \[6\] de 3.1.2;
+  - se bajaron las afirmaciones exageradas: la introducción, la canasta básica «cumplida» y la
+    validación con usuarios;
+  - se resolvieron contradicciones: el n de la encuesta por pregunta (25 o 26), la prueba de campo del
+    19/10, el recuento de ADR y de PR, la línea G, la tabla de OCR y dónde se guarda la evidencia;
+  - se sumaron los riesgos de seguridad a 6.7 y la protección de datos en 8.6.3;
+  - 4.5 y 4.6 quedaron completas y 12.9 dejó de estar vacía.
+- **Bibliografía**: 107 entradas, del 99 al 107 nuevas, en formato APA.
+- **Figuras 1 a 23** en el cuerpo:
+  - el diagrama nuevo de Pancho en 7.5.1 es la Figura 19;
+  - el ícono pasa a ser la Figura 20;
+  - las curvas del anexo, las Figuras 21 a 23.
+- **`sync_doc.py`** ahora parchea párrafos y celdas en lugar de reescribir secciones enteras, lo que
+  reduce la carga a un tercio. Con `--reinsert` también reescribe las secciones que tienen figuras. Doc
+  sincronizado con ops=0 y las 23 figuras con su imagen.
+
+### Pendientes
+
+- **Gemini en la compilación**: la compilación distribuida probablemente lleva una clave gratuita de Gemini
+  (`EXPO_PUBLIC_GEMINI_API_KEY` en los workflows de TestFlight y APK); conviene borrar ese secreto. El
+  ADR 0008 dice lo contrario.
+- **Datos personales en el anexo**: hay que decidir con el tutor si se anonimizan la entrevista de 12.4
+  (nombre, edad, estudios) y las respuestas identificables de 12.2.
+- **Costos**: los precios de 7.3.6 son los pagados en Uruguay, sin fuente ni fecha; la Zero 2 W figura a
+  99,95 USD.
+- **Pendiente de la revisión**:
+  - falta un documento de requisitos (lo pedía un entregable);
+  - el patrón híbrido BLE + WiFi de 4.7 no tiene cita;
+  - hay que confirmar que el *broker* MQTT sólo se usó para medir.
+- **Doc**: actualizar el índice a mano.

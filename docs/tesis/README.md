@@ -100,6 +100,14 @@ ni los comentarios de las secciones que no cambian. El ciclo es:
 4. Repetir hasta que el script diga `ops=0`. Al final, actualizar el índice a mano (la API no lo
    refresca).
 
+Desde el 2026-11-18 el script reescribe sólo los párrafos y las celdas de tabla que cambiaron, cuando la
+estructura de la sección coincide (mismos párrafos, ítems y tablas). Si no coincide, reemplaza la sección
+entera. Con `--reinsert 1-14,16-18,20-23` también reescribe las secciones cuyas únicas imágenes son
+figuras con fuente en el repositorio (`figuras/` o `docs/mediciones/`), y después el script
+`imgins.py` del scratchpad las vuelve a poner sobre su epígrafe. Los diagramas que el equipo dibujó en
+el Doc (7.4.1, 7.5.1) y las imágenes del anexo nunca se reescriben. La API de Docs limita las
+escrituras por minuto: ante el error de cuota hay que esperar y reintentar.
+
 El script salta a propósito las secciones que todavía no hay que pisar (hoy, la 12.2.3, que en el Doc
 tiene una copia de la tabla agregada a mano: ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
 abajo: traer primero al repo lo que se haya editado directo en el Doc.
