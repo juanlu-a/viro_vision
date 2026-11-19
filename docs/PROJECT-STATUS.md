@@ -111,9 +111,9 @@ Dependencias clave: `react-native-ble-plx`, `expo-speech`, `expo-audio`, `@supab
   - vigilante de la cámara; journal persistente (2026-09-23).
 - **Arranque**: la placa anuncia a los 16,2 s, la cámara está lista a los 21,3 s y el OCR a los
   33,6 s (2026-10-06).
-- **Audio en la placa**: PWM por `audremap` en el pin 12 (GPIO 18), con 260 Ω y 47 µF en serie con el
-  transductor de 4 Ω, **sin amplificador** (ADR 0012, 2026-11-12). Funciona con volumen bajo; la
-  amplificación queda como trabajo futuro.
+- **Audio en la placa**: PWM por `audremap` en el pin 12 → filtro RC de dos etapas → amplificador
+  PAM8403 → transductor de 4 Ω (ADR 0012, actualización 2026-11-19). Funciona; volumen desde la app; el
+  daemon desconecta el pin entre audios. Queda ruido de fondo del PWM (destino: I2S).
 - **Seguridad del AP**: la clave fija del AP se acepta como riesgo (#127, actualización del ADR 0003).
 - **Pruebas**: 197 tests pasan y 2 se omiten (2026-11-09).
 
