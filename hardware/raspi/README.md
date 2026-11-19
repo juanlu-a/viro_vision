@@ -667,10 +667,29 @@ comportándose como una Zero 2 W: la prueba es real, no una simulación.
 dtoverlay=audremap,pins_18_19    # GPIO 18 = pin 12, GPIO 19 = pin 35 (lo escribe setup.sh)
 ```
 
-| Cable | Pin físico | |
+Desde el 2026-11-19 la señal pasa por un amplificador **PAM8403** con un filtro a la entrada
+([ADR 0012](../../docs/architecture/adr/0012-audio-del-prototipo-sin-amplificador.md), actualización
+2026-11-19):
+
+```
+pin 12 ──[ 10 kΩ ]──●──[ 10 kΩ ]──●── entrada L del PAM8403
+                    │             │
+                [4,7 nF]     [1 nF] [1 nF]
+                    │             │
+pin 14 ─────────────●─────────────●── GND de entrada del PAM8403
+```
+
+| PAM8403 | Pin físico | |
 |---|---|---|
-| señal | **12** | GPIO 18, canal izquierdo, con resistencia y capacitor en serie |
-| masa | **14** | GND, el de al lado |
+| 5V | **2** | alimentación |
+| GND | **6** | masa de alimentación |
+| entrada L | **12** | GPIO 18, a través del filtro |
+| GND de entrada | **14** | masa de la señal |
+| L+ / L− | — | el transductor de 4 Ω; **ninguno de los dos a masa** |
+
+Sin el filtro, el PAM8403 satura: recibe la onda cuadrada de 3,3 V del PWM, no una señal de línea.
+Con el filtro, **el volumen del dispositivo va al máximo** desde la app: el software no cambia cuánto
+ruido entra, sólo cuánta voz.
 
 Hasta el 2026-11-12 el audio salía por `pins_12_13` (señal en el pin 32, masa en el 34). Se pasó a
 18/19 porque el pin 12 queda del lado de la microSD, donde la carcasa tiene lugar para la resistencia
@@ -687,12 +706,18 @@ pins.
 > picos en cada flanco, y va directo (con `audio_pwm_mode=1`, que conmuta menos, el pico es menor).
 > Un **auricular o parlante de 16-32 Ω es resistivo**: pediría ~100 mA continuos, seis veces el
 > límite, y **necesita una resistencia en serie de 100-330 Ω** o el DAC. Con uno de **4 Ω** (el
-> actual) la resistencia es la que fija la corriente: 260 Ω dan unos 12,5 mA de pico. Va además un
+> actual) conectado directo, sin amplificador, la resistencia es la que fija la corriente: 260 Ω dan unos 12,5 mA de pico (circuito usado hasta el 2026-11-18). Va además un
 > **capacitor electrolítico de 47 µF en serie (ADR 0012)** (el + hacia el GPIO): el PWM en silencio queda
 > en 50 % de ciclo, una continua de 1,65 V que sin el capacitor consume todo el tiempo.
 >
 > Un piezo alcanza para verificar el camino, **no para voz**: resuena en una banda angosta y el habla
 > sale apenas inteligible. Eso no es una falla del PWM.
+
+> **El pin se desconecta entre audios (2026-11-18).** El PWM sigue conmutando cuando termina un audio:
+> con un auricular directo no se oía, pero con el PAM8403 es un soplido fuerte que no para. El daemon
+> pasa el GPIO 18 a salida en bajo (`pinctrl set 18 op dl`) cuando lleva 1 s sin sonar nada y lo
+> devuelve al PWM (`pinctrl set 18 a5`) justo antes del próximo audio (`audio.PwmGate`). Sin `pinctrl`
+> el pin queda conectado, como antes.
 
 ## El enlace: la placa no se empareja, y lo dice
 

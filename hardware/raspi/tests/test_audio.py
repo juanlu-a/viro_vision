@@ -190,3 +190,65 @@ def test_a_clip_dequeued_before_a_hush_is_not_played_after_it(monkeypatch):
     worker.join(2)
     assert started == []
     assert player._worker is None, "a finished worker clears itself, so the next sequence starts one"
+
+
+def test_the_pwm_pin_is_parked_once_the_output_is_idle_and_reconnected_for_the_next_clip(monkeypatch):
+    """With the PAM8403 the idle PWM is a loud hiss that never stops (2026-11-18): the pin is held low
+    between clips and handed back to PWM right before the next one."""
+    import time
+
+    import virovision.audio as audio
+
+    monkeypatch.setattr(audio, "PARK_AFTER_S", 0.1)
+    commands = []
+    gate = audio.PwmGate(run=commands.append)
+
+    class Process:
+        pid = 1
+
+        def __init__(self, command, **kwargs):
+            self.done = False
+
+        def poll(self):
+            return 0 if self.done else None
+
+        def wait(self):
+            self.done = True
+
+        def terminate(self):
+            self.done = True
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Process)
+    monkeypatch.setattr(audio, "command_for", lambda path: ["aplay", path])
+    player = Player(gate=gate)
+    assert commands == [["pinctrl", "set", "18", "op", "dl"]], "parked at startup: nothing is playing"
+    commands.clear()
+
+    player.play("/tmp/a.wav")
+    assert commands == [["pinctrl", "set", "18", "a5"]]
+    commands.clear()
+    time.sleep(0.5)
+    assert commands == [], "still playing: the pin stays on PWM"
+
+    player._process.done = True
+    deadline = time.monotonic() + 3
+    while not commands and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert commands == [["pinctrl", "set", "18", "op", "dl"]]
+    assert gate.is_open is False
+
+    player.play("/tmp/b.wav")
+    assert commands[-1] == ["pinctrl", "set", "18", "a5"]
+    assert gate.is_open is True
+    player.stop()
+
+
+def test_a_gate_without_pinctrl_does_nothing(monkeypatch):
+    """The Mac, or a board without `pinctrl`: the audio must still play, just without parking."""
+    import virovision.audio as audio
+
+    monkeypatch.setattr(audio.shutil, "which", lambda name: None)
+    gate = audio.PwmGate()
+    gate.park()
+    gate.open()
+    assert gate.is_open is True

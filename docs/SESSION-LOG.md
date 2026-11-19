@@ -4852,3 +4852,30 @@ dependencias nuevas. Se quitó `VOLUMEN` de la tarjeta: el volumen pasa a elegir
 - Soldar el filtro de entrada del PAM8403 y probar.
 - Si después del filtro queda ruido en silencio: que el daemon apague el pin entre audios.
 - Actualizar las sec. 7.3.1, 7.3.3 y 10.1 de la tesis: el prototipo ya tiene amplificador.
+
+**El soplido que no para.** Con el daemon nuevo, después de cada audio el PAM8403 queda sonando fuerte
+indefinidamente: el PWM sigue conmutando sin audio. El daemon ahora desconecta el pin (GPIO 18 a salida
+en bajo con `pinctrl`) tras 1 s sin sonar nada y lo reconecta antes del próximo audio; también al
+arrancar. Va a la placa por la tarjeta (`virovision-update.tgz`).
+
+## 2026-11-19: el audio con el PAM8403 queda funcionando
+
+Con el daemon nuevo (volumen y pin desconectado entre audios) se resolvió el soplido posterior a cada
+audio, pero la voz seguía saturada. La resistencia en serie sola no alcanzaba: con 10 kΩ seguía
+saturando y con 20 kΩ la voz quedaba lejana bajo un soplido fuerte, porque una resistencia atenúa voz y
+ruido por igual. Un capacitor de 47 µF se descartó por cálculo (20.000 veces el valor necesario). Con
+20 kΩ y 1 nF mejoró mucho; el circuito final es un **filtro de dos etapas** con los componentes del kit
+cerámico: 10 kΩ + 4,7 nF (472) y 10 kΩ + 2 × 1 nF (102) en paralelo, con el volumen del dispositivo al
+máximo desde la app. Corte calculado ~2,1 kHz, −50 dB a 100 kHz. Montado sin placa (la primera
+resistencia en el cable con termocontraíble) y entró en la carcasa muy justo. Resultado: **funciona muy
+bien**; queda un ruido de fondo leve, de cuantización del PWM, que sólo se va con I2S.
+
+Documentado en el ADR 0012 (actualización 2026-11-19, con la tabla de intentos), la tesis (sec. 7.3.1,
+7.3.3, el relato de la placa nueva, 7.9 y la sec. 10.2 reescrita), los README de hardware, el estado
+del proyecto y la skill. **No se pasó al Google Doc**: el equipo lo decide después.
+
+### Pendientes
+
+- Pasar los cambios de la tesis al Google Doc cuando el equipo lo indique.
+- (#136 y #137 mergeados a `staging` el 2026-11-19.)
+- Medir el consumo de la placa con el amplificador.

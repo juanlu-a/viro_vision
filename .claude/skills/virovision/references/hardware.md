@@ -51,16 +51,17 @@ campo `battery` de `status` (`state.py`), que lo muestra en la pestaña Disposit
 estimación de terceros hasta medir el daemon real con un medidor USB en línea (ver
 `hardware/README.md`, *Alimentación*).
 
-### Audio: PWM por GPIO, sin amplificador (ADR 0012)
-La Zero 2 W no tiene jack: el audio PWM sale por `dtoverlay=audremap,pins_18_19` (señal en el pin 12,
-masa en el 14; hasta el 2026-11-12 era `pins_12_13`, pines 32/34), con `setup.sh` escribiendo la
-línea. El transductor de conducción ósea es de **4 Ω** y va directo con **260 Ω y 47 µF en serie**
-(+ hacia el pin): el pico queda en ~12,5 mA, dentro de los 16 mA de un GPIO, y el capacitor corta la
-continua del PWM. Se oye **bajo**; con el tutor se decidió dejarlo así en el prototipo (2026-11-12).
-Consume ~10 mW al sonar, menos del 1 % de la placa (calculado). El pin 35 queda como salida: nada
-conectado ahí. La amplificación es trabajo futuro: el destino recomendado es el **MAX98357A** en los
-mismos pines (GPIO 18/19/21); el ADR 0012 compara las alternativas y el espacio libre en la carcasa.
-
+### Audio: PWM → filtro → PAM8403 (ADR 0012)
+La Zero 2 W no tiene jack: el audio PWM sale por `dtoverlay=audremap,pins_18_19` (señal en el pin 12;
+`setup.sh` escribe la línea). Desde el 2026-11-19 pasa por un **filtro RC de dos etapas** (10 kΩ +
+4,7 nF, 10 kΩ + 2 × 1 nF) y un **PAM8403 mini** (5V pin 2, GND pin 6, entrada pin 12 vía filtro, GND
+de entrada pin 14) hacia el transductor óseo de **4 Ω** en L+/L− (ninguno a masa). Sin el filtro
+satura: el PWM es una onda cuadrada de 3,3 V. El daemon **desconecta el pin entre audios**
+(`audio.PwmGate`, `pinctrl`), porque el PWM ocioso amplificado es un soplido continuo. Volumen desde
+la app (comando `volume`, `vol` en `status`), **al máximo** con este filtro. El pin 35 queda como
+salida: nada conectado ahí. Queda ruido de cuantización del PWM en banda; se elimina sólo con I2S
+(MAX98357A, o PCM5102A + el PAM8403). Sin SSH, el daemon se actualiza por la microSD
+(`virovision-update.tgz`, `boot/README.md`).
 ### Entrada: un botón en GPIO 5 (pin 29, masa en el 30)
 `button.py`, con los gestos del ADR 0007 y tiempos calibrados el 2026-09-13 (antirrebote 15 ms,
 doble click 0,6 s, click largo 0,8 s; banderas `--debounce-ms`, `--double-click-ms`,

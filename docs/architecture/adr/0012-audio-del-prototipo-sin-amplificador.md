@@ -213,3 +213,86 @@ activo), porque la versión mini no expone el pin de apagado, más lo que entreg
 con el volumen. Sigue sin medir. El ruido de cuantización del PWM se amplifica junto con la voz; el
 MAX98357A sigue siendo el destino para eliminarlo.
 
+
+## Actualización 2026-11-19: saturación, soplido y el filtro de entrada
+
+Con el PAM8403 instalado aparecieron dos problemas que el volumen del software no resolvía. Esta
+sección registra cómo se diagnosticaron y en qué orden se resolvieron, porque cada intento descartó
+una hipótesis.
+
+### Problema 1: todo el audio salía saturado
+
+**Causa.** El pin 12 no entrega audio analógico: entrega una onda cuadrada de 0 a 3,3 V que conmuta
+a alta frecuencia, y el audio va codificado en el ancho de los pulsos. Bajar el volumen cambia el
+ancho, no la amplitud: cada pulso sigue siendo de 3,3 V. El PAM8403, con una ganancia fija de 24 dB,
+espera una señal de nivel de línea, unas diez veces menor, y recibía esa onda completa. Por eso
+saturaba a cualquier volumen. Usar otro pin no cambia nada: la Zero 2 W no tiene ninguna salida
+analógica, y cualquier pin entregaría la misma onda.
+
+**Solución.** Un filtro RC a la entrada del amplificador, que cumple dos funciones: atenúa la señal
+hasta el nivel que el amplificador espera y elimina la conmutación de alta frecuencia, dejando pasar
+la voz. Es el mismo principio del filtro que las Raspberry Pi con conector de auriculares traen en su
+placa.
+
+### Problema 2: un soplido fuerte e indefinido al terminar cada audio
+
+**Causa.** El PWM sigue conmutando después de que termina la reproducción. Con el transductor
+conectado directo al pin no se oía; amplificado, era un soplido fuerte que no se detenía.
+
+**Solución, en el software** (PR #137). El daemon desconecta el pin cuando la salida lleva 1 s sin
+reproducir nada (GPIO 18 como salida en nivel bajo, `pinctrl set 18 op dl`) y lo devuelve al PWM
+(`pinctrl set 18 a5`) justo antes del próximo audio; también lo desconecta al arrancar. La espera de
+1 s evita un chasquido entre los clips de un mismo anuncio de ómnibus (`audio.PwmGate`). Como efecto
+adicional, el pin deja de consumir mientras no suena nada.
+
+### Los intentos, en orden
+
+| # | Circuito entre el pin 12 y la entrada del PAM8403 | Resultado |
+|---|---|---|
+| 1 | directo | voz saturada y soplido fuerte al terminar cada audio |
+| 2 | directo, con el pin desconectado entre audios (PR #137) | desaparece el soplido posterior; sigue la saturación |
+| 3 | 10 kΩ en serie | la saturación baja, pero no alcanza |
+| 4 | 20 kΩ en serie | sin saturación, pero la voz se oye lejana y con un soplido fuerte durante todo el audio: la resistencia atenúa por igual la voz y el ruido |
+| 5 | 20 kΩ y 47 µF entre la entrada y masa | descartado por cálculo: es unas 20.000 veces la capacidad necesaria y cortaría también la voz |
+| 6 | 20 kΩ y 1 nF entre la entrada y masa | mejora notable; queda soplido audible |
+| 7 | **filtro de dos etapas** (abajo) | **funciona muy bien**: voz clara y soplido muy reducido |
+
+Junto con el filtro, el **volumen del dispositivo se lleva al máximo** desde la aplicación. Con el
+filtro a la entrada, el volumen del software no cambia cuánto ruido entra al amplificador sino cuánta
+voz va mezclada en la señal: al 50 % la voz es la mitad y el ruido el mismo. La intensidad final la
+fijan las resistencias del filtro.
+
+### El circuito final
+
+```
+pin 12 ──[ 10 kΩ ]──●──[ 10 kΩ ]──●── entrada L del PAM8403
+                    │             │
+                [4,7 nF]     [1 nF] [1 nF]
+                    │             │
+pin 14 ─────────────●─────────────●── GND de entrada del PAM8403
+
+pin 2 ── 5V del PAM8403        pin 6 ── GND de alimentación del PAM8403
+salida L+ y L− ── transductor de 4 Ω (ninguno de los dos a masa)
+```
+
+- **Primera etapa:** 10 kΩ y 4,7 nF (código 472), corte en ~3,4 kHz.
+- **Segunda etapa:** 10 kΩ y dos capacitores de 1 nF (código 102) en paralelo, 2 nF, corte en ~8 kHz.
+- **Respuesta del conjunto** (calculada sin la impedancia de entrada del amplificador): −3 dB en
+  ~2,1 kHz, −7 dB en 4 kHz, −25 dB en 20 kHz y −50 dB en 100 kHz. La voz conserva su
+  inteligibilidad, como en una llamada telefónica, y la conmutación del PWM, a cientos de kHz, queda
+  atenuada en más de 50 dB.
+- **Montaje sin placa:** la primera resistencia va en el cable, cubierta con termocontraíble; los
+  capacitores y la segunda resistencia, soldados sobre los pads del módulo. El conjunto entró en la
+  carcasa v0.29, con muy poco margen.
+- **Componentes:** resistencias de 10 kΩ y capacitores cerámicos de un kit de uso general; sin polaridad.
+
+### Lo que queda
+
+- **Ruido residual.** Parte del ruido del PWM es ruido de cuantización que cae dentro de la banda de
+  la voz, y ningún filtro lo elimina sin eliminar también la voz. Es audible en silencio, aunque ya
+  no molesta. Sólo desaparece con una salida digital: el MAX98357A, o un conversor PCM5102A por I2S
+  delante del mismo PAM8403.
+- **Consumo:** el PAM8403 suma unos 10 mA en reposo (sin pin de apagado en la versión mini) más lo
+  que entrega al hablar. Sin medir.
+- **Despliegue sin red.** El control de volumen y la desconexión del pin llegaron a la placa por la
+  microSD (`virovision-update.tgz`, PR #136), porque la placa estaba sin SSH.

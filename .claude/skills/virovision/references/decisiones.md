@@ -313,7 +313,11 @@ consume ~10 mW al sonar, menos del 1 % de la placa (calculado, sin medir). El AD
 alternativas (transistores, LM386, PAM8403, PAM8302, MAX98357A, la placa de los auriculares) con
 potencia, reposo, tamaño y disponibilidad en Uruguay.
 
-**Qué NO cambió**: el MAX98357A sigue siendo el destino recomendado, en los mismos pines. **Regla**:
+**Actualizaciones 2026-11-18/19**: se instaló un **PAM8403** (el prototipo ya no va sin
+amplificador). Satura sin un filtro RC de dos etapas a la entrada (10 kΩ + 4,7 nF, 10 kΩ + 2 nF), y el
+daemon desconecta el pin entre audios por el soplido del PWM ocioso. Volumen desde la app, al máximo.
+
+**Qué NO cambió**: una salida I2S (MAX98357A) sigue siendo el destino, para el ruido de fondo del PWM. **Regla**:
 nada conectado al pin 35 (el overlay lo deja como salida); ningún borne del transductor a masa si se
 pone un amplificador clase D.
 
