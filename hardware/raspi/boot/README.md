@@ -9,7 +9,7 @@ se pierde, se pierde la única forma de entrar a una placa en modo producto sin 
 
 | archivo | quién lo corre | qué hace |
 |---|---|---|
-| `modo-red.sh` | `virovision-modo-red.service`, cada arranque | modo de red según exista `SIN-AP`; instala perfiles `*.nmconnection` y los avisos de sistema dejados en la tarjeta (y retira los que la tarjeta ya no trae). Si existe `VOLUMEN` (un número de 0 a 100), instala un drop-in que reaplica ese nivel de ALSA 40 s después de que arranca el daemon; sin el archivo, lo retira (2026-11-18, parche para bajar el volumen sin SSH; **borrarlo una vez que el volumen se elige desde la app**, o pisa el nivel elegido en cada arranque). Sólo trabaja si algo cambió: ver abajo |
+| `modo-red.sh` | `virovision-modo-red.service`, cada arranque | modo de red según exista `SIN-AP`; instala perfiles `*.nmconnection` y los avisos de sistema dejados en la tarjeta (y retira los que la tarjeta ya no trae). Si existe `VOLUMEN` (un número de 0 a 100), instala un drop-in que reaplica ese nivel de ALSA 40 s después de que arranca el daemon; sin el archivo, lo retira (2026-11-18, parche para bajar el volumen sin SSH; **borrarlo una vez que el volumen se elige desde la app**, o pisa el nivel elegido en cada arranque). Si existe `virovision-update.tgz` (el paquete `virovision/` solo), reemplaza el código del daemon antes de que arranque, guarda el anterior en `virovision.anterior/` y renombra el tgz a `.aplicado` (2026-11-18: actualizar sin SSH; no toca el `.venv`, así que no sirve si cambian las dependencias). Sólo trabaja si algo cambió: ver abajo |
 | `instalar-daemon.sh` | `virovision-instalar.service`, etapa 2 | extrae `virovision-daemon.tgz` y corre `setup.sh`. **Protegido por la centinela `/var/lib/virovision-instalado`**: una vez instalado no se vuelve a ejecutar, así que un daemon nuevo se despliega por SSH |
 
 ## `modo-red.sh` está en la cadena crítica del arranque
@@ -49,3 +49,16 @@ guardó al apagarse. Todo lo que instala queda con la fecha del apagado anterior
 2026-09-17 eso hizo pensar que los avisos de sistema eran de un despliegue viejo cuando se acababan
 de copiar. Para saber cuándo se instaló algo, mirar
 `/var/log/virovision-firstrun.log`, no la fecha del archivo.
+
+## Actualizar el daemon sin SSH (2026-11-18)
+
+Para una placa sin red (por ejemplo, fuera de casa), desde la raíz del repo:
+
+```sh
+cd hardware/raspi && COPYFILE_DISABLE=1 tar czf /Volumes/bootfs/virovision-update.tgz \
+  --exclude __pycache__ --exclude '*.pyc' virovision
+```
+
+Con la tarjeta de vuelta en la placa, el próximo arranque aplica la actualización antes de que
+arranque el daemon. En la tarjeta queda `virovision-update.tgz.aplicado` como constancia. Sólo
+reemplaza el código Python: si cambiaron `requirements*.txt` o `setup.sh`, hace falta SSH.

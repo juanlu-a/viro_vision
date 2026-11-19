@@ -4831,6 +4831,28 @@ campo), la tabla de comandos de la tesis (sec. 7.1.4) y los README de `raspi/` y
   PAM8403.
 - Medir el consumo del amplificador junto con el de la placa.
 
+## 2026-11-18 (cont.): el PAM8403 satura, y actualizar el daemon desde la microSD
+
+**La saturación.** Con el PAM8403 soldado, todo audio sale saturado y al terminar queda un ruido blanco
+fuerte. No es el volumen: el pin 12 entrega una onda cuadrada de 0 a 3,3 V (el audio va en el ancho de
+los pulsos), y bajar el volumen cambia el ancho, no la amplitud. El PAM8403, con 24 dB fijos, espera
+una señal de nivel de línea. El arreglo es un filtro a la entrada: 10 kΩ en serie (en el cable, con
+termocontraíble) y 1 kΩ más 22 nF a masa, soldados sobre los pads L y GND del módulo; divide por diez y
+corta por encima de unos 8 kHz, como el filtro que las Raspberry con jack traen en su placa. Usar otro
+pin no cambia nada: la Zero no tiene salida analógica.
+
+**El daemon por la tarjeta.** Sin red en la placa, el control de volumen (#135) no podía llegar por
+SSH. `modo-red.sh` suma un paso: si en `bootfs` hay un `virovision-update.tgz` con el paquete
+`virovision/`, lo instala antes de que arranque el daemon, guarda el anterior y renombra el tgz a
+`.aplicado`. La placa tenía el daemon de #126; entre eso y `staging` sólo cambió código Python, sin
+dependencias nuevas. Se quitó `VOLUMEN` de la tarjeta: el volumen pasa a elegirse desde la app.
+
+### Pendientes
+
+- Soldar el filtro de entrada del PAM8403 y probar.
+- Si después del filtro queda ruido en silencio: que el daemon apague el pin entre audios.
+- Actualizar las sec. 7.3.1, 7.3.3 y 10.1 de la tesis: el prototipo ya tiene amplificador.
+
 **El soplido que no para.** Con el daemon nuevo, después de cada audio el PAM8403 queda sonando fuerte
 indefinidamente: el PWM sigue conmutando sin audio. El daemon ahora desconecta el pin (GPIO 18 a salida
 en bajo con `pinctrl`) tras 1 s sin sonar nada y lo reconecta antes del próximo audio; también al
@@ -4855,6 +4877,5 @@ del proyecto y la skill. **No se pasó al Google Doc**: el equipo lo decide desp
 ### Pendientes
 
 - Pasar los cambios de la tesis al Google Doc cuando el equipo lo indique.
+- (#136 y #137 mergeados a `staging` el 2026-11-19.)
 - Medir el consumo de la placa con el amplificador.
-- Mergear #136 (actualizar el daemon por la tarjeta) y #137 (pin desconectado entre audios); la placa ya
-  corre ese código.
