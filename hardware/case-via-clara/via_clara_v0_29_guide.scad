@@ -160,7 +160,7 @@ function items(v) =
         [[hat_x(26), HAT_TOP_Y + 4, 15], "UPS HAT + batería"],
         [[STACK_REAR_X - 20, PI_TOP_Y, 15], "Raspberry Pi Zero 2 W"],
         [[BUTTON_X, 30 + SW_TOP_Y + 1, BUTTON_Z + 3.5], "Tecla (pieza 04)"],
-        [[BUTTON_X, 16 + SW_BASE_Y + 1, BUTTON_Z + 3], "Pulsador 6 x 6"],
+        [[BUTTON_X, 16 + SW_BASE_Y + 1, BUTTON_Z + 3], "Pulsador SMD 4 x 4"],
         [[0, -30 + LEFT_FACE + 2, 18], "Mitad izquierda (cabeza)"],
         [[0, 30 + RIGHT_FACE - 2, 18], "Mitad derecha (externa)"],
         [TRANSDUCER_CENTER + [0, -30, 8], "Brazo del auricular (pieza 03)"]];
