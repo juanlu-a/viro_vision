@@ -282,6 +282,32 @@ La carcasa debe alojar el conjunto real de componentes sobre la patilla de unos 
 
 Se partió de un modelo base de terceros, que el repositorio conserva como versión de partida (v0.8), y se rediseñó como modelo paramétrico en OpenSCAD (proyecto “VIA Clara”, en hardware/case-via-clara/). Las dos mitades de la versión final miden 89,2 × 28,5 × 39,8 mm, sin contar el brazo que sostiene el transductor. Cada medida exterior se deriva de las del conjunto interior, de modo que corregir una medida real actualiza toda la carcasa. El conjunto, de la cara que apoya en la cabeza hacia afuera, está formado por las cabezas de los tornillos bajo el módulo de alimentación, el módulo, la batería de 40 × 30 × 8 mm, la Raspberry Pi Zero 2 W y, sobre ella, el conector de pines soldado y los separadores hexagonales. El cuerpo son dos mitades unidas por trabas a presión. Cada traba es una viga que corre a lo largo de la junta, dentro de la pared, y flexiona en el plano de la cama de impresión y no a través de las capas, que es la dirección en la que una pieza impresa se rompe. Completan el diseño un brazo que sostiene el transductor de 14 mm contra la cabeza, con una tapa que se fija a presión, dos puentes para un elástico plano de 6 mm y el botón, rodeado por un anillo en bajorrelieve.
 
+Las figuras siguientes muestran la versión final desde sus dos caras, el interior de la mitad externa y el despiece con los componentes.
+
+<!-- imagen del Doc: figuras/carcasa-exterior.png -->
+
+Figura 15: Carcasa VIA Clara v0.29, cara externa: el botón de modos con su anillo, la nariz que aloja la cámara y, en el extremo trasero, la ranura de la tarjeta de memoria, la carga y la ranura para abrir.
+
+Fuente: elaboración propia, a partir del modelo en OpenSCAD (hardware/case-via-clara/).
+
+<!-- imagen del Doc: figuras/carcasa-cara-cabeza.png -->
+
+Figura 16: Carcasa VIA Clara v0.29, cara que apoya en la patilla: el lente de la cámara, la ventana del interruptor de encendido con su punto en relieve, los puentes para el elástico y el brazo con el transductor de conducción ósea.
+
+Fuente: elaboración propia, a partir del modelo en OpenSCAD (hardware/case-via-clara/).
+
+<!-- imagen del Doc: figuras/carcasa-interior.png -->
+
+Figura 17: Interior de la mitad externa: las vigas y los ganchos de las trabas a presión, los alojamientos hexagonales de los separadores, los nervios de la cámara, el recorrido del cable plano y el bolsillo del pulsador.
+
+Fuente: elaboración propia, a partir del modelo en OpenSCAD (hardware/case-via-clara/).
+
+<!-- imagen del Doc: figuras/carcasa-despiece.png -->
+
+Figura 18: Despiece de la carcasa con los componentes: las dos mitades, la cámara, el módulo de alimentación con la batería, la Raspberry Pi Zero 2 W, el pulsador con su tecla y el brazo del transductor.
+
+Fuente: elaboración propia, a partir del modelo en OpenSCAD (hardware/case-via-clara/).
+
 El principal problema fue que las verificaciones del modelo se hacen contra maquetas de los componentes, y cada impresión mostró algo que las maquetas no tenían. La carcasa avanzó, por lo tanto, en ciclos de impresión, armado y corrección. La tabla resume la secuencia (bitácora del proyecto, 14 de octubre a 12 de noviembre de 2026):
 
 | **Versión** | **Lo que mostró la impresión o el armado** | **Cambio en la versión siguiente** |
@@ -301,6 +327,14 @@ El principal problema fue que las verificaciones del modelo se hacen contra maqu
 | v0.28 (11 de noviembre) | El encastre entre el brazo y la copa de la v0.27 quedaba flojo | Por error se supuso lo contrario y el enchufe se achicó a 5,1 mm, con lo que quedó todavía más flojo |
 | v0.29 (12 de noviembre) | Se probaron enchufes de 5,8, 6,0 y 6,2 mm; el de 6,0 mm calzó correctamente | Versión final: impresa y armada con el enchufe de 6,0 mm; se integra al repositorio (PR #131) |
 
+La comparación de tres versiones de la misma mitad, vistas desde el mismo ángulo, resume esa evolución: la v0.9 tenía alojamientos redondos para los separadores y un perfil sin la nariz de la cámara; la v0.20 incorporó los alojamientos hexagonales y la nariz de la cámara; la v0.29 es más alta, para los conectores que sobresalen de la placa, y suma el bolsillo del pulsador.
+
+<!-- imagen del Doc: figuras/carcasa-versiones.png -->
+
+Figura 19: Evolución de la carcasa: las dos mitades de las versiones v0.9, v0.20 y v0.29, desde el mismo ángulo. Cada imagen está ajustada a su cuadro, por lo que los tamaños no son comparables entre sí.
+
+Fuente: elaboración propia, a partir de los archivos de impresión de cada versión (hardware/case-via-clara/versions/).
+
 Varios hallazgos de esa secuencia significaron cambios en el diseño y no sólo un cambio de medida.
 
 El primero fue la orientación de la cámara. Con la v0.20 armada y colocada en la patilla, la fotografía salía girada 90° respecto de la vista del usuario. En una cámara convencional bastaría con girar la imagen por software, pero en este sistema el detector YOLO se ejecuta dentro del sensor IMX500, sobre la imagen tal como la capta el sensor, antes de que llegue a la placa. El sensor permite invertir la imagen pero no girarla 90°, y girar la imagen en la placa no cambiaría lo que ve el detector. La cámara, por lo tanto, no podía quedar de costado: su orientación física dentro de la carcasa tenía que coincidir con la vista del usuario. Se imprimieron dos alternativas, girar la carcasa completa (v0.21) o girar sólo la cámara un cuarto de vuelta en su plano (v0.22), y se eligió la segunda porque conservaba el resto del diseño ya validado. El cable plano pasó a bajar por el piso de la carcasa y subir frente a la placa, y la v0.23 le dejó 2 mm más de espacio para enrollarse.
@@ -309,9 +343,13 @@ El segundo fue el encendido. El módulo de alimentación trae su propia llave de
 
 El tercero fue la resolución de la impresora: ningún detalle funcional baja de tres líneas de extrusión (1,2 mm), porque un nervio de 0,65 mm no se reprodujo aun con la máxima calidad. El cuarto fue el pulsador: el real es un SMD de 4 × 4 × 1 mm con un actuador de menos de 1 mm, por lo que lleva encima una tecla impresa.
 
+El quinto fue el espacio interior. La primera versión suponía un conjunto de 16,5 mm de espesor y el real resultó de unos 23 mm; desde entonces cada medida exterior se deriva del conjunto medido y no de una estimación. Aun así, el espacio se ganó de a décimas: los conectores de la placa sobresalen 2,0 mm de su borde y no los 0,8 mm supuestos, lo que obligó a subir la carcasa a 39,8 mm; el cable plano de la cámara necesitó 2 mm más para enrollarse sin forzar el conector; y la patilla del lente pasaba por encima del brazo del auricular hasta que el elástico y el brazo quedaron separados 11 mm, el máximo que admite la cara plana. El último componente en entrar fue el amplificador de audio con su filtro (sec. 7.3.1), que no estaba previsto en el diseño: se ubicó en el hueco junto al conector de pines, del lado de la tarjeta de memoria, con la primera resistencia del filtro en el cable, cubierta con termocontraíble, y entró con muy poco margen.
+
+El sexto fueron las trabas a presión, que deben cerrar con un clic firme, abrirse para el desarrollo y no romperse. En la v0.11 las trabas delanteras quedaron pegadas a las guías de la cámara, no podían flexionar y se partieron al cerrar; se reubicaron detrás de las guías. En la v0.23 la tapa del auricular no llegaba a encastrar y se subió 1,5 mm. En la v0.25 los ganchos se ensancharon a 7 y 5 mm y su diente pasó a 0,5 mm, para un cierre más firme. La impresión también influye en el clic: la mitad impresa boca abajo pierde definición en el borde de la junta y sus trabas enganchan peor, lo que llevó a los ajustes de impresión que se describen más abajo. El brazo del transductor y su copa, que desde la v0.27 son piezas separadas, siguieron el mismo camino con el encastre entre ambos: se imprimieron tres enchufes de prueba de 5,8, 6,0 y 6,2 mm y se eligió el de 6,0 mm, que calzó sin juego.
+
 Un guion (export.sh) regenera las piezas, las imágenes y una guía de armado, y comprueba que cada pieza imprimible sea un único sólido apoyado en la cama. Ejecuta además verificaciones de interferencia entre volúmenes: las mitades entre sí, cada mitad contra placas, batería, interruptor, cámara, pulsador, tornillos y separadores, el recorrido del cable plano, el brazo y los caminos de armado, y no sólo la posición final. El guion falla si alguna verificación detecta una interferencia. Su alcance está limitado por las maquetas: una verificación contra una medida supuesta no garantiza nada sobre la pieza real, y eso fue lo que hizo fallar la v0.10.
 
-Las primeras versiones se imprimieron en una Creality Ender 3 V3 y las siguientes en una FLSUN T1 Max. El cambio se debió a la calidad de las piezas: la FLSUN dio bordes más definidos, mejor terminación superficial y soportes que se retiran con menos marcas, lo que importa en una pieza chica, con trabas y ranuras de pocas décimas de milímetro de juego. Las piezas se imprimen en PLA. La superficie exterior se imprime con textura (*fuzzy skin*), que mejora el agarre y disimula las líneas de capa; la mitad externa se imprime boca arriba. La mitad interna se imprime boca abajo, lo que da un exterior más prolijo pero hace que el borde de la junta pierda definición y que las trabas enganchen peor; por eso se recomendó quitar la textura en los primeros 3 mm y compensar el ensanchamiento de la primera capa (0,2 mm).
+Las primeras versiones se imprimieron en una Creality Ender 3 V3 y las siguientes, incluida la versión final, en una FLSUN T1 Max. El cambio se debió a la calidad de las piezas: la FLSUN dio bordes más definidos, mejor terminación superficial y soportes que se retiran con menos marcas, lo que importa en una pieza chica, con trabas y ranuras de pocas décimas de milímetro de juego. Las piezas se imprimen en PLA. La superficie exterior se imprime con textura (*fuzzy skin*), que mejora el agarre y disimula las líneas de capa; la mitad externa se imprime boca arriba. La mitad interna se imprime boca abajo, lo que da un exterior más prolijo pero hace que el borde de la junta pierda definición y que las trabas enganchen peor; por eso se recomendó quitar la textura en los primeros 3 mm y compensar el ensanchamiento de la primera capa (0,2 mm).
 
 El equipo sometió el modelo al flujo de revisión multimodelo tackle-ticket, en el que revisores basados en distintos modelos (Opus, Sonnet, Haiku y Codex) examinan el mismo cambio por separado. En la v0.9 la revisión llevó las trabas al plano de la cama de la impresora 3D, reservó el volumen del cable plano de la cámara, que no tenía por dónde pasar, y agregó las verificaciones de los caminos de armado; en la v0.11 encontró que los apoyos que debían sujetar el conjunto no lo tocaban y que el lente no pasaba por el plano de la junta.
 
@@ -352,7 +390,7 @@ Este pipeline es el componente de mayor complejidad técnica del proyecto y el �
 
 <!-- imagen del Doc -->
 
-Figura 15: Los pasos del pipeline de reconocimiento de líneas de ómnibus, del cuadro de la cámara al anuncio de voz.
+Figura 20: Los pasos del pipeline de reconocimiento de líneas de ómnibus, del cuadro de la cámara al anuncio de voz.
 
 Fuente: elaboración propia.
 
@@ -420,7 +458,7 @@ Para superar las dos limitaciones a la vez, la empresa Arnaldo Castro S.A. facil
 
 <!-- imagen del Doc -->
 
-Figura 16: Pérdidas de entrenamiento y de validación, y métricas de validación, a lo largo de las 120 épocas del reentrenamiento en la V100.
+Figura 21: Pérdidas de entrenamiento y de validación, y métricas de validación, a lo largo de las 120 épocas del reentrenamiento en la V100.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
@@ -477,13 +515,13 @@ Por clase, el ómnibus se detecta algo mejor que el cartel, con un mAP@0,5 de 0,
 
 <!-- imagen del Doc -->
 
-Figura 17: Curva precisión-exhaustividad del detector reentrenado, por clase y para ambas clases, sobre la partición de validación.
+Figura 22: Curva precisión-exhaustividad del detector reentrenado, por clase y para ambas clases, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
 <!-- imagen del Doc -->
 
-Figura 18: Matriz de confusión normalizada del detector reentrenado sobre la partición de validación. Cada columna corresponde a la clase real y cada fila a la clase predicha.
+Figura 23: Matriz de confusión normalizada del detector reentrenado sobre la partición de validación. Cada columna corresponde a la clase real y cada fila a la clase predicha.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
@@ -600,7 +638,7 @@ Las líneas de otros sistemas, como las suburbanas e interdepartamentales operad
 
 <!-- imagen del Doc -->
 
-Figura 19: Pasos de una lectura en el modo supermercado, del doble clic en el botón a la reproducción del audio en el dispositivo.
+Figura 24: Pasos de una lectura en el modo supermercado, del doble clic en el botón a la reproducción del audio en el dispositivo.
 
 Fuente: elaboración propia.
 
