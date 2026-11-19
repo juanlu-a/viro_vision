@@ -4876,6 +4876,6 @@ del proyecto y la skill. **No se pasó al Google Doc**: el equipo lo decide desp
 
 ### Pendientes
 
-- Pasar los cambios de la tesis al Google Doc cuando el equipo lo indique.
+- ~~Pasar los cambios de la tesis al Google Doc~~: publicado el 2026-11-19 con el ok del tutor (`sync_doc.py`, diez secciones; antes se trajeron al repo las ediciones del equipo en 7.2.6 y 7.3.5).
 - (#136 y #137 mergeados a `staging` el 2026-11-19.)
 - Medir el consumo de la placa con el amplificador.

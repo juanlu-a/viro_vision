@@ -147,7 +147,7 @@ La ocupación del 90% del chip tiene una consecuencia: en el sensor cabe un úni
 
 ### 7.2.6 Calibración de la interacción física
 
-Los tiempos iniciales del botón se tomaron de las convenciones de interfaces de escritorio y provocaban errores en el reconocimiento de los gestos; en particular, el doble clic se confundía con un clic simple. Se ajustaron así:
+Los tiempos iniciales del botón se tomaron de las convenciones de interfaces de escritorio y provocaban errores en el reconocimiento de los gestos; en particular, el doble clic se confundía con un clic simple. Se ajustaron de la siguiente manera:
 
 | **Constante** | **Antes** | **Ahora** | **Fundamento** |
 |---|---|---|---|
@@ -301,7 +301,7 @@ El principal problema fue que las verificaciones del modelo se hacen contra maqu
 | v0.28 (11 de noviembre) | El encastre entre el brazo y la copa de la v0.27 quedaba flojo | Por error se supuso lo contrario y el enchufe se achicó a 5,1 mm, con lo que quedó todavía más flojo |
 | v0.29 (12 de noviembre) | Se probaron enchufes de 5,8, 6,0 y 6,2 mm; el de 6,0 mm calzó correctamente | Versión final: impresa y armada con el enchufe de 6,0 mm; se integra al repositorio (PR #131) |
 
-Varios hallazgos de esa secuencia cambiaron el diseño y no sólo una medida.
+Varios hallazgos de esa secuencia significaron cambios en el diseño y no sólo un cambio de medida.
 
 El primero fue la orientación de la cámara. Con la v0.20 armada y colocada en la patilla, la fotografía salía girada 90° respecto de la vista del usuario. En una cámara convencional bastaría con girar la imagen por software, pero en este sistema el detector YOLO se ejecuta dentro del sensor IMX500, sobre la imagen tal como la capta el sensor, antes de que llegue a la placa. El sensor permite invertir la imagen pero no girarla 90°, y girar la imagen en la placa no cambiaría lo que ve el detector. La cámara, por lo tanto, no podía quedar de costado: su orientación física dentro de la carcasa tenía que coincidir con la vista del usuario. Se imprimieron dos alternativas, girar la carcasa completa (v0.21) o girar sólo la cámara un cuarto de vuelta en su plano (v0.22), y se eligió la segunda porque conservaba el resto del diseño ya validado. El cable plano pasó a bajar por el piso de la carcasa y subir frente a la placa, y la v0.23 le dejó 2 mm más de espacio para enrollarse.
 
@@ -313,7 +313,7 @@ Un guion (export.sh) regenera las piezas, las imágenes y una guía de armado, y
 
 Las primeras versiones se imprimieron en una Creality Ender 3 V3 y las siguientes en una FLSUN T1 Max. El cambio se debió a la calidad de las piezas: la FLSUN dio bordes más definidos, mejor terminación superficial y soportes que se retiran con menos marcas, lo que importa en una pieza chica, con trabas y ranuras de pocas décimas de milímetro de juego. Las piezas se imprimen en PLA. La superficie exterior se imprime con textura (*fuzzy skin*), que mejora el agarre y disimula las líneas de capa; la mitad externa se imprime boca arriba. La mitad interna se imprime boca abajo, lo que da un exterior más prolijo pero hace que el borde de la junta pierda definición y que las trabas enganchen peor; por eso se recomendó quitar la textura en los primeros 3 mm y compensar el ensanchamiento de la primera capa (0,2 mm).
 
-El equipo sometió el modelo al flujo de revisión multimodelo tackle-ticket, en el que revisores basados en distintos modelos (Opus, Sonnet, Haiku y Codex) examinan el mismo cambio por separado. En la v0.9 la revisión llevó las trabas al plano de la cama, reservó el volumen del cable plano de la cámara, que no tenía por dónde pasar, y agregó las verificaciones de los caminos de armado; en la v0.11 encontró que los apoyos que debían sujetar el conjunto no lo tocaban y que el lente no pasaba por el plano de la junta.
+El equipo sometió el modelo al flujo de revisión multimodelo tackle-ticket, en el que revisores basados en distintos modelos (Opus, Sonnet, Haiku y Codex) examinan el mismo cambio por separado. En la v0.9 la revisión llevó las trabas al plano de la cama de la impresora 3D, reservó el volumen del cable plano de la cámara, que no tenía por dónde pasar, y agregó las verificaciones de los caminos de armado; en la v0.11 encontró que los apoyos que debían sujetar el conjunto no lo tocaban y que el lente no pasaba por el plano de la junta.
 
 Los archivos de impresión de las versiones v0.9 a v0.29 están en el repositorio (hardware/case-via-clara/versions/). Con la carcasa final armada, queda pendiente verificar con ella los tiempos del botón (sec. 7.2.6).
 
