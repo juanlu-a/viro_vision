@@ -4879,3 +4879,20 @@ del proyecto y la skill. **No se pasó al Google Doc**: el equipo lo decide desp
 - ~~Pasar los cambios de la tesis al Google Doc~~: publicado el 2026-11-19 con el ok del tutor (`sync_doc.py`, diez secciones; antes se trajeron al repo las ediciones del equipo en 7.2.6 y 7.3.5).
 - (#136 y #137 mergeados a `staging` el 2026-11-19.)
 - Medir el consumo de la placa con el amplificador.
+
+## 2026-11-19 (cont.): la carcasa en la tesis, con figuras
+
+Con el ok del tutor se publicó en el Doc el capítulo del audio (PR #138). Después, a pedido del usuario,
+la sec. 7.3.5 sumó cinco figuras del modelo final (exterior, cara de la cabeza, interior, despiece y una
+comparación v0.9 / v0.20 / v0.29) en `docs/tesis/figuras/carcasa-*.png`, y dos hallazgos nuevos: el espacio
+interior (de 16,5 a ~23 mm, conectores, cable plano, patilla, y el amplificador que entró justo) y las trabas
+a presión (el clic: v0.11, v0.23, v0.25 y el encastre de la copa). La versión final se imprimió en la FLSUN.
+Las figuras 15 a 23 pasaron a 20 a 28 (en el Doc, con `replaceAllText`). La guía de armado decía «Pulsador
+6 x 6»: corregido a «SMD 4 x 4» y regenerado con `export.sh`. Las imágenes entraron al Doc por
+`insertInlineImage` desde el raw de GitHub (repo público). Índice actualizado desde Chrome y uniformado con
+`toc_style.py`. **No se tocaron las correcciones del tutor**: se ven cuando él avise que terminó.
+
+### Pendientes
+
+- Fotos reales de la carcasa impresa y armada, si el equipo las tiene (hoy son renders del modelo).
+- Correcciones del tutor, cuando avise.
