@@ -1110,3 +1110,29 @@ def test_a_press_during_the_boot_build_says_preparing_before_waiting():
         release.set()
         builder.join(5)
         starter.join(5)
+
+
+def test_a_photo_waits_for_the_frame_loop_to_let_go_of_the_camera():
+    """2026-11-20: the supermarket photo reached picamera2 while bus mode's frame loop was still
+    inside `capture_request`; it hung and the daemon had to restart. `wait_released` is what the
+    photo waits on: closed while a run is active, open once its frame loop has been joined."""
+    import threading
+
+    camera = ZoomingCamera(frames=0, sign=None)
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None)
+    assert watcher.wait_released(0)  # never started: nothing to wait for
+
+    leave = threading.Event()
+    frames = threading.Thread(target=leave.wait, args=(2,), name="bus-frames", daemon=True)
+    frames.start()
+    watcher._released.clear()
+    watcher._threads = [frames]
+    watcher.running = True
+    assert not watcher.wait_released(0)
+
+    stopper = threading.Thread(target=watcher.stop)
+    stopper.start()
+    assert not watcher.wait_released(0.1)  # the frame loop is still running
+    leave.set()
+    assert watcher.wait_released(2)
+    stopper.join(2)
