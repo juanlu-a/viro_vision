@@ -4934,7 +4934,10 @@ modelo): siete hallazgos importantes, todos corregidos.
 
 ### Pendientes
 
-- Probar en la placa: encender, abrir la app (sin permiso si ya se unió antes), supermercado al primer
-  intento, y supermercado → ómnibus sin audios superpuestos.
+- Daemon de esta rama ya instalado en la placa (2026-11-20, por SSH tras `tools/ap.py`, respaldo en
+  `/home/virovision/virovision.bak-*`): arranque limpio, foto con `X-Mode` en 0,24 s y `/audio` de otro
+  modo rechazado con 409. Falta la app nueva (build) para la prueba completa: encender, abrir la app (sin
+  permiso si ya se unió antes), supermercado al primer intento, y supermercado → ómnibus sin audios
+  superpuestos.
 - Sin test: el arranque fallido del modo ómnibus y la espera de cámara de `__main__.py`.
 - Riesgo aceptado: si la escritura del modo no llega a la placa en 1,5 s, la foto se saca igual.
