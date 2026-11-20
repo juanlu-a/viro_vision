@@ -329,8 +329,9 @@ describe('a reading with nothing on screen', () => {
     enterSupermarket();
 
     const running = requestReading('device');
-    await Promise.resolve();
-    await Promise.resolve();
+    // Until the cloud call is in flight: the deadline is about IT, not about the photo.
+    for (let i = 0; i < 20 && mockRecognize.mock.calls.length === 0; i += 1) await Promise.resolve();
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
     jest.advanceTimersByTime(READING_DEADLINE_MS + 1);
     await running;
 
@@ -508,5 +509,110 @@ describe('a mode change during a reading', () => {
 
     expect(mockRecognize).toHaveBeenCalledTimes(1);
     expect(mockSpeak.mock.calls.some(([text]) => /yerba/i.test(text))).toBe(true);
+  });
+});
+
+/**
+ * The camera error of 2026-11-20 on the first use after connecting: the photo was asked for while
+ * the phone was still joining the device's AP, while the board's camera was still starting (503),
+ * or in the same instant the mode left bus and the frame loop still held the camera.
+ */
+describe('the first reading after connecting', () => {
+  const { HttpDownloadError } = jest.requireActual('@/services/wifi/deviceHttp');
+
+  afterEach(() => jest.useRealTimers());
+
+  it('waits for the phone to join the device network instead of failing at once', async () => {
+    jest.useFakeTimers();
+    let onNetwork = false;
+    const downloadPhoto = jest.fn(() => Promise.resolve(photo));
+    configureReader(deps({ isNetworkReady: () => onNetwork, downloadPhoto }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(3_000);
+    expect(downloadPhoto).not.toHaveBeenCalled();
+    onNetwork = true;
+    await jest.advanceTimersByTimeAsync(500);
+    await running;
+
+    expect(downloadPhoto).toHaveBeenCalledTimes(1);
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the device is still connecting when the network never comes', async () => {
+    jest.useFakeTimers();
+    const downloadPhoto = jest.fn(() => Promise.resolve(photo));
+    configureReader(deps({ isNetworkReady: () => false, downloadPhoto }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(16_000);
+    await running;
+
+    expect(downloadPhoto).not.toHaveBeenCalled();
+    expect(mockSpeak).toHaveBeenCalledWith(expect.stringContaining('todavía se está conectando'));
+    expect(mockAudio[mockAudio.length - 1]).toBe('end');
+  });
+
+  it('retries while the camera is starting (503) and reads once it answers', async () => {
+    jest.useFakeTimers();
+    const downloadPhoto = jest
+      .fn()
+      .mockRejectedValueOnce(new HttpDownloadError('the device has no camera', 503))
+      .mockRejectedValueOnce(new HttpDownloadError('the device has no camera', 503))
+      .mockResolvedValue(photo);
+    configureReader(deps({ downloadPhoto }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(3_000);
+    await running;
+
+    expect(downloadPhoto).toHaveBeenCalledTimes(3);
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the camera is starting, not that it failed, when the 503 outlasts the wait', async () => {
+    jest.useFakeTimers();
+    const downloadPhoto = jest.fn(() => Promise.reject(new HttpDownloadError('the device has no camera', 503)));
+    configureReader(deps({ downloadPhoto }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(10_000);
+    await running;
+
+    expect(mockSpeak).toHaveBeenCalledWith(expect.stringContaining('se está iniciando'));
+    expect(mockRecognize).not.toHaveBeenCalled();
+  });
+
+  it('asks for the photo only once the board has the new mode', async () => {
+    const order: string[] = [];
+    let ack: () => void = () => {};
+    configureReader(
+      deps({
+        writeMode: () =>
+          new Promise<void>((resolve) => {
+            ack = () => {
+              order.push('mode');
+              resolve();
+            };
+          }),
+        downloadPhoto: () => {
+          order.push('photo');
+          return Promise.resolve(photo);
+        },
+      }),
+    );
+
+    applyGesture('doubleClick');
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    expect(order).toEqual([]);
+    ack();
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(order).toEqual(['mode', 'photo']);
   });
 });

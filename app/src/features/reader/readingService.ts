@@ -70,8 +70,31 @@ const t = strings.reader;
  */
 export const READING_DEADLINE_MS = 12_000;
 
-/** The photo cannot have the whole budget: 4 s is ~80× the measured 46 ms over the device's AP. */
-const PHOTO_TIMEOUT_MS = 4_000;
+/**
+ * The photo cannot have the whole budget. 4 s (~80× the measured 46 ms over the device's AP) until
+ * 2026-11-20; now 7 s, because right after leaving bus mode the board makes the photo wait for the
+ * frame loop to let go of the camera (up to 4 s, `BUS_RELEASE_TIMEOUT_S` on the board) — the race
+ * that made the first supermarket photo after bus mode hang the camera.
+ */
+const PHOTO_TIMEOUT_MS = 7_000;
+
+/**
+ * How long a reading waits for the phone to be on the device's network before giving up. Right
+ * after connecting, the board's AP comes up seconds after BLE and iOS takes ~10 s to (re)join it
+ * (`wifi.joining` → `wifi.ready` in telemetry): a reading asked for in that window used to fail at
+ * once as "no pudo sacar la foto", and only a reconnection fixed it (2026-11-20).
+ */
+const NETWORK_WAIT_MS = 15_000;
+
+/** While the board's camera is starting (IMX500 firmware, 4 s to ~1 min) it answers 503. */
+const CAMERA_WARMUP_WAIT_MS = 8_000;
+
+/** How long a reading waits for the mode it was asked in to reach the board. */
+const MODE_WRITE_WAIT_MS = 1_500;
+
+const POLL_MS = 250;
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * What a quota wait must leave of the reading deadline for the cloud call that follows it. The
@@ -144,6 +167,12 @@ export interface ReaderDeps {
    */
   isDeviceReady(): boolean;
   /**
+   * Whether the phone is on the device's network, so the photo can come down. Today the same
+   * condition as `isDeviceReady`, asked under its own name because the reading WAITS on this one
+   * (`waitForDeviceNetwork`) and only consults the other. Absent means "assume it is".
+   */
+  isNetworkReady?(): boolean;
+  /**
    * Cuts whatever the device's speaker is playing. Used before the phone speaks, so the two outputs
    * cannot end up talking over each other (ADR 0003, act. 2026-09-18).
    */
@@ -171,6 +200,12 @@ let reading = false;
 let modeEpoch = 0;
 /** The running reading's abort, so a mode change can stop its cloud call, synthesis and POST. */
 let readingAbort: AbortController | null = null;
+/**
+ * The last mode write to the board, still in flight. A double click from bus asks for the photo in
+ * the same instant it writes the mode: the photo has to reach a board that already knows it left
+ * bus mode, so it can wait for the frame loop to release the camera.
+ */
+let pendingModeWrite: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
 export function configureReader(next: ReaderDeps): void {
@@ -335,7 +370,11 @@ export function applyGesture(gesture: Gesture): void {
     changeMode(next, 'app');
     // The device learns the mode over BLE and turns its AP on or off. If it is not there, nothing
     // happens.
-    void deps.writeMode(next);
+    const write = deps.writeMode(next).catch(() => {});
+    pendingModeWrite = write;
+    void write.then(() => {
+      if (pendingModeWrite === write) pendingModeWrite = null;
+    });
   }
   // Asked SEPARATELY from the mode change, because the two answers differ: a double click in
   // supermarket changes no mode and still has to read. Keying the capture off the transition is
@@ -549,6 +588,11 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
 
   const t0 = Date.now();
   const controller = new AbortController();
+  // The photo comes over the device's WiFi: wait for the phone to be on it, and for the mode just
+  // written to reach the board. Both happen in the first seconds after connecting or switching.
+  // Synchronous in the usual case: every extra await here is time iOS may not give a locked phone.
+  const networkReady = isNetworkReady() || (await waitForDeviceNetwork(isStale));
+  if (pendingModeWrite) await Promise.race([pendingModeWrite, sleep(MODE_WRITE_WAIT_MS)]);
   // A mode change during the awaits above already moved on: do not start a reading for the old mode.
   if (isStale()) {
     record('reading.cancelled', { detail: { mode, stage: 'start' } });
@@ -563,9 +607,16 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
     record('reading.start', { detail: { mode, model: deps.getModel()?.id ?? null, source } });
     update({ status: 'reading', message: t.readingFromDevice, progress: null, failure: null, resultPhrase: null });
 
+    if (!networkReady) {
+      record('photo.failed', { ms: 0, detail: { mode, status: null, message: 'the phone is not on the device network', waitedMs: NETWORK_WAIT_MS } });
+      update({ status: 'idle', progress: null, message: t.deviceNetworkNotReady, failure: 'deviceCapture' });
+      await announce(t.deviceNetworkNotReady);
+      return;
+    }
+
     let photo: DevicePhoto;
     try {
-      photo = await deps.downloadPhoto({ timeoutMs: PHOTO_TIMEOUT_MS });
+      photo = await downloadPhotoWhenCameraReady(isStale);
       // The photo's size and time separately from the total: it is what separates "the network is
       // slow" from "the model is slow", and both look the same as "it was slow".
       record('photo.ok', { ms: photo.ms, detail: { bytes: photo.bytes } });
@@ -588,9 +639,11 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
         detail: { mode, status, message: errorDetail(err) },
       });
       // Something is spoken: someone who cannot see the screen has no other way of knowing why the
-      // button did nothing. The reason itself is not — it is in the row above.
-      update({ status: 'idle', progress: null, message: t.deviceCaptureFailed, failure: 'deviceCapture' });
-      await announce(t.deviceCaptureFailed);
+      // button did nothing. The reason itself is not — it is in the row above. A camera still
+      // starting says so: "probá de nuevo" right away would fail the same way.
+      const phrase = status === 503 ? t.deviceCameraWarmingUp : t.deviceCaptureFailed;
+      update({ status: 'idle', progress: null, message: phrase, failure: 'deviceCapture' });
+      await announce(phrase);
       return;
     }
 
@@ -634,6 +687,44 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   }
 }
 
+/**
+ * Waits, bounded, for the phone to be on the device's network (`isDeviceReady`: connected, joined,
+ * answering). True at once in the usual case. False when it never came or the mode changed meanwhile.
+ */
+function isNetworkReady(): boolean {
+  return deps.isNetworkReady ? deps.isNetworkReady() : true;
+}
+
+async function waitForDeviceNetwork(isStale: () => boolean): Promise<boolean> {
+  const t0 = Date.now();
+  while (Date.now() - t0 < NETWORK_WAIT_MS) {
+    await sleep(POLL_MS);
+    if (isStale()) return false;
+    if (isNetworkReady()) {
+      record('photo.waitedNetwork', { ms: Date.now() - t0 });
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The device's photo, retried while its camera answers 503 (still starting after a power-on or a
+ * restart). Any other failure, or a 503 that outlasts the wait, is thrown as it came.
+ */
+async function downloadPhotoWhenCameraReady(isStale: () => boolean): Promise<DevicePhoto> {
+  const t0 = Date.now();
+  for (;;) {
+    try {
+      return await deps.downloadPhoto({ timeoutMs: PHOTO_TIMEOUT_MS });
+    } catch (err) {
+      const warming = err instanceof HttpDownloadError && err.status === 503;
+      if (!warming || isStale() || Date.now() - t0 >= CAMERA_WARMUP_WAIT_MS) throw err;
+      await sleep(1_000);
+    }
+  }
+}
+
 /** Whether this reading began with the app not in the foreground. */
 function wasStartedInBackground(): boolean {
   return AppState.currentState !== 'active';
@@ -646,5 +737,6 @@ export function resetReaderForTests(): void {
   reading = false;
   modeEpoch = 0;
   readingAbort = null;
+  pendingModeWrite = null;
   listeners.clear();
 }

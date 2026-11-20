@@ -82,6 +82,8 @@ export type EventType =
   | 'reading.cancelled'
   | 'photo.ok'
   | 'photo.failed'
+  // The reading waited for the phone to join the device's network before asking for the photo.
+  | 'photo.waitedNetwork'
   | 'ocr.load'
   | 'cloud.wait'
   | 'audio.synthesis'

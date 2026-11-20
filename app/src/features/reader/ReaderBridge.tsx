@@ -52,6 +52,7 @@ export function ReaderBridge() {
       // (connected, on the device's network, and `/health` answering), so asking anything weaker
       // would pay for a synthesis the device cannot receive.
       isDeviceReady: () => latest.current.device.photoAvailable,
+      isNetworkReady: () => latest.current.device.photoAvailable,
       hushDevice: () => getBleClient().hushDevice(),
     });
     // The system notices reach the board from here too, and through the SAME client the readings
