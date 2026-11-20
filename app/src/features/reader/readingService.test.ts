@@ -423,3 +423,90 @@ describe("the app's own button", () => {
     expect(mockRecognize).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * The overlap reported on 2026-11-20: a supermarket reading still in flight when the user switched to
+ * bus kept going, and its result (or "elemento no reconocible", or an error) was said on top of
+ * "modo ómnibus activado" and the bus lines. A mode change now cancels the reading and silences it.
+ */
+describe('a mode change during a reading', () => {
+  function pendingRecognition() {
+    let settle: (value: unknown) => void = () => {};
+    let aborted: AbortSignal | undefined;
+    mockRecognize.mockImplementation(
+      (options: { signal?: AbortSignal }) =>
+        new Promise((resolve, reject) => {
+          aborted = options.signal;
+          settle = resolve;
+          options.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    return {
+      resolve: () => settle({ ms: 1, model: MODEL.id, product: null, text: '' }),
+      signal: () => aborted,
+    };
+  }
+
+  async function untilRecognizing() {
+    for (let i = 0; i < 10 && mockRecognize.mock.calls.length === 0; i += 1) await Promise.resolve();
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+  }
+
+  it('cancels the cloud call and says nothing of the old mode, not even the timeout', async () => {
+    const hush = jest.fn(() => Promise.resolve());
+    const cloud = pendingRecognition();
+    configureReader(deps({ hushDevice: hush }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await untilRecognizing();
+    setModeFromDevice('bus');
+    await running;
+
+    expect(cloud.signal()?.aborted).toBe(true);
+    expect(hush).toHaveBeenCalled();
+    const said = mockSpeak.mock.calls.map(([text]) => text);
+    expect(said.some((text) => /no reconoc|Tardó demasiado|no pudo/i.test(text))).toBe(false);
+    expect(mockEvents).toContain('reading.cancelled');
+    expect(mockAudio[mockAudio.length - 1]).toBe('end');
+  });
+
+  it('does not send a late result to the device after the user left supermarket', async () => {
+    let finishSynthesis: (uri: string) => void = () => {};
+    mockSynthesize.mockImplementationOnce(() => new Promise((resolve) => (finishSynthesis = resolve)));
+    const sendAudio = jest.fn(() => Promise.resolve(true));
+    setAudioOutput('device');
+    configureReader(deps({ sendAudio }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    for (let i = 0; i < 20 && mockSynthesize.mock.calls.length === 0; i += 1) await Promise.resolve();
+    expect(mockSynthesize).toHaveBeenCalledTimes(1);
+    setModeFromDevice('bus');
+    finishSynthesis('file:///tmp/late.mp3');
+    await running;
+
+    expect(sendAudio).not.toHaveBeenCalled();
+    // And no phone fallback either: the reading belongs to a mode the user already left.
+    expect(mockSpeak.mock.calls.some(([text]) => /arroz/i.test(text))).toBe(false);
+  });
+
+  it('lets the new mode read right away instead of dropping it as "already reading"', async () => {
+    const cloud = pendingRecognition();
+    configureReader(deps());
+    enterSupermarket();
+
+    const first = requestReading('device');
+    await untilRecognizing();
+    setModeFromDevice('bus');
+    setModeFromDevice('supermarket');
+    mockRecognize.mockReset();
+    mockRecognize.mockResolvedValue({ ms: 1, model: MODEL.id, product: { kind: 'yerba', brand: null, detail: null }, text: '' });
+    await requestReading('device');
+    cloud.resolve();
+    await first;
+
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+    expect(mockSpeak.mock.calls.some(([text]) => /yerba/i.test(text))).toBe(true);
+  });
+});

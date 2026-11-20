@@ -78,6 +78,8 @@ export type EventType =
   | 'reading.start'
   | 'reading.ok'
   | 'reading.failed'
+  // A reading the user left behind by changing mode: it ends in silence (`detail.stage` says where).
+  | 'reading.cancelled'
   | 'photo.ok'
   | 'photo.failed'
   | 'ocr.load'
@@ -92,6 +94,8 @@ export type EventType =
   // why. A table full of these means the device path is not actually usable yet, which is a finding
   // and not a bug report.
   | 'audio.fallback'
+  // A bus announcement that arrived with the app no longer in bus mode, and was not said.
+  | 'audio.dropped'
   | 'audio.spoken';
 
 export interface TelemetryEvent {

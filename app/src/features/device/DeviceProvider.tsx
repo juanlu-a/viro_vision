@@ -70,7 +70,8 @@ interface DeviceValue {
   writeVolume: (percent: number) => Promise<void>;
   downloadPhoto: (options?: { timeoutMs?: number }) => Promise<DevicePhoto>;
   /** Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. */
-  sendAudio: (uri: string, signal?: AbortSignal) => Promise<boolean>;
+  /** `mode` is the mode the reading was made in: the device drops it if the user has left it. */
+  sendAudio: (uri: string, signal?: AbortSignal, mode?: DeviceMode) => Promise<boolean>;
 }
 
 const DeviceContext = createContext<DeviceValue | null>(null);
@@ -543,7 +544,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const sendAudio = useCallback(
-    async (uri: string, signal?: AbortSignal): Promise<boolean> => {
+    async (uri: string, signal?: AbortSignal, mode?: DeviceMode): Promise<boolean> => {
       if (!photoAvailable || !address) return false;
       try {
         const { File } = await import('expo-file-system');
@@ -552,7 +553,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // device decodes it from the header.
         const r = await fetch(deviceUrl(address, '/audio'), {
           method: 'POST',
-          headers: { 'Content-Type': 'audio/mpeg', 'X-Encoding': 'base64' },
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'X-Encoding': 'base64',
+            // A reading that lands after a mode change is dropped by the device (409, 2026-11-20).
+            ...(mode ? { 'X-Mode': mode } : null),
+          },
           body: encodeBase64(bytes),
           signal,
         });

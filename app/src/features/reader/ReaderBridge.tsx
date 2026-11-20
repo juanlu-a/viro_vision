@@ -23,7 +23,7 @@ import { configureNotices } from '@/features/audio/systemNotice';
 import { useDevice } from '@/features/device/DeviceProvider';
 import { MODE_FROM_GATT } from '@/features/device/gatt';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
-import { configureReader, readFromDevice, setModeFromDevice } from '@/features/reader/readingService';
+import { configureReader, getReaderState, readFromDevice, setModeFromDevice } from '@/features/reader/readingService';
 import { getBleClient } from '@/services/ble/bleClient';
 import { record } from '@/services/telemetry';
 import { strings } from '@/i18n';
@@ -46,7 +46,7 @@ export function ReaderBridge() {
     configureReader({
       getModel: () => latest.current.model,
       downloadPhoto: (options) => latest.current.device.downloadPhoto(options),
-      sendAudio: (uri, signal) => latest.current.device.sendAudio(uri, signal),
+      sendAudio: (uri, signal, mode) => latest.current.device.sendAudio(uri, signal, mode),
       writeMode: (mode) => latest.current.device.writeMode(mode),
       // `photoAvailable` and not `connection.status`: it is the same condition `sendAudio` needs
       // (connected, on the device's network, and `/health` answering), so asking anything weaker
@@ -97,6 +97,13 @@ export function ReaderBridge() {
       getBleClient().onRecognition((event) => {
         // Recorded like every other spoken path: this is the bus surveillance — the product's main
         // mode — and until 2026-10-06 it was the one voice that left no row at all.
+        // A bus line heard after the user left bus mode talks over the new mode's announcement
+        // (2026-11-20). The board stops its watcher on the mode change; this drops the ones already
+        // on the wire.
+        if (getReaderState().mode !== 'bus') {
+          record('audio.dropped', { detail: { mode: getReaderState().mode, source: 'recognition' } });
+          return;
+        }
         const target = getAudioOutput();
         record('audio.spoken', { detail: { mode: 'bus', source: 'recognition', target } });
         if (target === 'phone') void announceRecognition(event);
@@ -111,6 +118,10 @@ export function ReaderBridge() {
   useEffect(
     () =>
       getBleClient().onBusApproaching(() => {
+        if (getReaderState().mode !== 'bus') {
+          record('audio.dropped', { detail: { mode: getReaderState().mode, source: 'approaching' } });
+          return;
+        }
         const target = getAudioOutput();
         record('audio.spoken', { detail: { mode: 'bus', source: 'approaching', target } });
         if (target === 'phone') void announce(strings.reader.announceBusApproaching);

@@ -135,7 +135,7 @@ const initialState: ReaderState = {
 export interface ReaderDeps {
   getModel(): ModelProfile | null;
   downloadPhoto(options?: { timeoutMs?: number }): Promise<DevicePhoto>;
-  sendAudio(uri: string, signal?: AbortSignal): Promise<boolean>;
+  sendAudio(uri: string, signal?: AbortSignal, mode?: Mode): Promise<boolean>;
   writeMode(mode: Mode): Promise<void>;
   /**
    * Whether the device can receive audio right now (connected, on its network, answering). Asked
@@ -162,6 +162,15 @@ const noDeps: ReaderDeps = {
 let deps: ReaderDeps = noDeps;
 let state: ReaderState = initialState;
 let reading = false;
+/**
+ * Bumped on every mode change. A reading remembers the epoch it started in and, after each await,
+ * gives up in silence if the epoch moved: once the user has switched mode, whatever the previous
+ * mode was about to say (a product, "elemento no reconocible", an error) is no longer theirs to hear,
+ * and saying it on top of "modo ómnibus activado" is the overlap reported on 2026-11-20.
+ */
+let modeEpoch = 0;
+/** The running reading's abort, so a mode change can stop its cloud call, synthesis and POST. */
+let readingAbort: AbortController | null = null;
 const listeners = new Set<() => void>();
 
 export function configureReader(next: ReaderDeps): void {
@@ -217,7 +226,7 @@ function errorMessage(err: unknown): string {
  *
  * It never throws: the caller falls back to the phone, and silence is not an available outcome.
  */
-async function sendReadingToDevice(text: string): Promise<boolean> {
+async function sendReadingToDevice(text: string, mode: Mode, cancel?: AbortSignal): Promise<boolean> {
   const t0 = Date.now();
   // Bounded, because nothing else bounds it: this leg runs after the reading deadline was already
   // cleared, and a POST to a phone that just left the device's AP hangs until the OS gives up. Until
@@ -225,14 +234,22 @@ async function sendReadingToDevice(text: string): Promise<boolean> {
   // as "already reading". On abort the phone speaks instead.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEVICE_DELIVERY_TIMEOUT_MS);
+  // A mode change cancels the delivery too: a supermarket MP3 that lands on the board after the user
+  // switched to bus is exactly the voice that talked over the bus announcements.
+  const onCancel = (): void => controller.abort();
+  if (cancel?.aborted) controller.abort();
+  cancel?.addEventListener('abort', onCancel);
   try {
     const uri = await synthesizeToFile(text, new Date(), controller.signal);
     // The call to the cloud TTS, measured separately from the send: they are two things that fail
     // for different reasons and take time for different reasons, and together they look like a
     // single "it was slow". Same criterion as separating the photo's ms from the pipeline's.
     record('audio.synthesis', { ms: Date.now() - t0, detail: { characters: text.length } });
+    // Cancelled while synthesizing (a mode change, or the delivery timeout): the POST would only
+    // carry audio nobody should hear now.
+    if (controller.signal.aborted) throw new Error('device delivery cancelled');
     const t1 = Date.now();
-    const sent = await deps.sendAudio(uri, controller.signal);
+    const sent = await deps.sendAudio(uri, controller.signal, mode);
     record('audio.send', { ms: Date.now() - t1, detail: { sent } });
     return sent;
   } catch (err) {
@@ -243,6 +260,7 @@ async function sendReadingToDevice(text: string): Promise<boolean> {
     return false;
   } finally {
     clearTimeout(timer);
+    cancel?.removeEventListener('abort', onCancel);
   }
 }
 
@@ -254,7 +272,8 @@ async function sendReadingToDevice(text: string): Promise<boolean> {
  * back `false`: by then the sentence has been synthesized and nobody has heard it, and paying twice
  * is much better than leaving the user with nothing.
  */
-async function deliverReading(text: string): Promise<void> {
+async function deliverReading(text: string, isStale: () => boolean, cancel: AbortSignal): Promise<void> {
+  if (isStale()) return;
   const delivery = decideDelivery({
     output: getAudioOutput(),
     deviceReady: deps.isDeviceReady(),
@@ -265,7 +284,10 @@ async function deliverReading(text: string): Promise<void> {
     // interrupted itself and neither the other, and overlapping voices are not information for
     // someone who cannot see the screen.
     stopSpeaking();
-    if (await sendReadingToDevice(text)) {
+    const sent = await sendReadingToDevice(text, 'supermarket', cancel);
+    // The mode changed while it was being sent: the phone must not pick it up as a fallback either.
+    if (isStale()) return;
+    if (sent) {
       record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'device' } });
       return;
     }
@@ -286,8 +308,20 @@ async function deliverReading(text: string): Promise<void> {
  */
 function changeMode(next: Mode, source: 'app' | 'device'): void {
   if (next === state.mode) return;
-  record('mode.change', { detail: { from: state.mode, to: next, source } });
-  update({ mode: next, reading: null, product: null, message: '', photoUri: null, failure: null, resultPhrase: null });
+  record('mode.change', { detail: { from: state.mode, to: next, source, cancelledReading: reading } });
+  // The previous mode goes quiet before the new one is announced (2026-11-20): its reading in flight
+  // is cancelled and marked stale, and both outputs are cut. Each output only ever interrupted
+  // itself, so a supermarket result on the board and "modo ómnibus activado" on the phone (or the
+  // other way round) used to play at the same time.
+  modeEpoch += 1;
+  readingAbort?.abort();
+  readingAbort = null;
+  // The cancelled reading no longer blocks: it ends on its own, silently, and the new mode can read
+  // right away (a double click from bus to supermarket must take its photo).
+  reading = false;
+  stopSpeaking();
+  void deps.hushDevice().catch(() => {});
+  update({ mode: next, status: 'idle', progress: null, reading: null, product: null, message: '', photoUri: null, failure: null, resultPhrase: null });
   // A system notice and no longer a bare `announce()`: since 2026-09-16 it comes out of the output
   // the user chose, like everything else. `void` because the transition is already applied — the
   // mode must not wait on a speaker.
@@ -335,7 +369,7 @@ export function readFromDevice(mode: Mode | null): Promise<void> {
 }
 
 /** Bus mode: ALWAYS local (ADR 0006): OCR over the photo, no network to read it. */
-async function readBus(uri: string): Promise<void> {
+async function readBus(uri: string, isStale: () => boolean): Promise<void> {
   if (!isOcrLoaded()) {
     update({ status: 'preparing', message: t.preparing, progress: 0 });
     // The first load downloads ~250 MB: if someone reports that "the first time it does not work",
@@ -346,6 +380,7 @@ async function readBus(uri: string): Promise<void> {
   update({ status: 'reading', message: t.reading, progress: null });
 
   const r = await readImage(uri);
+  if (isStale()) return;
   const visible = r.detections.filter((d) => d.score > 0.2).slice(0, 6);
   const busReading = guessBusReading(visible);
   const raw = visible.map((d) => d.text).join(' · ') || null;
@@ -382,7 +417,7 @@ async function readBus(uri: string): Promise<void> {
   // copy was a second voice saying the same line (`audioOutput.ts`), and with no device network it
   // paid for a cloud synthesis that had nowhere to go.
   if (isSynthesisEnabled && getAudioOutput() === 'device' && deps.isDeviceReady()) {
-    void sendReadingToDevice(spoken);
+    void sendReadingToDevice(spoken, 'bus');
   }
 }
 
@@ -391,7 +426,12 @@ async function readBus(uri: string): Promise<void> {
  * error type) and does not read; an exhausted quota says how long to wait — that field exists to be
  * read.
  */
-async function readSupermarket(image: CloudImage, signal: AbortSignal, deadlineAt: number): Promise<void> {
+async function readSupermarket(
+  image: CloudImage,
+  signal: AbortSignal,
+  deadlineAt: number,
+  isStale: () => boolean,
+): Promise<void> {
   const chosen = deps.getModel();
   if (!chosen) {
     record('reading.failed', { detail: { mode: 'supermarket', stage: 'model', reason: 'no model configured' } });
@@ -416,12 +456,14 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal, deadlineA
       // cannot see the screen, an app that sleeps for up to a minute is indistinguishable from a
       // frozen one.
       onWait: (waitMs) => {
+        if (isStale()) return;
         const notice = `${t.waitingSlot} ${Math.ceil(waitMs / 1000)} s.`;
         record('cloud.wait', { ms: waitMs, detail: { model: chosen.id } });
         void announce(notice);
         update({ message: notice });
       },
     });
+    if (isStale()) return;
     const spoken = phraseProduct(r.product, r.text || null);
     record('reading.ok', {
       ms: r.ms,
@@ -440,8 +482,13 @@ async function readSupermarket(image: CloudImage, signal: AbortSignal, deadlineA
     update({ status: 'idle', product: r.product, message: spoken, resultPhrase: spoken });
     // Where this is heard is the user's choice (`features/audio/audioOutput.ts`), and it is AWAITED:
     // the device path has to finish before the `finally` releases the audio session.
-    await deliverReading(spoken);
+    await deliverReading(spoken, isStale, signal);
   } catch (err) {
+    // Cancelled by a mode change: nothing to say, the new mode has already been announced.
+    if (isStale()) {
+      record('reading.cancelled', { detail: { mode: 'supermarket', stage: 'cloud' } });
+      return;
+    }
     // The deadline first: it is our own abort, and by type it arrives dressed as a network failure.
     // Saying "the cloud did not answer" when the cloud was fine sends the user to retry the wrong
     // thing — and with the screen locked the sentence is the only thing they get.
@@ -485,6 +532,8 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
     return;
   }
   reading = true;
+  const epoch = modeEpoch;
+  const isStale = (): boolean => epoch !== modeEpoch;
 
   // Both of these happen right at the start, before any of the slow work (photo, OCR, cloud), and
   // that order is the point. The session is the first thing awaited, while iOS is still giving us
@@ -500,6 +549,13 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
 
   const t0 = Date.now();
   const controller = new AbortController();
+  // A mode change during the awaits above already moved on: do not start a reading for the old mode.
+  if (isStale()) {
+    record('reading.cancelled', { detail: { mode, stage: 'start' } });
+    await endReadingAudio();
+    return;
+  }
+  readingAbort = controller;
   const deadline = setTimeout(() => controller.abort(), READING_DEADLINE_MS);
   const startedInBackground = wasStartedInBackground();
 
@@ -515,8 +571,16 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
       record('photo.ok', { ms: photo.ms, detail: { bytes: photo.bytes } });
       // Shown on screen from here on: the previous reading's photo must not outlive it, or the
       // screen would pair a fresh result with a stale image.
+      if (isStale()) {
+        record('reading.cancelled', { detail: { mode, stage: 'photo' } });
+        return;
+      }
       update({ photoUri: photo.uri });
     } catch (err) {
+      if (isStale()) {
+        record('reading.cancelled', { detail: { mode, stage: 'photo' } });
+        return;
+      }
       const status = err instanceof HttpDownloadError ? err.status : null;
       record('photo.failed', {
         ms: Date.now() - t0,
@@ -531,9 +595,13 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
     }
 
     try {
-      if (mode === 'bus') await readBus(photo.uri);
-      else await readSupermarket(photo.image, controller.signal, t0 + READING_DEADLINE_MS);
+      if (mode === 'bus') await readBus(photo.uri, isStale);
+      else await readSupermarket(photo.image, controller.signal, t0 + READING_DEADLINE_MS, isStale);
     } catch (err) {
+      if (isStale()) {
+        record('reading.cancelled', { detail: { mode, stage: mode === 'bus' ? 'ocr' : 'cloud' } });
+        return;
+      }
       const timedOut = controller.signal.aborted;
       record('reading.failed', {
         ms: Date.now() - t0,
@@ -550,7 +618,11 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
     }
   } finally {
     clearTimeout(deadline);
-    reading = false;
+    // Only if this reading still owns the flag: after a mode change a newer one may be running.
+    if (!isStale()) {
+      reading = false;
+      readingAbort = null;
+    }
     // The session is released only now: doing it a line after `announce()` would have cut the
     // announcement in half, because until 2026-09-10 `announce()` did not resolve on the last word.
     await endReadingAudio();
@@ -572,5 +644,7 @@ export function resetReaderForTests(): void {
   deps = noDeps;
   state = initialState;
   reading = false;
+  modeEpoch = 0;
+  readingAbort = null;
   listeners.clear();
 }
