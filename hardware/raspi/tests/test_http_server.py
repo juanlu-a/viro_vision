@@ -198,3 +198,18 @@ def test_a_reading_for_the_current_mode_or_from_an_older_app_is_played(tmp_path,
         assert len(played) == 2
     finally:
         s.stop()
+
+
+def test_the_photo_tells_the_board_which_mode_it_is_for_before_capturing():
+    """2026-11-20: a supermarket photo asked for before the mode write landed still has to wait for
+    bus mode to release the camera, so the server hands the app's `X-Mode` to `before_capture`."""
+    seen = []
+    s = HttpServer(lambda: {}, bytes, capture=lambda: b"\xff\xd8JPEG", port=0, before_capture=seen.append)
+    s.start()
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{s.port}/photos/latest", headers={"X-Mode": "supermarket"})
+        assert urllib.request.urlopen(req, timeout=5).status == 200
+        assert urllib.request.urlopen(f"http://127.0.0.1:{s.port}/photos/latest", timeout=5).status == 200
+        assert seen == ["supermarket", None]
+    finally:
+        s.stop()

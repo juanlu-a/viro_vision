@@ -4896,3 +4896,45 @@ Las figuras 15 a 23 pasaron a 20 a 28 (en el Doc, con `replaceAllText`). La guí
 
 - Fotos reales de la carcasa impresa y armada, si el equipo las tiene (hoy son renders del modelo).
 - Correcciones del tutor, cuando avise.
+
+## 2026-11-20: tres arreglos de producto (permiso de Wi‑Fi, cámara al primer uso, audios que se pisan)
+
+Probando en casa el dispositivo completo, el usuario reportó tres problemas. La telemetría (Supabase,
+`events`) confirmó los tres y cambió el diagnóstico del segundo.
+
+**El permiso de Wi‑Fi en cada encendido.** iOS muestra «¿Querés unirte a ViroVision?» cada vez que se
+llama a `NEHotspotConfiguration` con el teléfono fuera de esa red, aunque la configuración ya esté
+guardada (`services/wifi/join.ts`). Como la placa levanta el AP segundos después de anunciar BLE, la app
+siempre llegaba a llamarla. Ahora la app recuerda la red a la que el teléfono ya se unió
+(`services/storage/joinedNetwork.ts`) y, al conectar, no pregunta: espera hasta 20 s a que iOS vuelva
+sola (`mayPrompt: false`, evento `wifi.notJoined` si no vuelve, sin aviso). El permiso queda para cuando
+una lectura de supermercado necesita la foto (`joinNetwork`); el modo ómnibus no lo pide nunca. Límite
+que no se puede esquivar: con el teléfono en el Wi‑Fi de casa, iOS no se cambia sola a la red de la placa,
+y ahí el permiso aparece al usar supermercado.
+
+**La cámara al primer uso.** La telemetría del 2026-11-20 a las 12:16 mostró que la red estaba lista y la
+cámara también: el pedido de foto llegó en el mismo instante en que el modo pasaba de ómnibus a
+supermercado, y la captura se cruzó en picamera2 con el bucle de cuadros del modo ómnibus que todavía no
+había terminado. La captura se colgó 8 s, el reinicio de la cámara no pudo cerrar el sensor y el daemon se
+reinició (por eso «al reconectar anda»). Otros días hubo además fotos pedidas con el teléfono uniéndose
+todavía al AP y 503 con la cámara arrancando. Arreglos: en la placa, la foto espera (hasta 4 s) a que el
+modo ómnibus suelte la cámara (`BusWatcher.wait_released`, `release_camera_for`), también cuando la app
+avisa con `X-Mode` que la foto es para otro modo; en la app, la lectura espera la escritura del modo, la
+red de la placa (con «Conectando con el dispositivo…» a los 3 s) y reintenta los 503, todo dentro de un
+tope total de 30 s por ciclo (`READING_TOTAL_CAP_MS`). Frases nuevas en `es.ts` para red y cámara.
+
+**Los audios que se pisan.** Al cambiar de modo nada cancelaba la lectura de supermercado en curso
+(nube, síntesis y POST a la placa), y en la placa la cola de clips de ómnibus arrancaba encima del audio
+que estaba sonando y lo dejaba huérfano. Ahora un cambio de modo corta las dos salidas, cancela la
+lectura (termina en silencio, sin «tardó demasiado»), y la placa rechaza con 409 un audio de un modo que
+ya se dejó. La cola de ómnibus espera a que termine la frase anterior, con un tope de 20 s por clip.
+
+Revisión multi-modelo (Opus, Sonnet y Haiku, cuatro rondas; Codex no corrió porque la cuenta rechazó el
+modelo): siete hallazgos importantes, todos corregidos.
+
+### Pendientes
+
+- Probar en la placa: encender, abrir la app (sin permiso si ya se unió antes), supermercado al primer
+  intento, y supermercado → ómnibus sin audios superpuestos.
+- Sin test: el arranque fallido del modo ómnibus y la espera de cámara de `__main__.py`.
+- Riesgo aceptado: si la escritura del modo no llega a la placa en 1,5 s, la foto se saca igual.

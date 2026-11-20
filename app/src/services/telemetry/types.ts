@@ -75,6 +75,8 @@ export type EventType =
   | 'bus.evidenceFailed'
   // Operating modes (ADR 0007)
   | 'mode.change'
+  // The board reported an older mode while the app's own write was in flight; not applied.
+  | 'mode.echoIgnored'
   // One reading, end to end
   | 'reading.requested'
   | 'reading.start'

@@ -165,7 +165,7 @@ def test_a_clip_dequeued_before_a_hush_is_not_played_after_it(monkeypatch):
         def __init__(self, command, **kwargs):
             started.append(command[-1])
 
-        def wait(self):
+        def wait(self, timeout=None):
             pass
 
         def poll(self):
@@ -212,7 +212,7 @@ def test_the_pwm_pin_is_parked_once_the_output_is_idle_and_reconnected_for_the_n
         def poll(self):
             return 0 if self.done else None
 
-        def wait(self):
+        def wait(self, timeout=None):
             self.done = True
 
         def terminate(self):
@@ -311,3 +311,73 @@ def test_the_bus_clips_wait_for_the_sentence_play_started_instead_of_talking_ove
     worker.join(2)
     assert overlaps == []
     assert "/tmp/115.wav" in finish
+
+
+def test_a_hung_sentence_is_cut_after_the_cap_so_the_bus_clips_still_play(monkeypatch):
+    """A decoder that never ends must not hold every bus clip behind it (review, 2026-11-20)."""
+    import virovision.audio as audio
+
+    started = []
+
+    class Hung:
+        pid = 7
+
+        def __init__(self, command, **kwargs):
+            self.name = command[-1]
+            self.alive = self.name.endswith("hung.wav")
+            started.append(self.name)
+
+        def poll(self):
+            return None if self.alive else 0
+
+        def wait(self, timeout=None):
+            if self.alive and timeout is not None:
+                raise audio.subprocess.TimeoutExpired("x", timeout)
+
+        def terminate(self):
+            pass  # ignores SIGTERM
+
+        def kill(self):
+            self.alive = False
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Hung)
+    monkeypatch.setattr(audio, "PLAY_WAIT_CAP_S", 0.2)
+    player = Player()
+    player.play("/tmp/hung.wav")
+    player.play_sequence(["/tmp/115.wav"])
+    player._worker.join(3)
+    assert started == ["/tmp/hung.wav", "/tmp/115.wav"]
+
+
+def test_a_queued_clip_that_hangs_is_cut_so_the_next_one_plays(monkeypatch):
+    """The queue's own clip, not only the sentence it waits behind, is bounded (review, 2026-11-20)."""
+    import virovision.audio as audio
+
+    started = []
+
+    class Clip:
+        pid = 8
+
+        def __init__(self, command, **kwargs):
+            self.alive = command[-1].endswith("hung.wav")
+            started.append(command[-1])
+
+        def poll(self):
+            return None if self.alive else 0
+
+        def wait(self, timeout=None):
+            if self.alive:
+                raise audio.subprocess.TimeoutExpired("x", timeout)
+
+        def terminate(self):
+            self.alive = False
+
+        def kill(self):
+            self.alive = False
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Clip)
+    monkeypatch.setattr(audio, "PLAY_WAIT_CAP_S", 0.1)
+    player = Player()
+    player.play_sequence(["/tmp/hung.wav", "/tmp/115.wav"])
+    player._worker.join(3)
+    assert started == ["/tmp/hung.wav", "/tmp/115.wav"]

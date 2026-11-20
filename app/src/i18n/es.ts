@@ -40,6 +40,7 @@ export const es = {
       'Para leer hace falta el dispositivo prendido y cerca. Fijate en la pestaña Dispositivo en qué anda.',
     readingFromDevice: 'Pidiendo la foto al dispositivo…',
     deviceCaptureFailed: 'El dispositivo no pudo sacar la foto. Probá de nuevo.',
+    deviceConnecting: 'Conectando con el dispositivo…',
     deviceNetworkNotReady: 'El dispositivo todavía se está conectando. Probá en unos segundos.',
     deviceCameraWarmingUp: 'La cámara del dispositivo se está iniciando. Probá en unos segundos.',
     preparing: 'Preparando el lector… la primera vez descarga unos 250 MB.',

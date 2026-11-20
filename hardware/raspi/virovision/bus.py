@@ -501,9 +501,27 @@ class BusWatcher:
                 threading.Thread(target=self._watchdog, args=(self._stop,), name="bus-watchdog", daemon=True),
             ]
             self._released.clear()
-            for thread in self._threads:
-                thread.start()
-            self.running = True
+            failed: Optional[BaseException] = None
+            try:
+                for thread in self._threads:
+                    thread.start()
+            except Exception as exc:  # noqa: BLE001 — re-raised below, once the lock is free
+                self._stop.set()
+                self._jobs.put(None)
+                failed, started, self._threads = exc, self._threads, []
+            else:
+                self.running = True
+        if failed is not None:
+            # Nothing is watching: a photo must not wait on a frame loop that never started. One that
+            # did start is joined first, so it does not hold the camera, and outside the run lock, so
+            # a mode change meanwhile is not answered late (same rule as `_halt`).
+            for thread in started:
+                if thread.name == "bus-frames" and thread.is_alive():
+                    thread.join(timeout=3)
+                    if thread.is_alive():
+                        log.warning("bus: the frame loop did not stop in 3 s; releasing the camera anyway")
+            self._released.set()
+            raise failed
         if not self._wanted:
             # `stop` ran between the check above and `running = True`, and found nothing to stop.
             log.info("bus: the mode was left while it was starting; stopping")
@@ -541,10 +559,12 @@ class BusWatcher:
             thread.join(timeout=3)
             if thread.is_alive():
                 log.warning("bus: the frame loop did not stop in 3 s; releasing the camera anyway")
-        # Not if a new run started during the join: that run owns the camera and the zoom now.
-        if not self.running:
-            self._undo_zoom()
-            self._released.set()
+        # Not if a new run started during the join: that run owns the camera and the zoom now. Under
+        # the run lock, so a `start` cannot clear the event between the check and the set.
+        with self._run_lock:
+            if not self.running:
+                self._undo_zoom()
+                self._released.set()
         for thread in threads:
             if thread not in frames:
                 thread.join(timeout=3)

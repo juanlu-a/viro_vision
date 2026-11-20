@@ -60,7 +60,8 @@ import type { ModelProfile, ProductReading } from '@/services/vision';
 const t = strings.reader;
 
 /**
- * How long a whole reading may take before it is given up.
+ * How long the reading proper (the cloud call or the OCR, after the photo) may take before it is
+ * given up. The whole cycle is capped by `READING_TOTAL_CAP_MS`.
  *
  * It exists because of the locked screen. iOS hands the app a few seconds when a BLE notification
  * wakes it; the keep-alive tone buys more, but not forever, and a reading that runs past the point
@@ -69,6 +70,15 @@ const t = strings.reader;
  * still short enough that the user does not stand in front of a shelf wondering.
  */
 export const READING_DEADLINE_MS = 12_000;
+
+/**
+ * The hard cap on a whole cycle, from the press to the result, waits included. Since 2026-11-20 the
+ * 12 s above is armed once the photo is in (the network, mode and camera waits have their own
+ * bounds), so this is what still guarantees a locked phone hears an outcome before iOS gives up — in
+ * supermarket mode. The app's own bus reading (local OCR on the phone, no network) is not raced
+ * against it: it never waits on anyone else.
+ */
+export const READING_TOTAL_CAP_MS = 30_000;
 
 /**
  * The photo cannot have the whole budget. 4 s (~80× the measured 46 ms over the device's AP) until
@@ -93,6 +103,9 @@ const CAMERA_WARMUP_WAIT_MS = 8_000;
 const MODE_WRITE_WAIT_MS = 1_500;
 
 const POLL_MS = 250;
+
+/** After this long waiting for the network, the user hears that the device is connecting. */
+const CONNECTING_NOTICE_AFTER_MS = 3_000;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -157,7 +170,7 @@ const initialState: ReaderState = {
  */
 export interface ReaderDeps {
   getModel(): ModelProfile | null;
-  downloadPhoto(options?: { timeoutMs?: number }): Promise<DevicePhoto>;
+  downloadPhoto(options?: { timeoutMs?: number; mode?: Mode }): Promise<DevicePhoto>;
   sendAudio(uri: string, signal?: AbortSignal, mode?: Mode): Promise<boolean>;
   writeMode(mode: Mode): Promise<void>;
   /**
@@ -212,6 +225,8 @@ let readingAbort: AbortController | null = null;
  * bus mode, so it can wait for the frame loop to release the camera.
  */
 let pendingModeWrite: Promise<void> | null = null;
+/** The app's mode before that write: the only board report the echo filter may drop. */
+let modeBeforeWrite: Mode | null = null;
 const listeners = new Set<() => void>();
 
 export function configureReader(next: ReaderDeps): void {
@@ -338,9 +353,28 @@ async function deliverReading(text: string, isStale: () => boolean, cancel: Abor
   }
   // And the other way round: if the phone speaks, the board goes quiet. No `await`, so the reading
   // is not delayed behind a BLE write.
-  void deps.hushDevice().catch(() => {});
+  hushDeviceQuietly();
   await announce(text);
   record('audio.spoken', { detail: { mode: 'supermarket', characters: text.length, target: 'phone' } });
+}
+
+/** Cuts the board's speaker without waiting and without ever throwing (not even synchronously). */
+function hushDeviceQuietly(): void {
+  try {
+    void deps.hushDevice().catch(() => {});
+  } catch {
+    // the announcement path never throws
+  }
+}
+
+/** Waits for `promise` or `ms`, whichever comes first, and leaves no timer behind. */
+async function waitAtMost(promise: Promise<unknown>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([promise, new Promise<void>((resolve) => (timer = setTimeout(resolve, ms)))]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 /**
@@ -361,7 +395,7 @@ function changeMode(next: Mode, source: 'app' | 'device'): void {
   // right away (a double click from bus to supermarket must take its photo).
   reading = false;
   stopSpeaking();
-  void deps.hushDevice().catch(() => {});
+  hushDeviceQuietly();
   update({ mode: next, status: 'idle', progress: null, reading: null, product: null, message: '', photoUri: null, failure: null, resultPhrase: null });
   // A system notice and no longer a bare `announce()`: since 2026-09-16 it comes out of the output
   // the user chose, like everything else. `void` because the transition is already applied — the
@@ -371,15 +405,27 @@ function changeMode(next: Mode, source: 'app' | 'device'): void {
 
 /** A gesture made in the app's own UI. */
 export function applyGesture(gesture: Gesture): void {
-  const next = transition(state.mode, gesture);
+  const transitionFrom = state.mode;
+  const next = transition(transitionFrom, gesture);
   if (next !== state.mode) {
     changeMode(next, 'app');
     // The device learns the mode over BLE and turns its AP on or off. If it is not there, nothing
     // happens.
-    const write = deps.writeMode(next).catch(() => {});
+    const previous = transitionFrom;
+    // Bounded: a GATT write that never answers must not keep the echo filter on for good.
+    const write = waitAtMost(
+      Promise.resolve()
+        .then(() => deps.writeMode(next))
+        .catch(() => {}),
+      MODE_WRITE_WAIT_MS,
+    );
     pendingModeWrite = write;
+    modeBeforeWrite = previous;
     void write.then(() => {
-      if (pendingModeWrite === write) pendingModeWrite = null;
+      if (pendingModeWrite === write) {
+        pendingModeWrite = null;
+        modeBeforeWrite = null;
+      }
     });
   }
   // Asked SEPARATELY from the mode change, because the two answers differ: a double click in
@@ -390,6 +436,14 @@ export function applyGesture(gesture: Gesture): void {
 
 /** The mode the device reports (physical button, ADR 0007) wins: the app mirrors and announces it. */
 export function setModeFromDevice(mode: Mode): void {
+  // While the app's own mode write is in flight, the board may still report the mode BEFORE it (a
+  // fast bus → supermarket): applying that echo would flip the app back, cancel the reading just
+  // started and announce a mode the user already left. The write's own echo arrives after it.
+  // Only that echo: any other mode is a real press on the board and wins as always.
+  if (pendingModeWrite && mode !== state.mode && mode === modeBeforeWrite) {
+    record('mode.echoIgnored', { detail: { reported: mode, current: state.mode } });
+    return;
+  }
   if (mode !== state.mode) changeMode(mode, 'device');
 }
 
@@ -414,7 +468,7 @@ export function readFromDevice(mode: Mode | null): Promise<void> {
 }
 
 /** Bus mode: ALWAYS local (ADR 0006): OCR over the photo, no network to read it. */
-async function readBus(uri: string, isStale: () => boolean): Promise<void> {
+async function readBus(uri: string, isStale: () => boolean, cancel: AbortSignal): Promise<void> {
   if (!isOcrLoaded()) {
     update({ status: 'preparing', message: t.preparing, progress: 0 });
     // The first load downloads ~250 MB: if someone reports that "the first time it does not work",
@@ -461,8 +515,8 @@ async function readBus(uri: string, isStale: () => boolean): Promise<void> {
   // Only when the user chose the device AND it can receive it: with the output on the phone this
   // copy was a second voice saying the same line (`audioOutput.ts`), and with no device network it
   // paid for a cloud synthesis that had nowhere to go.
-  if (isSynthesisEnabled && getAudioOutput() === 'device' && deps.isDeviceReady()) {
-    void sendReadingToDevice(spoken, 'bus');
+  if (!isStale() && isSynthesisEnabled && getAudioOutput() === 'device' && deps.isDeviceReady()) {
+    void sendReadingToDevice(spoken, 'bus', cancel);
   }
 }
 
@@ -476,6 +530,7 @@ async function readSupermarket(
   signal: AbortSignal,
   deadlineAt: number,
   isStale: () => boolean,
+  cancel: AbortSignal,
 ): Promise<void> {
   const chosen = deps.getModel();
   if (!chosen) {
@@ -527,7 +582,9 @@ async function readSupermarket(
     update({ status: 'idle', product: r.product, message: spoken, resultPhrase: spoken });
     // Where this is heard is the user's choice (`features/audio/audioOutput.ts`), and it is AWAITED:
     // the device path has to finish before the `finally` releases the audio session.
-    await deliverReading(spoken, isStale, signal);
+    // The mode change's signal and not the deadline's: a synthesis that runs past the deadline still
+    // reaches the device (its own 8 s cap bounds it); only leaving the mode cancels it.
+    await deliverReading(spoken, isStale, cancel);
   } catch (err) {
     // Cancelled by a mode change: nothing to say, the new mode has already been announced.
     if (isStale()) {
@@ -592,21 +649,32 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   // without response.
   void notify('readingStarted');
 
-  const t0 = Date.now();
+  // Two aborts. `cancel` is the mode change's (`changeMode`): it stops everything, delivery included.
+  // `controller` is the deadline's, and also follows `cancel`; it covers the cloud call and is armed
+  // only once the photo is in, because the photo has its own bounds (timeout, warm-up retries) and a
+  // deadline that started before them used to expire on a cloud that had not been asked yet.
+  const pressedAt = Date.now();
+  const cancel = new AbortController();
   const controller = new AbortController();
+  cancel.signal.addEventListener('abort', () => controller.abort());
   // The photo comes over the device's WiFi: wait for the phone to be on it, and for the mode just
   // written to reach the board. Both happen in the first seconds after connecting or switching.
   // Synchronous in the usual case: every extra await here is time iOS may not give a locked phone.
-  const networkReady = isNetworkReady() || (await waitForDeviceNetwork(isStale));
-  if (pendingModeWrite) await Promise.race([pendingModeWrite, sleep(MODE_WRITE_WAIT_MS)]);
+  // Every wait below takes from the same total budget, so the cap holds for the whole cycle.
+  const left = (): number => pressedAt + READING_TOTAL_CAP_MS - Date.now();
+  const networkWaitStart = Date.now();
+  const networkReady = isNetworkReady() || (await waitForDeviceNetwork(isStale, Math.min(NETWORK_WAIT_MS, left())));
+  const networkWaitedMs = Date.now() - networkWaitStart;
+  if (pendingModeWrite) await waitAtMost(pendingModeWrite, MODE_WRITE_WAIT_MS);
   // A mode change during the awaits above already moved on: do not start a reading for the old mode.
   if (isStale()) {
     record('reading.cancelled', { detail: { mode, stage: 'start' } });
     await endReadingAudio();
     return;
   }
-  readingAbort = controller;
-  const deadline = setTimeout(() => controller.abort(), READING_DEADLINE_MS);
+  readingAbort = cancel;
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  const t0 = Date.now();
   const startedInBackground = wasStartedInBackground();
 
   try {
@@ -614,7 +682,7 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
     update({ status: 'reading', message: t.readingFromDevice, progress: null, failure: null, resultPhrase: null });
 
     if (!networkReady) {
-      record('photo.failed', { ms: 0, detail: { mode, status: null, message: 'the phone is not on the device network', waitedMs: NETWORK_WAIT_MS } });
+      record('photo.failed', { ms: 0, detail: { mode, status: null, message: 'the phone is not on the device network', waitedMs: networkWaitedMs } });
       update({ status: 'idle', progress: null, message: t.deviceNetworkNotReady, failure: 'deviceCapture' });
       await announce(t.deviceNetworkNotReady);
       return;
@@ -622,7 +690,7 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
 
     let photo: DevicePhoto;
     try {
-      photo = await downloadPhotoWhenCameraReady(isStale);
+      photo = await downloadPhotoWhenCameraReady(isStale, mode, left);
       // The photo's size and time separately from the total: it is what separates "the network is
       // slow" from "the model is slow", and both look the same as "it was slow".
       record('photo.ok', { ms: photo.ms, detail: { bytes: photo.bytes } });
@@ -654,8 +722,10 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
     }
 
     try {
-      if (mode === 'bus') await readBus(photo.uri, isStale);
-      else await readSupermarket(photo.image, controller.signal, t0 + READING_DEADLINE_MS, isStale);
+      const deadlineAt = Math.min(Date.now() + READING_DEADLINE_MS, pressedAt + READING_TOTAL_CAP_MS);
+      deadline = setTimeout(() => controller.abort(), Math.max(0, deadlineAt - Date.now()));
+      if (mode === 'bus') await readBus(photo.uri, isStale, cancel.signal);
+      else await readSupermarket(photo.image, controller.signal, deadlineAt, isStale, cancel.signal);
     } catch (err) {
       if (isStale()) {
         record('reading.cancelled', { detail: { mode, stage: mode === 'bus' ? 'ocr' : 'cloud' } });
@@ -676,7 +746,7 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
       await announce(message);
     }
   } finally {
-    clearTimeout(deadline);
+    if (deadline !== undefined) clearTimeout(deadline);
     // Only if this reading still owns the flag: after a mode change a newer one may be running.
     if (!isStale()) {
       reading = false;
@@ -701,18 +771,28 @@ function isNetworkReady(): boolean {
   return deps.isNetworkReady ? deps.isNetworkReady() : true;
 }
 
-async function waitForDeviceNetwork(isStale: () => boolean): Promise<boolean> {
+async function waitForDeviceNetwork(isStale: () => boolean, limitMs: number): Promise<boolean> {
   const t0 = Date.now();
+  let told = false;
   // The user asked for a reading that needs the photo: now the prompt is worth it. Not with the app
   // in the background, where iOS cannot show it.
   if (deps.joinDeviceNetwork && AppState.currentState === 'active') {
     record('photo.joiningNetwork');
     void deps.joinDeviceNetwork().catch(() => false);
   }
-  while (Date.now() - t0 < NETWORK_WAIT_MS) {
+  while (Date.now() - t0 < limitMs) {
     await sleep(POLL_MS);
     if (isStale()) return false;
+    // A wait this long after the chirp, in silence, sounds like a hang to someone who cannot see the
+    // screen. Said once.
+    if (!told && Date.now() - t0 >= CONNECTING_NOTICE_AFTER_MS) {
+      told = true;
+      // On the phone on purpose: the device's audio path needs the very network being waited for.
+      void announce(t.deviceConnecting);
+    }
     if (isNetworkReady()) {
+      // The "conectando" may still be talking: the reading's own sounds come next.
+      if (told) stopSpeaking();
       record('photo.waitedNetwork', { ms: Date.now() - t0 });
       return true;
     }
@@ -724,14 +804,19 @@ async function waitForDeviceNetwork(isStale: () => boolean): Promise<boolean> {
  * The device's photo, retried while its camera answers 503 (still starting after a power-on or a
  * restart). Any other failure, or a 503 that outlasts the wait, is thrown as it came.
  */
-async function downloadPhotoWhenCameraReady(isStale: () => boolean): Promise<DevicePhoto> {
+async function downloadPhotoWhenCameraReady(
+  isStale: () => boolean,
+  mode: Mode,
+  left: () => number,
+): Promise<DevicePhoto> {
   const t0 = Date.now();
   for (;;) {
     try {
-      return await deps.downloadPhoto({ timeoutMs: PHOTO_TIMEOUT_MS });
+      // Never past the cycle's total budget, and never below a second, which no photo fits in.
+      return await deps.downloadPhoto({ timeoutMs: Math.max(1_000, Math.min(PHOTO_TIMEOUT_MS, left())), mode });
     } catch (err) {
       const warming = err instanceof HttpDownloadError && err.status === 503;
-      if (!warming || isStale() || Date.now() - t0 >= CAMERA_WARMUP_WAIT_MS) throw err;
+      if (!warming || isStale() || Date.now() - t0 >= CAMERA_WARMUP_WAIT_MS || left() <= 2_000) throw err;
       await sleep(1_000);
     }
   }
@@ -750,5 +835,6 @@ export function resetReaderForTests(): void {
   modeEpoch = 0;
   readingAbort = null;
   pendingModeWrite = null;
+  modeBeforeWrite = null;
   listeners.clear();
 }

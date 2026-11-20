@@ -69,7 +69,7 @@ interface DeviceValue {
   deviceVolume: number | null;
   /** Sets the device's speaker level. Best-effort: it never throws. */
   writeVolume: (percent: number) => Promise<void>;
-  downloadPhoto: (options?: { timeoutMs?: number }) => Promise<DevicePhoto>;
+  downloadPhoto: (options?: { timeoutMs?: number; mode?: DeviceMode }) => Promise<DevicePhoto>;
   /**
    * Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. `mode` is the mode
    * the reading was made in: the device drops it if the user has left it.
@@ -132,6 +132,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   // it goes in a ref instead of being captured directly.
   const connectRef = useRef<() => Promise<void>>(async () => {});
   const networkSyncRun = useRef(0);
+  /** The sync run that may show the iOS join prompt, or 0. `joinNetwork` must not start a second one. */
+  const promptingRun = useRef(0);
   // The last thing synced, so the check does not restart with every `status` heartbeat — nor while
   // one is still running: a restart would cancel a join that is about to succeed and, worse, ask the
   // system again, which is a second prompt on top of the first (2026-09-19).
@@ -205,6 +207,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       // only waited for; the prompt is left to a reading that needs the photo (`joinNetwork`).
       const mayPrompt = mayPromptAlways || ssid === null || (await loadJoinedNetwork()) !== ssid;
       if (!current()) return false;
+      promptingRun.current = mayPrompt && ssid !== null ? run : 0;
       setWifi('joining');
       record('wifi.joining', { detail: { ap: apOn, ip: target.ip, ssid, mayPrompt } });
       const t0 = Date.now();
@@ -557,7 +560,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   }, [photoAvailable, address]);
 
   const downloadPhoto = useCallback(
-    async (options?: { timeoutMs?: number }) => {
+    async (options?: { timeoutMs?: number; mode?: DeviceMode }) => {
       if (!address) throw new DeviceNoAddressError();
       // The caller sets the deadline. With the screen locked the whole cycle has seconds, not the
       // 20 s the download would take by default (`readingService.ts`).
@@ -598,6 +601,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
 
   const joinNetwork = useCallback(async (): Promise<boolean> => {
     if (connection.status !== 'connected' || !address) return false;
+    // A check that is allowed to prompt is already running (the first pairing): replacing it would
+    // ask the system a second time, on top of the alert already on screen. The reading polls anyway.
+    if (syncedNetwork.current.running && promptingRun.current === networkSyncRun.current) return false;
     // Through the same bookkeeping as `ensureNetwork`, so a heartbeat does not start a second check
     // on top of this one (and a second prompt with it).
     const synced = { ap, ip: address.ip, ok: false, running: true };

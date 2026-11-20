@@ -108,9 +108,13 @@ class HttpServer:
         play: Optional[Callable[[str], None]] = None,
         evidence_dir: Optional[str] = None,
         current_mode: Optional[Callable[[], Optional[str]]] = None,
+        before_capture: Optional[Callable[[Optional[str]], None]] = None,
     ) -> None:
         """`current_mode` returns the device's mode in lowercase ("idle", "bus", "supermarket"), so
-        `/audio` can drop a reading the app sent for a mode the user already left."""
+        `/audio` can drop a reading the app sent for a mode the user already left.
+
+        `before_capture` runs before each `/photos/latest` with the mode the app asked the photo for
+        (its `X-Mode`, or None): it is where the photo waits for bus mode to release the camera."""
         server = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -151,6 +155,8 @@ class HttpServer:
                         self._json(503, {"error": "no camera"})
                         return
                     t0 = time.monotonic()
+                    if server._before_capture is not None:
+                        server._before_capture((self.headers.get("X-Mode") or "").strip().lower() or None)
                     try:
                         jpeg = server._capture()
                     except CameraNotReady as exc:
@@ -238,6 +244,7 @@ class HttpServer:
         self._capture = capture
         self._play = play
         self._current_mode = current_mode
+        self._before_capture = before_capture
         self._evidence_dir = evidence_dir
         self._server = _QuietServer(("0.0.0.0", port), Handler)
         self._server.daemon_threads = True
