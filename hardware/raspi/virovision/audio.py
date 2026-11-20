@@ -297,6 +297,8 @@ class Player:
             if command is None:
                 log.warning("audio: nothing can play %s", path)
                 continue
+            if not self._wait_for_current(generation):
+                continue  # stopped while waiting: this clip is not to be heard
             try:
                 with self._process_lock:
                     if generation != self._generation:
@@ -308,6 +310,26 @@ class Player:
                 log.warning("audio: could not play %s: %s", path, exc)
                 continue
             process.wait()
+
+    def _wait_for_current(self, generation: int) -> bool:
+        """Waits for whatever `play` started to finish before the queue starts its own clip.
+
+        Until 2026-11-20 the worker launched its process over the one `play` had started and
+        overwrote `_process`: a mode notice or a supermarket reading still talking was heard under the
+        bus clips, and it was orphaned, so no later `stop` could cut it. Waiting (and not killing)
+        because what `play` started is a whole sentence the user asked for; the bus clips can start a
+        second later. False when a `stop` came meanwhile."""
+        while True:
+            with self._process_lock:
+                if generation != self._generation:
+                    return False
+                current = self._process
+            if current is None or current.poll() is not None:
+                return True
+            try:
+                current.wait(timeout=0.2)
+            except subprocess.TimeoutExpired:
+                pass
 
     def _open_gate(self) -> None:
         """Called with `_process_lock` held, right before a player starts."""

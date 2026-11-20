@@ -153,3 +153,48 @@ def test_old_readings_are_deleted_so_tmp_does_not_eat_the_ram(server, tmp_path, 
     assert len(left) == m.AUDIO_FILES_KEPT
     assert os.path.basename(newest) in left
     assert "audio-1000000000001.mp3" not in left and "audio-1000000000004.mp3" in left
+
+
+def _mode_server(mode, played):
+    s = HttpServer(lambda: {}, bytes, capture=None, port=0, play=played.append, current_mode=lambda: mode)
+    s.start()
+    return s
+
+
+def _post_audio(server, mode=None):
+    headers = {"Content-Type": "audio/mpeg"}
+    if mode:
+        headers["X-Mode"] = mode
+    req = urllib.request.Request(f"http://127.0.0.1:{server.port}/audio", data=b"ID3mp3", method="POST", headers=headers)
+    return urllib.request.urlopen(req, timeout=5)
+
+
+def test_a_reading_for_a_mode_the_user_left_is_not_played(tmp_path, monkeypatch):
+    """2026-11-20: a supermarket reading that landed after the switch to bus talked over the bus
+    announcements. The app says which mode it read in; the board drops it when that is not its mode."""
+    import virovision.http_server as m
+
+    monkeypatch.setattr(m, "AUDIO_DIRECTORY", str(tmp_path))
+    played = []
+    s = _mode_server("bus", played)
+    try:
+        with pytest.raises(urllib.error.HTTPError) as err:
+            _post_audio(s, "supermarket")
+        assert err.value.code == 409
+        assert played == []
+    finally:
+        s.stop()
+
+
+def test_a_reading_for_the_current_mode_or_from_an_older_app_is_played(tmp_path, monkeypatch):
+    import virovision.http_server as m
+
+    monkeypatch.setattr(m, "AUDIO_DIRECTORY", str(tmp_path))
+    played = []
+    s = _mode_server("supermarket", played)
+    try:
+        assert _post_audio(s, "supermarket").status == 202
+        assert _post_audio(s).status == 202  # no header: an app from before this
+        assert len(played) == 2
+    finally:
+        s.stop()

@@ -252,3 +252,62 @@ def test_a_gate_without_pinctrl_does_nothing(monkeypatch):
     gate.park()
     gate.open()
     assert gate.is_open is True
+
+
+def test_the_bus_clips_wait_for_the_sentence_play_started_instead_of_talking_over_it(monkeypatch):
+    """2026-11-20: the queue worker launched its clip over the one `play` had started (a mode notice,
+    a supermarket reading) and overwrote `_process`, so both were heard at once and the first became
+    an orphan no `stop` could cut. Now the clips start only once that sentence has ended."""
+    import threading
+
+    import virovision.audio as audio
+
+    running = []
+    overlaps = []
+    finish = {}
+
+    class Process:
+        pid = 1
+
+        def __init__(self, command, **kwargs):
+            self.name = command[-1]
+            self.done = threading.Event()
+            finish[self.name] = self.done
+            if running:
+                overlaps.append((running[-1], self.name))
+            running.append(self.name)
+
+        def _end(self):
+            if self.name in running:
+                running.remove(self.name)
+
+        def wait(self, timeout=None):
+            if not self.done.wait(timeout if timeout is not None else 2):
+                raise audio.subprocess.TimeoutExpired("x", timeout)
+            self._end()
+
+        def poll(self):
+            if self.done.is_set():
+                self._end()
+                return 0
+            return None
+
+        def terminate(self):
+            self.done.set()
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Process)
+    player = Player()
+    player.play("/tmp/modo-omnibus.wav")
+    player.play_sequence(["/tmp/115.wav"])
+    worker = player._worker
+    # The notice is still talking: the bus clip must not have started.
+    assert "/tmp/115.wav" not in finish
+    finish["/tmp/modo-omnibus.wav"].set()
+    for _ in range(50):
+        if "/tmp/115.wav" in finish:
+            break
+        threading.Event().wait(0.02)
+    finish["/tmp/115.wav"].set()
+    worker.join(2)
+    assert overlaps == []
+    assert "/tmp/115.wav" in finish

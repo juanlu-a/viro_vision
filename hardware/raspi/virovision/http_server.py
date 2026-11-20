@@ -107,7 +107,10 @@ class HttpServer:
         port: int = DEFAULT_PORT,
         play: Optional[Callable[[str], None]] = None,
         evidence_dir: Optional[str] = None,
+        current_mode: Optional[Callable[[], Optional[str]]] = None,
     ) -> None:
+        """`current_mode` returns the device's mode in lowercase ("idle", "bus", "supermarket"), so
+        `/audio` can drop a reading the app sent for a mode the user already left."""
         server = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -205,6 +208,16 @@ class HttpServer:
                     except (binascii.Error, ValueError):
                         self._json(400, {"error": "invalid base64"})
                         return
+                # The mode the app read this for (2026-11-20). A reading that lands after the user
+                # switched mode is not played: it was the supermarket voice talking over the bus
+                # announcements. Without the header (an older app) it plays, as before.
+                reading_mode = (self.headers.get("X-Mode") or "").strip().lower() or None
+                if reading_mode is not None and server._current_mode is not None:
+                    current = server._current_mode()
+                    if current is not None and current != reading_mode:
+                        log.info("audio dropped: read in %s, device now in %s", reading_mode, current)
+                        self._json(409, {"error": "mode changed", "mode": current})
+                        return
                 content_type = self.headers.get("Content-Type", "application/octet-stream")
                 extension = "mp3" if "mpeg" in content_type or "mp3" in content_type else "wav" if "wav" in content_type else "bin"
                 os.makedirs(AUDIO_DIRECTORY, exist_ok=True)
@@ -224,6 +237,7 @@ class HttpServer:
         self._synthetic_payload = synthetic_payload
         self._capture = capture
         self._play = play
+        self._current_mode = current_mode
         self._evidence_dir = evidence_dir
         self._server = _QuietServer(("0.0.0.0", port), Handler)
         self._server.daemon_threads = True

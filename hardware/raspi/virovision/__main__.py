@@ -196,6 +196,7 @@ async def _main(args: argparse.Namespace) -> None:
         return True
 
     http = None
+    service = None
     if not args.no_http:
         http = HttpServer(
             read_status=status,
@@ -208,6 +209,8 @@ async def _main(args: argparse.Namespace) -> None:
             play=None if args.no_audio else player.play,
             # Where the app downloads what bus mode announces over BLE (`evidence.py`).
             evidence_dir=None if args.no_evidence else args.evidence_dir,
+            # Resolved at request time: `service` is built below, after the server is listening.
+            current_mode=lambda: service.core.modes.current.name.lower() if service is not None else None,
         )
         http.start()
 
