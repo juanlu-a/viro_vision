@@ -53,6 +53,7 @@ export function ReaderBridge() {
       // would pay for a synthesis the device cannot receive.
       isDeviceReady: () => latest.current.device.photoAvailable,
       isNetworkReady: () => latest.current.device.photoAvailable,
+      joinDeviceNetwork: () => latest.current.device.joinNetwork(),
       hushDevice: () => getBleClient().hushDevice(),
     });
     // The system notices reach the board from here too, and through the SAME client the readings

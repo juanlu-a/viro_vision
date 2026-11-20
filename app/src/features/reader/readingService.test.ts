@@ -526,12 +526,16 @@ describe('the first reading after connecting', () => {
     jest.useFakeTimers();
     let onNetwork = false;
     const downloadPhoto = jest.fn(() => Promise.resolve(photo));
-    configureReader(deps({ isNetworkReady: () => onNetwork, downloadPhoto }));
+    const joinDeviceNetwork = jest.fn(() => Promise.resolve(true));
+    configureReader(deps({ isNetworkReady: () => onNetwork, downloadPhoto, joinDeviceNetwork }));
     enterSupermarket();
 
     const running = requestReading('device');
     await jest.advanceTimersByTimeAsync(3_000);
     expect(downloadPhoto).not.toHaveBeenCalled();
+    // The reading needs the photo, so now the system is asked (the prompt is worth it here, unlike
+    // on every connection).
+    expect(joinDeviceNetwork).toHaveBeenCalledTimes(1);
     onNetwork = true;
     await jest.advanceTimersByTimeAsync(500);
     await running;
@@ -547,7 +551,7 @@ describe('the first reading after connecting', () => {
     enterSupermarket();
 
     const running = requestReading('device');
-    await jest.advanceTimersByTimeAsync(16_000);
+    await jest.advanceTimersByTimeAsync(21_000);
     await running;
 
     expect(downloadPhoto).not.toHaveBeenCalled();

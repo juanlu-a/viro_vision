@@ -54,6 +54,8 @@ export type EventType =
   | 'wifi.joining'
   | 'wifi.ready'
   | 'wifi.failed'
+  // A network this phone already joined did not come back by itself; nothing was asked (no prompt).
+  | 'wifi.notJoined'
   // What the device reports about itself
   | 'device.status'
   | 'device.warning'
@@ -84,6 +86,8 @@ export type EventType =
   | 'photo.failed'
   // The reading waited for the phone to join the device's network before asking for the photo.
   | 'photo.waitedNetwork'
+  // A reading found the phone off the device's network and asked the system to join it (prompt).
+  | 'photo.joiningNetwork'
   | 'ocr.load'
   | 'cloud.wait'
   | 'audio.synthesis'

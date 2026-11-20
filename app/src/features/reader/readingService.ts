@@ -84,7 +84,7 @@ const PHOTO_TIMEOUT_MS = 7_000;
  * (`wifi.joining` → `wifi.ready` in telemetry): a reading asked for in that window used to fail at
  * once as "no pudo sacar la foto", and only a reconnection fixed it (2026-11-20).
  */
-const NETWORK_WAIT_MS = 15_000;
+const NETWORK_WAIT_MS = 20_000;
 
 /** While the board's camera is starting (IMX500 firmware, 4 s to ~1 min) it answers 503. */
 const CAMERA_WARMUP_WAIT_MS = 8_000;
@@ -172,6 +172,12 @@ export interface ReaderDeps {
    * (`waitForDeviceNetwork`) and only consults the other. Absent means "assume it is".
    */
   isNetworkReady?(): boolean;
+  /**
+   * Asks the system to put the phone on the device's network (the iOS prompt). Called by a reading
+   * that needs the photo and found the phone elsewhere: on connection, a network already joined is
+   * only waited for, never asked for (2026-11-20).
+   */
+  joinDeviceNetwork?(): Promise<boolean>;
   /**
    * Cuts whatever the device's speaker is playing. Used before the phone speaks, so the two outputs
    * cannot end up talking over each other (ADR 0003, act. 2026-09-18).
@@ -697,6 +703,12 @@ function isNetworkReady(): boolean {
 
 async function waitForDeviceNetwork(isStale: () => boolean): Promise<boolean> {
   const t0 = Date.now();
+  // The user asked for a reading that needs the photo: now the prompt is worth it. Not with the app
+  // in the background, where iOS cannot show it.
+  if (deps.joinDeviceNetwork && AppState.currentState === 'active') {
+    record('photo.joiningNetwork');
+    void deps.joinDeviceNetwork().catch(() => false);
+  }
   while (Date.now() - t0 < NETWORK_WAIT_MS) {
     await sleep(POLL_MS);
     if (isStale()) return false;
