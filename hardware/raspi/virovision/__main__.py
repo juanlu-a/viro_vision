@@ -11,6 +11,7 @@ import asyncio
 import logging
 from pathlib import Path
 import signal
+import time
 
 from bluez_peripheral.advert import Advertisement
 from bluez_peripheral.agent import NoIoAgent
@@ -39,6 +40,13 @@ log = logging.getLogger("virovision")
 STATUS_EVERY_SECONDS = 15
 AP_REFRESH_WAIT_S = 10.0
 """How long an AP change waits for a network refresh already in flight before giving up on its own."""
+# How long a photo waits for bus mode's frame loop to let go of the camera. The loop's join is capped
+# at 3 s (`BusWatcher._halt`); a little more covers the executor picking up `bus.stop`.
+BUS_RELEASE_TIMEOUT_S = 4.0
+# How long a photo for another mode waits for that mode's write to reach the board before giving up
+# on it (the app waits 1.5 s for the write on its side). Past it the photo shares the stream as it did
+# before 2026-11-20: the risk of the old race, taken knowingly, over a photo that never comes.
+MODE_WRITE_GRACE_S = 1.5
 
 
 def _arguments() -> argparse.Namespace:
@@ -132,7 +140,47 @@ async def _main(args: argparse.Namespace) -> None:
     # boot, and while it ran here the board was invisible to every phone; any hang in it left the board
     # invisible for good (2026-10-05). Capture is wired now and answers "still starting" until then.
     wants_camera = not args.no_camera
-    capture = (lambda: loop.run_in_executor(None, camera.capture_jpeg)) if wants_camera else None
+    # Built further down, once the service exists; read at capture time.
+    bus_watcher = None
+    service = None
+
+    def release_camera_for(requested_mode: str | None) -> None:
+        """Makes a photo wait for bus mode's frame loop to let go of the camera (2026-11-20).
+
+        Leaving bus mode and asking for the supermarket photo happen in the same instant (the app
+        writes the mode and then asks; the button changes mode and then sends `read`), and
+        `bus.stop` runs on an executor. The photo used to reach picamera2 while the frame loop was
+        still inside `capture_request`: it hung, the camera restart could not close the sensor and
+        the daemon restarted. So the photo waits for the frame loop to let go, but only when the
+        device is NOT in bus mode: the app's own read button in bus mode still shares the stream.
+        Also when the app says the photo is for another mode (`X-Mode`): its mode write may not have
+        landed yet, and the frame loop stops as soon as it does."""
+        try:
+            if bus_watcher is None or service is None:
+                return
+            leaving_bus = service.core.modes.current is not Mode.BUS
+            for_other_mode = requested_mode is not None and requested_mode != Mode.BUS.name.lower()
+            if not (leaving_bus or for_other_mode):
+                return
+            started = time.monotonic()
+            while not bus_watcher.wait_released(0.1):
+                waited = time.monotonic() - started
+                # Only the app's word that the mode is changing, and the board still in bus mode: if
+                # the write has not landed in a moment it is not coming, and waiting the rest only
+                # makes the photo late.
+                write_lost = service.core.modes.current is Mode.BUS and waited >= MODE_WRITE_GRACE_S
+                if write_lost or waited >= BUS_RELEASE_TIMEOUT_S:
+                    log.warning("photo: bus mode still holds the camera after %.1f s; capturing anyway", waited)
+                    return
+        except Exception:  # noqa: BLE001 — the photo is still worth taking
+            log.exception("photo: could not wait for bus mode to release the camera")
+
+    def capture_photo() -> bytes:
+        """The BLE photo path: same wait, with no mode from the app."""
+        release_camera_for(None)
+        return camera.capture_jpeg()
+
+    capture = (lambda: loop.run_in_executor(None, capture_photo)) if wants_camera else None
 
     # The HTTP server (ADR 0003's plan B) runs on its own thread; its port travels through `status` so
     # the app knows where to download the photo from. The capture is the same blocking function BLE
@@ -201,6 +249,7 @@ async def _main(args: argparse.Namespace) -> None:
             read_status=status,
             synthetic_payload=synthetic_payload,
             capture=camera.capture_jpeg if wants_camera else None,
+            before_capture=release_camera_for if wants_camera else None,
             port=args.port,
             # THE closing of the supermarket loop: until this was passed, `/audio` wrote the MP3 to
             # /tmp, answered 202 and nobody ever heard it. `--no-audio` keeps that old behaviour for
@@ -208,6 +257,8 @@ async def _main(args: argparse.Namespace) -> None:
             play=None if args.no_audio else player.play,
             # Where the app downloads what bus mode announces over BLE (`evidence.py`).
             evidence_dir=None if args.no_evidence else args.evidence_dir,
+            # Resolved at request time: `service` is built below, after the server is listening.
+            current_mode=lambda: service.core.modes.current.name.lower() if service is not None else None,
         )
         http.start()
 
@@ -252,7 +303,6 @@ async def _main(args: argparse.Namespace) -> None:
     # Bus mode (ADR 0006, amended 2026-09-07): the detector already lives in the sensor, so what is
     # wired here is who speaks and where the reading goes. Built after the service because it emits
     # its readings through this core, and the core starts and stops it on every mode change.
-    bus_watcher = None
     if not args.no_bus and wants_camera:
         labels = [name.strip() for name in args.bus_labels.split(",") if name.strip()] if args.bus_labels else None
         # Derived, never passed separately: a detector that emits a `bus` class gives real bus boxes,

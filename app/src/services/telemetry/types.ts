@@ -54,6 +54,8 @@ export type EventType =
   | 'wifi.joining'
   | 'wifi.ready'
   | 'wifi.failed'
+  // A network this phone already joined did not come back by itself; nothing was asked (no prompt).
+  | 'wifi.notJoined'
   // What the device reports about itself
   | 'device.status'
   | 'device.warning'
@@ -73,13 +75,21 @@ export type EventType =
   | 'bus.evidenceFailed'
   // Operating modes (ADR 0007)
   | 'mode.change'
+  // The board reported an older mode while the app's own write was in flight; not applied.
+  | 'mode.echoIgnored'
   // One reading, end to end
   | 'reading.requested'
   | 'reading.start'
   | 'reading.ok'
   | 'reading.failed'
+  // A reading the user left behind by changing mode: it ends in silence (`detail.stage` says where).
+  | 'reading.cancelled'
   | 'photo.ok'
   | 'photo.failed'
+  // The reading waited for the phone to join the device's network before asking for the photo.
+  | 'photo.waitedNetwork'
+  // A reading found the phone off the device's network and asked the system to join it (prompt).
+  | 'photo.joiningNetwork'
   | 'ocr.load'
   | 'cloud.wait'
   | 'audio.synthesis'
@@ -92,6 +102,8 @@ export type EventType =
   // why. A table full of these means the device path is not actually usable yet, which is a finding
   // and not a bug report.
   | 'audio.fallback'
+  // A bus announcement that arrived with the app no longer in bus mode, and was not said.
+  | 'audio.dropped'
   | 'audio.spoken';
 
 export interface TelemetryEvent {

@@ -205,6 +205,26 @@ class PwmGate:
         self.is_open = False
 
 
+# How long any one clip may play before it is taken for a hung decoder and cut: the longest reading
+# is a few seconds. It bounds both a queued bus clip and the sentence the queue waits behind.
+PLAY_WAIT_CAP_S = 20.0
+
+
+def _end(process: subprocess.Popen) -> None:
+    """Terminates `process` and makes sure it is gone: a decoder that ignores SIGTERM is killed."""
+    try:
+        process.terminate()
+        process.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+            process.wait(timeout=1)  # reaped, so `poll()` sees it gone
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    except OSError:
+        pass
+
+
 def _run_quietly(command: list) -> None:
     try:
         subprocess.run(command, check=True, capture_output=True, timeout=5)
@@ -297,17 +317,67 @@ class Player:
             if command is None:
                 log.warning("audio: nothing can play %s", path)
                 continue
+            process = self._launch_after_current(command, generation)
+            if process is None:
+                continue  # stopped meanwhile, or it could not start: this clip is not to be heard
+            try:
+                process.wait(timeout=PLAY_WAIT_CAP_S)
+            except subprocess.TimeoutExpired:
+                log.warning("audio: %s still playing after %.0f s; cutting it", path, PLAY_WAIT_CAP_S)
+                _end(process)
+
+    def _launch_after_current(self, command: list, generation: int) -> Optional[subprocess.Popen]:
+        """Starts a queued clip once nothing else is playing. The check and the launch happen under
+        one lock hold; a `play` that slips in between the wait and the launch is waited for again."""
+        while True:
+            if not self._wait_for_current(generation):
+                return None
             try:
                 with self._process_lock:
                     if generation != self._generation:
-                        continue  # stopped after this clip was dequeued: it is not to be heard
+                        return None
+                    current = self._process
+                    if current is not None and current.poll() is None:
+                        continue
                     self._open_gate()
                     process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     self._process = process
+                    return process
             except (OSError, subprocess.SubprocessError) as exc:
-                log.warning("audio: could not play %s: %s", path, exc)
-                continue
-            process.wait()
+                log.warning("audio: could not play %s: %s", command[-1], exc)
+                return None
+
+    def _wait_for_current(self, generation: int) -> bool:
+        """Waits for whatever `play` started to finish before the queue starts its own clip.
+
+        Until 2026-11-20 the worker launched its process over the one `play` had started and
+        overwrote `_process`: a mode notice or a supermarket reading still talking was heard under the
+        bus clips, and it was orphaned, so no later `stop` could cut it. Waiting (and not killing)
+        because what `play` started is a whole sentence the user asked for; the bus clips can start a
+        second later. False when a `stop` came meanwhile.
+
+        Capped: a decoder that hangs must not hold every bus clip behind it. Past the cap it is
+        terminated, the way `play` would have cut it."""
+        watched = None
+        deadline = 0.0
+        while True:
+            with self._process_lock:
+                if generation != self._generation:
+                    return False
+                current = self._process
+            if current is None or current.poll() is not None:
+                return True
+            if current is not watched:
+                # Per process: a newer `play` that replaced the one being waited for gets its own cap.
+                watched, deadline = current, time.monotonic() + PLAY_WAIT_CAP_S
+            if time.monotonic() >= deadline:
+                log.warning("audio: pid %d still playing after %.0f s; cutting it for the queue", current.pid, PLAY_WAIT_CAP_S)
+                _end(current)
+                return True
+            try:
+                current.wait(timeout=0.2)
+            except subprocess.TimeoutExpired:
+                pass
 
     def _open_gate(self) -> None:
         """Called with `_process_lock` held, right before a player starts."""

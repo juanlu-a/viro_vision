@@ -329,8 +329,9 @@ describe('a reading with nothing on screen', () => {
     enterSupermarket();
 
     const running = requestReading('device');
-    await Promise.resolve();
-    await Promise.resolve();
+    // Until the cloud call is in flight: the deadline is about IT, not about the photo.
+    for (let i = 0; i < 20 && mockRecognize.mock.calls.length === 0; i += 1) await Promise.resolve();
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
     jest.advanceTimersByTime(READING_DEADLINE_MS + 1);
     await running;
 
@@ -421,5 +422,308 @@ describe("the app's own button", () => {
     // The device learns the mode over BLE; without this its AP and its own state drift from the app.
     expect(written).toEqual(['supermarket']);
     expect(mockRecognize).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * The overlap reported on 2026-11-20: a supermarket reading still in flight when the user switched to
+ * bus kept going, and its result (or "elemento no reconocible", or an error) was said on top of
+ * "modo ómnibus activado" and the bus lines. A mode change now cancels the reading and silences it.
+ */
+describe('a mode change during a reading', () => {
+  function pendingRecognition() {
+    let settle: (value: unknown) => void = () => {};
+    let aborted: AbortSignal | undefined;
+    mockRecognize.mockImplementation(
+      (options: { signal?: AbortSignal }) =>
+        new Promise((resolve, reject) => {
+          aborted = options.signal;
+          settle = resolve;
+          options.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    return {
+      resolve: () => settle({ ms: 1, model: MODEL.id, product: null, text: '' }),
+      signal: () => aborted,
+    };
+  }
+
+  async function untilRecognizing() {
+    for (let i = 0; i < 10 && mockRecognize.mock.calls.length === 0; i += 1) await Promise.resolve();
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+  }
+
+  it('cancels the cloud call and says nothing of the old mode, not even the timeout', async () => {
+    const hush = jest.fn(() => Promise.resolve());
+    const cloud = pendingRecognition();
+    configureReader(deps({ hushDevice: hush }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await untilRecognizing();
+    setModeFromDevice('bus');
+    await running;
+
+    expect(cloud.signal()?.aborted).toBe(true);
+    expect(hush).toHaveBeenCalled();
+    const said = mockSpeak.mock.calls.map(([text]) => text);
+    expect(said.some((text) => /no reconoc|Tardó demasiado|no pudo/i.test(text))).toBe(false);
+    expect(mockEvents).toContain('reading.cancelled');
+    expect(mockAudio[mockAudio.length - 1]).toBe('end');
+  });
+
+  it('does not send a late result to the device after the user left supermarket', async () => {
+    let finishSynthesis: (uri: string) => void = () => {};
+    mockSynthesize.mockImplementationOnce(() => new Promise((resolve) => (finishSynthesis = resolve)));
+    const sendAudio = jest.fn(() => Promise.resolve(true));
+    setAudioOutput('device');
+    configureReader(deps({ sendAudio }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    for (let i = 0; i < 20 && mockSynthesize.mock.calls.length === 0; i += 1) await Promise.resolve();
+    expect(mockSynthesize).toHaveBeenCalledTimes(1);
+    setModeFromDevice('bus');
+    finishSynthesis('file:///tmp/late.mp3');
+    await running;
+
+    expect(sendAudio).not.toHaveBeenCalled();
+    // And no phone fallback either: the reading belongs to a mode the user already left.
+    expect(mockSpeak.mock.calls.some(([text]) => /arroz/i.test(text))).toBe(false);
+  });
+
+  it('lets the new mode read right away instead of dropping it as "already reading"', async () => {
+    const cloud = pendingRecognition();
+    configureReader(deps());
+    enterSupermarket();
+
+    const first = requestReading('device');
+    await untilRecognizing();
+    setModeFromDevice('bus');
+    setModeFromDevice('supermarket');
+    mockRecognize.mockReset();
+    mockRecognize.mockResolvedValue({ ms: 1, model: MODEL.id, product: { kind: 'yerba', brand: null, detail: null }, text: '' });
+    await requestReading('device');
+    cloud.resolve();
+    await first;
+
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+    expect(mockSpeak.mock.calls.some(([text]) => /yerba/i.test(text))).toBe(true);
+  });
+});
+
+/**
+ * The camera error of 2026-11-20 on the first use after connecting: the photo was asked for while
+ * the phone was still joining the device's AP, while the board's camera was still starting (503),
+ * or in the same instant the mode left bus and the frame loop still held the camera.
+ */
+describe('the first reading after connecting', () => {
+  const { HttpDownloadError } = jest.requireActual('@/services/wifi/deviceHttp');
+
+  afterEach(() => jest.useRealTimers());
+
+  it('waits for the phone to join the device network instead of failing at once', async () => {
+    jest.useFakeTimers();
+    let onNetwork = false;
+    const downloadPhoto = jest.fn(() => Promise.resolve(photo));
+    const joinDeviceNetwork = jest.fn(() => Promise.resolve(true));
+    configureReader(deps({ isNetworkReady: () => onNetwork, downloadPhoto, joinDeviceNetwork }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(3_000);
+    expect(downloadPhoto).not.toHaveBeenCalled();
+    // The reading needs the photo, so now the system is asked (the prompt is worth it here, unlike
+    // on every connection).
+    expect(joinDeviceNetwork).toHaveBeenCalledTimes(1);
+    onNetwork = true;
+    await jest.advanceTimersByTimeAsync(500);
+    await running;
+
+    expect(downloadPhoto).toHaveBeenCalledTimes(1);
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the device is still connecting when the network never comes', async () => {
+    jest.useFakeTimers();
+    const downloadPhoto = jest.fn(() => Promise.resolve(photo));
+    configureReader(deps({ isNetworkReady: () => false, downloadPhoto }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(21_000);
+    await running;
+
+    expect(downloadPhoto).not.toHaveBeenCalled();
+    expect(mockSpeak).toHaveBeenCalledWith(expect.stringContaining('todavía se está conectando'));
+    expect(mockAudio[mockAudio.length - 1]).toBe('end');
+  });
+
+  it('retries while the camera is starting (503) and reads once it answers', async () => {
+    jest.useFakeTimers();
+    const downloadPhoto = jest
+      .fn()
+      .mockRejectedValueOnce(new HttpDownloadError('the device has no camera', 503))
+      .mockRejectedValueOnce(new HttpDownloadError('the device has no camera', 503))
+      .mockResolvedValue(photo);
+    configureReader(deps({ downloadPhoto }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(3_000);
+    await running;
+
+    expect(downloadPhoto).toHaveBeenCalledTimes(3);
+    expect(mockRecognize).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the camera is starting, not that it failed, when the 503 outlasts the wait', async () => {
+    jest.useFakeTimers();
+    const downloadPhoto = jest.fn(() => Promise.reject(new HttpDownloadError('the device has no camera', 503)));
+    configureReader(deps({ downloadPhoto }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(10_000);
+    await running;
+
+    expect(mockSpeak).toHaveBeenCalledWith(expect.stringContaining('se está iniciando'));
+    expect(mockRecognize).not.toHaveBeenCalled();
+  });
+
+  it('asks for the photo only once the board has the new mode', async () => {
+    const order: string[] = [];
+    let ack: () => void = () => {};
+    configureReader(
+      deps({
+        writeMode: () =>
+          new Promise<void>((resolve) => {
+            ack = () => {
+              order.push('mode');
+              resolve();
+            };
+          }),
+        downloadPhoto: () => {
+          order.push('photo');
+          return Promise.resolve(photo);
+        },
+      }),
+    );
+
+    applyGesture('doubleClick');
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    expect(order).toEqual([]);
+    ack();
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(order).toEqual(['mode', 'photo']);
+  });
+});
+
+describe('review follow-ups', () => {
+  it('ignores the board reporting the previous mode while the app is still writing the new one', async () => {
+    let ack: () => void = () => {};
+    configureReader(deps({ writeMode: () => new Promise<void>((resolve) => (ack = resolve)) }));
+    applyGesture('click'); // → bus, write pending
+
+    setModeFromDevice('idle'); // the board's echo of the mode BEFORE the click
+
+    expect(getReaderState().mode).toBe('bus');
+    ack();
+  });
+
+  it('still applies a real button press on the board while the app is writing its mode', () => {
+    configureReader(deps({ writeMode: () => new Promise<void>(() => {}) }));
+    applyGesture('click'); // idle → bus, write pending
+
+    setModeFromDevice('supermarket'); // not the echo of idle: the user pressed the board's button
+
+    expect(getReaderState().mode).toBe('supermarket');
+  });
+
+  it('stops filtering echoes when the mode write never answers', async () => {
+    jest.useFakeTimers();
+    configureReader(deps({ writeMode: () => new Promise<void>(() => {}) }));
+    applyGesture('click'); // idle → bus, the write hangs
+
+    await jest.advanceTimersByTimeAsync(2_000);
+    setModeFromDevice('idle');
+
+    expect(getReaderState().mode).toBe('idle');
+    jest.useRealTimers();
+  });
+
+  it('says "conectando" once while it waits for the network, and not before 3 s', async () => {
+    jest.useFakeTimers();
+    let onNetwork = false;
+    configureReader(deps({ isNetworkReady: () => onNetwork }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(2_000);
+    expect(mockSpeak.mock.calls.filter(([text]) => /Conectando/.test(text))).toHaveLength(0);
+    await jest.advanceTimersByTimeAsync(6_000);
+    onNetwork = true;
+    await jest.advanceTimersByTimeAsync(500);
+    await running;
+
+    expect(mockSpeak.mock.calls.filter(([text]) => /Conectando/.test(text))).toHaveLength(1);
+    jest.useRealTimers();
+  });
+
+  it('says the photo is for the reading mode, so the board can wait for bus mode to let go', async () => {
+    const downloadPhoto = jest.fn(() => Promise.resolve(photo));
+    configureReader(deps({ downloadPhoto }));
+    enterSupermarket();
+
+    await requestReading('device');
+
+    expect(downloadPhoto).toHaveBeenCalledWith(expect.objectContaining({ mode: 'supermarket' }));
+  });
+});
+
+describe('the total budget of a cycle', () => {
+  const { HttpDownloadError } = jest.requireActual('@/services/wifi/deviceHttp');
+
+  afterEach(() => jest.useRealTimers());
+
+  it('shrinks the photo timeout and the cloud deadline after a long network wait', async () => {
+    jest.useFakeTimers();
+    let onNetwork = false;
+    const timeouts: number[] = [];
+    let attempts = 0;
+    const downloadPhoto = jest.fn((options?: { timeoutMs?: number }) => {
+      timeouts.push(options?.timeoutMs ?? -1);
+      attempts += 1;
+      return attempts < 6 ? Promise.reject(new HttpDownloadError('the device has no camera', 503)) : Promise.resolve(photo);
+    });
+    let cloudSignal: AbortSignal | undefined;
+    mockRecognize.mockImplementation(
+      (options: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          cloudSignal = options.signal;
+          options.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    configureReader(deps({ isNetworkReady: () => onNetwork, downloadPhoto }));
+    enterSupermarket();
+
+    const running = requestReading('device');
+    await jest.advanceTimersByTimeAsync(19_000);
+    onNetwork = true;
+    await jest.advanceTimersByTimeAsync(5_500); // five 503s (camera starting), then the photo
+    expect(downloadPhoto).toHaveBeenCalledTimes(6);
+    // The budget runs out under the retries: the late attempts get less than the usual 7 s.
+    expect(timeouts[0]).toBe(7_000);
+    expect(timeouts[5]).toBeLessThan(7_000);
+    expect(cloudSignal?.aborted).toBe(false);
+
+    // Well under 12 s after the photo, but at the 30 s mark since the press.
+    await jest.advanceTimersByTimeAsync(6_000);
+    await running;
+
+    expect(cloudSignal?.aborted).toBe(true);
+    expect(mockSpeak).toHaveBeenCalledWith(expect.stringContaining('Tardó demasiado'));
   });
 });

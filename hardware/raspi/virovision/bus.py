@@ -341,6 +341,12 @@ class BusWatcher:
         start on macOS and from machine boot on Linux, so a literal zero silences the first notice on
         one platform and not on the other."""
         self.running = False
+        # Set while no frame loop is using the camera. A supermarket photo taken while the frame loop
+        # is still inside `capture_request` makes picamera2 serve two jobs at once: on 2026-11-20 the
+        # first photo after leaving bus mode hung for 8 s, the restart could not close the sensor and
+        # the daemon had to be restarted. `wait_released` is what the photo waits on.
+        self._released = threading.Event()
+        self._released.set()
         # Serialises launching and halting the threads, and only that — never held across a build.
         # `stop` cannot take the build lock (it must cancel a cold build, not wait minutes for it), so
         # without this a stop landing between `start`'s last `_wanted` check and `running = True` saw
@@ -494,9 +500,28 @@ class BusWatcher:
                 ),
                 threading.Thread(target=self._watchdog, args=(self._stop,), name="bus-watchdog", daemon=True),
             ]
-            for thread in self._threads:
-                thread.start()
-            self.running = True
+            self._released.clear()
+            failed: Optional[BaseException] = None
+            try:
+                for thread in self._threads:
+                    thread.start()
+            except Exception as exc:  # noqa: BLE001 — re-raised below, once the lock is free
+                self._stop.set()
+                self._jobs.put(None)
+                failed, started, self._threads = exc, self._threads, []
+            else:
+                self.running = True
+        if failed is not None:
+            # Nothing is watching: a photo must not wait on a frame loop that never started. One that
+            # did start is joined first, so it does not hold the camera, and outside the run lock, so
+            # a mode change meanwhile is not answered late (same rule as `_halt`).
+            for thread in started:
+                if thread.name == "bus-frames" and thread.is_alive():
+                    thread.join(timeout=3)
+                    if thread.is_alive():
+                        log.warning("bus: the frame loop did not stop in 3 s; releasing the camera anyway")
+            self._released.set()
+            raise failed
         if not self._wanted:
             # `stop` ran between the check above and `running = True`, and found nothing to stop.
             log.info("bus: the mode was left while it was starting; stopping")
@@ -527,12 +552,28 @@ class BusWatcher:
         # Joined outside the lock: three threads at up to 3 s each, and a `start` waiting on the lock
         # meanwhile is a button press that answers 9 s late. Each run has its own stop event and
         # queues, so a thread still finishing cannot touch the next run.
-        for thread in threads:
+        # The frame loop first: it is the only one that touches the camera, and a photo is waiting
+        # for it (`wait_released`). The OCR thread may still be finishing a read.
+        frames = [thread for thread in threads if thread.name == "bus-frames"]
+        for thread in frames:
             thread.join(timeout=3)
-        # Not if a new run started during the joins: that run owns the zoom now.
-        if not self.running:
-            self._undo_zoom()
+            if thread.is_alive():
+                log.warning("bus: the frame loop did not stop in 3 s; releasing the camera anyway")
+        # Not if a new run started during the join: that run owns the camera and the zoom now. Under
+        # the run lock, so a `start` cannot clear the event between the check and the set.
+        with self._run_lock:
+            if not self.running:
+                self._undo_zoom()
+                self._released.set()
+        for thread in threads:
+            if thread not in frames:
+                thread.join(timeout=3)
         log.info("bus mode stopped")
+
+    def wait_released(self, timeout: float) -> bool:
+        """Blocks until no frame loop is using the camera (at once when bus mode is not running).
+        True when released; False when it took longer than `timeout`."""
+        return self._released.wait(timeout)
 
     def _undo_zoom(self) -> None:
         if not self._zoom_enabled:

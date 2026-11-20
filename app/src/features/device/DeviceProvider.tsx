@@ -36,6 +36,7 @@ import { downloadDevicePhoto, type DevicePhoto } from '@/services/camera';
 import { handleEvidence } from '@/services/evidence';
 import { errorDetail, errorType, record } from '@/services/telemetry';
 import { deviceUrl, type DeviceAddress } from '@/services/wifi/deviceHttp';
+import { loadJoinedNetwork, saveJoinedNetwork } from '@/services/storage/joinedNetwork';
 import { reachDeviceNetwork } from '@/services/wifi/join';
 
 import { MODE_FROM_GATT, GATT_MODE, type DeviceStatus, type WifiCredentials } from './gatt';
@@ -68,9 +69,18 @@ interface DeviceValue {
   deviceVolume: number | null;
   /** Sets the device's speaker level. Best-effort: it never throws. */
   writeVolume: (percent: number) => Promise<void>;
-  downloadPhoto: (options?: { timeoutMs?: number }) => Promise<DevicePhoto>;
-  /** Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. */
-  sendAudio: (uri: string, signal?: AbortSignal) => Promise<boolean>;
+  downloadPhoto: (options?: { timeoutMs?: number; mode?: DeviceMode }) => Promise<DevicePhoto>;
+  /**
+   * Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. `mode` is the mode
+   * the reading was made in: the device drops it if the user has left it.
+   */
+  sendAudio: (uri: string, signal?: AbortSignal, mode?: DeviceMode) => Promise<boolean>;
+  /**
+   * Gets the phone onto the device's network now, asking the system if it has to (the iOS prompt).
+   * For a reading that needs the photo: on connection a network already joined once is only waited
+   * for, never asked for. True when the device answers.
+   */
+  joinNetwork: () => Promise<boolean>;
 }
 
 const DeviceContext = createContext<DeviceValue | null>(null);
@@ -122,6 +132,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   // it goes in a ref instead of being captured directly.
   const connectRef = useRef<() => Promise<void>>(async () => {});
   const networkSyncRun = useRef(0);
+  /** The sync run that may show the iOS join prompt, or 0. `joinNetwork` must not start a second one. */
+  const promptingRun = useRef(0);
   // The last thing synced, so the check does not restart with every `status` heartbeat — nor while
   // one is still running: a restart would cancel a join that is about to succeed and, worse, ask the
   // system again, which is a second prompt on top of the first (2026-09-19).
@@ -170,7 +182,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const syncNetwork = useCallback(
-    async (apOn: boolean, target: DeviceAddress | null): Promise<boolean> => {
+    async (apOn: boolean, target: DeviceAddress | null, mayPromptAlways = false): Promise<boolean> => {
       const run = ++networkSyncRun.current;
       const current = () => run === networkSyncRun.current;
       if (!target) {
@@ -189,14 +201,29 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
       }
+      const ssid = apOn ? (credentials.current?.ssid ?? null) : null;
+      // A network this phone already joined is saved on it: iOS rejoins it by itself, and asking the
+      // system again is exactly the prompt the user got on every power-on (2026-11-20). So it is
+      // only waited for; the prompt is left to a reading that needs the photo (`joinNetwork`).
+      const mayPrompt = mayPromptAlways || ssid === null || (await loadJoinedNetwork()) !== ssid;
+      if (!current()) return false;
+      promptingRun.current = mayPrompt && ssid !== null ? run : 0;
       setWifi('joining');
-      record('wifi.joining', { detail: { ap: apOn, ip: target.ip, ssid: apOn ? (credentials.current?.ssid ?? null) : null } });
+      record('wifi.joining', { detail: { ap: apOn, ip: target.ip, ssid, mayPrompt } });
       const t0 = Date.now();
       // With the AP on, the credentials are the phone's ticket in; without it the device is on the
       // same network as the phone (development) and there is nothing to join, only to reach.
-      const outcome = await reachDeviceNetwork(target, apOn ? credentials.current : null);
+      const outcome = await reachDeviceNetwork(target, apOn ? credentials.current : null, { mayPrompt });
       if (!current()) return false;
+      if (!outcome.ok && outcome.reason === 'notJoined') {
+        // Not a failure and not announced: the phone is elsewhere (at home, on the home WiFi) and
+        // bus mode does not need this network. The next `status` heartbeat checks again.
+        setWifi('off');
+        record('wifi.notJoined', { ms: Date.now() - t0, detail: { ip: target.ip } });
+        return false;
+      }
       if (outcome.ok) {
+        if (ssid) void saveJoinedNetwork(ssid);
         setWifi('ready');
         // The time until the device answers is what separates "it is slow" from "it does not work":
         // on 2026-09-06 the network never became ready and without this number there was no way to
@@ -533,7 +560,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   }, [photoAvailable, address]);
 
   const downloadPhoto = useCallback(
-    async (options?: { timeoutMs?: number }) => {
+    async (options?: { timeoutMs?: number; mode?: DeviceMode }) => {
       if (!address) throw new DeviceNoAddressError();
       // The caller sets the deadline. With the screen locked the whole cycle has seconds, not the
       // 20 s the download would take by default (`readingService.ts`).
@@ -543,7 +570,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   );
 
   const sendAudio = useCallback(
-    async (uri: string, signal?: AbortSignal): Promise<boolean> => {
+    async (uri: string, signal?: AbortSignal, mode?: DeviceMode): Promise<boolean> => {
       if (!photoAvailable || !address) return false;
       try {
         const { File } = await import('expo-file-system');
@@ -552,7 +579,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // device decodes it from the header.
         const r = await fetch(deviceUrl(address, '/audio'), {
           method: 'POST',
-          headers: { 'Content-Type': 'audio/mpeg', 'X-Encoding': 'base64' },
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'X-Encoding': 'base64',
+            // A reading that lands after a mode change is dropped by the device (409, 2026-11-20).
+            ...(mode ? { 'X-Mode': mode } : null),
+          },
           body: encodeBase64(bytes),
           signal,
         });
@@ -567,9 +599,26 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     [address, photoAvailable]
   );
 
+  const joinNetwork = useCallback(async (): Promise<boolean> => {
+    if (connection.status !== 'connected' || !address) return false;
+    // A check that is allowed to prompt is already running (the first pairing): replacing it would
+    // ask the system a second time, on top of the alert already on screen. The reading polls anyway.
+    if (syncedNetwork.current.running && promptingRun.current === networkSyncRun.current) return false;
+    // Through the same bookkeeping as `ensureNetwork`, so a heartbeat does not start a second check
+    // on top of this one (and a second prompt with it).
+    const synced = { ap, ip: address.ip, ok: false, running: true };
+    syncedNetwork.current = synced;
+    const ok = await syncNetwork(ap, address, true);
+    if (syncedNetwork.current === synced) {
+      synced.running = false;
+      synced.ok = ok;
+    }
+    return ok;
+  }, [connection.status, address, ap, syncNetwork]);
+
   const value = useMemo<DeviceValue>(
-    () => ({ connection, address, wifi, photoAvailable, ap, deviceMode, deviceVolume, connect, disconnect, writeMode, writeAudioTarget, writeVolume, downloadPhoto, sendAudio }),
-    [connection, address, wifi, photoAvailable, ap, deviceMode, deviceVolume, connect, disconnect, writeMode, writeAudioTarget, writeVolume, downloadPhoto, sendAudio]
+    () => ({ connection, address, wifi, photoAvailable, ap, deviceMode, deviceVolume, connect, disconnect, writeMode, writeAudioTarget, writeVolume, downloadPhoto, sendAudio, joinNetwork }),
+    [connection, address, wifi, photoAvailable, ap, deviceMode, deviceVolume, connect, disconnect, writeMode, writeAudioTarget, writeVolume, downloadPhoto, sendAudio, joinNetwork]
   );
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;
