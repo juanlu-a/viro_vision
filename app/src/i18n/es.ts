@@ -30,6 +30,9 @@ export const es = {
     modeOffHint: 'Equivale a un click largo del botón: vuelve a esperando y apaga el reconocimiento.',
     announceIdle: 'Esperando. Reconocimiento apagado.',
     announceBus: 'Modo ómnibus activado.',
+    // The board could not start bus mode (no camera, no detector). A fixed sentence with the remedy
+    // the user has (ADR 0011); the board's reason goes to telemetry only.
+    announceBusUnavailable: 'El modo ómnibus no está disponible ahora. Probá apagar y volver a prender el dispositivo.',
     announceBusWarmingUp: 'Modo ómnibus. Preparando la lectura, esperá unos segundos.',
     announceBusApproaching: 'Se acerca un ómnibus.',
     announceSupermarket: 'Modo supermercado activado.',
