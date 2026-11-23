@@ -1,6 +1,7 @@
 # ADR 0008: Un proxy propio para las claves de los modelos de nube
 
-- **Status:** Accepted (2026-09-01), **desplegado el 2026-09-02**
+- **Status:** Accepted (2026-09-01), **desplegado el 2026-09-02**, enmendado el 2026-11-23 (ninguna
+  clave en un build de distribución)
 - **Date:** 2026-09-01
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** app, backend, architecture, security
@@ -226,6 +227,25 @@ camino directo contra las claves de desarrollo.
 puede todo sobre el proyecto: no correrlo en un log, un CI o una sesión compartida. Ya pasó una vez
 (2026-09-02) y se resolvió rotando el JWT secret, que invalida `anon` y `service_role`, barato
 porque la app no usa ninguna de las dos y el proxy corre con `verify_jwt = false`.
+
+## Enmienda 2026-11-23: ninguna clave en un build de distribución
+
+La revisión de todo el código del 2026-11-23 encontró que la integración continua seguía pasando al
+compilado el secret `EXPO_PUBLIC_GEMINI_API_KEY`. La app no lo usaba (con el proxy configurado
+`resolveTransport` manda todo al proxy), pero al ser `EXPO_PUBLIC_*` quedaba legible dentro de cada
+`.ipa` y `.apk` distribuido. Se decidió:
+
+- **El secret se borró del repositorio** y los flujos de compilación (`testflight.yml`,
+  `android-play.yml`, `android-apk.yml`) ya no pasan ninguna clave de proveedor. La clave de Gemini
+  conviene rotarla en Google AI Studio, porque viajó en builds anteriores.
+- **La app lee las claves sólo en desarrollo** (`__DEV__ ? process.env.EXPO_PUBLIC_*_API_KEY : ''`
+  en `services/vision/config.ts` y `services/audio/synthesis.ts`). En un build de distribución Metro
+  reemplaza `__DEV__` por `false` y descarta la rama con el texto de la clave: aunque una clave
+  quede en el `.env` local, no llega al paquete. Se verificó exportando el paquete de producción con
+  claves ficticias, que no aparecieron.
+- **`npm run keys` exige el proxy** para un build: sin él, el modo supermercado no existe en ese
+  build, haya o no claves en el entorno.
+- Los modelos en uso son los de OpenAI y Qwen (servido por Groq), los dos detrás del proxy.
 
 ## Ver también
 
