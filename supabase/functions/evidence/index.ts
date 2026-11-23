@@ -45,6 +45,11 @@ function reply(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
+/** Storage's answer for a path that already holds an object (HTTP 409, "already exists"). */
+function alreadyStored(error: { message?: string; statusCode?: string | number }): boolean {
+  return String(error.statusCode) === '409' || /already exists|duplicate/i.test(error.message ?? '');
+}
+
 function decode(base64: string): Uint8Array | null {
   try {
     const binary = atob(base64);
@@ -95,8 +100,14 @@ Deno.serve(async (request: Request) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const stored: string[] = [];
   for (const { path, bytes } of uploads) {
-    // upsert: a retry after a response that never reached the phone uploads the same file again.
-    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
+    // No upsert: this endpoint answers anyone, and with it a known path could be overwritten. A retry
+    // after a response that never reached the phone finds the file already there, and that is a
+    // success: the paths are deterministic, so the same path is the same picture.
+    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: 'image/jpeg', upsert: false });
+    if (error && alreadyStored(error)) {
+      stored.push(path);
+      continue;
+    }
     if (error) {
       console.error('evidence: upload failed:', path, error.message);
       // The storage message stays in the server's log: this endpoint answers anyone.

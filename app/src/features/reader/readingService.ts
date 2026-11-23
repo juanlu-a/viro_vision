@@ -666,7 +666,7 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   const pressedAt = Date.now();
   const cancel = new AbortController();
   const controller = new AbortController();
-  cancel.signal.addEventListener('abort', () => controller.abort());
+  cancel.signal.addEventListener('abort', () => controller.abort(), { once: true });
   // The photo comes over the device's WiFi: wait for the phone to be on it, and for the mode just
   // written to reach the board. Both happen in the first seconds after connecting or switching.
   // Synchronous in the usual case: every extra await here is time iOS may not give a locked phone.
@@ -773,14 +773,15 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   }
 }
 
-/**
- * Waits, bounded, for the phone to be on the device's network (`isDeviceReady`: connected, joined,
- * answering). True at once in the usual case. False when it never came or the mode changed meanwhile.
- */
+/** Whether the phone is on the device's network right now (true when the deps cannot tell). */
 function isNetworkReady(): boolean {
   return deps.isNetworkReady ? deps.isNetworkReady() : true;
 }
 
+/**
+ * Waits, bounded, for the phone to be on the device's network (`isDeviceReady`: connected, joined,
+ * answering). True at once in the usual case. False when it never came or the mode changed meanwhile.
+ */
 async function waitForDeviceNetwork(isStale: () => boolean, limitMs: number): Promise<boolean> {
   const t0 = Date.now();
   let told = false;
