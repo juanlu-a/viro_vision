@@ -151,6 +151,9 @@ class Core:
         self.modes = ModeMachine()
         self._transfer_id = 0
         self._transfer_in_flight: Optional[asyncio.Task] = None
+        # Strong references to scheduled tasks until they finish: the loop keeps only weak ones, and
+        # a task nobody holds can be collected mid-flight.
+        self._tasks: set[asyncio.Task] = set()
 
     def attach_bus(self, bus) -> None:
         """Wires bus mode in after the fact: the watcher needs to emit events through this core, and
@@ -269,6 +272,10 @@ class Core:
                 self._event({"t": "error", "msg": "no camera: use measure"})
                 return
             chunk, interval_ms = self._chunk(cmd, mtu), self._interval(cmd)
+            # Checked before `_capture()`, not inside `_start_transfer`: the capture starts the moment
+            # it is called (a camera lock, up to 8 s), and a photo nobody will receive is pure cost.
+            if self._transfer_busy():
+                return
             self._start_transfer(source=self._capture(), chunk=chunk, interval_ms=interval_ms, kind="photo")
         elif name == "mode":
             self._change_mode(int(cmd.get("value", 0)))
@@ -398,7 +405,13 @@ class Core:
     # --- internals ---------------------------------------------------------------------------
 
     def _schedule(self, coroutine: Awaitable[None]) -> asyncio.Task:
-        return self._loop.create_task(coroutine)
+        """A task nobody awaits: held until it finishes, and its failure logged (which also relays it
+        to the app, `log_relay.py`) instead of surfacing only as asyncio's message at collection."""
+        task = self._loop.create_task(coroutine)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        task.add_done_callback(_log_failure(getattr(coroutine, "__qualname__", "task")))
+        return task
 
     def _in_executor(self, fn: Callable, *args) -> asyncio.Future:
         """`run_in_executor` for work nobody awaits. Until 2026-10-06 those futures were dropped, so
@@ -472,7 +485,13 @@ class Core:
         ómnibus activado" from the app and then nothing, ever — no detector, no OCR, and no way to
         tell from the phone. Only the failures the watcher names are reported: "the camera is still
         starting" is already said out loud (`warming`), and "the user left meanwhile" is no failure."""
+        # Start and stop run as separate executor jobs and can finish out of order: a start that runs
+        # after the user already left (or that finishes after the stop) must not leave the watcher on.
+        if self.modes.current is not Mode.BUS:
+            return
         if self._bus.start():
+            if self.modes.current is not Mode.BUS:
+                self._bus.stop()
             return
         reason = getattr(self._bus, "unavailable_reason", None)
         if reason:
@@ -492,9 +511,15 @@ class Core:
     async def _synthetic_source(self, amount: int) -> bytes:
         return self._synthetic_payload(amount)
 
-    def _start_transfer(self, source: Awaitable[bytes], chunk: int, interval_ms: int, kind: str) -> None:
+    def _transfer_busy(self) -> bool:
+        """True, and says so to the app, when a transfer is already in flight."""
         if self._transfer_in_flight and not self._transfer_in_flight.done():
             self._event({"t": "error", "msg": "a transfer is already in progress"})
+            return True
+        return False
+
+    def _start_transfer(self, source: Awaitable[bytes], chunk: int, interval_ms: int, kind: str) -> None:
+        if self._transfer_busy():
             if hasattr(source, "close"):
                 source.close()  # close the coroutine we are not going to await, or Python warns on collection
             return

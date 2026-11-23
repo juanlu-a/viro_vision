@@ -5,8 +5,8 @@ and leaves the home WiFi, so there is no SSH; pulling the card to create `SIN-AP
 off and opening the case. The repo's to-do list already named this path ("turn the AP off over BLE
 from the Mac with the app closed"), but there was nothing to do it with. This is that.
 
-It is not a trick: `AccessPoint.turn_off()` calls `nmcli device connect wlan0` on purpose, so the
-board goes back to the known network on its own.
+It is not a trick: `AccessPoint.turn_off()` hands wlan0 back to a known network on purpose
+(`AccessPoint.reconnect`), so the board rejoins the home WiFi on its own.
 
 ```sh
 cd hardware/raspi
@@ -31,13 +31,13 @@ why.
 import asyncio
 import json
 import sys
+from pathlib import Path
 
 from bleak import BleakClient, BleakScanner
 
-SERVICE = "4380c500-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_CONTROL = "4380c502-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_STATUS = "4380c505-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_WIFI = "4380c506-7ca3-4e37-b27d-f60e8d8d73d1"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from virovision.profile import CH_CONTROL, CH_STATUS, CH_WIFI, SERVICE_UUID as SERVICE  # noqa: E402
 
 
 async def main() -> int:

@@ -66,9 +66,11 @@ jest.mock('@/services/vision', () => ({
   recognizeProduct: (options: unknown) => mockRecognize(options),
 }));
 
+let mockOcrLoaded = true;
+const mockLoadOcr = jest.fn((_onProgress?: (p: number) => void) => Promise.resolve({ ms: 0 }));
 jest.mock('@/services/ondevice', () => ({
-  isOcrLoaded: () => true,
-  loadOcr: () => Promise.resolve({ ms: 0 }),
+  isOcrLoaded: () => mockOcrLoaded,
+  loadOcr: (onProgress?: (p: number) => void) => mockLoadOcr(onProgress),
   readImage: () => Promise.resolve({ ms: 1, detections: [] }),
 }));
 
@@ -131,6 +133,8 @@ beforeEach(() => {
   mockRecognize.mockReset();
   mockRecognize.mockResolvedValue({ ms: 900, model: MODEL.id, product: { kind: 'arroz', brand: 'Saman', detail: '1 kg' }, text: '' });
   (AppState as { currentState: unknown }).currentState = 'active';
+  mockOcrLoaded = true;
+  mockLoadOcr.mockClear();
 });
 
 describe('a reading with nothing on screen', () => {
@@ -509,6 +513,33 @@ describe('a mode change during a reading', () => {
 
     expect(mockRecognize).toHaveBeenCalledTimes(1);
     expect(mockSpeak.mock.calls.some(([text]) => /yerba/i.test(text))).toBe(true);
+  });
+});
+
+describe('a mode change while the bus OCR model is still loading', () => {
+  it('does not leave the new mode marked as reading when the load finishes', async () => {
+    let finishLoad: (r: { ms: number }) => void = () => {};
+    let progress: ((p: number) => void) | undefined;
+    mockOcrLoaded = false;
+    mockLoadOcr.mockImplementationOnce((onProgress) => {
+      progress = onProgress;
+      return new Promise((resolve) => (finishLoad = resolve));
+    });
+    configureReader(deps());
+    setModeFromDevice('bus');
+
+    const running = requestReading('device');
+    for (let i = 0; i < 20 && mockLoadOcr.mock.calls.length === 0; i += 1) await Promise.resolve();
+    expect(mockLoadOcr).toHaveBeenCalledTimes(1);
+    setModeFromDevice('supermarket');
+    const afterChange = getReaderState().status;
+    progress?.(0.5);
+    finishLoad({ ms: 1 });
+    await running;
+
+    expect(getReaderState().status).toBe(afterChange);
+    expect(getReaderState().status).not.toBe('reading');
+    expect(getReaderState().progress ?? null).toBeNull();
   });
 });
 

@@ -7,7 +7,7 @@
  * desactivado" does not say which mode is on). The choice is spoken, because nothing else confirms it
  * to someone who does not see Home change.
  */
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { DropdownSelect, type DropdownOption } from '@/components/dropdown-select';
 import { announce } from '@/features/audio/announcer';
@@ -30,6 +30,13 @@ export function AppModeSelector() {
   const { mode, setMode } = useAppMode();
   // Only the last switch is said: two quick switches must not speak a stale mode after the new one.
   const pendingAnnounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Nor after Settings is gone.
+  useEffect(
+    () => () => {
+      if (pendingAnnounce.current) clearTimeout(pendingAnnounce.current);
+    },
+    []
+  );
 
   const choose = (value: AppMode) => {
     if (value === mode) return;

@@ -53,6 +53,9 @@ export default function HomeScreen() {
   const { mode } = useAppMode();
   const view = homeView(state, mode, model != null);
 
+  // Only the read button waits for a reading to end. The mode buttons stay live: changing mode cancels
+  // the reading in flight (`applyGesture`), and disabling them left the app user unable to leave a
+  // mode for up to 30 s (or a whole OCR download) when the device button could.
   const busy = state.status !== 'idle';
   const inBus = state.mode === 'bus';
   const inSupermarket = state.mode === 'supermarket';
@@ -78,14 +81,12 @@ export default function HomeScreen() {
           hint={inBus ? r.modeOffHint : r.modeBusOnHint}
           variant="secondary"
           onPress={() => applyGesture(inBus ? 'longPress' : 'click')}
-          disabled={busy}
         />
         <AccessibleButton
           label={inSupermarket ? r.modeSuperOff : r.modeSuperOn}
           hint={inSupermarket ? r.modeOffHint : r.modeSuperOnHint}
           variant="secondary"
           onPress={() => applyGesture(inSupermarket ? 'longPress' : 'doubleClick')}
-          disabled={busy}
         />
         {/* Choosing the model is a setting and lives in Settings; what stays here is only the notice
             that this build ships no key, and only with the mode that needs it active. It is said

@@ -4998,3 +4998,39 @@ ni commit lleve atribución de IA. Se hizo en tres partes:
 ### Pendientes
 
 - Si alguna vez se regraban todas las microSD, renombrar los archivos de la tarjeta al inglés.
+
+## 2026-11-23 (cont.): revisión del codebase entero
+
+Se corrió la revisión multi-modelo (`tackle-review`) sobre todo el código, no sobre un diff: Opus
+(app y daemon), Sonnet (servicios de la app), Haiku (funciones de Supabase, CI y tests de la placa)
+y Codex, con una segunda vuelta de Opus y Codex sobre los arreglos. Lo que se arregló:
+
+- **App.** La cola de GATT ya no queda trabada detrás de una operación colgada (se libera a los
+  5 s), y un listener que falla no silencia a los demás. Un cambio de modo mientras se carga el OCR
+  ya no deja el botón de leer deshabilitado. Una falla de red que se repite en cada latido de 15 s
+  se dice una sola vez, y el reintento no vuelve a mostrar el aviso de iOS para unirse. Los botones
+  de modo de Inicio quedan habilitados durante una lectura (cambiar de modo la cancela).
+- **Telemetría.** Un envío exitoso descuenta sólo las pérdidas que informó; un 429 del freno no
+  cuenta como intento fallido.
+- **Placa.** Repetir la última lectura respeta la salida elegida (antes sonaba siempre en la placa).
+  Un arranque de ómnibus que llega después de salir del modo no deja el detector prendido. No se
+  saca una foto si ya hay una transferencia en curso. Dos `play` simultáneos ya no superponen
+  decodificadores. `--no-audio` también silencia el modo ómnibus. La actualización del código desde
+  la tarjeta vuelve atrás si falla a mitad de camino.
+- **Supabase.** `telemetry` y `evidence` limitan el cuerpo mientras lo leen (antes lo cargaban
+  entero), las tres funciones rechazan un JSON `null` con 400 y `telemetry` tiene freno por IP. El
+  freno, la IP del cliente y el lector quedaron en `supabase/functions/_shared/http.ts`.
+- **CI.** Los builds ya no llevan claves de proveedores (el secret de Gemini se seguía incrustando
+  aunque la app siempre usa el proxy, ADR 0008); las notas y los mensajes de commit pasan por `env`
+  y no por interpolación en el shell; `GITHUB_TOKEN` queda de sólo lectura.
+
+### Pendientes
+
+- **Desplegar las funciones de Supabase** (`vision`, `telemetry`, `evidence`): el merge no las
+  despliega.
+- Borrar los secrets `EXPO_PUBLIC_GEMINI_API_KEY` (y los demás de proveedores, si aparecen) del
+  repo en GitHub: ya no se usan.
+- Hallazgos que quedaron sin tocar: el archivo `VOLUMEN` de la tarjeta sobrescribe el volumen de la
+  app (se decide si se retira); el error "cámara no arrancó" en modo ómnibus va a telemetría pero la
+  app no lo dice; el filtro de ecos de modo recuerda una sola escritura; faltan tests de
+  `DeviceProvider`; los tests de la placa que dependen de `sleep` pueden ser inestables en CI.

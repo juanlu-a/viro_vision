@@ -19,6 +19,8 @@
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+import { clientIp, createBrake, isObject, readCapped } from '../_shared/http.ts';
+
 const BUCKET = 'evidence';
 /** A crop and a 1024 px frame at q85 are ~10 KB and ~150 KB; four of them, base64, fit easily. */
 const MAX_BODY_BYTES = 6_000_000;
@@ -37,31 +39,7 @@ const FILE = /^t\d{3,}-[a-z0-9-]+\.jpg$/;
  * up to 6 MB a request into the bucket with the service role. A field run uploads a few pictures a
  * minute; 60 leaves plenty of room.
  */
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 60;
-const hits = new Map<string, number[]>();
-let sweptAt = 0;
-
-function overTheBrake(ip: string, now: number): boolean {
-  if (now - sweptAt >= WINDOW_MS) {
-    sweptAt = now;
-    for (const [key, times] of hits) if (times.every((t) => now - t >= WINDOW_MS)) hits.delete(key);
-  }
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  const over = recent.length >= MAX_PER_WINDOW;
-  if (!over) recent.push(now);
-  hits.set(ip, recent);
-  return over;
-}
-
-function clientIp(request: Request): string {
-  return (
-    request.headers.get('cf-connecting-ip')?.trim() ||
-    request.headers.get('x-real-ip')?.trim() ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
-  );
-}
+const overTheBrake = createBrake(60_000, 60);
 
 function reply(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -85,9 +63,11 @@ Deno.serve(async (request: Request) => {
 
   let body: { phone?: unknown; ref?: unknown; files?: unknown };
   try {
-    const text = await request.text();
-    if (text.length > MAX_BODY_BYTES) return reply(413, { error: 'too large' });
-    body = JSON.parse(text);
+    const text = await readCapped(request, MAX_BODY_BYTES);
+    if (text === null) return reply(413, { error: 'too large' });
+    const parsed: unknown = JSON.parse(text);
+    if (!isObject(parsed)) return reply(400, { error: 'invalid JSON' });
+    body = parsed;
   } catch {
     return reply(400, { error: 'invalid JSON' });
   }

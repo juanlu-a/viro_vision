@@ -40,6 +40,9 @@ env:
   # The same computation and the same trap as in testflight.yml: once, at workflow level.
   TRACK: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.track == 'alpha')) && 'alpha' || 'internal' }}
 
+permissions:
+  contents: read
+
 jobs:
   play:
     name: Build and upload (${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.track == 'alpha')) && 'alpha · closed testing' || 'internal testing' }})
@@ -47,15 +50,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # One key per selector provider (ADR 0006). The missing ones simply leave their model out of
-      # the selector in that build; they break nothing. CAREFUL: they stay readable inside the
-      # .ipa/.apk until ADR 0008's proxy is deployed.
-      EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
-      EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
-      EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
-      EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
-      # With the proxy deployed (ADR 0008) the four keys above stop being needed here: the server
-      # holds them and the build goes out with none. See docs/supabase.md.
+      # No provider keys here (ADR 0008): an EXPO_PUBLIC_* value is inlined into the bundle and stays
+      # readable inside the .ipa/.apk. The proxy below holds them on the server; with it set, the
+      # app never calls a provider directly (`services/cloud/transport.ts`).
       EXPO_PUBLIC_VISION_PROXY_URL: ${{ secrets.EXPO_PUBLIC_VISION_PROXY_URL }}
       # Telemetry (the `events` table). Since 2026-09-08 the technical information is NOT on the
       # screens: without this secret the build goes out with no diagnosis at all. It is not a key, it
@@ -99,8 +96,11 @@ jobs:
         env:
           PLAY_KEYSTORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
       - name: Upload to Google Play
+        # Through env and not `${{ }}` inside the script: a quote in the notes would break the
+        # command, and the step holds the store credentials.
+        env:
+          NOTES: ${{ inputs.notes }}
         run: |
-          NOTES="${{ inputs.notes }}"
           if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · branch ${GITHUB_REF_NAME}"; fi
           node scripts/gplay.mjs --aab android/app/build/outputs/bundle/release/app-release.aab --track "$TRACK" --notes "$NOTES"
       - uses: actions/upload-artifact@v4

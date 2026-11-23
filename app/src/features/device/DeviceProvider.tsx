@@ -189,12 +189,24 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const announcedReadyFor = useRef<string | null>(null);
 
   /**
+   * The failure last said out loud, as `reason@ip`. A check that failed is retried on every `status`
+   * heartbeat (15 s), and each retry that fails the same way used to say the failure sentence again:
+   * the user heard "no pude usar la red" every 15 s for as long as it lasted. The retry stays; the
+   * sentence is said once per distinct failure, and again only after the network was ready or the
+   * link started over.
+   */
+  const announcedFailure = useRef<string | null>(null);
+
+  /** The SSID a check was last allowed to prompt for: a heartbeat retry does not prompt for it again. */
+  const promptedFor = useRef<string | null>(null);
+
+  /**
    * The network follows the AP: join when the device has one up, and check that the device answers
    * before declaring the photo available. It is called from the event handlers (connection, new
    * status), never from an effect. Every run carries a number: if the situation changed while it
    * waited, its results are discarded.
    */
-  const failNetwork = useCallback((reason: string, extra?: Record<string, unknown>) => {
+  const failNetwork = useCallback((reason: string, ip: string | null, extra?: Record<string, unknown>) => {
     // Cleared here and on every other way out of `ready` below: the guard must suppress a repeated
     // announcement, never a real one. A network that failed and came back has to be announced again.
     announcedReadyFor.current = null;
@@ -203,14 +215,18 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     // The reason lives in the table and nowhere else (2026-10-06): the user never hears an IP, a
     // system error string or a step of the join. They hear one fixed sentence, because a silent
     // failure leaves them waiting for a button that never comes.
-    record('wifi.failed', { detail: { reason, ...extra } });
+    record('wifi.failed', { detail: { reason, ip, ...extra } });
+    // Said once per distinct failure (see `announcedFailure`); every retry is still recorded above.
+    const key = `${reason}@${ip ?? ''}`;
+    if (announcedFailure.current === key) return;
+    announcedFailure.current = key;
     // Two reasons never fix themselves, and "still trying" would be false for them: no credentials
     // (the remedy is the user's) and a build with no WiFi module.
     void notify(reason === 'noCredentials' || reason === 'unavailable' ? 'networkUnusable' : 'networkFailed');
   }, []);
 
   const syncNetwork = useCallback(
-    async (apOn: boolean, target: DeviceAddress | null, mayPromptAlways = false): Promise<boolean> => {
+    async (apOn: boolean, target: DeviceAddress | null, mayPromptAlways = false, retry = false): Promise<boolean> => {
       const run = ++networkSyncRun.current;
       const current = () => run === networkSyncRun.current;
       if (!target) {
@@ -225,7 +241,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         credentials.current = await getBleClient().readWifi().catch(recordWifiReadFailure);
         if (!current()) return false;
         if (!credentials.current) {
-          failNetwork('noCredentials');
+          failNetwork('noCredentials', target.ip);
           return false;
         }
       }
@@ -233,7 +249,14 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       // A network this phone already joined is saved on it: iOS rejoins it by itself, and asking the
       // system again is exactly the prompt the user got on every power-on (2026-11-20). So it is
       // only waited for; the prompt is left to a reading that needs the photo (`joinNetwork`).
-      const mayPrompt = mayPromptAlways || ssid === null || (await loadJoinedNetwork()) !== ssid;
+      // A heartbeat retry does not prompt again for a network it already prompted for: a user who
+      // dismissed the iOS alert would otherwise get it every 15 s. A retry that never got as far as
+      // prompting (the credentials read failed the first time) still may. The next reading that
+      // needs the photo always asks (`joinNetwork`, `mayPromptAlways`).
+      const alreadyPrompted = retry && ssid !== null && promptedFor.current === ssid;
+      const mayPrompt =
+        mayPromptAlways || (!alreadyPrompted && (ssid === null || (await loadJoinedNetwork()) !== ssid));
+      if (mayPrompt && ssid !== null) promptedFor.current = ssid;
       if (!current()) return false;
       promptingRun.current = mayPrompt && ssid !== null ? run : 0;
       setWifi('joining');
@@ -253,6 +276,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       }
       if (outcome.ok) {
         if (ssid) void saveJoinedNetwork(ssid);
+        announcedFailure.current = null;
+        promptedFor.current = null;
         setWifi('ready');
         // The time until the device answers is what separates "it is slow" from "it does not work":
         // on 2026-09-06 the network never became ready and without this number there was no way to
@@ -269,7 +294,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         }
         return true;
       }
-      failNetwork(outcome.reason, { ip: target.ip, message: errorDetail(outcome.message) });
+      failNetwork(outcome.reason, target.ip, { message: errorDetail(outcome.message) });
       return false;
     },
     [failNetwork]
@@ -292,7 +317,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       if (!changed && (previous.ok || previous.running)) return;
       const synced = { ap: apOn, ip: target?.ip ?? null, ok: false, running: true };
       syncedNetwork.current = synced;
-      void syncNetwork(apOn, target).then((ok) => {
+      void syncNetwork(apOn, target, false, !changed).then((ok) => {
         if (syncedNetwork.current !== synced) return; // superseded: its verdict is not ours to keep
         synced.running = false;
         synced.ok = ok;
@@ -309,6 +334,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
    */
   const startNetworkTransition = useCallback(() => {
     announcedReadyFor.current = null;
+    announcedFailure.current = null;
     networkSyncRun.current += 1;
     syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     setAddress(null);
@@ -445,6 +471,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         record('ble.lost');
         paired.reset();
         announcedReadyFor.current = null;
+        announcedFailure.current = null;
+        promptedFor.current = null;
         networkSyncRun.current += 1; // invalidates any network wait in flight
         // And forgets what was synced: the next connection has to check the network again even if
         // the device comes back with the very same address, or `wifi` stays 'off' for good.
@@ -532,6 +560,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     networkSyncRun.current += 1;
     syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     announcedReadyFor.current = null;
+    announcedFailure.current = null;
+    promptedFor.current = null;
     await getBleClient().disconnect();
     setConnection(initialConnection);
     setAddress(null);

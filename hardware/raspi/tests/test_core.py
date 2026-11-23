@@ -115,6 +115,35 @@ def test_photo_with_a_camera_transfers_what_was_captured(loop):
     assert join(n.of(TRANSFER)) == b"JPEG" * 100
 
 
+def test_a_second_photo_during_a_transfer_does_not_start_a_capture(loop):
+    """The capture starts the moment it is called (a camera lock, seconds): a photo that cannot be
+    sent because another transfer is running must not take one for nobody."""
+    started = []
+    release = asyncio.Event()
+
+    async def capture():
+        await release.wait()
+        return b"JPEG"
+
+    def start_capture():
+        # Counted at call time, like the device's capture (a future already running in the executor).
+        started.append(1)
+        return capture()
+
+    core, n = build(loop, start_capture)
+
+    async def scenario():
+        core.write_control(b'{"cmd":"photo"}')
+        await asyncio.sleep(0)
+        core.write_control(b'{"cmd":"photo"}')
+        release.set()
+        await _drain(loop)
+
+    loop.run_until_complete(scenario())
+    assert started == [1]
+    assert {"t": "error", "msg": "a transfer is already in progress"} in n.events()
+
+
 def test_ap_turns_on_for_a_bounded_time_and_says_so(loop):
     calls = []
     core, n = build(loop, ap_control=calls.append)

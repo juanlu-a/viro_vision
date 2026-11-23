@@ -36,6 +36,16 @@ describe('EventQueue', () => {
     expect(queue.droppedCount).toBe(0);
   });
 
+  it('clearing what was reported keeps the drops that happened while the batch was in flight', () => {
+    const queue = new EventQueue(2);
+    for (const n of [1, 2, 3]) queue.enqueue(event(n));
+    const reported = queue.droppedCount;
+    queue.enqueue(event(4));
+    queue.enqueue(event(5));
+    queue.clearDropped(reported);
+    expect(queue.droppedCount).toBe(2);
+  });
+
   it('a batch that could not be uploaded comes back at the front, without disturbing the order', () => {
     const queue = new EventQueue();
     for (const n of [1, 2]) queue.enqueue(event(n));

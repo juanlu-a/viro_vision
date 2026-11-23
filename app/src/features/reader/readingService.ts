@@ -473,8 +473,13 @@ async function readBus(uri: string, isStale: () => boolean, cancel: AbortSignal)
     update({ status: 'preparing', message: t.preparing, progress: 0 });
     // The first load downloads ~250 MB: if someone reports that "the first time it does not work",
     // this number says whether it was downloading or whether it hung.
-    const load = await loadOcr((p) => update({ progress: p }));
+    // A mode change while the model downloads resets the status to idle; a stale reading must not
+    // write over it, or Home's read button stays disabled until the next mode change.
+    const load = await loadOcr((p) => {
+      if (!isStale()) update({ progress: p });
+    });
     record('ocr.load', { ms: load.ms });
+    if (isStale()) return;
   }
   update({ status: 'reading', message: t.reading, progress: null });
 
@@ -818,6 +823,8 @@ async function downloadPhotoWhenCameraReady(
       const warming = err instanceof HttpDownloadError && err.status === 503;
       if (!warming || isStale() || Date.now() - t0 >= CAMERA_WARMUP_WAIT_MS || left() <= 2_000) throw err;
       await sleep(1_000);
+      // The mode may have changed during the wait: one more photo would go to a board that has moved on.
+      if (isStale()) throw err;
     }
   }
 }

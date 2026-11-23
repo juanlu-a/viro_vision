@@ -334,6 +334,7 @@ class BusWatcher:
         self._timeline = Timeline()
         self._last_frame_at = 0.0
         self._last_announcement: list = []
+        self._last_result_event: dict | None = None
         self._last_line: tuple = ()
         self._last_line_at: float | None = None
         self._last_voice_at: float | None = None
@@ -591,7 +592,11 @@ class BusWatcher:
             log.info("bus: nothing to repeat yet")
             return False
         log.info("bus: repeating the last announcement")
-        self._announce(self._last_announcement)
+        # Both halves, like the reading it repeats: `_announce` straight away played it on the board
+        # even with the output on the phone, and sent nothing, so a phone listener heard nothing.
+        self._speak(self._last_announcement)
+        if self._last_result_event is not None:
+            self._emit(self._last_result_event)
         return True
 
     # --- internals -------------------------------------------------------------------------
@@ -963,8 +968,9 @@ class BusWatcher:
             log.info("bus: %s", event.phrase())
             self._last_voice_at = time.monotonic()
             self._last_announcement = self._files_for(event.number, event.destination)
+            self._last_result_event = self._result_event(event)
             self._speak(self._last_announcement)
-            self._emit(self._result_event(event))
+            self._emit(self._last_result_event)
         elif event.kind == "lost":
             track = next((t for t in self._watcher.tracker.recent if t.id == event.track), None)
             self._timeline.lost(event, bool(track and track.announced_reading))

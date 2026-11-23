@@ -83,6 +83,20 @@ function withDeadline<T>(ms: number, error: () => Error, run: (resolve: (v: T) =
   });
 }
 
+/**
+ * Calls every listener, each on its own: one that throws (an announcer whose TTS failed, say) must
+ * not keep the others from hearing the event. The failure goes to telemetry, never to the user.
+ */
+function emit<A extends unknown[]>(listeners: Set<(...args: A) => void>, ...args: A): void {
+  for (const listener of listeners) {
+    try {
+      listener(...args);
+    } catch (err) {
+      record('app.error', { detail: { where: 'ble.listener', message: errorDetail(err) } });
+    }
+  }
+}
+
 export function createBleClientPlx(): BleClient | null {
   if (Platform.OS === 'web') return null;
   let manager: BleManager;
@@ -148,7 +162,7 @@ class BleClientPlx implements BleClient {
         // peripheral in a half-open state that the next `connectToDevice` queues behind, which turns
         // one dropped link into the several failed attempts the user has to sit through.
         void this.manager.cancelDeviceConnection(device.id).catch(() => {});
-        for (const listener of this.disconnectListeners) listener();
+        emit(this.disconnectListeners);
       }),
       this.manager.monitorCharacteristicForDevice(device.id, GATT.serviceUuid, GATT.characteristics.event, (error, c) => {
         if (!current()) return;
@@ -162,7 +176,7 @@ class BleClientPlx implements BleClient {
         if (!c?.value) return;
         try {
           const status = JSON.parse(decodeTextBase64(c.value)) as DeviceStatus;
-          for (const listener of this.statusListeners) listener(status);
+          emit(this.statusListeners, status);
         } catch (err) {
           // An unreadable status takes nothing down, but it is recorded: a board whose status never
           // parses looks, from here, exactly like a board that stopped sending it.
@@ -174,7 +188,7 @@ class BleClientPlx implements BleClient {
         if (error) return this.monitorFailed('mode', error);
         if (!c?.value) return;
         const bytes = decodeBase64(c.value);
-        if (bytes.length > 0) for (const listener of this.modeListeners) listener(bytes[0]);
+        if (bytes.length > 0) emit(this.modeListeners, bytes[0]);
       })
     );
 
@@ -183,7 +197,7 @@ class BleClientPlx implements BleClient {
     // (battery, crash) comes back idle, and without this read the app kept showing — and waiting
     // in — the mode from before the drop while nothing on the board was watching for buses.
     const mode = await this.readMode(device);
-    if (mode !== null && current()) for (const listener of this.modeListeners) listener(mode);
+    if (mode !== null && current()) emit(this.modeListeners, mode);
     return {
       id: device.id,
       name: device.name ?? device.localName ?? DEVICE_ADVERTISED_NAME,
@@ -272,17 +286,7 @@ class BleClientPlx implements BleClient {
    * a write nobody confirmed would leave the app believing a setting that is not in force.
    */
   async writeAudioTarget(target: 'phone' | 'device'): Promise<void> {
-    const device = this.device;
-    if (!device) throw new BleNotConnectedError();
-    const payload = new TextEncoder().encode(audioCommand(target));
-    await this.gatt(() =>
-      this.manager.writeCharacteristicWithResponseForDevice(
-        device.id,
-        GATT.serviceUuid,
-        GATT.characteristics.control,
-        encodeBase64(payload)
-      )
-    );
+    await this.writeControl(audioCommand(target), true);
   }
 
   /**
@@ -290,17 +294,7 @@ class BleClientPlx implements BleClient {
    * a write nobody confirmed would leave the slider claiming a level the board does not have.
    */
   async writeVolume(percent: number): Promise<void> {
-    const device = this.device;
-    if (!device) throw new BleNotConnectedError();
-    const payload = new TextEncoder().encode(volumeCommand(percent));
-    await this.gatt(() =>
-      this.manager.writeCharacteristicWithResponseForDevice(
-        device.id,
-        GATT.serviceUuid,
-        GATT.characteristics.control,
-        encodeBase64(payload)
-      )
-    );
+    await this.writeControl(volumeCommand(percent), true);
   }
 
   /**
@@ -317,17 +311,7 @@ class BleClientPlx implements BleClient {
    * leaving only a link that dies in the same instant.
    */
   async playNotice(clip: string): Promise<void> {
-    const device = this.device;
-    if (!device) throw new BleNotConnectedError();
-    const payload = new TextEncoder().encode(noticeCommand(clip));
-    await this.gatt(() =>
-      this.manager.writeCharacteristicWithoutResponseForDevice(
-        device.id,
-        GATT.serviceUuid,
-        GATT.characteristics.control,
-        encodeBase64(payload)
-      )
-    );
+    await this.writeControl(noticeCommand(clip), false);
   }
 
   /**
@@ -336,17 +320,7 @@ class BleClientPlx implements BleClient {
    * board's `aplay` gets its `terminate` as soon as possible.
    */
   async hushDevice(): Promise<void> {
-    const device = this.device;
-    if (!device) throw new BleNotConnectedError();
-    const payload = new TextEncoder().encode(hushCommand());
-    await this.gatt(() =>
-      this.manager.writeCharacteristicWithoutResponseForDevice(
-        device.id,
-        GATT.serviceUuid,
-        GATT.characteristics.control,
-        encodeBase64(payload)
-      )
-    );
+    await this.writeControl(hushCommand(), false);
   }
 
   isLinked(): boolean {
@@ -376,6 +350,18 @@ class BleClientPlx implements BleClient {
   }
 
   // --- private ----------------------------------------------------------------------------------
+
+  /** One JSON command on `control`, queued like every other GATT operation. */
+  private async writeControl(command: string, withResponse: boolean): Promise<void> {
+    const device = this.device;
+    if (!device) throw new BleNotConnectedError();
+    const value = encodeBase64(new TextEncoder().encode(command));
+    await this.gatt(() =>
+      withResponse
+        ? this.manager.writeCharacteristicWithResponseForDevice(device.id, GATT.serviceUuid, GATT.characteristics.control, value)
+        : this.manager.writeCharacteristicWithoutResponseForDevice(device.id, GATT.serviceUuid, GATT.characteristics.control, value)
+    );
+  }
 
   private async waitForRadio(): Promise<void> {
     let last: string = await this.manager.state();
@@ -546,7 +532,7 @@ class BleClientPlx implements BleClient {
     if (event.t !== 'log') record('ble.event', { detail: { t: event.t } });
     switch (event.t) {
       case 'error':
-        for (const listener of this.errorListeners) listener(event.msg);
+        emit(this.errorListeners, event.msg);
         break;
       case 'log':
         // The daemon's own warnings and errors, which otherwise live only in its journal. Straight
@@ -565,26 +551,26 @@ class BleClientPlx implements BleClient {
         });
         break;
       case 'warming':
-        for (const listener of this.warmingListeners) listener();
+        emit(this.warmingListeners);
         break;
       case 'bus':
-        for (const listener of this.busListeners) listener();
+        emit(this.busListeners);
         break;
       case 'evidence':
-        if (typeof event.ref === 'string') for (const listener of this.evidenceListeners) listener(event.ref);
+        if (typeof event.ref === 'string') emit(this.evidenceListeners, event.ref);
         break;
       case 'ap':
-        for (const listener of this.apListeners) listener(event.on);
+        emit(this.apListeners, event.on);
         break;
       case 'read': {
         // The board says which mode it is reading in, and that number is the whole point: see
         // `onReadRequest` in `bleClient.ts`. `undefined` is a board from before the field existed.
         const mode = typeof event.mode === 'number' ? event.mode : null;
-        for (const listener of this.readRequestListeners) listener(mode);
+        emit(this.readRequestListeners, mode);
         break;
       }
       case 'result':
-        for (const listener of this.recognitionListeners) listener(event.event);
+        emit(this.recognitionListeners, event.event);
         break;
       default:
         break;

@@ -35,6 +35,9 @@ defaults:
   run:
     working-directory: ./app
 
+permissions:
+  contents: read
+
 jobs:
   apk:
     name: Build the .apk
@@ -43,12 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # Same as android-play.yml: one key per selector provider (ADR 0006); the missing ones just
-      # leave their model out of the selector. With the ADR 0008 proxy set, none of them is needed.
-      EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
-      EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
-      EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
-      EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
+      # Same as android-play.yml: no provider keys, the ADR 0008 proxy holds them.
       EXPO_PUBLIC_VISION_PROXY_URL: ${{ secrets.EXPO_PUBLIC_VISION_PROXY_URL }}
       EXPO_PUBLIC_TELEMETRY_URL: ${{ secrets.EXPO_PUBLIC_TELEMETRY_URL }}
       EXPO_PUBLIC_AUDIO_FILE_ENABLED: ${{ secrets.EXPO_PUBLIC_AUDIO_FILE_ENABLED }}
