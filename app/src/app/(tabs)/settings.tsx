@@ -8,6 +8,9 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { notify } from '@/features/audio/systemNotice';
 import { AudioOutputSelector } from '@/features/audio/AudioOutputSelector';
+import { AppModeSelector } from '@/features/appMode/AppModeSelector';
+import { DeviceVolumeControl } from '@/features/device/DeviceVolumeControl';
+import { useAppMode } from '@/features/appMode/AppModeProvider';
 import { ModelSelector } from '@/features/reader/ModelSelector';
 import { useProductModel } from '@/features/reader/ProductModelProvider';
 import { strings } from '@/i18n';
@@ -54,23 +57,27 @@ function FeatureRow({
 export default function SettingsScreen() {
   const t = strings.settings;
   const { model, models, choose } = useProductModel();
+  const { isDevelopment } = useAppMode();
 
   return (
     <Screen scroll>
       <ScreenHeader title={t.title} />
 
-      {/* No surrounding label, by request: the trigger already announces itself as "Modelo
-          seleccionado: X" and the menu as "Seleccionar modelo". With no key in the build there is
-          nothing to choose and it says so, because an absent control communicates no state. */}
-      <Card>
-        {model ? (
-          <ModelSelector value={model} options={models} onChange={choose} />
-        ) : (
-          <ThemedText type="small" themeColor="textSecondary">
-            {strings.reader.cloudNotConfigured}
-          </ThemedText>
-        )}
-      </Card>
+      {/* Development mode only: which cloud model answers is the team's comparison, not a choice
+          someone using the app can weigh by ear. Product mode reads with the stored or default one.
+          No surrounding label, by request: the trigger already announces itself as "Modelo
+          seleccionado: X". With no key in the build the card says so instead of going empty. */}
+      {isDevelopment && (
+        <Card>
+          {model ? (
+            <ModelSelector value={model} options={models} onChange={choose} />
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">
+              {strings.reader.cloudNotConfigured}
+            </ThemedText>
+          )}
+        </Card>
+      )}
 
       {/* Above "cómo funciona" and below the model: it is a decision about the reading, like the
           model, and not part of the explanation of the app. */}
@@ -79,6 +86,15 @@ export default function SettingsScreen() {
           {t.audioOutput.toUpperCase()}
         </ThemedText>
         <AudioOutputSelector />
+      </Card>
+
+      {/* Right below where it is heard: the level of that same speaker. The device has no volume
+          buttons (2026-11-18), so this is the only place to change it. */}
+      <Card>
+        <ThemedText type="small" themeColor="textSecondary" accessibilityRole="header">
+          {t.deviceVolume.toUpperCase()}
+        </ThemedText>
+        <DeviceVolumeControl />
       </Card>
 
       <Card>
@@ -102,6 +118,12 @@ export default function SettingsScreen() {
         />
       </Card>
 
+      {/* Last: it is the team's switch, and the user should reach everything else first. No header,
+          like the model card: the trigger already says "Modo de la app: Modo producto", and a header
+          above it would make the screen reader say "modo de la app" twice. */}
+      <Card>
+        <AppModeSelector />
+      </Card>
     </Screen>
   );
 }

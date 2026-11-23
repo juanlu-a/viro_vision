@@ -7,7 +7,7 @@
  * choice would look applied and would not be until a remount. That is why it is a Provider: one
  * state, with the storage and the resolver untouched.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { resolveProductModel } from '@/features/reader/productModel';
 import {
@@ -34,10 +34,13 @@ export function ProductModelProvider({ children }: { children: React.ReactNode }
     resolveProductModel(null, models),
   );
 
+  // A choice made before the stored one loads wins (same guard as `AppModeProvider`).
+  const chosen = useRef(false);
+
   useEffect(() => {
     let active = true;
     loadVisionModelPreference().then((storedId) => {
-      if (active) setModel(resolveProductModel(storedId, models));
+      if (active && !chosen.current) setModel(resolveProductModel(storedId, models));
     });
     return () => {
       active = false;
@@ -48,6 +51,7 @@ export function ProductModelProvider({ children }: { children: React.ReactNode }
     (id: string) => {
       const next = resolveProductModel(id, models);
       if (!next) return;
+      chosen.current = true;
       setModel(next);
       // Applied in memory and persisted in the background: the choice does not wait for the disk.
       void saveVisionModelPreference(next.id);

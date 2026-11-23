@@ -21,6 +21,8 @@
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+import { clientIp, createBrake, readCapped } from '../_shared/http.ts';
+
 /** More than this per batch is trimmed and the tail is lost: that is why the app sends 100 at a time. */
 const MAX_EVENTS_PER_BATCH = 100;
 
@@ -133,17 +135,26 @@ function toRow(e: IncomingEvent, batch: { phone: string; session: string; app: s
   };
 }
 
+/**
+ * A per-IP brake, like `vision`'s and `evidence`'s. The app sends a batch every 15 s, or sooner
+ * past 25 pending events: a handful a minute. Without a brake, a loop of valid-shaped POSTs wrote
+ * rows with the service role as fast as it could send them.
+ */
+const overTheBrake = createBrake(60_000, 60);
+
 Deno.serve(async (request: Request) => {
   if (request.method !== 'POST') return reply(405, { error: 'POST' });
+  if (overTheBrake(clientIp(request), Date.now())) return reply(429, { error: 'too many' });
 
-  // Checked before reading, when the client says; and after, for a body that did not say (chunked).
+  // Checked before reading, when the client says; and while reading, for a body that did not say
+  // (chunked), so it is never buffered past the cap.
   const declared = Number(request.headers.get('content-length') ?? '0');
   if (declared > MAX_BODY_BYTES) return reply(413, { error: 'batch too large' });
 
   let batch: IncomingBatch;
   try {
-    const text = await request.text();
-    if (encoder.encode(text).length > MAX_BODY_BYTES) return reply(413, { error: 'batch too large' });
+    const text = await readCapped(request, MAX_BODY_BYTES);
+    if (text === null) return reply(413, { error: 'batch too large' });
     batch = JSON.parse(text);
   } catch {
     return reply(400, { error: 'invalid JSON' });

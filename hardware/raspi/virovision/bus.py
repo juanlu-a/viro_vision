@@ -27,9 +27,11 @@ import queue
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable, Optional
 
 from .notices import SYSTEM_DIR as NOTICES_DIR
+from .zoom import View, ZoomController, widest_sign
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +50,16 @@ MIN_CONFIDENCE = 0.3
 CONFIRM_SECONDS = 0.6
 VOTES_NEEDED = 2
 MIN_BANNER_HEIGHT_PX = 22
+SIGN_MARGINS = (0.18, 0.06, 0.06)
+"""(left, right, vertical) margins the pipeline adds around the sign box before the OCR, as fractions
+of the box. The most on the LEFT: Montevideo's line number sits at the left of the sign, and a box that
+hugs the LEDs cuts its first digit ("15" for 115, first seen on 2026-09-15).
+
+History: these are `bus_banner.crop.expand_banner`'s defaults, measured on the 117 evaluation images.
+On 2026-10-21 the team tried reading the retrained detector's box as is (all zero); in the team's
+tests the "1" kept going missing, so on 2026-10-22 (#122) the margins came back. Margins belong to the
+model that drew the box (`Pipeline`'s own docstring), and the model is chosen here (`--bus-model`), so
+this is where they live. The app's picture of the sign is the crop the OCR read, margins included."""
 ENGINE_RETRY_S = 60.0
 """After the OCR engine fails to build (`OcrEngineFailed`), how long bus mode refuses to try again."""
 FRAME_SILENCE_S = 12.0
@@ -81,6 +93,35 @@ lost and the same bus came back as a new one (2026-09-15). Whatever makes the tr
 a hand on the camera, a pole in the way, someone walking past - would repeat the announcement, and a
 blind user hearing the same line twice cannot tell whether a second bus arrived. Ten seconds is
 shorter than any real gap between two buses of the same line at a stop."""
+
+SKIPPED = object()
+"""Result of a read that never reached the OCR: the zoom had moved and the frame did not show the whole
+sign. It frees the track for the next frame without counting as an attempt."""
+
+
+class ZoomedFrame:
+    """A frame plus the part of the sensor it shows (`zoom.View`).
+
+    What the `Watcher` gets instead of the bare array while the zoom is on: it only asks the frame for
+    its shape and hands it to the reader, and the shape of the full view is the frame's own. The
+    tracker keeps working in the full view, and the reader (`BusWatcher._queue_read`) is the one place
+    where a box is translated into the frame."""
+
+    def __init__(self, image, view: View) -> None:
+        self.image = image
+        self.view = view
+
+    @property
+    def shape(self):
+        return self.image.shape
+
+
+def _unzoomed(frame) -> tuple:
+    """(array, view or None) from whatever the frame loop handed the watcher."""
+    if isinstance(frame, ZoomedFrame):
+        return frame.image, frame.view
+    return frame, None
+
 
 Announce = Callable[[list], None]
 """Plays a list of `.wav` files, in order, without cutting each other off."""
@@ -216,6 +257,23 @@ def is_available() -> bool:
         return False
 
 
+def _with_margins(box):
+    """The sign box grown by SIGN_MARGINS, as the pipeline will crop it."""
+    left, right, vertical = SIGN_MARGINS
+    dy = box.height * vertical
+    return type(box)(box.x1 - box.width * left, box.y1 - dy, box.x2 + box.width * right, box.y2 + dy)
+
+
+def pipeline_options(pipeline_class) -> dict:
+    """What `Pipeline` is built with beyond its detector, OCR and catalog. Looked up in its signature
+    because the daemon runs against whatever `bus_banner` wheel was deployed: one without `margins`
+    still starts, with its own margins, and says so in the journal."""
+    if "margins" in inspect.signature(pipeline_class).parameters:
+        return {"margins": SIGN_MARGINS}
+    log.warning("bus_banner cannot take crop margins: the sign is read with its built-in ones")
+    return {}
+
+
 class BusWatcher:
     """Owns bus mode while it is active: the frame loop, the OCR thread and what gets announced."""
 
@@ -232,8 +290,11 @@ class BusWatcher:
         min_conf: float = MIN_CONFIDENCE,
         audio_target: str = "device",
         evidence=None,
+        zoom: bool = True,
     ) -> None:
         self._camera = camera
+        # Digital zoom on the sign (`zoom.py`). Off with a camera that cannot crop (the tests' fakes).
+        self._zoom_enabled = zoom and hasattr(camera, "set_zoom")
         # `evidence.Evidence`, or None: what the camera saw behind each announcement and each read,
         # kept on the card. Diagnostics only — bus mode never waits on it nor depends on it.
         self._evidence = evidence
@@ -260,6 +321,10 @@ class BusWatcher:
         # once on a 512 MB board, and the loser's never stopped.
         # Reentrant: `start` holds it across its whole sequence and calls `_build`, which takes it too.
         self._build_lock = threading.RLock()
+        # «Preparando» already said for the build in progress (see `start`), and its own lock: two
+        # presses that miss the build lock at once must not both read False and both say it.
+        self._warming_said = False
+        self._warming_lock = threading.Lock()
         self._watcher = None
         self._settings: dict = {}
         self._stop = threading.Event()
@@ -269,6 +334,7 @@ class BusWatcher:
         self._timeline = Timeline()
         self._last_frame_at = 0.0
         self._last_announcement: list = []
+        self._last_result_event: dict | None = None
         self._last_line: tuple = ()
         self._last_line_at: float | None = None
         self._last_voice_at: float | None = None
@@ -276,14 +342,20 @@ class BusWatcher:
         start on macOS and from machine boot on Linux, so a literal zero silences the first notice on
         one platform and not on the other."""
         self.running = False
+        # Set while no frame loop is using the camera. A supermarket photo taken while the frame loop
+        # is still inside `capture_request` makes picamera2 serve two jobs at once: on 2026-11-20 the
+        # first photo after leaving bus mode hung for 8 s, the restart could not close the sensor and
+        # the daemon had to be restarted. `wait_released` is what the photo waits on.
+        self._released = threading.Event()
+        self._released.set()
         # Serialises launching and halting the threads, and only that — never held across a build.
         # `stop` cannot take the build lock (it must cancel a cold build, not wait minutes for it), so
         # without this a stop landing between `start`'s last `_wanted` check and `running = True` saw
         # nothing running, returned, and left the camera watching in another mode (2026-10-06).
         self._run_lock = threading.Lock()
-        # The frame thread's own run: its watcher and its jobs queue. `_queue_read` is called by the
-        # `Watcher` with no way to pass them, and a frame loop of a previous run that outlived `stop`
-        # must feed ITS queue, not the new run's (2026-10-06).
+        # The frame thread's own run: its watcher, queues and timeline. `_queue_read` and `_handle` are
+        # called with no way to pass them, and a frame loop of a previous run that outlived `stop`
+        # must feed ITS queue and timeline, not the new run's (2026-10-06).
         self._run_local = threading.local()
         self.unavailable_reason: Optional[str] = None
         """Why the last `start` could not watch, in words the app can show; None when it started, or
@@ -326,10 +398,40 @@ class BusWatcher:
         bus, another mode, bus again, all inside a cold build — and both used to see `running` False
         and launch their own three threads on the same camera."""
         self._wanted = True
-        with self._build_lock:
-            return self._start_locked()
+        if not self._build_lock.acquire(blocking=False):
+            # Someone else holds the build — almost always `warm_up` building the OCR at boot, which
+            # takes 20 to 120 s. Waiting on the lock first meant `_start_locked` only got to say
+            # «preparando» once the build was over, so a press in that window was silence: the
+            # 2026-09-22 bug again, through a different door.
+            # Not when the holder is another `start` that already said it: two presses in one cold
+            # build would hear «preparando» twice.
+            # The camera still starting is the same sentence and the same wait, so it is said here too:
+            # at boot the two overlap, and the camera branch of `_start_locked` only runs once the
+            # lock is free.
+            announced = not self.ready and self._claim_warming()
+            if announced:
+                log.info("bus: asked to watch while the OCR is being built; saying so")
+                self._warming_up()
+            self._build_lock.acquire()
+        else:
+            announced = False
+        try:
+            return self._start_locked(announced=announced)
+        finally:
+            # This start's build is over, one way or the other: the next cold build may say it again.
+            with self._warming_lock:
+                self._warming_said = False
+            self._build_lock.release()
 
-    def _start_locked(self) -> bool:
+    def _claim_warming(self) -> bool:
+        """True for the one caller that gets to say «preparando» for the build in progress."""
+        with self._warming_lock:
+            if self._warming_said:
+                return False
+            self._warming_said = True
+            return True
+
+    def _start_locked(self, announced: bool = False) -> bool:
         self.unavailable_reason = None
         if self.running:
             return True
@@ -340,7 +442,8 @@ class BusWatcher:
             # Said out loud for the same reason as the OCR warm-up below; `__main__` starts the mode
             # for real once the camera is ready.
             log.info("bus: asked to watch while the camera is still starting; saying so")
-            self._warming_up()
+            if not announced:
+                self._warming_up()
             return False
         if not self.available:
             self.unavailable_reason = "no detector in the sensor" if is_available() else "bus_banner is not installed"
@@ -350,7 +453,7 @@ class BusWatcher:
             self.unavailable_reason = f"the OCR engine failed to build {time.monotonic() - self._engine_failed_at:.0f} s ago"
             log.warning("bus mode unavailable: %s", self.unavailable_reason)
             return False
-        if not self.ready:
+        if not self.ready and not announced and self._claim_warming():
             # The OCR takes tens of seconds to load and `_build` below is where that happens. Until
             # 2026-09-22 a button press inside that window left the device silent, which for someone
             # who cannot see the screen is the same thing as a device that died. It is said before
@@ -364,6 +467,12 @@ class BusWatcher:
             self.unavailable_reason = f"could not start: {exc}"
             log.error("bus mode could not start: %s", exc)
             return False
+        # Before the run lock, not under it: making room may prune hundreds of MB on the SD card, and
+        # a `stop` (a mode change, a photo waiting for the camera) waits on that lock. Starts are
+        # already serialized by `_build_lock`, and the `_wanted` check right after catches a stop that
+        # landed during the prune.
+        if self._evidence is not None:
+            self._evidence.begin_run()
         if not self._wanted:
             log.info("bus: the mode was left while it was being prepared; not starting")
             return False
@@ -377,8 +486,12 @@ class BusWatcher:
             self._jobs = queue.Queue()
             self._results = queue.Queue()
             self._last_frame_at = time.monotonic()
-            if self._evidence is not None:
-                self._evidence.begin_run()
+            # Fresh too: `_build` makes a new Tracker per run and its ids restart at 1, so a timeline
+            # kept across runs logged the new track 1 as "is back", aged from the previous run.
+            self._timeline = Timeline()
+            # From the full view, always: a frame loop of the previous run still inside its `aim`
+            # may have re-zoomed after `_halt`'s reset, and this run's fresh zoom assumes no crop.
+            self._undo_zoom()
             self._threads = [
                 # The run's state goes in as arguments, bound HERE: `Thread.start()` returns before the
                 # target's first line, and a thread that read `self._stop` itself could pick up the
@@ -386,15 +499,34 @@ class BusWatcher:
                 threading.Thread(target=self._read_loop, args=(self._jobs, self._results), name="bus-ocr", daemon=True),
                 threading.Thread(
                     target=self._frame_loop,
-                    args=(self._stop, self._jobs, self._results, self._watcher),
+                    args=(self._stop, self._jobs, self._results, self._watcher, self._timeline),
                     name="bus-frames",
                     daemon=True,
                 ),
                 threading.Thread(target=self._watchdog, args=(self._stop,), name="bus-watchdog", daemon=True),
             ]
-            for thread in self._threads:
-                thread.start()
-            self.running = True
+            self._released.clear()
+            failed: Optional[BaseException] = None
+            try:
+                for thread in self._threads:
+                    thread.start()
+            except Exception as exc:  # noqa: BLE001 — re-raised below, once the lock is free
+                self._stop.set()
+                self._jobs.put(None)
+                failed, started, self._threads = exc, self._threads, []
+            else:
+                self.running = True
+        if failed is not None:
+            # Nothing is watching: a photo must not wait on a frame loop that never started. One that
+            # did start is joined first, so it does not hold the camera, and outside the run lock, so
+            # a mode change meanwhile is not answered late (same rule as `_halt`).
+            for thread in started:
+                if thread.name == "bus-frames" and thread.is_alive():
+                    thread.join(timeout=3)
+                    if thread.is_alive():
+                        log.warning("bus: the frame loop did not stop in 3 s; releasing the camera anyway")
+            self._released.set()
+            raise failed
         if not self._wanted:
             # `stop` ran between the check above and `running = True`, and found nothing to stop.
             log.info("bus: the mode was left while it was starting; stopping")
@@ -417,12 +549,45 @@ class BusWatcher:
             self._jobs.put(None)
             threads, self._threads = self._threads, []
             self.running = False
+        # The zoom is undone BEFORE the joins as well as after. The camera is shared, and a double
+        # click from bus mode asks for the supermarket photo at the same moment it stops this mode:
+        # waiting up to 9 s of joins first let that photo come out cropped on a bus sign. The second
+        # reset covers a frame loop that re-zoomed on its way out.
+        self._undo_zoom()
         # Joined outside the lock: three threads at up to 3 s each, and a `start` waiting on the lock
         # meanwhile is a button press that answers 9 s late. Each run has its own stop event and
         # queues, so a thread still finishing cannot touch the next run.
-        for thread in threads:
+        # The frame loop first: it is the only one that touches the camera, and a photo is waiting
+        # for it (`wait_released`). The OCR thread may still be finishing a read.
+        frames = [thread for thread in threads if thread.name == "bus-frames"]
+        for thread in frames:
             thread.join(timeout=3)
+            if thread.is_alive():
+                log.warning("bus: the frame loop did not stop in 3 s; releasing the camera anyway")
+        # Not if a new run started during the join: that run owns the camera and the zoom now. Under
+        # the run lock, so a `start` cannot clear the event between the check and the set.
+        with self._run_lock:
+            if not self.running:
+                self._undo_zoom()
+                self._released.set()
+        for thread in threads:
+            if thread not in frames:
+                thread.join(timeout=3)
         log.info("bus mode stopped")
+
+    def wait_released(self, timeout: float) -> bool:
+        """Blocks until no frame loop is using the camera (at once when bus mode is not running).
+        True when released; False when it took longer than `timeout`."""
+        return self._released.wait(timeout)
+
+    def _undo_zoom(self) -> None:
+        if not self._zoom_enabled:
+            return
+        # The camera is shared: a supermarket photo taken after this must show the whole view.
+        try:
+            self._camera.set_zoom(None)
+        except Exception as exc:  # noqa: BLE001 — a camera mid-restart comes back unzoomed anyway
+            log.warning("bus: could not undo the zoom (%s)", exc)
 
     def repeat_last(self) -> bool:
         """Says the last reading again. A short click inside bus mode: the user did not catch it, and
@@ -431,7 +596,11 @@ class BusWatcher:
             log.info("bus: nothing to repeat yet")
             return False
         log.info("bus: repeating the last announcement")
-        self._announce(self._last_announcement)
+        # Both halves, like the reading it repeats: `_announce` straight away played it on the board
+        # even with the output on the phone, and sent nothing, so a phone listener heard nothing.
+        self._speak(self._last_announcement)
+        if self._last_result_event is not None:
+            self._emit(self._last_result_event)
         return True
 
     # --- internals -------------------------------------------------------------------------
@@ -500,7 +669,7 @@ class BusWatcher:
                     self.close()
                     raise RuntimeError("bus mode is closing")
                 # The detector is the sensor's, so the pipeline needs none of its own.
-                self._pipeline = Pipeline(NullDetector(), self._ocr, catalog)
+                self._pipeline = Pipeline(NullDetector(), self._ocr, catalog, **pipeline_options(Pipeline))
             self._settings = network_settings(self._camera.sensor.network_intrinsics, labels=self._labels)
             fps = self._settings["fps"]
             tracker = Tracker(max_missed=max(1, round(0.5 * fps)), memory=max(1, round(5 * fps)))
@@ -523,14 +692,34 @@ class BusWatcher:
                 **options,
             )
 
+    def _this_run(self) -> tuple:
+        """(watcher, jobs, results, timeline) of the run the calling frame loop belongs to; the
+        current ones outside a frame loop."""
+        return getattr(self._run_local, "run", None) or (self._watcher, self._jobs, self._results, self._timeline)
+
     def _queue_read(self, frame, banner_box, bus_box):
         """The reader the `Watcher` calls. Hands the job to the OCR thread and returns None, which is
         how `async_reads` says "in progress": the camera loop must not wait 0.9 s here."""
-        watcher, jobs = getattr(self._run_local, "run", None) or (self._watcher, self._jobs)
+        watcher, jobs, results, timeline = self._this_run()
         track_id = watcher.reading_track
-        attempts = next((t.read_attempts for t in watcher.tracker.tracks if t.id == track_id), 0)
-        self._timeline.read_queued(track_id, attempts, banner_box, bus_box)
-        jobs.put((frame, banner_box, bus_box, track_id, attempts))
+        track = next((t for t in watcher.tracker.tracks if t.id == track_id), None)
+        attempts = track.read_attempts if track is not None else 0
+        image, view = _unzoomed(frame)
+        if view is not None:
+            if not view.shows(_with_margins(banner_box) if banner_box is not None else bus_box):
+                # The crop moved between the detection and this frame and cut the sign: reading half of
+                # it would cost a second of OCR and an attempt for a reading that cannot be right. The
+                # margins count: the left one is what keeps the line's first digit, and the pipeline
+                # would clip it at the frame's edge without a word.
+                if track is not None:
+                    track.read_attempts -= 1
+                results.put((track_id, SKIPPED, 0, None))
+                return None
+            height, width = image.shape[:2]
+            banner_box = view.to_frame(banner_box) if banner_box is not None else None
+            bus_box = view.to_frame(bus_box).clip(width, height) if bus_box is not None else None
+        timeline.read_queued(track_id, attempts, banner_box, bus_box)
+        jobs.put((image, banner_box, bus_box, track_id, attempts))
         return None
 
     def _read_loop(self, jobs: queue.Queue, results: queue.Queue) -> None:
@@ -546,7 +735,15 @@ class BusWatcher:
                 log.warning("bus: the reading failed: %s", exc)
                 result = None
             ocr_ms = round((time.monotonic() - started) * 1000)
-            evidence = self._evidence.read(track_id, attempt, frame, result, ocr_ms) if self._evidence else None
+            evidence = None
+            if self._evidence is not None:
+                # Instrumentation, guarded like the read above: a raise here (a full SD, a bad frame
+                # for the encoder) ended the `bus-ocr` thread while `running` stayed true, and the mode
+                # kept watching without ever reading again.
+                try:
+                    evidence = self._evidence.read(track_id, attempt, frame, result, ocr_ms)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("bus: could not keep the evidence: %s", exc)
             results.put((track_id, result.reading if result else None, ocr_ms, evidence))
 
     def _watchdog(self, stop: threading.Event) -> None:
@@ -575,11 +772,31 @@ class BusWatcher:
             self._last_frame_at = time.monotonic()
             failed = 0 if getattr(self._camera, "available", True) else failed + 1
 
-    def _heartbeat(self, frames: int, with_detections: int, buses: int, signs: int) -> None:
-        log.info("bus: %d frames in %.0f s, %d with detections (bus %d, sign %d)", frames, HEARTBEAT_S, with_detections, buses, signs)
+    def _heartbeat(self, frames: int, with_detections: int, buses: int, signs: int, zoom: float = 1.0) -> None:
+        log.info(
+            "bus: %d frames in %.0f s, %d with detections (bus %d, sign %d), zoom %.1fx",
+            frames,
+            HEARTBEAT_S,
+            with_detections,
+            buses,
+            signs,
+            zoom,
+        )
+
+    def _new_zoom(self) -> Optional[ZoomController]:
+        """The zoom for this run, or None when the camera cannot tell its bounds (not started yet)."""
+        if not self._zoom_enabled:
+            return None
+        bounds = self._camera.zoom_bounds()
+        if bounds is None:
+            return None
+        full, min_size, size = bounds
+        zoom = ZoomController(full, min_size, size)
+        log.info("bus: zoom on the sign up to %.1fx (full crop %s)", zoom.max_zoom, full)
+        return zoom
 
     def _frame_loop(
-        self, stop: threading.Event, jobs: queue.Queue, results: queue.Queue, watcher: Any
+        self, stop: threading.Event, jobs: queue.Queue, results: queue.Queue, watcher: Any, timeline: Optional[Timeline] = None
     ) -> None:
         """Drains frames for as long as the mode lasts — through camera restarts included.
 
@@ -593,7 +810,10 @@ class BusWatcher:
         from bus_banner.imx500 import detections_from_tensors
 
         # This run's (see `_start_locked`): a loop that outlives `stop` must not feed the next run.
-        self._run_local.run = (watcher, jobs)
+        if timeline is None:
+            timeline = self._timeline
+        self._run_local.run = (watcher, jobs, results, timeline)
+        zoom = self._new_zoom()
         frame_number = 0
         beat_at = time.monotonic()
         frames = with_detections = buses = signs = 0
@@ -621,24 +841,33 @@ class BusWatcher:
             if down_since is not None:
                 log.warning("bus: frames again after %.1f s without the camera", time.monotonic() - down_since)
                 down_since = None
+                if zoom is not None:
+                    zoom.forget()
             self._last_frame_at = time.monotonic()
             # One bad frame must not end the mode (2026-10-06): an exception here used to kill this
             # thread silently, with the same consequences as a dead camera. The frame is skipped.
             try:
-                detections, frame = self._read_request(request, detections_from_tensors)
+                detections, frame, view = self._read_request(request, detections_from_tensors, zoom)
+                if zoom is not None:
+                    crop = zoom.aim(widest_sign(detections))
+                    if crop is not None:
+                        self._camera.set_zoom(crop)
+                    # The watcher measures signs in the full view; what decides whether the OCR can
+                    # read one is its height in the frame, which the zoom multiplies.
+                    watcher.min_banner_height_px = MIN_BANNER_HEIGHT_PX / view.zoom
                 frames += 1
                 if detections:
                     with_detections += 1
                     buses += sum(d.label == "bus" for d in detections)
                     signs += sum(d.label == "bus_sign" for d in detections)
                 if time.monotonic() - beat_at >= HEARTBEAT_S:
-                    self._heartbeat(frames, with_detections, buses, signs)
+                    self._heartbeat(frames, with_detections, buses, signs, view.zoom if view is not None else 1.0)
                     beat_at = time.monotonic()
                     frames = with_detections = buses = signs = 0
 
-                self._drain_results(frame_number, results, watcher)
+                self._drain_results(frame_number, results, watcher, timeline)
                 events = watcher.process(frame, detections, frame_number)
-                self._timeline.frame(watcher.tracker.tracks, detections)
+                timeline.frame(watcher.tracker.tracks, detections)
                 for event in events:
                     if stop.is_set():
                         break  # left mid-frame: nothing more is said
@@ -651,17 +880,26 @@ class BusWatcher:
                     errors_unlogged = 0
             frame_number += 1
 
-    def _read_request(self, request, detections_from_tensors) -> tuple:
-        """The sensor's detections and, only if there are any, a copy of the frame. Always releases the
-        request: picamera2 has a fixed pool of buffers and a leaked one stalls the camera."""
+    def _read_request(self, request, detections_from_tensors, zoom: Optional[ZoomController] = None) -> tuple:
+        """The sensor's detections, a copy of the frame only if there are any, and the part of the
+        sensor the frame shows (None without zoom). Always releases the request: picamera2 has a fixed
+        pool of buffers and a leaked one stalls the camera.
+
+        With the zoom on, the boxes are mapped as if the frame had no zoom (the full view, see
+        `zoom.py`): the frame's metadata with its `ScalerCrop` swapped for the full one."""
         try:
             sensor = self._camera.sensor  # the current handle, not the one from before a restart
             metadata = request.get_metadata()
+            view = None
+            mapping = metadata
+            if zoom is not None:
+                view = View(tuple(metadata["ScalerCrop"]), zoom.full, zoom.size)
+                mapping = dict(metadata, ScalerCrop=zoom.full)
             detections = detections_from_tensors(
                 sensor.get_outputs(metadata),
                 self._settings["labels"],
                 input_size=sensor.get_input_size(),
-                to_stream=lambda y1, x1, y2, x2, m=metadata: self._camera.to_stream((y1, x1, y2, x2), m),
+                to_stream=lambda y1, x1, y2, x2, m=mapping: self._camera.to_stream((y1, x1, y2, x2), m),
                 min_conf=self._min_conf,
                 signs_only=self._signs_only,
                 normalize=self._settings["normalize"],
@@ -670,17 +908,24 @@ class BusWatcher:
             # Copying the frame is the expensive part on a Pi 3 B+: only when there is something in
             # it. A sign alone counts: it carries its own track when the bus box is missing or bad.
             frame = request.make_array("main") if detections else None
+            if frame is not None and view is not None:
+                frame = ZoomedFrame(frame, view)
         finally:
             request.release()
-        return detections, frame
+        return detections, frame, view
 
-    def _drain_results(self, frame_number: int, results: queue.Queue, watcher) -> None:
+    def _drain_results(self, frame_number: int, results: queue.Queue, watcher, timeline: Optional[Timeline] = None) -> None:
+        if timeline is None:
+            timeline = self._timeline
         while True:
             try:
                 track_id, reading, ocr_ms, evidence = results.get_nowait()
             except queue.Empty:
                 return
-            self._timeline.read_done(track_id, reading, ocr_ms, evidence)
+            if reading is SKIPPED:
+                watcher.submit_reading(track_id, None, frame_number)
+                continue
+            timeline.read_done(track_id, reading, ocr_ms, evidence)
             watcher.submit_reading(track_id, reading, frame_number)
 
     def _is_an_echo(self, number: str, destination: str) -> bool:
@@ -707,11 +952,19 @@ class BusWatcher:
         return True
 
     def _handle(self, event, frame=None, detections: Optional[list] = None) -> None:
+        watcher, _, _, timeline = self._this_run()
         if event.kind == "bus":
             # Kept even when the phrase is silenced below: the picture is of what the sensor took for
             # a bus, which is the question whether or not it was said. And named in the journal
             # either way, so the line and the picture can be matched after the run.
-            picture = self._evidence.bus_seen(event.track, frame, detections or []) if self._evidence else None
+            picture = None
+            if self._evidence is not None:
+                image, view = _unzoomed(frame)
+                marks = detections or []
+                if view is not None:
+                    # Drawn where they are in this frame, which with the zoom on is not the full view.
+                    marks = [SimpleNamespace(label=d.label, box=view.to_frame(d.box), conf=d.conf) for d in marks]
+                picture = self._evidence.bus_seen(event.track, image, marks)
             seen = f" (evidence {picture})" if picture else ""
             if not self._presence_is_worth_saying():
                 log.info("bus: track %d is a bus, said %.1f s ago%s", event.track, time.monotonic() - (self._last_voice_at or 0.0), seen)
@@ -719,7 +972,7 @@ class BusWatcher:
             log.info("bus: track %d is a bus, saying so%s", event.track, seen)
             self._announce_presence()
         elif event.kind == "reading":
-            self._timeline.decided(event, self._evidence.track_ref(event.track) if self._evidence else None)
+            timeline.decided(event, self._evidence.track_ref(event.track) if self._evidence else None)
             echo = self._is_an_echo(event.number, event.destination)
             if self._evidence is not None:
                 self._evidence.decided(event, announced=not echo)
@@ -729,11 +982,12 @@ class BusWatcher:
             log.info("bus: %s", event.phrase())
             self._last_voice_at = time.monotonic()
             self._last_announcement = self._files_for(event.number, event.destination)
+            self._last_result_event = self._result_event(event)
             self._speak(self._last_announcement)
-            self._emit(self._result_event(event))
+            self._emit(self._last_result_event)
         elif event.kind == "lost":
-            track = next((t for t in self._watcher.tracker.recent if t.id == event.track), None)
-            self._timeline.lost(event, bool(track and track.announced_reading))
+            track = next((t for t in watcher.tracker.recent if t.id == event.track), None)
+            timeline.lost(event, bool(track and track.announced_reading))
 
     def _warming_up(self) -> None:
         """Says «preparando la lectura» through whichever output the user chose.
@@ -741,9 +995,14 @@ class BusWatcher:
         Both halves, like every reading: the clip when the device is the output, and the event always,
         so a phone that is listening says it instead. A board with no `.wav` for it (deployed before
         the clip existed) stays quiet here rather than failing to start the mode."""
-        clip = self._announcements / NOTICES_DIR / WARMING_UP_CLIP
-        self._speak([clip] if clip.exists() else [])
-        self._emit({"t": "warming"})
+        # Never raises: `start` calls it with the once-flag claimed and outside its `finally`, so a
+        # failing notify or speaker would have left the flag set and every later cold press silent.
+        try:
+            clip = self._announcements / NOTICES_DIR / WARMING_UP_CLIP
+            self._speak([clip] if clip.exists() else [])
+            self._emit({"t": "warming"})
+        except Exception as exc:  # noqa: BLE001
+            log.warning("bus: could not say it is preparing: %s", exc)
 
     def _announce_presence(self) -> None:
         """«Se acerca un ómnibus»: both halves, like a reading.

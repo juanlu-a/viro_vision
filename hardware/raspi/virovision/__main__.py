@@ -11,13 +11,14 @@ import asyncio
 import logging
 from pathlib import Path
 import signal
+import time
 
 from bluez_peripheral.advert import Advertisement
 from bluez_peripheral.agent import NoIoAgent
 from bluez_peripheral.util import Adapter, get_message_bus, is_bluez_available
 
 from .ap import AP_IP, AccessPoint
-from .audio import DEFAULT_VOLUME_PERCENT, Player, set_output_volume
+from .audio import DEFAULT_VOLUME_PERCENT, VOLUME_FILE, Player, PwmGate, Volume
 from .button import DEBOUNCE_S, DEFAULT_GPIO, DOUBLE_CLICK_WINDOW_S, LONG_PRESS_S, try_connect
 from .bus import DEFAULT_ANNOUNCEMENTS as BUS_DEFAULT_ANNOUNCEMENTS
 from .bus import DEFAULT_CATALOG as BUS_DEFAULT_CATALOG
@@ -39,6 +40,13 @@ log = logging.getLogger("virovision")
 STATUS_EVERY_SECONDS = 15
 AP_REFRESH_WAIT_S = 10.0
 """How long an AP change waits for a network refresh already in flight before giving up on its own."""
+# How long a photo waits for bus mode's frame loop to let go of the camera. The loop's join is capped
+# at 3 s (`BusWatcher._halt`); a little more covers the executor picking up `bus.stop`.
+BUS_RELEASE_TIMEOUT_S = 4.0
+# How long a photo for another mode waits for that mode's write to reach the board before giving up
+# on it (the app waits 1.5 s for the write on its side). Past it the photo shares the stream as it did
+# before 2026-11-20: the risk of the old race, taken knowingly, over a photo that never comes.
+MODE_WRITE_GRACE_S = 1.5
 
 
 def _arguments() -> argparse.Namespace:
@@ -49,7 +57,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="HTTP server port (plan B)")
     parser.add_argument("--no-http", action="store_true", help="do not bring the HTTP server up")
     parser.add_argument("--no-audio", action="store_true", help="receive the reading's audio but do not play it (only store it)")
-    parser.add_argument("--volume", type=int, default=DEFAULT_VOLUME_PERCENT, help=f"output level 0-100, applied at startup (default {DEFAULT_VOLUME_PERCENT})")
+    parser.add_argument("--volume", type=int, default=DEFAULT_VOLUME_PERCENT, help=f"output level 0-100 for a board the app never set one on (default {DEFAULT_VOLUME_PERCENT}); the level chosen in the app, kept in {VOLUME_FILE}, wins")
     parser.add_argument("--no-ap", action="store_true", help="do not bring the access point up at startup (development on the home network)")
     parser.add_argument(
         "--bus-model",
@@ -69,6 +77,15 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--announcements", type=Path, default=BUS_DEFAULT_ANNOUNCEMENTS, help="folder with the pre-recorded .wav")
     parser.add_argument("--bus-catalog", type=Path, default=BUS_DEFAULT_CATALOG, help="CSV number,destination used to fix the OCR")
     parser.add_argument("--no-bus", action="store_true", help="do not load the detector nor watch in bus mode")
+    parser.add_argument("--no-bus-zoom", action="store_true", help="bus mode reads the sign from the whole view, without zooming on it")
+    parser.add_argument(
+        "--bus-full-res",
+        action="store_true",
+        help=(
+            "run the sensor at 4056x3040 so bus mode can zoom up to 4x instead of 2x. NOT on a Zero 2 W: "
+            "there it jammed the camera at the first detection (2026-10-22)"
+        ),
+    )
     parser.add_argument("--evidence-dir", type=Path, default=EVIDENCE_DEFAULT_DIR, help="where bus mode keeps the frame of each bus and the crop of each OCR read")
     parser.add_argument("--no-evidence", action="store_true", help="do not keep bus mode's frames and crops on the card")
     parser.add_argument("--no-button", action="store_true", help="do not use the physical button (modes come in over BLE only)")
@@ -117,13 +134,53 @@ async def _main(args: argparse.Namespace) -> None:
     relay = LogRelay()
     logging.getLogger().addHandler(relay)
 
-    camera = Camera(model=None if args.no_bus else args.bus_model)
+    camera = Camera(model=None if args.no_bus else args.bus_model, full_res=args.bus_full_res and not args.no_bus)
     # The camera is NOT started here: it starts in the background once the board is advertising
     # (`_bring_camera_up`, below). Loading the detector into the IMX500 takes about a minute after a
     # boot, and while it ran here the board was invisible to every phone; any hang in it left the board
     # invisible for good (2026-10-05). Capture is wired now and answers "still starting" until then.
     wants_camera = not args.no_camera
-    capture = (lambda: loop.run_in_executor(None, camera.capture_jpeg)) if wants_camera else None
+    # Built further down, once the service exists; read at capture time.
+    bus_watcher = None
+    service = None
+
+    def release_camera_for(requested_mode: str | None) -> None:
+        """Makes a photo wait for bus mode's frame loop to let go of the camera (2026-11-20).
+
+        Leaving bus mode and asking for the supermarket photo happen in the same instant (the app
+        writes the mode and then asks; the button changes mode and then sends `read`), and
+        `bus.stop` runs on an executor. The photo used to reach picamera2 while the frame loop was
+        still inside `capture_request`: it hung, the camera restart could not close the sensor and
+        the daemon restarted. So the photo waits for the frame loop to let go, but only when the
+        device is NOT in bus mode: the app's own read button in bus mode still shares the stream.
+        Also when the app says the photo is for another mode (`X-Mode`): its mode write may not have
+        landed yet, and the frame loop stops as soon as it does."""
+        try:
+            if bus_watcher is None or service is None:
+                return
+            leaving_bus = service.core.modes.current is not Mode.BUS
+            for_other_mode = requested_mode is not None and requested_mode != Mode.BUS.name.lower()
+            if not (leaving_bus or for_other_mode):
+                return
+            started = time.monotonic()
+            while not bus_watcher.wait_released(0.1):
+                waited = time.monotonic() - started
+                # Only the app's word that the mode is changing, and the board still in bus mode: if
+                # the write has not landed in a moment it is not coming, and waiting the rest only
+                # makes the photo late.
+                write_lost = service.core.modes.current is Mode.BUS and waited >= MODE_WRITE_GRACE_S
+                if write_lost or waited >= BUS_RELEASE_TIMEOUT_S:
+                    log.warning("photo: bus mode still holds the camera after %.1f s; capturing anyway", waited)
+                    return
+        except Exception:  # noqa: BLE001 — the photo is still worth taking
+            log.exception("photo: could not wait for bus mode to release the camera")
+
+    def capture_photo() -> bytes:
+        """The BLE photo path: same wait, with no mode from the app."""
+        release_camera_for(None)
+        return camera.capture_jpeg()
+
+    capture = (lambda: loop.run_in_executor(None, capture_photo)) if wants_camera else None
 
     # The HTTP server (ADR 0003's plan B) runs on its own thread; its port travels through `status` so
     # the app knows where to download the photo from. The capture is the same blocking function BLE
@@ -149,14 +206,20 @@ async def _main(args: argparse.Namespace) -> None:
         startup: if a capture hangs the camera restarts, and if it does not come back, the status has
         to say so."""
         name, ip = network.current
-        return read_status(camera=camera.available, http_port=None if args.no_http else args.port, ap=ap.on, network=name, ip=ip)
+        return read_status(
+            camera=camera.available, http_port=None if args.no_http else args.port, ap=ap.on, network=name, ip=ip,
+            volume=None if args.no_audio else volume.current,
+        )
 
     # The device's speaker. It is built even with `--no-http`, so the log says at startup whether
     # there is anything on this board able to play a reading. The level is set here and not left to
     # whatever `amixer` was last told by hand: on 2026-09-11 the first real reading came out too quiet
     # to use, and a level that depends on who ran what is not a level.
-    player = Player()
-    set_output_volume(args.volume)
+    # The pin is parked between clips: with the PAM8403 the idle PWM is a loud, endless hiss.
+    player = Player(gate=PwmGate())
+    # The level the user last chose in the app wins over `--volume` (2026-11-18): see `audio.Volume`.
+    volume = Volume(default=args.volume)
+    volume.apply_current()
 
     def say(clip: str) -> bool:
         """Play a system notice the app asked for over BLE (`cmd: 'say'`). True if the file was there.
@@ -186,6 +249,7 @@ async def _main(args: argparse.Namespace) -> None:
             read_status=status,
             synthetic_payload=synthetic_payload,
             capture=camera.capture_jpeg if wants_camera else None,
+            before_capture=release_camera_for if wants_camera else None,
             port=args.port,
             # THE closing of the supermarket loop: until this was passed, `/audio` wrote the MP3 to
             # /tmp, answered 202 and nobody ever heard it. `--no-audio` keeps that old behaviour for
@@ -193,6 +257,8 @@ async def _main(args: argparse.Namespace) -> None:
             play=None if args.no_audio else player.play,
             # Where the app downloads what bus mode announces over BLE (`evidence.py`).
             evidence_dir=None if args.no_evidence else args.evidence_dir,
+            # Resolved at request time: `service` is built below, after the server is listening.
+            current_mode=lambda: service.core.modes.current.name.lower() if service is not None else None,
         )
         http.start()
 
@@ -214,6 +280,7 @@ async def _main(args: argparse.Namespace) -> None:
         say=None if args.no_audio else say,
         hush=None if args.no_audio else player.stop,
         restart_camera=camera.restart if wants_camera else None,
+        set_volume=None if args.no_audio else volume.set,
     )
     await service.register(bus, adapter=adapter)
     relay.attach(service.core.emit_event)
@@ -236,7 +303,6 @@ async def _main(args: argparse.Namespace) -> None:
     # Bus mode (ADR 0006, amended 2026-09-07): the detector already lives in the sensor, so what is
     # wired here is who speaks and where the reading goes. Built after the service because it emits
     # its readings through this core, and the core starts and stops it on every mode change.
-    bus_watcher = None
     if not args.no_bus and wants_camera:
         labels = [name.strip() for name in args.bus_labels.split(",") if name.strip()] if args.bus_labels else None
         # Derived, never passed separately: a detector that emits a `bus` class gives real bus boxes,
@@ -246,13 +312,15 @@ async def _main(args: argparse.Namespace) -> None:
         signs_only = "bus" not in labels if labels else True
         bus_watcher = BusWatcher(
             camera,
-            announce=player.play_sequence,
+            # `--no-audio` silences bus readings like every other sound; the events still go out.
+            announce=(lambda files: None) if args.no_audio else player.play_sequence,
             emit=service.core.emit_event,
             announcements=args.announcements,
             catalog=args.bus_catalog,
             labels=labels,
             signs_only=signs_only,
             evidence=None if args.no_evidence else Evidence(args.evidence_dir, emit=service.core.emit_event),
+            zoom=not args.no_bus_zoom,
         )
         service.core.attach_bus(bus_watcher)
 
@@ -315,6 +383,10 @@ async def _main(args: argparse.Namespace) -> None:
     # is pushed again the moment each one is.
     async def _bring_camera_up() -> None:
         if not await loop.run_in_executor(None, camera.start):
+            # A user already in bus mode heard «preparando» and then nothing: the error event reaches
+            # the app, which records it and says a fixed sentence (`busUnavailable`, ADR 0011).
+            if bus_watcher is not None and service.core.modes.current is Mode.BUS:
+                service.core.emit_event({"t": "error", "msg": "bus unavailable: camera did not start"})
             return
         service.notify_status()
         if bus_watcher is None:
@@ -379,6 +451,20 @@ async def _main(args: argparse.Namespace) -> None:
         await loop.run_in_executor(None, lambda: network.refresh(wait_s=AP_REFRESH_WAIT_S))
         service.notify_status()
 
+    async def _recover_network() -> None:
+        # In product mode the AP IS the board's network: if every boot attempt failed (or it went
+        # down), bring it back instead of hunting for a client network the board may not know.
+        if not args.no_ap:
+            log.warning("no network and no AP: retrying the AP")
+            await loop.run_in_executor(None, ap.turn_on)
+            await loop.run_in_executor(None, lambda: network.refresh(wait_s=AP_REFRESH_WAIT_S))
+            service.notify_status()
+        else:
+            await loop.run_in_executor(None, ap.reconnect)
+
+    # Not awaited from the heartbeat: `nmcli con up` can block for its whole timeout, and the status
+    # push and the SIGTERM check must not wait for it. Held so two recoveries never overlap.
+    recovery: asyncio.Task | None = None
     no_network_since = None
     heartbeats = 0
     while not stop.is_set():
@@ -396,17 +482,18 @@ async def _main(args: argparse.Namespace) -> None:
             if heartbeats % 4 == 0:
                 await report_visibility(adapter, centrals)
             # Network watchdog: if it is not an AP and it has gone more than a minute with no network,
-            # ask NM to connect. A device on no network at all is useless and cannot be fixed remotely.
+            # bring the AP back (product mode) or ask NM to connect. A device on no network at all is
+            # useless and cannot be fixed remotely.
             if not ap.on and network.current[0] is None:
                 no_network_since = no_network_since or loop.time()
                 if loop.time() - no_network_since > 60:
-                    log.warning("no network for %d s: reconnecting", int(loop.time() - no_network_since))
-                    # Guarded: `nmcli` failing to even run (a timeout, NM restarting) raised out of
-                    # the heartbeat and ended the daemon (2026-10-06). It is retried next minute.
-                    try:
-                        await loop.run_in_executor(None, ap.reconnect)
-                    except Exception as exc:  # noqa: BLE001
-                        log.error("reconnecting failed: %s", exc)
+                    if recovery is None or recovery.done():
+                        log.warning("no network for %d s: recovering", int(loop.time() - no_network_since))
+                        # A failure (an `nmcli` timeout, NM restarting) is only logged: it once
+                        # raised out of the heartbeat and ended the daemon (2026-10-06). It is
+                        # retried next minute.
+                        recovery = asyncio.create_task(_recover_network(), name="network-recovery")
+                        recovery.add_done_callback(_log_task_failure)
                     no_network_since = None
             else:
                 no_network_since = None

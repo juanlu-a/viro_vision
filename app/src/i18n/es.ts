@@ -30,6 +30,9 @@ export const es = {
     modeOffHint: 'Equivale a un click largo del botón: vuelve a esperando y apaga el reconocimiento.',
     announceIdle: 'Esperando. Reconocimiento apagado.',
     announceBus: 'Modo ómnibus activado.',
+    // The board could not start bus mode (no camera, no detector). A fixed sentence with the remedy
+    // the user has (ADR 0011); the board's reason goes to telemetry only.
+    announceBusUnavailable: 'El modo ómnibus no está disponible ahora. Probá apagar y volver a prender el dispositivo.',
     announceBusWarmingUp: 'Modo ómnibus. Preparando la lectura, esperá unos segundos.',
     announceBusApproaching: 'Se acerca un ómnibus.',
     announceSupermarket: 'Modo supermercado activado.',
@@ -40,6 +43,9 @@ export const es = {
       'Para leer hace falta el dispositivo prendido y cerca. Fijate en la pestaña Dispositivo en qué anda.',
     readingFromDevice: 'Pidiendo la foto al dispositivo…',
     deviceCaptureFailed: 'El dispositivo no pudo sacar la foto. Probá de nuevo.',
+    deviceConnecting: 'Conectando con el dispositivo…',
+    deviceNetworkNotReady: 'El dispositivo todavía se está conectando. Probá en unos segundos.',
+    deviceCameraWarmingUp: 'La cámara del dispositivo se está iniciando. Probá en unos segundos.',
     preparing: 'Preparando el lector… la primera vez descarga unos 250 MB.',
     reading: 'Leyendo…',
     line: 'Línea',
@@ -143,6 +149,24 @@ export const es = {
     audioOutputSetToPhone: 'Dónde se escucha: en el teléfono.',
     audioOutputSetToDevice: 'Dónde se escucha: en el dispositivo.',
     audioOutputNotConfigured: 'En esta versión la lectura del supermercado va a sonar en el teléfono.',
+    // Product mode is the clean app people use; development mode adds the photos, the result fields
+    // and the model selector for the team. Only the screen changes: telemetry is always on.
+    appMode: 'Modo de la app',
+    appModeSelect: 'Seleccionar modo de la app',
+    appModeHint: 'Elegí si la pantalla muestra sólo el resultado o también los detalles para el equipo.',
+    appModeProduct: 'Modo producto',
+    appModeProductHint: 'La app limpia: el resultado se dice en voz alta y la pantalla no muestra fotos ni detalles.',
+    appModeDevelopment: 'Modo desarrollo',
+    appModeDevelopmentHint:
+      'Para el equipo: muestra las fotos del dispositivo, los campos de cada lectura y el selector de modelo.',
+    appModeSetToProduct: 'Modo producto.',
+    appModeSetToDevelopment: 'Modo desarrollo.',
+    // The level of the device's speaker (2026-11-18). The device has no volume buttons, so this is
+    // the only place to change it; without a device the card says so instead of showing a level.
+    deviceVolume: 'Volumen del dispositivo',
+    deviceVolumeHint: 'Deslizá hacia arriba o hacia abajo para subir o bajar el volumen del parlante del dispositivo.',
+    deviceVolumeNoDevice: 'Conectá el dispositivo para cambiar su volumen.',
+    deviceVolumeUnsupported: 'Este dispositivo no permite cambiar el volumen desde la app.',
   },
   auth: {
     loading: 'Cargando sesión…',
@@ -179,6 +203,9 @@ export const es = {
     // Said aloud, not shown: a bare «Conectado» is enough on screen, where it sits next to the
     // device name, but on its own in the ear it does not say connected to what.
     connectedAnnounce: 'Dispositivo conectado.',
+    // Product mode only (2026-11-23): one sentence once the device is usable, instead of the link
+    // and the network as two separate steps, which read as "something might still go wrong".
+    pairedAnnounce: 'Dispositivo emparejado.',
     // Amber on the Device tab: the Bluetooth link is up but the photo path is not. Only what is
     // missing, in brackets. The reason goes to telemetry; the remedy, when there is one, is spoken.
     connectedWithoutWifi: 'Conectado (falta el WiFi)',

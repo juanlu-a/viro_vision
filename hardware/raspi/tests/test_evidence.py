@@ -272,3 +272,33 @@ def test_with_evidence_off_nothing_is_served(tmp_path):
         assert _fetch(server, "/evidence/20261012-101500/t001-bus.json")[0] == 404
     finally:
         server.stop()
+
+
+def test_the_crop_in_the_app_is_exactly_the_one_the_ocr_read(tmp_path):
+    """2026-10-22: the app is where the team checks the detector's box, so its picture of the sign must
+    be the OCR's crop to the pixel. `bus_banner` rounds the box (`Box.ints`); this used to truncate, and
+    the picture came out up to a pixel off. Half-way values round the same way on both sides."""
+
+    class Frame:
+        shape = (766, 1024, 3)
+
+        def __getitem__(self, key):
+            rows, cols = key
+            return (rows.start, rows.stop, cols.start, cols.stop)
+
+    evidence = Evidence(tmp_path / "evidence", encode=lambda image: b"", min_free_bytes=0)
+    box = Box(483.6, 342.5, 607.5, 368.4)
+    ocr = tuple(int(round(v)) for v in (box.x1, box.y1, box.x2, box.y2))  # what `Box.ints` does
+    assert evidence._cropped(Frame(), box) == (ocr[1], ocr[3], ocr[0], ocr[2])
+
+
+def test_a_track_past_999_is_still_served(tmp_path):
+    """The device names files `t{id:03d}`, which is four digits from track 1000 on. A three-digit
+    pattern turned every ref of a long run into a 404 from that point."""
+    from virovision.evidence import find_file
+
+    run = tmp_path / "20261012-101500"
+    run.mkdir()
+    (run / "t1000-r01.json").write_text("{}")
+    assert find_file(tmp_path, "20261012-101500", "t1000-r01.json") is not None
+    assert find_file(tmp_path, "20261012-101500", "../t1000-r01.json") is None

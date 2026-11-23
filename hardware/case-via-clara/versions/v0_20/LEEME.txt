@@ -1,0 +1,20 @@
+VIA Clara v0.20: versión para imprimir completa (2026-10-29)
+
+Piezas:
+  01_left_half_v0_20.stl          mitad izquierda (lado cabeza), con el switch de panel
+  02_right_half_v0_20.stl         mitad derecha (externa): zócalos hexagonales de 5,0 entre caras, 3,5 de profundidad
+  03_bone_arm_v0_20.stl           brazo del auricular, copa de Ø 17 x 6
+  04_mode_button_v0_20.stl        botón: cilindro que se pega al pulsador
+  07_transducer_cover_v0_20.stl   tapa a click del auricular, con la ranura hacia el oído
+  00_assembly_check_v0_20.stl     todo armado, sólo para mirar (no imprimir)
+
+Ya no está la 05 (la corredera): el switch de panel la reemplaza. Tampoco está la 06 (tapita del botón).
+
+Switch de panel (mitad izquierda):
+  - ventana de 4,2 x 7,4 (1 mm más angosta que antes), 2 mm más abajo que la de la corredera,
+    para que una pestaña de unos 20 mm no choque con la esquina redondeada de arriba
+  - dos pernos de Ø 2,3, a 14,8 entre centros y 2 mm de alto, para los agujeros de los tornillos;
+    después, gotita
+
+Calidad: las curvas van con 128 segmentos (antes 64). Para imprimir en mejor calidad, en el slicer:
+capa de 0,12 a 0,16 mm, 3 perímetros, sin soportes dentro de los zócalos hexagonales.

@@ -40,3 +40,6 @@ ml/**/*.weights
 
 # Artefactos locales de la CLI de Supabase (el proyecto vinculado, tokens de sesión)
 supabase/.temp/
+
+# Modelos 3D exportados: se regeneran con export.sh y se guardan en el Drive (modelo_3d)
+hardware/case-via-clara/stl/

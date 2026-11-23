@@ -3,7 +3,7 @@
 Documentos fuente del proyecto: lo que se dibujó o se escribió fuera del repo y conviene versionar
 tal cual, como registro de dónde salió una decisión.
 
-No es donde se leen las cosas. La documentación viva está en [`../docs/`](../docs/) — acá va el
+No es donde se leen las cosas. La documentación viva está en [`../docs/`](../docs/); acá va el
 original, allá la versión mantenida.
 
 | Archivo | Qué es |
@@ -14,4 +14,4 @@ original, allá la versión mantenida.
 
 El PDF es el artefacto original y prueba qué se acordó y cuándo; el mermaid es texto, se lee en un
 diff, GitHub lo renderiza y se corrige sin volver a abrir la herramienta de dibujo. Duplicar tiene
-un costo —pueden desincronizarse— y por eso está escrito cuál de los dos manda.
+un costo (pueden desincronizarse) y por eso está escrito cuál de los dos manda.

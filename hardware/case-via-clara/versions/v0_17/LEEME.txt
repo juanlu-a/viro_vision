@@ -1,0 +1,7 @@
+VIA Clara v0.17
+
+Sólo cambian el brazo del auricular y su tapa:
+  03_bone_arm           copa de Ø 17 interior (antes 15), 6 de profundidad. Acostado, copa hacia arriba.
+  07_transducer_cover   la tapa a click, agrandada para la copa nueva. Disco abajo, sin soportes.
+
+Las mitades: 02_right_half de ~/Desktop/VIA_CLARA_v0_16/ y el resto de ~/Desktop/VIA_CLARA_v0_15/.

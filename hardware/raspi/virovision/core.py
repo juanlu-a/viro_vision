@@ -47,6 +47,9 @@ ApControl = Callable[[bool], None]
 Say = Callable[[str], bool]
 # Cuts off whatever the speaker is playing. None when the board has nothing to play with.
 Hush = Callable[[], None]
+# Sets, applies and remembers the output level (0-100), returning the one in force (`audio.Volume`).
+# None when the board has no mixer to set (the Mac emulator, or `--no-audio`).
+SetVolume = Callable[[int], int]
 DEFAULT_AUDIO_TARGET = "device"
 AUDIO_TARGETS = ("device", "phone")
 AP_MINUTES_DEFAULT = 10
@@ -122,6 +125,7 @@ class Core:
         say: Optional[Say] = None,
         hush: Optional[Hush] = None,
         restart_camera: Optional[Callable[[], None]] = None,
+        set_volume: Optional[SetVolume] = None,
     ) -> None:
         self._loop = loop
         self._read_status = read_status
@@ -134,6 +138,7 @@ class Core:
         self._say = say
         self._hush = hush
         self._restart_camera = restart_camera
+        self._set_volume = set_volume
         self.audio_target = DEFAULT_AUDIO_TARGET
         """Where the user wants to hear ViroVision, as last written by the app (`cmd: 'audio'`).
 
@@ -146,6 +151,9 @@ class Core:
         self.modes = ModeMachine()
         self._transfer_id = 0
         self._transfer_in_flight: Optional[asyncio.Task] = None
+        # Strong references to scheduled tasks until they finish: the loop keeps only weak ones, and
+        # a task nobody holds can be collected mid-flight.
+        self._tasks: set[asyncio.Task] = set()
 
     def attach_bus(self, bus) -> None:
         """Wires bus mode in after the fact: the watcher needs to emit events through this core, and
@@ -264,6 +272,10 @@ class Core:
                 self._event({"t": "error", "msg": "no camera: use measure"})
                 return
             chunk, interval_ms = self._chunk(cmd, mtu), self._interval(cmd)
+            # Checked before `_capture()`, not inside `_start_transfer`: the capture starts the moment
+            # it is called (a camera lock, up to 8 s), and a photo nobody will receive is pure cost.
+            if self._transfer_busy():
+                return
             self._start_transfer(source=self._capture(), chunk=chunk, interval_ms=interval_ms, kind="photo")
         elif name == "mode":
             self._change_mode(int(cmd.get("value", 0)))
@@ -278,14 +290,20 @@ class Core:
                 if self._bus is not None:
                     self._bus.audio_target = target
                 log.info("audio → %s", target)
+        elif name == "volume":
+            self._volume(int(cmd.get("value")))
         elif name == "say":
             self._say_notice(str(cmd.get("clip", "")))
         elif name == "hush":
             # The phone is about to speak: the board goes quiet. One voice at a time, whichever side
             # it comes from (ADR 0003, 2026-09-18 update). No reply and no event: it is the most
             # urgent thing the app can ask for and there is nothing to answer.
+            # Off the loop: `Player.stop` takes the lock a clip launch holds through `pinctrl` (up to
+            # 5 s) and through ending a stubborn decoder, and the loop must keep serving BLE meanwhile.
+            # Every other command that makes sound already runs in the executor, so the order between
+            # them is unchanged.
             if self._hush is not None:
-                self._hush()
+                self._in_executor(self._hush)
                 log.info("hush: speaker cut off")
         elif name == "status":
             self._schedule(self._notify(STATUS, self.read_status()))
@@ -304,6 +322,21 @@ class Core:
             self._in_executor(self._restart_camera)
         else:
             self._event({"t": "error", "msg": f"unknown command: {name}"})
+
+    def _volume(self, percent: int) -> None:
+        """The level the user chose in the app's Settings (2026-11-18). The device has no volume
+        buttons, and with the amplifier the fixed startup level was far too loud, so this is the only
+        way the person wearing it can change it.
+
+        Clamped here and again in `Volume`: the value arrives over the air. Applied in an executor
+        because `amixer` is a process. The new `status` goes out when it is done, so the app's slider
+        settles on the level the board actually has, not on the one it asked for.
+        """
+        if self._set_volume is None:
+            self._event({"t": "error", "msg": "this device has no volume control"})
+            return
+        future = self._in_executor(self._set_volume, max(0, min(100, percent)))
+        future.add_done_callback(lambda _: self.notify_status())
 
     def _say_notice(self, clip: str) -> None:
         """Play one of the pre-recorded system notices (`notices.py`).
@@ -376,7 +409,13 @@ class Core:
     # --- internals ---------------------------------------------------------------------------
 
     def _schedule(self, coroutine: Awaitable[None]) -> asyncio.Task:
-        return self._loop.create_task(coroutine)
+        """A task nobody awaits: held until it finishes, and its failure logged (which also relays it
+        to the app, `log_relay.py`) instead of surfacing only as asyncio's message at collection."""
+        task = self._loop.create_task(coroutine)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        task.add_done_callback(_log_failure(getattr(coroutine, "__qualname__", "task")))
+        return task
 
     def _in_executor(self, fn: Callable, *args) -> asyncio.Future:
         """`run_in_executor` for work nobody awaits. Until 2026-10-06 those futures were dropped, so
@@ -450,7 +489,13 @@ class Core:
         ómnibus activado" from the app and then nothing, ever — no detector, no OCR, and no way to
         tell from the phone. Only the failures the watcher names are reported: "the camera is still
         starting" is already said out loud (`warming`), and "the user left meanwhile" is no failure."""
+        # Start and stop run as separate executor jobs and can finish out of order: a start that runs
+        # after the user already left (or that finishes after the stop) must not leave the watcher on.
+        if self.modes.current is not Mode.BUS:
+            return
         if self._bus.start():
+            if self.modes.current is not Mode.BUS:
+                self._bus.stop()
             return
         reason = getattr(self._bus, "unavailable_reason", None)
         if reason:
@@ -470,9 +515,15 @@ class Core:
     async def _synthetic_source(self, amount: int) -> bytes:
         return self._synthetic_payload(amount)
 
-    def _start_transfer(self, source: Awaitable[bytes], chunk: int, interval_ms: int, kind: str) -> None:
+    def _transfer_busy(self) -> bool:
+        """True, and says so to the app, when a transfer is already in flight."""
         if self._transfer_in_flight and not self._transfer_in_flight.done():
             self._event({"t": "error", "msg": "a transfer is already in progress"})
+            return True
+        return False
+
+    def _start_transfer(self, source: Awaitable[bytes], chunk: int, interval_ms: int, kind: str) -> None:
+        if self._transfer_busy():
             if hasattr(source, "close"):
                 source.close()  # close the coroutine we are not going to await, or Python warns on collection
             return

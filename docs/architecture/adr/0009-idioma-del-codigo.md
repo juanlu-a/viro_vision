@@ -1,6 +1,6 @@
-# ADR 0009 — El código en inglés, la app y la tesis en español
+# ADR 0009: El código en inglés, la app y la tesis en español
 
-- **Status:** Accepted (2026-09-09)
+- **Status:** Accepted (2026-09-09), enmendado el 2026-11-23 (PRs en inglés, también los viejos)
 - **Date:** 2026-09-09
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** app, hardware, backend, convenciones
@@ -12,8 +12,8 @@
 
 Hasta hoy la regla era mixta y estaba escrita así en las convenciones: **identificadores en inglés,
 comentarios y cadenas en español**, con los sustantivos del dominio en español aun dentro de código
-inglés (`BusReading.numero`, `ProductoLeido.marca`). La regla nació de algo razonable —la tesis es en
-español y los comentarios explican decisiones que se discutieron en español— pero la frontera nunca
+inglés (`BusReading.numero`, `ProductoLeido.marca`). La regla nació de algo razonable (la tesis es en
+español y los comentarios explican decisiones que se discutieron en español) pero la frontera nunca
 quedó donde decía.
 
 Lo que se acumuló:
@@ -24,11 +24,11 @@ Lo que se acumuló:
   (`lectura.fallo`) y en los flags del daemon (`--sin-camara`). No había una línea, había una
   pendiente.
 - **Las dos mitades de un mismo contrato quedaron en idiomas distintos.** `providers/anthropic.ts`
-  arma `max_tokens` y `content_block_delta` —inglés, porque lo fija la API— y los envuelve en
+  arma `max_tokens` y `content_block_delta` (inglés, porque lo fija la API) y los envuelve en
   `interpretarErrorHttp` y `ESPERA_POR_DEFECTO_S`. Lo mismo del lado de la placa: `capture_file` de
   picamera2 dentro de `capturar_jpeg`. Cada archivo hacía dos saltos de idioma por pantalla.
 - **Tres personas, un solo repo, y un lector futuro.** El proyecto va a ser leído por el tutor, por
-  el tribunal y —si sirve— por quien lo retome. El código con vocabulario mezclado obliga a saber los
+  el tribunal y, si sirve, por quien lo retome. El código con vocabulario mezclado obliga a saber los
   dos idiomas para leer una línea; la tesis en español no.
 
 Al mismo tiempo hay una parte del sistema que **tiene** que estar en español y no es negociable: lo
@@ -53,7 +53,7 @@ En inglés, sin excepciones:
 
 En español, porque lo lee o lo escucha una persona:
 
-- los **valores** de `app/src/i18n/es.ts` — las claves son inglesas;
+- los **valores** de `app/src/i18n/es.ts` (las claves son inglesas);
 - el prompt del modo supermercado (`services/vision/providers/prompts.ts`): su respuesta se lee en
   voz alta, así que pedirle al modelo que conteste en español es parte del producto, no del código.
   Los **nombres de campo** del schema sí son ingleses (`kind`, `brand`, `detail`);
@@ -66,7 +66,7 @@ En español, porque lo lee o lo escucha una persona:
 **A favor**
 
 - Un archivo se lee en un solo idioma. La API externa y el código que la envuelve dejan de alternar.
-- La frontera es enunciable en una línea —"¿lo lee una persona o lo lee una máquina?"— y por eso se
+- La frontera es enunciable en una línea ("¿lo lee una persona o lo lee una máquina?") y por eso se
   puede sostener. La anterior no lo era.
 - El esquema de telemetría queda consultable con un vocabulario: las filas viejas se traducen en la
   misma migración, así que una consulta no necesita `type in ('reading.ok','lectura.ok')`.
@@ -80,8 +80,8 @@ En español, porque lo lee o lo escucha una persona:
   sigue los renombres) y con `--follow`, pero los cambios dentro de cada archivo quedan bajo este
   commit.
 - **Un paso manual en la microSD.** El script de arranque `/boot/firmware/modo-red.sh` tiene
-  `--sin-ap` hardcodeado —lo usa para escribir el drop-in de modo desarrollo cuando existe el archivo
-  `SIN-AP`—, así que volver a ese modo sin editarlo deja al daemon sin arrancar. Está en FAT: se
+  `--sin-ap` hardcodeado (lo usa para escribir el drop-in de modo desarrollo cuando existe el archivo
+  `SIN-AP`), así que volver a ese modo sin editarlo deja al daemon sin arrancar. Está en FAT: se
   arregla con la tarjeta puesta en cualquier computadora, sin entrar a la placa.
 - **Los comentarios pierden algo de matiz.** Estaban escritos por hablantes nativos de español y
   varios contaban un fallo concreto con precisión. La traducción conserva el hecho y la consecuencia;
@@ -99,6 +99,37 @@ En español, porque lo lee o lo escucha una persona:
   y deja al proyecto ilegible para cualquiera fuera del Río de la Plata.
 - **Inglés en el código pero dejar las fronteras en español** (el protocolo BLE, el esquema). Era la
   opción sin riesgo operativo: no había que reinstalar el daemon ni migrar la tabla. Se descartó
-  porque el contrato entre la app y la placa es justamente donde la mezcla más molesta —los dos lados
-  se leen juntos— y porque el costo de moverlo sólo crece con cada unidad de hardware y cada fila de
+  porque el contrato entre la app y la placa es justamente donde la mezcla más molesta (los dos lados
+  se leen juntos) y porque el costo de moverlo sólo crece con cada unidad de hardware y cada fila de
   telemetría.
+
+## Enmienda 2026-11-23: los PRs en inglés, también los anteriores
+
+La decisión original ya pedía mensajes de PR en inglés "de acá en adelante", pero en la práctica
+siguieron saliendo títulos y descripciones en español (de #72 a #142 hubo una veintena). Se precisa:
+
+- **El título y la descripción de todo PR van en inglés**, igual que el código. Las únicas cadenas
+  en español dentro de un PR son las literales que el producto dice o muestra («Dispositivo
+  emparejado», "Se acerca un ómnibus"), citadas tal cual.
+- **Los PRs anteriores se tradujeron** (del #10 al #142), sólo en GitHub: título y descripción,
+  sin nota de que se tradujeron. A diferencia de los commits, editar un PR no reescribe la historia
+  de Git, así que el argumento de "no vale la pena" no aplica. Los commits viejos siguen como están.
+- **Los comentarios que quedaban en español** se tradujeron: los scripts de arranque de la microSD
+  (`hardware/raspi/boot/`, comentarios y líneas de log), las herramientas `tools/ap.py` y
+  `tools/say.py`, los tests de la placa y `app/jest/styleMock.js`.
+
+Lo que sigue en español, a propósito:
+
+- **La documentación entera** (`docs/`, ADRs, la skill, la tesis), como dice la decisión original.
+- **Los nombres que viven en la microSD y en la placa**: `modo-red.sh`, `instalar-daemon.sh`, los
+  archivos `SIN-AP` y `VOLUMEN`, `virovision.anterior/`, el sufijo `.aplicado`, el drop-in
+  `10-sin-ap.conf` y la centinela `/var/lib/virovision-instalado`. Las tarjetas ya grabadas y las
+  unidades de systemd los referencian por nombre; renombrarlos obliga a regrabar cada tarjeta y deja
+  una ventana en que la placa y el repo no coinciden, el mismo problema que se aceptó una vez con
+  `--sin-ap`. Se renombran sólo si alguna vez se regraban todas las tarjetas.
+- **La migración `20260907190000_eventos.sql`**: ya está aplicada y el log de migraciones es de sólo
+  agregar (lo dice la migración siguiente, que la traduce con `rename`).
+- **Las etiquetas de la guía de armado** (`via_clara_v0_29_guide.scad`), porque las lee una persona
+  en las imágenes.
+- **Los datos de prueba con caracteres no ASCII** (`ñ`, nombres de calles), que existen para probar
+  UTF-8 y no son prosa.

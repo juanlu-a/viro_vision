@@ -22,6 +22,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useAppMode } from '@/features/appMode/AppModeProvider';
 import { notify } from '@/features/audio/systemNotice';
 import type { AudioOutput } from '@/features/audio/audioOutput';
 import { strings } from '@/i18n';
@@ -34,10 +35,13 @@ import {
 import { encodeBase64 } from '@/services/ble/base64';
 import { downloadDevicePhoto, type DevicePhoto } from '@/services/camera';
 import { handleEvidence } from '@/services/evidence';
-import { errorDetail, record } from '@/services/telemetry';
-import { deviceUrl, type DeviceAddress } from '@/services/wifi/deviceHttp';
+import { errorDetail, errorType, record } from '@/services/telemetry';
+import { deviceUrl, HttpDownloadError, type DeviceAddress } from '@/services/wifi/deviceHttp';
+import { loadJoinedNetwork, saveJoinedNetwork } from '@/services/storage/joinedNetwork';
 import { reachDeviceNetwork } from '@/services/wifi/join';
 
+import { createNetworkCheckGate } from './networkCheck';
+import { createPairedAnnouncer } from './pairedNotice';
 import { MODE_FROM_GATT, GATT_MODE, type DeviceStatus, type WifiCredentials } from './gatt';
 import { DeviceNoAddressError, type ConnectionState, type DeviceInfo } from './types';
 
@@ -61,9 +65,25 @@ interface DeviceValue {
   writeMode: (mode: DeviceMode) => Promise<void>;
   /** Tells the device where bus readings should be heard. Best-effort: it never throws. */
   writeAudioTarget: (target: AudioOutput) => Promise<void>;
-  downloadPhoto: (options?: { timeoutMs?: number }) => Promise<DevicePhoto>;
-  /** Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. */
-  sendAudio: (uri: string, signal?: AbortSignal) => Promise<boolean>;
+  /**
+   * The level of the device's speaker as the device last reported it (0-100), or null when there is
+   * no device or it cannot be changed. The board is the source of truth: the app keeps no copy.
+   */
+  deviceVolume: number | null;
+  /** Sets the device's speaker level. Best-effort: it never throws. */
+  writeVolume: (percent: number) => Promise<void>;
+  downloadPhoto: (options?: { timeoutMs?: number; mode?: DeviceMode }) => Promise<DevicePhoto>;
+  /**
+   * Sends a reading's MP3 to the device's speaker. Best-effort: it never throws. `mode` is the mode
+   * the reading was made in: the device drops it if the user has left it.
+   */
+  sendAudio: (uri: string, signal?: AbortSignal, mode?: DeviceMode) => Promise<boolean>;
+  /**
+   * Gets the phone onto the device's network now, asking the system if it has to (the iOS prompt).
+   * For a reading that needs the photo: on connection a network already joined once is only waited
+   * for, never asked for. True when the device answers.
+   */
+  joinNetwork: () => Promise<boolean>;
 }
 
 const DeviceContext = createContext<DeviceValue | null>(null);
@@ -81,6 +101,23 @@ const initialConnection: ConnectionState = { status: 'idle', device: null, messa
  * and iOS throttles timers in the background on its own.
  */
 const RETRIES_MS = [1_000, 2_000, 3_000, 5_000];
+/**
+ * How long product mode waits for the network before saying «Dispositivo emparejado» anyway: past
+ * the 20 s `reachDeviceNetwork` gives iOS to rejoin a known network on its own, with some slack.
+ */
+const PAIRED_FALLBACK_MS = 25_000;
+
+/**
+ * Module-level, like the reading pipeline's state: there is one device and one provider, and the
+ * callbacks below are made once. Product until the stored app mode says otherwise, which is the same
+ * default `AppModeProvider` starts from.
+ */
+let productModeNow = true;
+const paired = createPairedAnnouncer({
+  sayPaired: () => void notify('paired'),
+  isProductMode: () => productModeNow,
+  fallbackMs: PAIRED_FALLBACK_MS,
+});
 
 function errorMessage(err: unknown): string {
   if (err instanceof BleNotImplementedError) return strings.connection.unavailable;
@@ -89,14 +126,32 @@ function errorMessage(err: unknown): string {
   return strings.connection.error;
 }
 
+/**
+ * `readWifi` records its own GATT failures, but not the `BleNotConnectedError` it throws before
+ * trying: without this a lost link here vanished silently (ADR 0011).
+ */
+function recordWifiReadFailure(err: unknown): null {
+  record('ble.readFailed', { detail: { char: 'wifi', message: errorDetail(err), type: errorType(err) } });
+  return null;
+}
+
 export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [connection, setConnection] = useState<ConnectionState>(initialConnection);
   const [address, setAddress] = useState<DeviceAddress | null>(null);
   const [ap, setAp] = useState(false);
   const [wifi, setWifi] = useState<WifiState>('off');
   const [deviceMode, setDeviceMode] = useState<DeviceMode | null>(null);
+  const [deviceVolume, setDeviceVolume] = useState<number | null>(null);
 
   const credentials = useRef<WifiCredentials | null>(null);
+  // Product mode says one «Dispositivo emparejado» when the device is usable, instead of the link
+  // and the network as two notices (2026-11-23). Mirrored into the module so the announcer reads it
+  // at the instant: the user can switch modes in Settings while connected.
+  const { isDevelopment } = useAppMode();
+  useEffect(() => {
+    productModeNow = !isDevelopment;
+  }, [isDevelopment]);
+  useEffect(() => () => paired.reset(), []);
   const autoConnect = useRef(true);
   const retry = useRef(0);
   const connecting = useRef(false);
@@ -105,6 +160,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   // it goes in a ref instead of being captured directly.
   const connectRef = useRef<() => Promise<void>>(async () => {});
   const networkSyncRun = useRef(0);
+  /** The sync run that may show the iOS join prompt, or 0. `joinNetwork` must not start a second one. */
+  const promptingRun = useRef(0);
   // The last thing synced, so the check does not restart with every `status` heartbeat — nor while
   // one is still running: a restart would cancel a join that is about to succeed and, worse, ask the
   // system again, which is a second prompt on top of the first (2026-09-19).
@@ -132,28 +189,34 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
    */
   const announcedReadyFor = useRef<string | null>(null);
 
+  /** Which failures were already said, and which network was already prompted for (`networkCheck.ts`). */
+  const gate = useRef(createNetworkCheckGate());
+
   /**
    * The network follows the AP: join when the device has one up, and check that the device answers
    * before declaring the photo available. It is called from the event handlers (connection, new
    * status), never from an effect. Every run carries a number: if the situation changed while it
    * waited, its results are discarded.
    */
-  const failNetwork = useCallback((reason: string, extra?: Record<string, unknown>) => {
+  const failNetwork = useCallback((reason: string, ip: string | null, extra?: Record<string, unknown>) => {
     // Cleared here and on every other way out of `ready` below: the guard must suppress a repeated
     // announcement, never a real one. A network that failed and came back has to be announced again.
     announcedReadyFor.current = null;
     setWifi('error');
+    paired.networkFailed();
     // The reason lives in the table and nowhere else (2026-10-06): the user never hears an IP, a
     // system error string or a step of the join. They hear one fixed sentence, because a silent
     // failure leaves them waiting for a button that never comes.
-    record('wifi.failed', { detail: { reason, ...extra } });
+    record('wifi.failed', { detail: { reason, ip, ...extra } });
+    // Said once per distinct failure (`networkCheck.ts`); every retry is still recorded above.
+    if (!gate.current.shouldAnnounceFailure(reason, ip)) return;
     // Two reasons never fix themselves, and "still trying" would be false for them: no credentials
     // (the remedy is the user's) and a build with no WiFi module.
     void notify(reason === 'noCredentials' || reason === 'unavailable' ? 'networkUnusable' : 'networkFailed');
   }, []);
 
   const syncNetwork = useCallback(
-    async (apOn: boolean, target: DeviceAddress | null): Promise<boolean> => {
+    async (apOn: boolean, target: DeviceAddress | null, mayPromptAlways = false, retry = false): Promise<boolean> => {
       const run = ++networkSyncRun.current;
       const current = () => run === networkSyncRun.current;
       if (!target) {
@@ -165,21 +228,42 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // The device turned its AP on but the app has no credentials for it: almost always it is
         // iOS's GATT cache serving a characteristics list from before `wifi` existed (2026-09-05). It
         // is read once more; if it is still empty, the user is told the remedy, which is theirs.
-        credentials.current = await getBleClient().readWifi().catch(() => null);
+        credentials.current = await getBleClient().readWifi().catch(recordWifiReadFailure);
         if (!current()) return false;
         if (!credentials.current) {
-          failNetwork('noCredentials');
+          failNetwork('noCredentials', target.ip);
           return false;
         }
       }
+      const ssid = apOn ? (credentials.current?.ssid ?? null) : null;
+      // A network this phone already joined is saved on it: iOS rejoins it by itself, and asking the
+      // system again is exactly the prompt the user got on every power-on (2026-11-20). So it is
+      // only waited for; the prompt is left to a reading that needs the photo (`joinNetwork`).
+      // A heartbeat retry does not prompt again for a network it already prompted for; a reading that
+      // needs the photo always may (`networkCheck.ts`).
+      const promptQuery = { ssid, retry, always: mayPromptAlways };
+      const joinedSsid = gate.current.needsJoinedSsid(promptQuery) ? await loadJoinedNetwork() : null;
+      const mayPrompt = gate.current.mayPrompt({ ...promptQuery, joinedSsid });
+      if (!current()) return false;
+      promptingRun.current = mayPrompt && ssid !== null ? run : 0;
       setWifi('joining');
-      record('wifi.joining', { detail: { ap: apOn, ip: target.ip, ssid: apOn ? (credentials.current?.ssid ?? null) : null } });
+      record('wifi.joining', { detail: { ap: apOn, ip: target.ip, ssid, mayPrompt } });
       const t0 = Date.now();
       // With the AP on, the credentials are the phone's ticket in; without it the device is on the
       // same network as the phone (development) and there is nothing to join, only to reach.
-      const outcome = await reachDeviceNetwork(target, apOn ? credentials.current : null);
+      const outcome = await reachDeviceNetwork(target, apOn ? credentials.current : null, { mayPrompt });
       if (!current()) return false;
+      if (!outcome.ok && outcome.reason === 'notJoined') {
+        // Not a failure and not announced: the phone is elsewhere (at home, on the home WiFi) and
+        // bus mode does not need this network. The next `status` heartbeat checks again.
+        setWifi('off');
+        record('wifi.notJoined', { ms: Date.now() - t0, detail: { ip: target.ip } });
+        paired.networkAbsent();
+        return false;
+      }
       if (outcome.ok) {
+        if (ssid) void saveJoinedNetwork(ssid);
+        gate.current.ready();
         setWifi('ready');
         // The time until the device answers is what separates "it is slow" from "it does not work":
         // on 2026-09-06 the network never became ready and without this number there was no way to
@@ -191,11 +275,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // table, it is just not worth saying out loud again.
         if (announcedReadyFor.current !== target.ip) {
           announcedReadyFor.current = target.ip;
-          void notify('networkReady');
+          if (productModeNow) paired.networkReady();
+          else void notify('networkReady');
         }
         return true;
       }
-      failNetwork(outcome.reason, { ip: target.ip, message: errorDetail(outcome.message) });
+      failNetwork(outcome.reason, target.ip, { message: errorDetail(outcome.message) });
       return false;
     },
     [failNetwork]
@@ -218,7 +303,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       if (!changed && (previous.ok || previous.running)) return;
       const synced = { ap: apOn, ip: target?.ip ?? null, ok: false, running: true };
       syncedNetwork.current = synced;
-      void syncNetwork(apOn, target).then((ok) => {
+      void syncNetwork(apOn, target, false, !changed).then((ok) => {
         if (syncedNetwork.current !== synced) return; // superseded: its verdict is not ours to keep
         synced.running = false;
         synced.ok = ok;
@@ -235,6 +320,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
    */
   const startNetworkTransition = useCallback(() => {
     announcedReadyFor.current = null;
+    gate.current.transition();
     networkSyncRun.current += 1;
     syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     setAddress(null);
@@ -256,6 +342,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         record('device.status', { detail: { ...status } });
       }
       setAp(status.ap);
+      setDeviceVolume(typeof status.vol === 'number' ? status.vol : null);
       // The previous object is kept when nothing changed. A fresh one every 15 s re-rendered every
       // consumer of this context — Home, the reader bridge, the Device tab — on each heartbeat, and
       // recreated the callbacks that close over the address.
@@ -318,11 +405,13 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       // tab, so the only way to learn about it was to look at the screen — which is the one thing
       // this app's user cannot do. It is announced from here and not from an effect on `status` so a
       // re-render cannot say it twice.
-      void notify('connected');
+      // Product mode waits for the device to be usable and says it once (see `pairedNotice.ts`).
+      if (productModeNow) paired.linked();
+      else void notify('connected');
       setAddress(device.address);
       setAp(device.ap);
       const run = networkSyncRun.current;
-      credentials.current = await client.readWifi().catch(() => null);
+      credentials.current = await client.readWifi().catch(recordWifiReadFailure);
       // The link can drop during that read (the disconnect handlers bump `networkSyncRun`), and
       // joining and announcing "network ready" for a device that is already gone would be a sentence
       // about nothing. A heartbeat that started its own check meanwhile bumps it too, and then that
@@ -335,8 +424,11 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       record('ble.failed', {
         ms: Date.now() - t0,
         detail: {
-          type: err instanceof Error ? err.name : typeof err,
+          type: errorType(err),
           message: errorDetail(err),
+          // "off" vs "unauthorized" vs "unsupported": the field exists to be read, and they have
+          // different remedies.
+          ...(err instanceof BleRadioOffError ? { state: err.state } : null),
         },
       });
       // Disconnect was tapped while this attempt was failing: no retry is coming, so "still looking"
@@ -363,7 +455,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     const unsubscribes = [
       client.onDisconnect(() => {
         record('ble.lost');
+        paired.reset();
         announcedReadyFor.current = null;
+        gate.current.reset();
         networkSyncRun.current += 1; // invalidates any network wait in flight
         // And forgets what was synced: the next connection has to check the network again even if
         // the device comes back with the very same address, or `wifi` stays 'off' for good.
@@ -377,6 +471,14 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         setAddress(null);
         setAp(false);
         setWifi('off');
+        // Forgotten too, so a board that comes back reporting the same mode still fires the
+        // reader's `[deviceMode]` effect instead of being treated as "no change". The board wins on
+        // reconnect (ADR 0007: the button is the source of truth): a mode picked in the app while
+        // the link was down never reached it, and keeping it here would show a mode nothing is
+        // running.
+        setDeviceMode(null);
+        // No link, no level to show: the slider goes inert instead of claiming a stale one.
+        setDeviceVolume(null);
         scheduleRetry();
       }),
       client.onStatus(applyStatus),
@@ -406,6 +508,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // failed on it (bringing the AP up, the camera). Only the table: since 2026-10-06 the user
         // never sees nor hears the board's own error strings — they are diagnosis, not guidance.
         record('device.warning', { detail: { message: errorDetail(message) } });
+        // The one board error the user must hear about: bus mode could not start, after «preparando»
+        // or the mode announcement promised a reading. A fixed sentence, never the board's string.
+        if (typeof message === 'string' && message.startsWith('bus unavailable')) void notify('busUnavailable');
       }),
     ];
     // The first connection comes out of the mount effect but on the next tick: the effect only
@@ -433,6 +538,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     // would reconnect on its own a second later and the button would be useless.
     autoConnect.current = false;
     record('ble.disconnected');
+    paired.reset();
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
@@ -442,12 +548,14 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     networkSyncRun.current += 1;
     syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     announcedReadyFor.current = null;
+    gate.current.reset();
     await getBleClient().disconnect();
     setConnection(initialConnection);
     setAddress(null);
     setAp(false);
     setWifi('off');
     setDeviceMode(null);
+    setDeviceVolume(null);
   }, []);
 
   const writeAudioTarget = useCallback(
@@ -460,6 +568,20 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // Not worth interrupting the user for, and not worth hiding either: this is exactly the bug
         // that made a reading come out of the board with the setting on "phone" (2026-09-15).
         record('device.audioTargetFailed', { detail: { target, message: errorDetail(err) } });
+      }
+    },
+    [connection.status]
+  );
+
+  const writeVolume = useCallback(
+    async (percent: number) => {
+      if (connection.status !== 'connected') return;
+      try {
+        await getBleClient().writeVolume(percent);
+      } catch (err) {
+        // The board kept its previous level, and its next `status` puts the slider back there: the
+        // user sees and hears that it did not take. The table says why.
+        record('device.volumeFailed', { detail: { percent, message: errorDetail(err) } });
       }
     },
     [connection.status]
@@ -489,17 +611,28 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   }, [photoAvailable, address]);
 
   const downloadPhoto = useCallback(
-    async (options?: { timeoutMs?: number }) => {
+    async (options?: { timeoutMs?: number; mode?: DeviceMode }) => {
       if (!address) throw new DeviceNoAddressError();
       // The caller sets the deadline. With the screen locked the whole cycle has seconds, not the
       // 20 s the download would take by default (`readingService.ts`).
-      return downloadDevicePhoto(address, options);
+      try {
+        return await downloadDevicePhoto(address, options);
+      } catch (err) {
+        // No HTTP answer at all: the phone may have left the device's network while the link stayed
+        // up, and "ready" was cached for the whole link. Forgetting it makes the next heartbeat check
+        // again instead of offering a photo that cannot arrive. An HTTP error means the network works.
+        if (!(err instanceof HttpDownloadError) && syncedNetwork.current.ok) {
+          syncedNetwork.current = { ...syncedNetwork.current, ok: false, running: false };
+          record('wifi.recheck', { detail: { message: errorDetail(err) } });
+        }
+        throw err;
+      }
     },
     [address]
   );
 
   const sendAudio = useCallback(
-    async (uri: string, signal?: AbortSignal): Promise<boolean> => {
+    async (uri: string, signal?: AbortSignal, mode?: DeviceMode): Promise<boolean> => {
       if (!photoAvailable || !address) return false;
       try {
         const { File } = await import('expo-file-system');
@@ -508,7 +641,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // device decodes it from the header.
         const r = await fetch(deviceUrl(address, '/audio'), {
           method: 'POST',
-          headers: { 'Content-Type': 'audio/mpeg', 'X-Encoding': 'base64' },
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'X-Encoding': 'base64',
+            // A reading that lands after a mode change is dropped by the device (409, 2026-11-20).
+            ...(mode ? { 'X-Mode': mode } : null),
+          },
           body: encodeBase64(bytes),
           signal,
         });
@@ -523,9 +661,26 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     [address, photoAvailable]
   );
 
+  const joinNetwork = useCallback(async (): Promise<boolean> => {
+    if (connection.status !== 'connected' || !address) return false;
+    // A check that is allowed to prompt is already running (the first pairing): replacing it would
+    // ask the system a second time, on top of the alert already on screen. The reading polls anyway.
+    if (syncedNetwork.current.running && promptingRun.current === networkSyncRun.current) return false;
+    // Through the same bookkeeping as `ensureNetwork`, so a heartbeat does not start a second check
+    // on top of this one (and a second prompt with it).
+    const synced = { ap, ip: address.ip, ok: false, running: true };
+    syncedNetwork.current = synced;
+    const ok = await syncNetwork(ap, address, true);
+    if (syncedNetwork.current === synced) {
+      synced.running = false;
+      synced.ok = ok;
+    }
+    return ok;
+  }, [connection.status, address, ap, syncNetwork]);
+
   const value = useMemo<DeviceValue>(
-    () => ({ connection, address, wifi, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio }),
-    [connection, address, wifi, photoAvailable, ap, deviceMode, connect, disconnect, writeMode, writeAudioTarget, downloadPhoto, sendAudio]
+    () => ({ connection, address, wifi, photoAvailable, ap, deviceMode, deviceVolume, connect, disconnect, writeMode, writeAudioTarget, writeVolume, downloadPhoto, sendAudio, joinNetwork }),
+    [connection, address, wifi, photoAvailable, ap, deviceMode, deviceVolume, connect, disconnect, writeMode, writeAudioTarget, writeVolume, downloadPhoto, sendAudio, joinNetwork]
   );
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;

@@ -10,6 +10,8 @@ handler that answers the phone would die with it).
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from virovision.audio import Player, command_for  # noqa: E402
@@ -37,23 +39,45 @@ def test_a_format_nobody_can_play_is_none_instead_of_a_guess():
     assert command_for("/tmp/audio-1") is None
 
 
-def test_playing_a_format_nobody_can_play_does_not_raise():
+def test_playing_a_format_nobody_can_play_does_not_raise(monkeypatch, caplog):
     # The caller is the HTTP handler answering the phone: an exception here would be a 500 on a
     # request that did deliver its audio.
-    Player().play("/tmp/audio-1.bin")
+    import virovision.audio as audio
+
+    launched = []
+    monkeypatch.setattr(audio.subprocess, "Popen", lambda *a, **k: launched.append(a))
+    player = Player()
+    player.play("/tmp/audio-1.bin")
+    assert launched == [], "no decoder is guessed for it"
+    assert player._process is None
+    assert "nothing can play /tmp/audio-1.bin" in caplog.text
 
 
-def test_playing_with_no_decoder_installed_does_not_raise():
+def test_playing_with_no_decoder_installed_does_not_raise(monkeypatch, caplog):
     """On the Mac neither mpg123 nor aplay exists, which is exactly the board's state before
     `setup.sh` runs. It has to end in a log line, not in an exception."""
-    Player().play("/tmp/does-not-exist.mp3")
+    import virovision.audio as audio
+
+    def missing(*_args, **_kwargs):
+        raise FileNotFoundError("mpg123")
+
+    monkeypatch.setattr(audio.subprocess, "Popen", missing)
+    player = Player()
+    player.play("/tmp/does-not-exist.mp3")
+    assert player._process is None
+    assert "could not play /tmp/does-not-exist.mp3" in caplog.text
 
 
-def test_stopping_with_nothing_playing_is_safe():
+def test_stopping_with_nothing_playing_is_safe(monkeypatch):
     # `stop()` is called on every new reading and on shutdown, most of the time with nothing playing.
+    import virovision.audio as audio
+
+    monkeypatch.setattr(audio.subprocess, "Popen", lambda *a, **k: pytest.fail("stop must not launch anything"))
     player = Player()
     player.stop()
     player.stop()
+    assert player._process is None
+    assert player._generation == 2, "each stop still invalidates whatever was queued before it"
 
 
 def test_the_volume_is_clamped_instead_of_passed_through():
@@ -74,6 +98,71 @@ def test_the_default_level_leaves_headroom():
     from virovision.audio import DEFAULT_VOLUME_PERCENT
 
     assert DEFAULT_VOLUME_PERCENT < 100
+
+
+def test_the_default_is_not_the_old_unamplified_level():
+    """90 % was right for a transducer hanging off a bare GPIO and far too loud once the PAM8403 went
+    in (2026-11-18). A board nobody has set a level on yet must not start at that."""
+    from virovision.audio import DEFAULT_VOLUME_PERCENT
+
+    assert DEFAULT_VOLUME_PERCENT <= 60
+
+
+def test_a_chosen_volume_survives_a_reboot(tmp_path):
+    """The whole point of persisting it: the device has no volume buttons, and a reboot that put the
+    level back to the default would be the device ignoring what the user asked for."""
+    from virovision.audio import Volume
+
+    applied = []
+    path = tmp_path / "state" / "volume"
+    Volume(path=path, default=50, apply=applied.append).set(30)
+
+    after_reboot = Volume(path=path, default=50, apply=applied.append)
+    after_reboot.apply_current()
+    assert after_reboot.current == 30
+    assert applied == [30, 30]
+
+
+def test_without_a_remembered_level_the_default_applies(tmp_path):
+    from virovision.audio import Volume
+
+    applied = []
+    Volume(path=tmp_path / "volume", default=50, apply=applied.append).apply_current()
+    assert applied == [50]
+
+
+def test_a_garbled_volume_file_falls_back_to_the_default(tmp_path):
+    """Someone edits it by hand, or the battery dies mid-write on an older daemon: the board must
+    still start, at the default, rather than crash on `int()`."""
+    from virovision.audio import Volume
+
+    path = tmp_path / "volume"
+    path.write_text("loud\n")
+    assert Volume(path=path, default=50, apply=lambda _: True).current == 50
+
+
+def test_the_volume_is_clamped_before_it_is_applied_or_stored(tmp_path):
+    from virovision.audio import Volume
+
+    applied = []
+    path = tmp_path / "volume"
+    volume = Volume(path=path, default=50, apply=applied.append)
+    assert volume.set(140) == 100
+    assert volume.set(-5) == 0
+    assert applied == [100, 0]
+    assert path.read_text().strip() == "0"
+
+
+def test_a_volume_that_cannot_be_stored_still_applies(tmp_path):
+    """Losing the level at the next reboot is better than refusing to change it now."""
+    from virovision.audio import Volume
+
+    blocker = tmp_path / "not-a-dir"
+    blocker.write_text("")
+    applied = []
+    volume = Volume(path=blocker / "volume", default=50, apply=applied.append)
+    assert volume.set(20) == 20
+    assert applied == [20] and volume.current == 20
 
 
 def test_a_sequence_with_no_player_installed_does_not_raise():
@@ -100,7 +189,7 @@ def test_a_clip_dequeued_before_a_hush_is_not_played_after_it(monkeypatch):
         def __init__(self, command, **kwargs):
             started.append(command[-1])
 
-        def wait(self):
+        def wait(self, timeout=None):
             pass
 
         def poll(self):
@@ -125,3 +214,201 @@ def test_a_clip_dequeued_before_a_hush_is_not_played_after_it(monkeypatch):
     worker.join(2)
     assert started == []
     assert player._worker is None, "a finished worker clears itself, so the next sequence starts one"
+
+
+def test_the_pwm_pin_is_parked_once_the_output_is_idle_and_reconnected_for_the_next_clip(monkeypatch):
+    """With the PAM8403 the idle PWM is a loud hiss that never stops (2026-11-18): the pin is held low
+    between clips and handed back to PWM right before the next one."""
+    import time
+
+    import virovision.audio as audio
+
+    monkeypatch.setattr(audio, "PARK_AFTER_S", 0.1)
+    commands = []
+    gate = audio.PwmGate(run=commands.append)
+
+    class Process:
+        pid = 1
+
+        def __init__(self, command, **kwargs):
+            self.done = False
+            self.polls = 0
+
+        def poll(self):
+            self.polls += 1
+            return 0 if self.done else None
+
+        def wait(self, timeout=None):
+            self.done = True
+
+        def terminate(self):
+            self.done = True
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Process)
+    monkeypatch.setattr(audio, "command_for", lambda path: ["aplay", path])
+    player = Player(gate=gate)
+    assert commands == [["pinctrl", "set", "18", "op", "dl"]], "parked at startup: nothing is playing"
+    commands.clear()
+
+    player.play("/tmp/a.wav")
+    assert commands == [["pinctrl", "set", "18", "a5"]]
+    commands.clear()
+    # Three of the parker's ticks while it plays: an idle pin would have been parked by the second.
+    playing = player._process
+    deadline = time.monotonic() + 3
+    while playing.polls < 3 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert playing.polls >= 3
+    assert commands == [], "still playing: the pin stays on PWM"
+
+    player._process.done = True
+    deadline = time.monotonic() + 3
+    while not commands and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert commands == [["pinctrl", "set", "18", "op", "dl"]]
+    assert gate.is_open is False
+
+    player.play("/tmp/b.wav")
+    assert commands[-1] == ["pinctrl", "set", "18", "a5"]
+    assert gate.is_open is True
+    player.stop()
+
+
+def test_a_gate_without_pinctrl_does_nothing(monkeypatch):
+    """The Mac, or a board without `pinctrl`: the audio must still play, just without parking."""
+    import virovision.audio as audio
+
+    monkeypatch.setattr(audio.shutil, "which", lambda name: None)
+    gate = audio.PwmGate()
+    gate.park()
+    gate.open()
+    assert gate.is_open is True
+
+
+def test_the_bus_clips_wait_for_the_sentence_play_started_instead_of_talking_over_it(monkeypatch):
+    """2026-11-20: the queue worker launched its clip over the one `play` had started (a mode notice,
+    a supermarket reading) and overwrote `_process`, so both were heard at once and the first became
+    an orphan no `stop` could cut. Now the clips start only once that sentence has ended."""
+    import threading
+
+    import virovision.audio as audio
+
+    running = []
+    overlaps = []
+    finish = {}
+
+    class Process:
+        pid = 1
+
+        def __init__(self, command, **kwargs):
+            self.name = command[-1]
+            self.done = threading.Event()
+            finish[self.name] = self.done
+            if running:
+                overlaps.append((running[-1], self.name))
+            running.append(self.name)
+
+        def _end(self):
+            if self.name in running:
+                running.remove(self.name)
+
+        def wait(self, timeout=None):
+            if not self.done.wait(timeout if timeout is not None else 2):
+                raise audio.subprocess.TimeoutExpired("x", timeout)
+            self._end()
+
+        def poll(self):
+            if self.done.is_set():
+                self._end()
+                return 0
+            return None
+
+        def terminate(self):
+            self.done.set()
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Process)
+    player = Player()
+    player.play("/tmp/mode-bus.wav")
+    player.play_sequence(["/tmp/115.wav"])
+    worker = player._worker
+    # The notice is still talking: the bus clip must not have started.
+    assert "/tmp/115.wav" not in finish
+    finish["/tmp/mode-bus.wav"].set()
+    for _ in range(50):
+        if "/tmp/115.wav" in finish:
+            break
+        threading.Event().wait(0.02)
+    finish["/tmp/115.wav"].set()
+    worker.join(2)
+    assert overlaps == []
+    assert "/tmp/115.wav" in finish
+
+
+def test_a_hung_sentence_is_cut_after_the_cap_so_the_bus_clips_still_play(monkeypatch):
+    """A decoder that never ends must not hold every bus clip behind it (review, 2026-11-20)."""
+    import virovision.audio as audio
+
+    started = []
+
+    class Hung:
+        pid = 7
+
+        def __init__(self, command, **kwargs):
+            self.name = command[-1]
+            self.alive = self.name.endswith("hung.wav")
+            started.append(self.name)
+
+        def poll(self):
+            return None if self.alive else 0
+
+        def wait(self, timeout=None):
+            if self.alive and timeout is not None:
+                raise audio.subprocess.TimeoutExpired("x", timeout)
+
+        def terminate(self):
+            pass  # ignores SIGTERM
+
+        def kill(self):
+            self.alive = False
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Hung)
+    monkeypatch.setattr(audio, "PLAY_WAIT_CAP_S", 0.2)
+    player = Player()
+    player.play("/tmp/hung.wav")
+    player.play_sequence(["/tmp/115.wav"])
+    player._worker.join(3)
+    assert started == ["/tmp/hung.wav", "/tmp/115.wav"]
+
+
+def test_a_queued_clip_that_hangs_is_cut_so_the_next_one_plays(monkeypatch):
+    """The queue's own clip, not only the sentence it waits behind, is bounded (review, 2026-11-20)."""
+    import virovision.audio as audio
+
+    started = []
+
+    class Clip:
+        pid = 8
+
+        def __init__(self, command, **kwargs):
+            self.alive = command[-1].endswith("hung.wav")
+            started.append(command[-1])
+
+        def poll(self):
+            return None if self.alive else 0
+
+        def wait(self, timeout=None):
+            if self.alive:
+                raise audio.subprocess.TimeoutExpired("x", timeout)
+
+        def terminate(self):
+            self.alive = False
+
+        def kill(self):
+            self.alive = False
+
+    monkeypatch.setattr(audio.subprocess, "Popen", Clip)
+    monkeypatch.setattr(audio, "PLAY_WAIT_CAP_S", 0.1)
+    player = Player()
+    player.play_sequence(["/tmp/hung.wav", "/tmp/115.wav"])
+    player._worker.join(3)
+    assert started == ["/tmp/hung.wav", "/tmp/115.wav"]

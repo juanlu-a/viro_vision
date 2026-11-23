@@ -1,62 +1,67 @@
 # ViroVision
 
-**ViroVision** is an assistive system for people with **low or no vision** that identifies
-**metropolitan bus lines** and **food items on a supermarket shelf** and gives **real-time auditory
-feedback**. A camera device mounted on the temple of a pair of glasses captures the environment;
-a paired mobile app handles connectivity, processing support, and interaction.
+**ViroVision** es un sistema de asistencia para personas **ciegas o con baja visión** que identifica
+**líneas de ómnibus metropolitanas** y **alimentos en la góndola del supermercado** y devuelve
+**retroalimentación auditiva en tiempo real**. Un dispositivo con cámara, montado en la patilla de
+unos lentes, capta el entorno; una aplicación móvil emparejada se encarga de la conectividad, el
+apoyo al procesamiento y la interacción.
 
-Final-career (thesis) project — Ingeniería en Telemática, Facultad de Ingeniería, Montevideo,
-Uruguay, 2026. By Juan Lucas Abreu, Magalí Dellapiazza and Francisco Tauber. Director: Ing. MSc.
+Proyecto de fin de carrera de Ingeniería en Telemática, Facultad de Ingeniería, Montevideo,
+Uruguay, 2026. Autores: Juan Lucas Abreu, Magalí Dellapiazza y Francisco Tauber. Director: Ing. MSc.
 Sebastián García Parra.
 
-## The two use cases
+## Los dos casos de uso
 
-1. **Bus lines** — recognize the line of an approaching bus (OCR) and announce it, prioritizing the
-   most relevant one when several are present.
-2. **Supermarket products** — identify food items and announce them. The scope was the basic basket
-   while the accuracy was unknown; measured on the real device (2026-09-11) the model identifies any
-   food, loose yerba included, so the basket stays as the **evaluation dataset**, not as the limit.
+1. **Líneas de ómnibus**: reconocer la línea de un ómnibus que se acerca y anunciarla, una sola vez
+   por ómnibus. Corre entero en el dispositivo, sin internet: detector en el sensor de la cámara,
+   zoom digital sobre el cartel, OCR en la placa y cruce con el catálogo de líneas del STM.
+2. **Productos de supermercado**: identificar alimentos y anunciarlos, con un modelo de visión en la
+   nube a través de un proxy propio. La canasta básica fue el alcance mientras no se conocía la
+   precisión; medido en el dispositivo real (2026-09-11), el modelo identifica cualquier alimento, y
+   la canasta queda como **conjunto de evaluación**, no como límite.
 
-## Monorepo layout
+## Estructura del monorepo
 
-| Path | Pillar | What's here |
+| Ruta | Pilar | Qué hay |
 |------|--------|-------------|
-| [`app/`](app/) | **Mobile app** | React Native (Expo) app — BLE link to the device, auditory feedback, accessibility-first UI. |
-| [`hardware/`](hardware/) | **Hardware / IoT** | Raspberry Pi Zero 2 W + Coral TPU + Camera Module 3; firmware, BLE peripheral, 3D casing. |
-| [`ml/`](ml/) | **ML / OCR / CV** | YOLO11 detection, OCR, Edge AI (TFLite), datasets. |
-| [`docs/`](docs/) | **Docs** | Thesis deliverables, architecture, ADRs. |
+| [`app/`](app/README.md) | **Aplicación móvil** | React Native (Expo): enlace BLE con el dispositivo, salida de audio elegible, interfaz pensada primero para lectores de pantalla. |
+| [`hardware/`](hardware/README.md) | **Hardware / IoT** | Raspberry Pi Zero 2 W + AI Camera (IMX500) + Waveshare UPS HAT (C); el daemon de la placa y la carcasa VIA Clara (OpenSCAD). |
+| [`ml/`](ml/README.md) | **ML / OCR / CV** | Puntero al pipeline de ómnibus (YOLO11n en el sensor, OCR PP-OCRv5, catálogo), que vive en el repositorio `bus-banner-recognizer`. |
+| [`supabase/`](supabase/) | **Nube** | Funciones `vision` (proxy de claves), `telemetry` y `evidence`. |
+| [`docs/`](docs/README.md) | **Documentación** | Tesis, arquitectura, ADRs, mediciones y guías de operación. |
 
-Deep context for AI assistants lives in the `virovision` skill: `.claude/skills/virovision/`.
+El contexto completo para los asistentes de programación vive en la skill `virovision`:
+`.claude/skills/virovision/`. El estado vigente, en [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md).
 
-## Quick start (app)
+## Inicio rápido (app)
 
 ```bash
 cd app
 npm install
-npx expo start          # TTS works in Expo Go; BLE needs a dev client (npx expo run:ios / run:android)
+npx expo start          # el TTS anda en Expo Go; BLE necesita un dev client (npx expo run:ios / run:android)
 ```
 
-See [`app/README.md`](app/README.md) for the full app guide.
+La guía completa está en [`app/README.md`](app/README.md); la de la placa, en
+[`hardware/raspi/README.md`](hardware/raspi/README.md).
 
-## Status
+## Estado (2026-10-22)
 
-- ✅ Monorepo scaffolded; React Native app bootstrapped with an accessible starting screen + working
-  text-to-speech.
-- 🚧 BLE/GATT communication, device firmware, and the ML models are the next pieces (see each
-  pillar's README).
+- Los dos modos funcionan de punta a punta con el dispositivo real, disparados por su botón.
+- La app se distribuye por TestFlight (interno desde `staging`, público desde `main`) y como `.apk`.
+- Pendiente: la prueba del modo ómnibus en la calle, las métricas del detector reentrenado, la
+  carcasa definitiva y las pruebas con usuarios. Detalle en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-## Constraints & principles
+## Restricciones y principios
 
-- **Accessibility is a hard requirement** (VoiceOver / TalkBack, real usability testing with blind users).
-- **Offline-first / self-contained.** Essential features (detection, OCR, audio feedback) must work
-  **without internet** — the recognition model is bundled and runs locally (on the device or on the
-  phone), never a cloud API **as the only path** (since ADR 0001 was amended on 2026-08-10 the
-  cloud may act as an *optional accelerator*, with local inference as the guaranteed fallback).
-  Non-essential features may use the internet.
-- **Low cost, portable**, adapted to the Uruguayan context.
-- Two device architectures are evaluated: **on-device** processing vs. **offload to the phone**
-  (in both, inference stays local).
+- **La accesibilidad es un requisito duro** (VoiceOver, TalkBack y pruebas de uso con personas
+  ciegas).
+- **Offline-first.** Las funciones esenciales (detección, OCR y audio) funcionan **sin internet**.
+  Desde la enmienda del ADR 0001 (2026-08-10) la nube se admite como *acelerador opcional*, nunca
+  como único camino; el modo supermercado es la excepción declarada, con el respaldo local abierto.
+- **Bajo costo y portátil**, adaptado al contexto uruguayo.
+- **Los errores no se le dicen al usuario** (ADR 0011): van a la telemetría.
 
-## Timeline
+## Calendario
 
-Development targeted for **~mid-November 2026**; hard deadline **30 November 2026**.
+El desarrollo apunta a **mediados de noviembre de 2026**; la fecha límite es el **30 de noviembre
+de 2026**.

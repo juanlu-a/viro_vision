@@ -1,0 +1,37 @@
+VIA Clara v0.24 (2026-11-05): la v0.23 con la ranura de la microSD 1 mm hacia adentro
+
+Es la v0.23 (la v0.22 con la cámara 2 mm más lejos y la tapa del auricular más alta) con un cambio más:
+
+0. Ranura de la microSD 1 mm hacia adentro, hacia el borde de la mitad derecha donde se une con
+   la izquierda (en el extremo trasero). Cambia sólo la mitad derecha (02).
+
+0b. Guía delantera de la cámara abierta en toda la franja de abajo (la del conector, 7 mm de alto),
+    en las DOS mitades: antes sólo estaba cortada en la mitad derecha, por el componente de la
+    cámara. Cambian las dos mitades (01 y 02) y las narices de prueba.
+
+Y lo de la v0.23:
+
+1. Cámara 2 mm más lejos de las placas. Entre la parte de atrás de la cámara y el frente de la Pi
+   y la HAT hay ahora 10 mm (antes 8), porque ahí va enrollado el flex. La nariz y la carcasa
+   crecen 2 mm: las mitades miden 89,2 mm de largo (antes 87,2). Las guías de la cámara son las
+   mismas, sólo se corrieron hacia adelante.
+
+2. Tapa del auricular 1,5 mm más alta. El disco queda 1,5 mm por encima del borde de la copa y los
+   dedos son 1,5 mm más largos (más flexibles); la traba cae en la misma ranura de la copa. El
+   brazo no cambia.
+
+Piezas:
+  01_left_half_v0_24.stl          mitad del lado de la cabeza (más larga)
+  02_right_half_v0_24.stl         mitad externa (más larga)
+  03_bone_arm_v0_24.stl           brazo (igual a la v0.20 y la v0.22)
+  04_mode_button_v0_24.stl        botón (igual)
+  07_transducer_cover_v0_24.stl   tapa del auricular, 1,5 mm más alta
+  00_assembly_check_v0_24.stl     todo armado, sólo para mirar
+  Orientación y soportes: como la v0.20.
+
+pruebas/:
+  07_transducer_cover_alto_1_0 / _alto_2_0   la misma tapa, 1 y 2 mm más alta, para probar las
+                                             tres alturas y quedarse con la que hace click mejor
+  test_nose_left / test_nose_right           la nariz de cada mitad, con el hueco nuevo del flex
+
+modelo/: el .scad de esta versión, la guía y export.sh.

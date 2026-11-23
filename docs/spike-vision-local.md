@@ -1,4 +1,4 @@
-# Spike — visión local en el teléfono (2026-08-12/13)
+# Spike: visión local en el teléfono (2026-08-12/13)
 
 **Pregunta:** ¿puede el teléfono leer el cartel del ómnibus sin depender de la nube?
 (ADR 0004 propone Gemma local; ADR 0001 permite la nube sólo como acelerador opcional.)
@@ -12,9 +12,9 @@ podrían venir del experimento y no del modelo. Todo corre desde la pantalla de 
 
 | Camino | Qué usa | Resultado |
 |---|---|---|
-| **Nube** (Gemini) | `services/vision/` — API con streaming SSE | ✅ Funciona. TTFT < 1 s. Necesita internet; cuota de 20 req/min por modelo en el tier gratuito |
+| **Nube** (Gemini) | `services/vision/`, API con streaming SSE | ✅ Funciona. TTFT < 1 s. Necesita internet; cuota de 20 req/min por modelo en el tier gratuito |
 | **LiteRT-LM** (runtime de Google, sucesor de TFLite) | `react-native-litert-lm@0.6.0` + Gemma | ⚠️ **Texto sí**: Gemma 3 1B genera (910 ms, 13,4 tok/s); Gemma 4 E2B (2,5 GB) carga. **Visión no**: falla al crear la conversación con 3 modelos (756 MB–2,5 GB), en cualquier backend, contexto y precisión |
-| **ExecuTorch** (runtime de PyTorch; en iOS corre sobre MLX, el stack de Apple) | `react-native-executorch@0.9.3` + Gemma 4 E2B multimodal (3 GB) | ✅ **La visión funciona**: carga en ~4 s y lee bien el cartel. Pero TTFT ~5,6 s / total ~6,4 s — lento para un ómnibus acercándose |
+| **ExecuTorch** (runtime de PyTorch; en iOS corre sobre MLX, el stack de Apple) | `react-native-executorch@0.9.3` + Gemma 4 E2B multimodal (3 GB) | ✅ **La visión funciona**: carga en ~4 s y lee bien el cartel. Pero TTFT ~5,6 s / total ~6,4 s, lento para un ómnibus acercándose |
 | **OCR local** (mismo ExecuTorch) | Detector CRAFT + reconocedor CRNN en **español**, ~250 MB | ✅ Rápido y liviano. Devuelve texto **+ posición + confianza**. La precisión mejora mucho con buen encuadre o recorte |
 
 ## La conclusión clave
@@ -43,9 +43,17 @@ cambio), precisión de activaciones y decodificado restringido. Es reportable co
 
 ## Recomendación para discutir con el equipo
 
+> **Superado por el ADR 0006 (2026-09-07).** La recomendación de abajo se adoptó en su forma
+> (detección, recorte del banner, OCR) pero no en sus piezas: el detector no corre en el teléfono ni
+> en un Coral sino **dentro del sensor IMX500** de la AI Camera, y **sí se entrena** (YOLO11n de dos
+> clases, `bus_sign` y `bus`), porque COCO no trae una clase para el cartel. El OCR tampoco es CRAFT +
+> CRNN sobre ExecuTorch: es PP-OCRv5 mobile (`latin`) vía ONNX, en la Pi. El modo ómnibus corre entero
+> en la placa desde el 2026-09-15. Estado vigente en la
+> [actualización 2026-10-22 del ADR 0006](architecture/adr/0006-pipelines-por-caso-de-uso.md).
+
 **Pipeline detección → recorte del banner → OCR, con modelos preentrenados de ExecuTorch:**
 
-1. Detector chico (`rfdetr-nano` / `yolo26`): COCO ya trae la clase "bus" — **no hay que entrenar**.
+1. Detector chico (`rfdetr-nano` / `yolo26`): COCO ya trae la clase "bus": **no hay que entrenar**.
 2. El banner es geométricamente predecible: franja superior de la caja del ómnibus.
 3. El recorte reescalado pasa por el OCR: letras grandes, precisión alta.
 4. Caja más grande = ómnibus más cercano → la priorización que la tesis exige, gratis.
@@ -54,7 +62,7 @@ Es la arquitectura que la tesis describía (detección + OCR) **sin pagar el ent
 local queda como término de comparación en el informe; la nube como acelerador opcional (ADR 0001).
 
 La pregunta de alcance del ADR 0004 (¿Gemma multimodal reemplaza a YOLO+OCR?) ahora tiene evidencia:
-**hoy, en este hardware, no** — 6,4 s contra fracciones de segundo, y sin coordenadas para priorizar.
+**hoy, en este hardware, no**: 6,4 s contra fracciones de segundo, y sin coordenadas para priorizar.
 
 ## Nota de cierre (2026-08-30)
 
@@ -63,14 +71,15 @@ y sólo para el OCR del modo ómnibus; LiteRT-LM y el Gemma multimodal se desins
 (`react-native-litert-lm`, `react-native-nitro-modules`, `expo-document-picker`), y el benchmark de
 nube también, porque el modo supermercado ya usa la nube como camino de producto con selector de
 modelo (ADR 0006, actualización 2026-08-30). El código completo del laboratorio sigue disponible en
-la rama `spike/laboratorio-vision-local`, el tag `spike-laboratorio-vision-local-2026-08-30` y el PR
+el tag `spike-laboratorio-vision-local-2026-08-30` y el PR
 draft "[NO MERGEAR]" #33; el índice y la receta para revivirlo están en
-[`spike-laboratorio-referencia.md`](spike-laboratorio-referencia.md) (en esa rama).
+[`spike-laboratorio-referencia.md`](https://github.com/juanlu-a/viro_vision/blob/spike-laboratorio-vision-local-2026-08-30/docs/spike-laboratorio-referencia.md) (en ese tag).
 
 ## Pendientes
 
 - Reportar el bug de visión a `react-native-litert-lm` con el caso reproducible (desde la rama).
-- ~~Decidir runtime único~~ → resuelto el 2026-08-30: queda ExecuTorch (OCR).
+- ~~Decidir runtime único~~ → resuelto el 2026-08-30: queda ExecuTorch (OCR). Superado por el ADR 0006
+  (2026-09-07): el OCR del modo ómnibus corre en la placa, no en el teléfono.
 - Anotado: el mínimo de iOS subió a **17.0** (lo exige el podspec de ExecuTorch).
 - La cuenta paga de Apple quedó **desacoplada de esto**: sirve para distribuir la app al equipo,
   no hace falta para la visión local.

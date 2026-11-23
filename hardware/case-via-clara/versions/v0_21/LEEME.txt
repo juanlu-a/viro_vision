@@ -1,0 +1,30 @@
+VIA Clara v0.21 (2026-11-01): la v0.20 girada entera, con la cara de la HAT ARRIBA
+
+Con la v0.20 puesta, la foto salía girada 90°. La foto sale derecha con la cara de la HAT arriba, así
+que se giró la carcasa entera para ese lado: la foto sale derecha SIN invertir nada en la placa. El
+interior es el de la v0.20 que imprimiste (guías de la cámara, zócalos, trabas, switch).
+
+Puesta:
+  - arriba: la cara de la HAT, con el SWITCH
+  - abajo: la cara de la Pi, con el BOTÓN (centrado)
+  - contra la patilla: los puentes del elástico y el zócalo del brazo
+  - el corte entre mitades queda horizontal: mitad de la HAT arriba, mitad de la Pi abajo
+Medidas: 87,2 de largo, 28,5 de alto, sobresale 37,2 de la patilla.
+
+Piezas:
+  01_top_half_v0_21.stl           mitad de la HAT (arriba, switch): imprimir sobre la cara de la HAT.
+                                  Soporte bajo el extremo de los medios puentes y del medio zócalo del
+                                  brazo (quedan de costado), el ahusado trasero y la nariz.
+  02_bottom_half_v0_21.stl        mitad de la Pi (abajo, botón): sobre la cara de la Pi. Mismos
+                                  soportes; NINGUNO dentro de los zócalos hexagonales. Cortar los
+                                  puentes de las vigas de las trabas.
+  03_bone_arm_v0_21.stl           brazo (tapón 0,5 más corto, agujero Ø 2,6 en otro lugar)
+  04_mode_button_v0_21.stl        botón (igual a la v0.20)
+  07_transducer_cover_v0_21.stl   tapa del auricular (igual)
+  00_assembly_check_v0_21.stl     todo armado, sólo para mirar
+  modelo/                         el .scad de esta versión (el repo sigue con la v0.22)
+
+Armado: el cable del auricular se saca por su paso (en la mitad de la HAT) ANTES de cerrar. Ojo: ese
+paso da adentro junto al conector JST de la batería de la HAT.
+
+Pruebas (pruebas/): las narices y la pared de zócalos, iguales a la v0.20.

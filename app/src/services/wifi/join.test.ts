@@ -112,6 +112,26 @@ describe('reachDeviceNetwork', () => {
     expect(gaveUp).toMatchObject({ ok: false, reason: 'unreachable' });
     expect(c.now()).toBe(3_000);
   });
+
+  // 2026-11-20: the prompt on every power-on. A network the phone already joined is saved, and iOS
+  // rejoins it by itself (~10 s after the AP comes up); asking the system again IS the prompt.
+  it('for a network already joined it never asks the system, it waits for iOS to rejoin', async () => {
+    const { probe } = probeFrom(12); // answers after ~12 probes, like an iOS rejoin seconds later
+    const join = jest.fn(async () => 'joined' as const);
+    const outcome = await reachDeviceNetwork(address, credentials, { ...clock(), probe, join, mayPrompt: false, intervalMs: 1_000 });
+    expect(outcome).toEqual({ ok: true, via: 'already' });
+    expect(join).not.toHaveBeenCalled();
+  });
+
+  it('for a network already joined that does not come back, it gives up without a prompt', async () => {
+    const never = probeFrom(Infinity);
+    const join = jest.fn(async () => 'joined' as const);
+    const c = clock();
+    const outcome = await reachDeviceNetwork(address, credentials, { ...c, probe: never.probe, join, mayPrompt: false, rejoinMs: 20_000, intervalMs: 1_000 });
+    expect(outcome).toMatchObject({ ok: false, reason: 'notJoined' });
+    expect(join).not.toHaveBeenCalled();
+    expect(c.now()).toBe(20_000);
+  });
 });
 
 describe('probeDevice', () => {

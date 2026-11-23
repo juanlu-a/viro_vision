@@ -15,8 +15,8 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 |---|---|
 | `01-introduccion.md` | Del documento original |
 | `02-descripcion-del-proyecto.md` | Del documento original: alcance, objetivos, entregables, antecedentes |
-| `03-estado-del-arte.md` | Del original, más los cuatro apartados que estaban vacíos |
-| `04-marco-teorico.md` | Del original, más métricas, YOLO, OCR, Edge AI, comunicación inalámbrica, audio y WCAG |
+| `03-marco-teorico.md` | Reescrito por el equipo en el Doc (noviembre de 2026): IA, métricas, YOLO, OCR, Edge AI, comunicación inalámbrica, audio y WCAG |
+| `04-estado-del-arte.md` | Del original, más los apartados que estaban vacíos |
 | `05-metodologia.md` | Nuevo |
 | `06-planificacion.md` | Nuevo |
 | `07-desarrollo.md` | Nuevo, el capítulo central |
@@ -32,14 +32,26 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 - **Sin raya larga.** No se usa el guion largo de estilo inglés. Se emplean comas, dos puntos o
   paréntesis. `build.py` falla si aparece uno.
 - **Números en formato español**: coma decimal y punto de miles.
+- **Referencias internas como «sec. 7.4.6»**, no con el signo de párrafo (decisión del equipo en el
+  Doc, 2026-09-18).
 - **Toda cifra tiene fuente.** Cada número remite a un ADR, a una campaña de `docs/mediciones/` o a
   un resultado guardado del repositorio de visión.
 - **Lo pendiente se declara.** Lo que no está hecho o no está medido se dice, no se omite.
 - **Ninguna credencial se transcribe.** Se nombra la deuda, no el valor.
+- **Comillas “” y cita antes del punto** (convención del equipo en el Doc, 2026-11-17): “así”, y
+  «… del proyecto \[45\].». Las citas son numéricas, \[n\], y remiten a la lista única del capítulo 11.
+- **La bibliografía es una sola lista numerada**, sin subtítulos por tema: si se agrupara, el Doc
+  reiniciaría la numeración en cada grupo y las citas dejarían de coincidir. Una fuente nueva se
+  agrega al final, para no correr la numeración de las que ya se citan.
+- **Las figuras van en el cuerpo**, junto al párrafo que las cita, con numeración global y
+  correlativa: «Figura N: título.» debajo de la imagen y, en el párrafo siguiente, «Fuente: …». Sólo
+  las muy grandes o las complementarias van además, o únicamente, en el anexo. En el Markdown la
+  imagen se marca con `<!-- imagen del Doc: ruta -->`; las fuentes de las figuras nuevas están en
+  `figuras/` o en la campaña de `docs/mediciones/` que corresponda.
 
 ## Marcadores
 
-- `[FIGURA N: …]` marca una figura por producir, con la descripción de qué debe mostrar.
+- `[FIGURA: …]` marca una figura por producir, con la descripción de qué debe mostrar.
 - `[PENDIENTE: …]` marca un dato que falta y que debe completarse antes de la entrega.
 
 ## Publicar en el Doc
@@ -73,6 +85,55 @@ En el Doc, para reemplazar una sección:
 - **No deshacer a ciegas.** Borrar el cuerpo y pegar son operaciones separadas: unos pocos `cmd+z`
   seguidos se llevan también la carátula y el índice. Ante la duda, *Archivo → Historial de
   versiones*, que guarda todo.
+
+### Publicar por la API, sección por sección (desde el 2026-10-22)
+
+Con el conector de Google Docs, `sync_doc.py` reemplaza en el Doc **sólo las secciones que cambiaron**,
+de abajo hacia arriba, sin tocar la carátula, el índice, las imágenes que el equipo agregó en el Doc
+ni los comentarios de las secciones que no cambian. El ciclo es:
+
+1. Leer el Doc con `read_doc` y quedarse con el objeto `content` (`jq '.content'`).
+2. `python3 sync_doc.py doc.json batch.json --max-chars 25000` arma la tanda siguiente; con
+   `--report` lista qué secciones difieren.
+3. Mandar `batch.json` con `update_doc`, **siempre con su `writeControl`**: si alguien editó el Doc
+   en el medio, Google rechaza la tanda entera y se vuelve al paso 1.
+4. Repetir hasta que el script diga `ops=0`. Al final, actualizar el índice a mano (la API no lo
+   refresca).
+
+Desde el 2026-11-18 el script reescribe sólo los párrafos y las celdas de tabla que cambiaron, cuando la
+estructura de la sección coincide (mismos párrafos, ítems y tablas). Si no coincide, reemplaza la sección
+entera. Con `--reinsert 1-14,16-18,20-23` también reescribe las secciones cuyas únicas imágenes son
+figuras con fuente en el repositorio (`figuras/` o `docs/mediciones/`), y después el script
+`imgins.py` del scratchpad las vuelve a poner sobre su epígrafe. Los diagramas que el equipo dibujó en
+el Doc (7.4.1, 7.5.1) y las imágenes del anexo nunca se reescriben. La API de Docs limita las
+escrituras por minuto: ante el error de cuota hay que esperar y reintentar.
+
+El script salta a propósito las secciones que todavía no hay que pisar (hoy, la 12.2.3, que en el Doc
+tiene una copia de la tabla agregada a mano: ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
+abajo: traer primero al repo lo que se haya editado directo en el Doc.
+
+### Actualizar el índice
+
+La API de Docs no puede actualizar el índice. Se actualiza desde Chrome, con el perfil jlabreu24:
+se hace clic dentro del índice y se pulsa el botón "Actualizar índice" que aparece a su izquierda.
+La actualización mezcla fuentes (las líneas nuevas quedan en Arial 11 y el resto en Times New Roman
+12), por lo que después hay que uniformarlas:
+
+1. Leer el Doc con `read_doc` y quedarse con el objeto `content`.
+2. `python3 toc_style.py doc.json batch.json` arma la tanda. Por defecto toma la fuente y el tamaño
+   mayoritarios en el índice; con `--font` y `--size` se fijan a mano. Sólo cambia la fuente y el
+   tamaño, y vuelve a poner la negrita donde estaba, porque el cambio de fuente la borra.
+3. Mandar `batch.json` con `update_doc`, con su `writeControl`. Si el script informa `ops=0`, el
+   índice ya está uniforme.
+
+### Traer el Doc al repo cuando el equipo editó mucho
+
+Si el equipo reescribió secciones enteras en el Doc, conviene importar el Doc completo antes de
+editar: se arma el Markdown de cada capítulo desde `read_doc` y se verifica con
+`sync_doc.py --report` que no quede ninguna sección distinta. Así se hizo el 2026-11-09 (ver la
+bitácora). Si después se renombra un título, hay que renombrarlo primero en el Doc (`replaceAllText`):
+el script empareja secciones por título y, con un título nuevo, insertaría la sección sin borrar la
+vieja.
 
 ## Trabajar en paralelo
 

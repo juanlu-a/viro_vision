@@ -9,6 +9,7 @@ daemon sees when `bus_banner` is not installed.
 """
 
 import asyncio
+import dataclasses
 import inspect
 import json
 import types
@@ -61,16 +62,33 @@ class FakeBus:
 @pytest.fixture
 def loop():
     loop_ = asyncio.new_event_loop()
+    # The core sends `bus.start`/`bus.stop` to the executor, and those futures are not tasks: a drain
+    # that only gathered tasks raced the worker thread, and the first CI run (2026-11-02) lost it.
+    # Every executor future is tracked so `_drain` can wait for it too.
+    original = loop_.run_in_executor
+    loop_.executor_futures = []
+
+    def tracked(*args, **kwargs):
+        future = original(*args, **kwargs)
+        loop_.executor_futures.append(future)
+        return future
+
+    loop_.run_in_executor = tracked
     yield loop_
     loop_.close()
 
 
 async def _drain(loop_):
-    for _ in range(5):
-        await asyncio.sleep(0)
-    pending = [t for t in asyncio.all_tasks(loop_) if t is not asyncio.current_task()]
-    if pending:
-        await asyncio.gather(*pending)
+    """Until nothing the scenario started is still running: tasks, and work in the executor (which
+    can schedule more tasks when it finishes)."""
+    for _ in range(20):
+        for _ in range(5):
+            await asyncio.sleep(0)
+        tasks = [t for t in asyncio.all_tasks(loop_) if t is not asyncio.current_task()]
+        futures = [f for f in getattr(loop_, "executor_futures", []) if not f.done()]
+        if not tasks and not futures:
+            return
+        await asyncio.gather(*tasks, *futures, return_exceptions=True)
 
 
 def build(loop_, bus=None):
@@ -233,24 +251,25 @@ def test_the_same_bus_seen_twice_is_announced_once():
 
 
 def test_a_bus_is_announced_once_even_if_the_tracker_sees_several():
-    """«Se acerca un ómnibus» salía una vez por track, y un ómnibus que se pierde y vuelve es un
-    track nuevo. Probando con videos el 2026-09-15 la frase se repitió muchas veces seguidas: los
-    cortes del video rompían el seguimiento. La frase no distingue un ómnibus de otro, así que
-    repetirla no agrega nada."""
+    """«Se acerca un ómnibus» was said once per track, and a bus that is lost and comes back is a new
+    track. Testing with videos on 2026-09-15 the phrase was repeated many times in a row: the cuts
+    in the video broke the tracking. The phrase does not tell one bus from another, so repeating it
+    adds nothing."""
 
     class CameraWithoutModel:
         sensor = None
 
     watcher = BusWatcher(CameraWithoutModel(), lambda files: None, lambda event: None)
-    assert watcher._presence_is_worth_saying(), "el primero sí"
-    assert not watcher._presence_is_worth_saying(), "un instante después, no"
-    watcher._last_voice_at -= PRESENCE_SILENCE_S + 1  # pasó la ventana
-    assert watcher._presence_is_worth_saying(), "más tarde vuelve a ser noticia"
+    assert watcher._presence_is_worth_saying(), "the first one, yes"
+    assert not watcher._presence_is_worth_saying(), "an instant later, no"
+    watcher._last_voice_at -= PRESENCE_SILENCE_S + 1  # the window has passed
+    assert watcher._presence_is_worth_saying(), "later it is news again"
 
 
 def test_the_line_silences_the_presence_that_would_follow_it():
-    """Decir «se acerca un ómnibus» después de haber dicho «ómnibus 115, Luis Braille» es contar algo
-    que el usuario ya sabe, y así llegaba: el anuncio de la línea no armaba la ventana de silencio."""
+    """Saying «se acerca un ómnibus» after having said «ómnibus 115, Luis Braille» tells the user
+    something they already know, and that is how it arrived: the line announcement did not arm the
+    silence window."""
 
     class Event:
         kind = "reading"
@@ -266,8 +285,8 @@ def test_the_line_silences_the_presence_that_would_follow_it():
         sensor = None
 
     watcher = BusWatcher(CameraWithoutModel(), lambda files: None, lambda event: None)
-    watcher._files_for = lambda number, destination: []  # los .wav viven en la placa, no acá
-    watcher._result_event = lambda event: {}  # el evento BLE tiene su propio test
+    watcher._files_for = lambda number, destination: []  # the .wav files live on the board, not here
+    watcher._result_event = lambda event: {}  # the BLE event has its own test
     watcher._handle(Event())
     assert not watcher._presence_is_worth_saying()
 
@@ -400,20 +419,27 @@ def test_a_silent_camera_is_reopened_by_the_watchdog():
         def restart(self):
             self.restarts += 1
 
+    class Ticks:
+        """A stop event whose `wait` is one watchdog tick that never sleeps: `ticks` of them, then
+        stop. The test drives the watchdog tick by tick instead of racing its 1 s clock."""
+
+        def __init__(self, ticks):
+            self.left = ticks
+            self.restarts_per_tick = []
+
+        def wait(self, _timeout):
+            self.restarts_per_tick.append(camera.restarts)
+            self.left -= 1
+            return self.left < 0
+
     camera = SilentCamera()
     watcher = BusWatcher(camera, lambda files: None, lambda event: None)
-    watcher._last_frame_at = time.monotonic()
-    threading.Thread(target=watcher._watchdog, args=(watcher._stop,), daemon=True).start()
-    try:
-        watcher._last_frame_at -= FRAME_SILENCE_S + 1  # as if the camera had been quiet that long
-        deadline = time.monotonic() + 5
-        while camera.restarts == 0 and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert camera.restarts == 1
-        time.sleep(1.5)
-        assert camera.restarts == 1, "the restart takes seconds; it must not fire again meanwhile"
-    finally:
-        watcher._stop.set()
+    watcher._last_frame_at = time.monotonic() - FRAME_SILENCE_S - 1  # as if the camera had been quiet that long
+    ticks = Ticks(3)
+    watcher._watchdog(ticks)
+    # Tick 1 reopens it; ticks 2 and 3 see the clock it reset and leave it alone.
+    assert ticks.restarts_per_tick == [0, 1, 1, 1]
+    assert camera.restarts == 1, "the restart takes seconds; it must not fire again meanwhile"
 
 
 def test_bus_mode_runs_against_a_pipeline_package_without_signs_expected():
@@ -670,28 +696,51 @@ def test_two_overlapping_starts_launch_one_set_of_threads(tmp_path):
     and each launched three threads on the same camera."""
     launched = []
     building = threading.Event()
+    release = threading.Event()
+    second_waiting = threading.Event()
 
     class Camera:
         sensor = object()
 
+    class SpyLock:
+        """The build lock, telling the test when the second start is about to block on it."""
+
+        def __init__(self):
+            self._lock = threading.Lock()
+
+        def acquire(self, blocking=True):
+            if blocking:
+                second_waiting.set()
+            return self._lock.acquire(blocking)
+
+        def release(self):
+            self._lock.release()
+
     watcher = BusWatcher(Camera(), lambda files: None, lambda e: None, announcements=tmp_path)
+    watcher._build_lock = SpyLock()
 
     def slow_build():
         building.set()
-        time.sleep(0.2)
+        assert release.wait(5)
         watcher._pipeline = object()
 
     watcher._build = slow_build
     watcher._frame_loop = lambda *_: launched.append("frames")
     watcher._read_loop = lambda *_: None
     watcher._watchdog = lambda *_: None
+    results = []
     with patch("virovision.bus.is_available", return_value=True):
-        first = threading.Thread(target=watcher.start)
+        first = threading.Thread(target=lambda: results.append(("first", watcher.start())))
         first.start()
-        building.wait(2)
-        assert watcher.start(), "the second start waits for the first and finds it running"
-        first.join()
+        assert building.wait(5)
+        second = threading.Thread(target=lambda: results.append(("second", watcher.start())))
+        second.start()
+        assert second_waiting.wait(5)  # the second start overlaps the build, as on the board
+        release.set()
+        first.join(5)
+        second.join(5)
     watcher.stop()
+    assert ("second", True) in results, "the second start waits for the first and finds it running"
     assert launched == ["frames"]
 
 
@@ -706,9 +755,11 @@ def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path)
 
     watcher = BusWatcher(Camera(), lambda files: None, lambda e: None, announcements=tmp_path)
 
+    release = threading.Event()
+
     def slow_build():
         building.set()
-        time.sleep(0.2)
+        assert release.wait(5)
         watcher._pipeline = object()
 
     watcher._build = slow_build
@@ -719,9 +770,10 @@ def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path)
     with patch("virovision.bus.is_available", return_value=True):
         first = threading.Thread(target=lambda: result.append(watcher.start()))
         first.start()
-        building.wait(2)
+        assert building.wait(5)
         watcher.stop()  # the user switched modes; this must not wait for the build
-        first.join()
+        release.set()
+        first.join(5)
     assert result == [False]
     assert launched == []
     assert not watcher.running
@@ -849,3 +901,313 @@ def test_a_frame_released_after_stop_is_not_processed(monkeypatch):
     watcher._watcher = FakeWatcher()
     watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
     assert released == [1] and processed == []
+
+
+IMAGE = types.SimpleNamespace(shape=(768, 1024, 3))
+"""All of a frame the zoom looks at: its shape. numpy is not in the Mac's environment."""
+
+
+class ZoomingCamera:
+    """A camera whose ISP crop follows `set_zoom` from the next frame on, like the real one (a bit
+    sooner: the real one takes a couple of frames)."""
+
+    FULL = (0, 0, 4056, 3040)
+
+    def __init__(self, frames, sign):
+        self.sensor = types.SimpleNamespace(get_outputs=lambda metadata: metadata, get_input_size=lambda: (640, 640))
+        self.crop = self.FULL
+        self.zooms: list = []
+        self.mapped_with: list = []
+        self._frames = frames
+        self._sign = sign  # normalized (y1, x1, y2, x2): where the sensor sees the sign
+        self.on_last_frame = lambda: None
+
+    def zoom_bounds(self):
+        return self.FULL, (2048, 1536), (1024, 768)
+
+    def set_zoom(self, crop):
+        self.zooms.append(crop)
+        self.crop = crop if crop is not None else self.FULL
+
+    def capture_request(self):
+        if self._frames == 0:
+            self.on_last_frame()
+            raise RuntimeError("closed by stop")
+        self._frames -= 1
+        crop = self.crop
+
+        class Request:
+            def get_metadata(self):
+                return {"ScalerCrop": crop, "sign": True}
+
+            def make_array(self, name):
+                return IMAGE
+
+            def release(self):
+                pass
+
+        return Request()
+
+    def to_stream(self, coords, metadata):
+        """`convert_inference_coords` with no zoom: the full view."""
+        self.mapped_with.append(metadata["ScalerCrop"])
+        y1, x1, y2, x2 = coords
+        return (x1 * 1024, y1 * 768, (x2 - x1) * 1024, (y2 - y1) * 768)
+
+
+def _fake_pipeline_with_signs(monkeypatch, sign):
+    """`bus_banner` faked: the sensor reports one sign at `sign` (normalized y1, x1, y2, x2)."""
+
+    @dataclasses.dataclass(frozen=True)
+    class Box:
+        x1: float
+        y1: float
+        x2: float
+        y2: float
+        width = property(lambda self: self.x2 - self.x1)
+        height = property(lambda self: self.y2 - self.y1)
+        area = property(lambda self: self.width * self.height)
+        aspect = property(lambda self: self.width / self.height)
+
+        def clip(self, width, height):
+            return Box(max(0, self.x1), max(0, self.y1), min(width, self.x2), min(height, self.y2))
+
+    def detections_from_tensors(outputs, labels, *, to_stream, **kwargs):
+        x, y, w, h = to_stream(*sign)
+        return [types.SimpleNamespace(label="bus_sign", box=Box(x, y, x + w, y + h), conf=0.9)]
+
+    imx500 = types.ModuleType("bus_banner.imx500")
+    imx500.detections_from_tensors = detections_from_tensors
+    monkeypatch.setitem(sys.modules, "bus_banner", types.ModuleType("bus_banner"))
+    monkeypatch.setitem(sys.modules, "bus_banner.imx500", imx500)
+    return Box
+
+
+def test_bus_mode_zooms_on_the_sign_and_reads_it_from_the_zoomed_frame(monkeypatch):
+    """Field test of 2026-10-19: the sign was ~9 px tall in the 1024 px frame until the bus was almost
+    in front of the user. The tracker keeps seeing the whole view —its boxes do not jump when the zoom
+    moves— and only the crop handed to the OCR is translated into the zoomed frame."""
+    from virovision.bus import MIN_BANNER_HEIGHT_PX, ZoomedFrame
+
+    sign = (0.40, 0.50, 0.4130, 0.55)  # ~10 px tall at 768, a bus far away
+    _fake_pipeline_with_signs(monkeypatch, sign)
+    camera = ZoomingCamera(frames=3, sign=sign)
+    seen: list = []
+
+    class FakeWatcher:
+        tracker = types.SimpleNamespace(tracks=[])
+        min_banner_height_px = MIN_BANNER_HEIGHT_PX
+
+        def process(self, frame, detections, frame_number):
+            seen.append((frame, detections[0].box, self.min_banner_height_px))
+            return []
+
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None)
+    camera.on_last_frame = watcher._stop.set
+    watcher._watcher = FakeWatcher()
+    watcher._settings = {"labels": ["bus_sign"], "normalize": False, "order": None}
+    watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
+
+    assert camera.zooms and camera.zooms[0][2] == 2048, "zoomed on the sign, as far as the binned mode goes"
+    assert set(camera.mapped_with) == {ZoomingCamera.FULL}, "the tracker's boxes always come in the full view"
+    (_, before, threshold_before), (zoomed, after, threshold_after) = seen[0], seen[1]
+    assert before == after, "the zoom moved and the tracker did not notice"
+    assert isinstance(zoomed, ZoomedFrame) and zoomed.view.zoom > 1.9
+    assert threshold_after < threshold_before, "a sign is judged by its height in the zoomed frame"
+
+    # The reader, handed that frame: the job carries the plain array and the box where it is in it.
+    track = types.SimpleNamespace(id=1, read_attempts=1)
+    watcher._watcher.tracker.tracks = [track]
+    watcher._watcher.reading_track = 1
+    watcher._queue_read(zoomed, after, None)
+    image, banner, _, track_id, _ = watcher._jobs.get_nowait()
+    assert image is zoomed.image and track_id == 1
+    assert abs(banner.height - after.height * zoomed.view.zoom) < 0.5, "read from real pixels, not upscaled ones"
+
+
+def test_a_sign_the_zoom_cut_is_not_read_and_costs_no_attempt(monkeypatch):
+    from virovision.bus import SKIPPED, ZoomedFrame
+    from virovision.zoom import View
+
+    Box = _fake_pipeline_with_signs(monkeypatch, (0, 0, 0, 0))
+    watcher = BusWatcher(ZoomingCamera(frames=0, sign=None), lambda files: None, lambda event: None)
+    track = types.SimpleNamespace(id=7, read_attempts=3)
+    submitted = []
+    watcher._watcher = types.SimpleNamespace(
+        tracker=types.SimpleNamespace(tracks=[track]),
+        reading_track=7,
+        submit_reading=lambda *args: submitted.append(args),
+    )
+    view = View((2028, 0, 2028, 1520), ZoomingCamera.FULL, (1024, 768))  # the right upper quarter
+    frame = ZoomedFrame(IMAGE, view)
+
+    assert watcher._queue_read(frame, Box(480, 100, 560, 120), None) is None  # half of it is left of the crop
+    assert watcher._jobs.empty(), "no OCR on half a sign"
+    assert track.read_attempts == 2, "the attempt the watcher counted never happened"
+    assert watcher._results.get_nowait() == (7, SKIPPED, 0, None)
+
+    watcher._results.put((7, SKIPPED, 0, None))
+    watcher._drain_results(10, watcher._results, watcher._watcher)
+    assert submitted == [(7, None, 10)], "the track is free for the next frame"
+
+
+def test_leaving_bus_mode_undoes_the_zoom():
+    """The camera is shared with supermarket mode: its next photo must show the whole view."""
+    camera = ZoomingCamera(frames=0, sign=None)
+    camera.crop = (2028, 0, 2028, 1520)
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None)
+    watcher.running = True
+    watcher.stop()
+    # Twice on purpose: once before the joins (a double click asks for the supermarket photo at the
+    # same moment) and once after, for a frame loop that re-zoomed on its way out.
+    assert camera.zooms == [None, None] and camera.crop == ZoomingCamera.FULL
+
+
+def test_bus_mode_can_be_told_not_to_zoom(monkeypatch):
+    _fake_pipeline_with_signs(monkeypatch, (0.40, 0.50, 0.4130, 0.55))
+    camera = ZoomingCamera(frames=2, sign=None)
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None, zoom=False)
+    camera.on_last_frame = watcher._stop.set
+    watcher._watcher = types.SimpleNamespace(tracker=types.SimpleNamespace(tracks=[]), process=lambda *a: [])
+    watcher._settings = {"labels": ["bus_sign"], "normalize": False, "order": None}
+    watcher._frame_loop(watcher._stop, watcher._jobs, watcher._results, watcher._watcher)
+    assert camera.zooms == []
+
+
+def test_the_sign_is_read_with_room_for_its_first_digit():
+    """2026-10-21 the team tried reading the YOLO box as is; in the team's tests the "1" of the line
+    kept going missing, so on 2026-10-22 (#122) the margins came back, the most on the left. They are
+    passed explicitly: the pipeline's own defaults are not this repo's decision."""
+    from virovision.bus import SIGN_MARGINS, pipeline_options
+
+    class Pipeline:
+        def __init__(self, detector, ocr, catalog=None, enhance=False, margins=None):
+            pass
+
+    class OldPipeline:
+        def __init__(self, detector, ocr, catalog=None, enhance=False):
+            pass
+
+    left, right, vertical = SIGN_MARGINS
+    assert left > right > 0 and vertical > 0, "the line number is at the left of the sign"
+    assert pipeline_options(Pipeline) == {"margins": SIGN_MARGINS}
+    assert pipeline_options(OldPipeline) == {}, "an older wheel still builds, with its own margins"
+
+
+def test_a_sign_whose_left_margin_the_zoom_cut_is_not_read(monkeypatch):
+    """The box itself fits in the zoomed frame but its left margin does not: the pipeline would clip the
+    margin at the edge, and the margin is what keeps the first digit of the line."""
+    from virovision.bus import SKIPPED, ZoomedFrame
+    from virovision.zoom import View
+
+    Box = _fake_pipeline_with_signs(monkeypatch, (0, 0, 0, 0))
+    watcher = BusWatcher(ZoomingCamera(frames=0, sign=None), lambda files: None, lambda event: None)
+    track = types.SimpleNamespace(id=3, read_attempts=1)
+    watcher._watcher = types.SimpleNamespace(tracker=types.SimpleNamespace(tracks=[track]), reading_track=3)
+    view = View((2028, 0, 2028, 1520), ZoomingCamera.FULL, (1024, 768))  # starts at x = 512 of the full view
+    frame = ZoomedFrame(IMAGE, view)
+
+    assert view.shows(Box(520, 100, 620, 120)), "the box alone is in the frame"
+    watcher._queue_read(frame, Box(520, 100, 620, 120), None)  # 18 % of 100 px reaches x = 502
+    assert watcher._jobs.empty() and watcher._results.get_nowait() == (3, SKIPPED, 0, None)
+
+    watcher._queue_read(frame, Box(540, 100, 640, 120), None)  # its margin starts at x = 522: inside
+    assert not watcher._jobs.empty()
+
+
+def test_a_press_during_the_boot_build_says_preparing_before_waiting():
+    """The 2026-09-22 bug through a second door: `warm_up` holds the build lock for the whole OCR
+    build (20 to 120 s), and `start` used to wait on that lock before it could say «preparando»."""
+    import threading as _threading
+
+    events = []
+    watcher = BusWatcher(ZoomingCamera(frames=0, sign=None), lambda files: None, events.append)
+    held = _threading.Event()
+    release = _threading.Event()
+
+    def build_in_progress():
+        with watcher._build_lock:
+            held.set()
+            release.wait(5)
+
+    builder = _threading.Thread(target=build_in_progress)
+    builder.start()
+    held.wait(5)
+    starter = _threading.Thread(target=watcher.start)
+    starter.start()
+    deadline = time.monotonic() + 5
+    while not events and time.monotonic() < deadline:
+        time.sleep(0.01)
+    try:
+        assert {"t": "warming"} in events, "silence while the OCR was being built"
+    finally:
+        release.set()
+        builder.join(5)
+        starter.join(5)
+
+
+def test_a_photo_waits_for_the_frame_loop_to_let_go_of_the_camera():
+    """2026-11-20: the supermarket photo reached picamera2 while bus mode's frame loop was still
+    inside `capture_request`; it hung and the daemon had to restart. `wait_released` is what the
+    photo waits on: closed while a run is active, open once its frame loop has been joined."""
+    import threading
+
+    camera = ZoomingCamera(frames=0, sign=None)
+    watcher = BusWatcher(camera, lambda files: None, lambda event: None)
+    assert watcher.wait_released(0)  # never started: nothing to wait for
+
+    leave = threading.Event()
+    frames = threading.Thread(target=leave.wait, args=(2,), name="bus-frames", daemon=True)
+    frames.start()
+    watcher._released.clear()
+    watcher._threads = [frames]
+    watcher.running = True
+    assert not watcher.wait_released(0)
+
+    stopper = threading.Thread(target=watcher.stop)
+    stopper.start()
+    assert not watcher.wait_released(0.1)  # the frame loop is still running
+    leave.set()
+    assert watcher.wait_released(2)
+    stopper.join(2)
+
+
+@pytest.mark.parametrize("target", ["phone", "device"])
+def test_a_repeat_follows_the_chosen_output_like_the_reading(target):
+    """A click inside bus mode repeats the last reading. It used to play the clips on the board
+    whatever the output was, and send nothing: with the output on the phone, the user heard the
+    repeat from the wrong speaker, or nothing at all."""
+
+    class CameraWithoutModel:
+        sensor = None
+
+    played, emitted = [], []
+    watcher = BusWatcher(CameraWithoutModel(), played.append, emitted.append)
+    watcher.audio_target = target
+    watcher._last_announcement = ["bus.wav", "115.wav"]
+    watcher._last_result_event = {"t": "result", "event": {"label": "115"}}
+
+    assert watcher.repeat_last() is True
+    assert played == ([["bus.wav", "115.wav"]] if target == "device" else [])
+    assert emitted == [{"t": "result", "event": {"label": "115"}}]
+
+
+def test_a_bus_start_that_runs_after_the_user_left_does_not_leave_the_watcher_on(loop):
+    """Start and stop are separate executor jobs and can run out of order: a start that runs, or
+    finishes, after the mode already changed must leave the watcher stopped."""
+    bus = FakeBus()
+    core, _ = build(loop, bus)
+
+    core._start_bus()  # the mode is not BUS: a start arriving late does nothing
+    assert bus.running is False
+
+    core.modes.current = Mode.BUS
+
+    def start_while_the_user_leaves():
+        core.modes.current = Mode.IDLE
+        bus.running = True
+        return True
+
+    bus.start = start_while_the_user_leaves
+    core._start_bus()
+    assert bus.running is False

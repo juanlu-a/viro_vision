@@ -61,6 +61,8 @@ describe('isEvidenceRef', () => {
   it('accepts only names the device writes', () => {
     expect(isEvidenceRef(REF)).toBe(true);
     expect(isEvidenceRef('20261012-101500-2/t001-bus')).toBe(true);
+    // Past track 999 the device writes four digits (`t{id:03d}`): a long run must not 404 from there on.
+    expect(isEvidenceRef('20261012-101500/t1000-r01')).toBe(true);
     expect(isEvidenceRef('../secret')).toBe(false);
     expect(isEvidenceRef('20261012-101500/t003-r02/../../x')).toBe(false);
   });

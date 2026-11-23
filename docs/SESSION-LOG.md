@@ -3864,3 +3864,1201 @@ Ordenado por lo que destraba cada cosa. Lo de arriba es lo que más rinde tomar 
     con su etiqueta para el lector de pantalla.
 - **Temporal**, como el resto de la evidencia: agregado a la lista del ROADMAP.
 - Verificado: lint, typecheck y 332 tests en verde. **Falta un build** para verlo en el teléfono.
+
+## 2026-10-14 — Carcasa VIA Clara v0.9: dos mitades a presión, sobre el conjunto real de placas
+
+- **Punto de partida**: la especificación final de la carcasa (pegada en la sesión) sobre el modelo
+  **VIA Clara v0.8** (OpenSCAD, llegó por mail; estaba en `~/Downloads`). Se versionó tal cual en
+  `hardware/case-via-clara/via_clara_v0_8.scad`, y la v0.9 se escribió al lado.
+- **Correcciones del usuario sobre la primera v0.9**: un solo botón (modos); huecos para la microSD, la
+  llave de la batería y la carga; las almohadillas para termofundir; y, sobre todo, **usar las medidas
+  reales**: la HAT ya viene unida a su batería y la Pi tiene el header soldado.
+- **Lo que mostraron las fuentes** (plano de la Zero 2 W, product brief de la AI Camera, fotos de
+  Waveshare): la batería va **del lado de los pogo pins, entre la HAT y la Pi**, y los pogo pins tocan
+  las colas de los pines 1–6 del header. Eso pone la llave de la HAT adelante, contra la cámara, y la
+  microSD y el micro USB de carga atrás. El conjunto mide ≈ 23 mm (27 con las almohadillas y la
+  luz), contra los 16,5 que suponía la v0.8, y el cuerpo pasó a 31,2 de ancho. El lente está a 14,4 del borde (la v0.8 usaba 12,5).
+- **Revisión multi-modelo** (`tackle-review`: Opus, Sonnet y Haiku; Codex no corrió porque la cuenta
+  de ChatGPT no habilita ningún modelo en la CLI). Cambios de la primera vuelta:
+  - las trabas pasaron a ser **vigas en el plano de la cama** con gancho y 0,4 de enganche real (antes
+    flexionaban a través de las capas y enganchaban 0,15);
+  - la cámara quedó con **topes en sus cuatro bordes** (antes la ubicaba el barril del lente);
+  - la nariz creció 6 mm y quedó **reservado el volumen del flex**, que antes no tenía por dónde pasar;
+  - el **cajón del pulsador** ya no bloquea la entrada;
+  - la **corredera** es un solo sólido, recorre la palanca entera e imprime acostada;
+  - las **colas del header** quedaron modeladas sobre la batería.
+  Segunda vuelta: la corredera se monta **antes** de la HAT (la palanca cae en la horquilla); las vigas
+  se imprimen atadas por un puente de 0,4 que se corta después; la traba delantera de abajo se sacó
+  (ahí apoya el flex); la tecla y el pulsador entran por un canal y se verifica el camino de armado.
+  Tercera vuelta (con Codex, que volvió a andar: la CLI que trae la app era vieja, 0.142.5; con
+  `npx @openai/codex@0.162.1` funciona con la cuenta de ChatGPT): conectores de la Pi modelados con su
+  voladizo; nervios de aplastamiento sólo arriba y abajo; el puente de las vigas cruza la ranura del
+  extremo, para que se pueda cortar; el cuerpo pasa a 37,6 de alto (≥ 1,1 de piel sobre las vigas, las ranuras y los labios); un
+  punto en relieve marca el ON de la corredera; `export.sh` ya no da por buena una verificación que
+  falla con un error de OpenSCAD.
+- **Después de la revisión**, con una foto del conjunto: el usuario confirmó que los separadores de
+  bronce asoman bajo la HAT, y que la microSD es sólo para el equipo. Las almohadillas pasaron a recibir
+  esos separadores (el conjunto entra entero, sin desarmar, y el collar queda 0,7 por debajo de la
+  placa) y la microSD quedó adentro, sin agujero. Se evaluó dar vuelta el conjunto para que la llave
+  quede atrás, accesible directo, pero la carga (diaria) quedaría mirando a la cámara: se mantuvo la
+  cámara del lado del CSI y la corredera para la llave.
+- **Verificación**: `export.sh` comprueba que cada pieza sea un solo sólido y corre 14 verificaciones
+  de interferencia, incluidas la corredera en ON y en OFF, el volumen del flex y los caminos de armado. Todas pasan, pero
+  **contra maquetas**: hay que medir con calibre lo marcado `MEASURE` antes de imprimir. Es lo que hizo
+  fallar la v1.
+- **Guía con flechas** (`via_clara_v0_9_guide.scad` → `img/guide/`): cinco vistas que dicen para qué es
+  cada ranura, agujero y pieza; la regenera `export.sh`.
+- **Los STL salen del repo**: van al Drive, en `Tesis: ViroVision / modelo_3d`, una carpeta por versión
+  (la de v0.9 ya está creada). El repo guarda el `.scad` y `export.sh`, que los regeneran.
+- Rama `feat/case-v0-9-snap-fit`.
+
+**Pendiente**: medir (`BOARD_GAP`, la palanca de la llave, los separadores que asoman bajo la HAT,
+el voladizo de los conectores de la Pi, el pulsador, el transductor); imprimir primero la parte trasera y la nariz
+como prueba; confirmar que la perilla de la llave se alcanza con los lentes puestos; decidir si la rama
+vieja `feat/carcasa-modelo-3d` (v1) se archiva.
+
+## 2026-10-17 — Carcasa v0.10: lo que mostró la primera impresión de la v0.9
+
+La v0.9 se imprimió (todo menos el brazo del auricular) y "funcionó casi perfecto". Las correcciones
+del usuario y cómo quedaron en `hardware/case-via-clara/via_clara_v0_10.scad`:
+
+- **Separadores del lado de la Pi.** Los separadores hexagonales quedaron sobre la Pi, junto al header,
+  y bajo la HAT sólo hay cabezas de tornillos Phillips (así toda la altura queda de un lado). El
+  conjunto ahora se termofija a la **mitad derecha**: las almohadillas pasaron ahí y reciben esos
+  separadores. Del lado de la HAT alcanza con 2,1 mm de luz.
+- **microSD.** Hubo que cortar el extremo trasero con una Dremel. Ahora hay lugar para 3,5 mm de tarjeta
+  afuera del borde de la Pi + 1,0 de luz (`SD_CARD_OUT`, a medir).
+- **Paredes.** Pasaron de 2,2 a 1,6 en los costados y de 2,7 a 2,4 arriba y abajo. El cuerpo quedó en
+  92,9 × 28,7 × 36,6 (antes 91,9 × 31,4 × 37,6).
+- **Cámara girada 90°.** La imagen salía girada respecto de la vista del usuario. El conector queda ahora
+  en el costado que mira a la Pi, y el flex va derecho al CSI sin retorcerse. Si sale cabeza abajo, se
+  corrige con una rotación de 180° por software.
+- **Soporte cuadrado del lente.** Es más grande que en el plano y no entraba: hubo que poner la cámara
+  detrás de los nervios. Ahora tiene lugar (`AI_CAM_HOLDER`, a medir).
+- Como el flex ya no apoya en el piso de la nariz, la traba delantera recupera su par de abajo (6 trabas)
+  y la perilla de la corredera crece a 9,1 mm de ancho.
+- **Botón.** El pulsador real es un 6 × 6 de 4 patas, de ~5 mm de alto, y no pasaba (el cajón estaba
+  pensado para un SMD de 2,5 que entraba deslizando desde abajo). Ahora va en un bolsillo abierto hacia
+  adentro: la tecla, con brida rectangular, y el pulsador entran derecho, y una gota de pegamento lo
+  fija. Las patas se recortan a 1,5 mm. La cara de la Pi se modela más baja en el centro (`PI_PARTS_LOW`).
+- Nueva verificación `stack_insert` (el conjunto bajando a las almohadillas). Las 15 verificaciones y
+  las de cada pieza pasan.
+
+**Pendiente**: medir los separadores sobre la Pi (`HEX_H`, `HEX_AF`), las cabezas bajo la HAT, cuánto
+sobresale la microSD y el soporte del lente, y con eso imprimir primero la nariz. Subir los STL a la
+carpeta `modelo_3d` del Drive de ViroVision: quedó pendiente porque el Chrome conectado no tenía esa
+cuenta.
+
+## 2026-10-19 — Zoom digital sobre el cartel en modo ómnibus
+
+- **Prueba de campo del modo ómnibus** (el usuario): con buena toma el cartel se detecta y el catálogo
+  corrige bien, y el supermercado anda perfecto. El problema es la distancia. El ómnibus se detecta de
+  lejos, pero el cartel o no aparece o sale borroso, y sólo se lee con el ómnibus prácticamente encima.
+  Eso es tarde si no para en la parada. Las mejores lecturas fueron con el ómnibus quieto en un semáforo.
+- **Diagnóstico en el código**: el stream de donde sale el recorte es de 1024 px sobre un sensor de
+  4056; el OCR recibe un cartel de pocos píxeles que `bus_banner.crop` sólo reescala. En el fuente de
+  picamera2 se confirmó que la zona de entrada del detector del IMX500 es un control propio
+  (`set_inference_roi_abs`, fijado al sensor entero), separado del `ScalerCrop` del ISP, y que
+  `convert_inference_coords` usa el `ScalerCrop` de cada frame.
+- **Decisión** (ADR 0006, actualización 2026-10-19): zoom digital **dinámico** con `ScalerCrop`,
+  centrado en el cartel de mayor área entre los alargados (`widest_sign`), hasta que el cartel mide ~64 px de alto y nunca más de la mitad del
+  ancho del frame; se sostiene 1,5 s si el detector pierde el cartel y después vuelve a 1x. El usuario
+  aceptó perder campo de visión ("si se mira hacia donde viene el ómnibus el campo ya es muy amplio")
+  mientras no agregue una latencia palpable.
+- **Implementación** (rama `feat/bus-dynamic-zoom`, sólo en ViroVision; el repo de Magalí no se toca):
+  `virovision/zoom.py` (geometría pura y controlador), `Camera.zoom_bounds`/`set_zoom` y la opción
+  `--bus-full-res`. En `bus.py` el tracker recibe las cajas en el **campo completo** y el `Watcher`
+  recibe un `ZoomedFrame`. El lector traduce la caja al frame con zoom; si el zoom cortó el cartel, no
+  lee y no descuenta el intento. El umbral de altura del cartel se ajusta al zoom de cada frame.
+  `--no-bus-zoom` apaga el zoom para comparar. Tests: `test_zoom.py`, más casos en `test_bus.py` y
+  `test_camera.py` (192 pasan).
+- Detalle que destapó un test: el frame real es de 1024×**766**, no 768. La geometría usa escalas
+  separadas en x e y, así que no la afecta.
+
+**Pendiente**: probar en la placa. Verificar que `ScalerCrop` no altere la inferencia y medir cuántos
+frames tarda en aplicarse el recorte. Verificar `ScalerCropMaximum` en el modo agrupado. Medir la
+memoria y los cuadros por segundo con `--bus-full-res`. En la calle, comparar con y sin zoom la
+distancia a la que se anuncia la línea. Si el cuello resulta ser el detector, que no ve el cartel de
+lejos, encarar la fase 2: mover también la zona de entrada del detector.
+
+## 2026-10-21 — El cartel se lee con el box del YOLO, sin márgenes
+
+- **Pregunta de los compañeros**: el recorte que muestra la app ¿es el box del YOLO tal cual? No lo era.
+  El daemon armaba el `Pipeline` sin `margins`, así que se aplicaban los valores por defecto de
+  `bus_banner.crop.expand_banner`: 18 % a la izquierda, 6 % a la derecha y 6 % arriba y abajo. La
+  imagen que muestra la app es ese recorte expandido, el mismo que leyó el OCR.
+- **Decisión del equipo** (el usuario): con el detector reentrenado en la V100 (unas 500 fotos, no las
+  ~140 del primer fine-tune que cita el ADR 0006) el box se usa tal cual, sin colchón en el código.
+  Ahora `bus.py` le pasa `margins=SIGN_MARGINS = (0, 0, 0)` al `Pipeline`. Los márgenes dependen del
+  modelo que dibujó el box (lo dice el propio `Pipeline`), y el modelo se elige en ViroVision
+  (`--bus-model`), así que el valor vive acá: el repo de Magalí no cambia. Si la wheel instalada no
+  acepta `margins`, el daemon arranca igual con los márgenes de fábrica y lo avisa en el journal.
+- Commit en la misma rama `feat/bus-dynamic-zoom`.
+
+**Pendiente**: el riesgo conocido de quitar el margen izquierdo es perder el primer dígito (pasó con el
+primer modelo, 2026-09-15: "15" por "115"). Revisarlo en la próxima prueba de campo y, si hace falta,
+con `bus-banner evaluate` sobre las 117 imágenes con margen cero. Seguir con la prueba del zoom contra
+un video, que quedó a medias el 2026-10-19 porque se perdió la placa.
+
+## 2026-10-21 — Carcasa v0.11: lo que mostró la impresión de la v0.10
+
+La v0.10 impresa salió mal ("espantoso"). Lo que falló y cómo quedó en `via_clara_v0_11.scad`:
+
+- **Ventana de la llave demasiado larga.** El usuario quería que calzara justo con el switch: ahora mide
+  4,2 × 7,4, frente a la palanca, y la perilla de la corredera 3,8 × 3.
+- **Las guías de la cámara no se podían imprimir** (nervios de 0,65 y de aplastamiento de 0,6, aun con
+  la calidad al máximo). Ahora son nervios de 1,2 con 0,3 de luz, sin nervios de aplastamiento.
+- **El botón chocaba con el disipador** de la Pi (medido: 12 × 12 × 4; el usuario lo quiere mantener).
+  El botón pasó a x −14, y el disipador entró al modelo y a las verificaciones.
+- **La microSD estaba en espejo** (el slot no está centrado en el borde de la Pi). Se corrigió de lado, y
+  el espacio ahora se abre por el extremo trasero para sacar y poner la tarjeta.
+- **El brazo del auricular no entraba**: su tubo arrancaba 0,6 adentro del zócalo y los topes de la
+  ficha trababan. Se corrió el tubo, se sacaron los topes y la ficha tiene 0,35 de luz por lado.
+- **Seguía grande y con relleno en los extremos.** La cámara se acercó a la Pi (quedan 3,2 mm para que
+  el flex baje al CSI), la nariz quedó más baja (32,2) y el extremo trasero es una cáscara. El cuerpo
+  quedó en 83,4 × 28,5 × 37,2.
+- **Los pernos traseros se rompían.** Ahora hay un par de trabas atrás, en x 30, como las de los costados.
+- Error mío del proceso: mandé a imprimir la v0.10 con medidas supuestas sin confirmar. Las verificaciones
+  pasaban contra maquetas, pero las maquetas no tenían el disipador ni el pulsador real.
+
+Con las medidas reales que pasó el usuario (disipador 12 × 12 × 4; hexágonos de 2,2 entre caras que
+asoman 1,2 sobre la Pi; soporte del lente 11 × 11 × 3 y lente de Ø 8 × 1; pulsador SMD de 4 × 4 × 1, con
+una tecla impresa pegada encima y una tapita detrás, la pieza 06):
+
+- **Sin termofundir por ahora**: los zócalos de los hexágonos tienen 0,2 de luz por lado para que la placa
+  entre y salga sin presión, y la pared de la mitad izquierda apoya en las cabezas de los tornillos del HAT.
+- **Dos versiones** (`VARIANT` en el `.scad`; `export.sh` arma y verifica las dos): `integrated`, con la
+  cámara en una ranura de las dos mitades, y `cap`, un cuerpo de tres piezas en el que la cámara va
+  pegada sobre 4 postes de una tapa aparte (pieza 07, `*_tapa.stl`). La tapa queda atrapada por un reborde
+  en una ranura de las dos mitades. Como su par de trabas delantero caería en la tapa, en esa versión el
+  par de x −12 se da vuelta y engancha en x −22. La corredera, el brazo, la tecla y la tapita son las
+  mismas en las dos.
+
+Revisión multi-modelo (`/tackle-review`, Opus + Sonnet + Haiku + Codex, tres rondas). Lo que encontró:
+
+- Los postes que tenían que sujetar el conjunto no lo tocaban: ahora lo sujeta la pared, apoyada en los tornillos.
+- El lente de Ø 8 no pasaba por el plano de la junta: el agujero ahora es de 9,4, con una verificación
+  nueva, `cam_insert`.
+- La tapita del botón no tenía lugar para los cables: ahora tiene 1,0 de luz, un taco y muescas.
+- Las trabas eran más finas que las de la v0.9: volvieron a sus valores, con paredes de 2,7.
+- La corredera de la versión con tapa quedaba 0,6 corta de ON. Ahora es una sola corredera para las dos
+  versiones.
+- En la versión con tapa no había ninguna traba adelante.
+- El README tenía números viejos.
+
+**Pendiente**: imprimir primero la nariz de prueba; medir lo que el README marca `MEASURE`, sobre todo el
+rigidizador del flex de la cámara (tiene 1,4 mm para doblar) y lo que asoma de la microSD (la punta
+queda ~2 mm adentro: hace falta pinza). Subir los STL al Drive de ViroVision (`modelo_3d`).
+
+## 2026-10-22 — Zoom del modo ómnibus probado en la placa
+
+- **Desplegados en la placa** (Zero 2 W) el zoom y el box sin márgenes, por SSH sobre `Jack_2.4`. El AP
+  se baja por BLE con `tools/ap.py`. Ojo: cada reinicio del daemon lo vuelve a levantar, y hay que
+  bajarlo de nuevo. El modo ómnibus se pone por BLE con `{"cmd": "mode", "value": 1}` en `control`.
+- **Prueba contra `video2.MP4`** (el 115 del repo de Magalí) en la pantalla de la laptop: zoom 2.0x
+  con el cartel en cuadro, detecciones en 68 a 76 frames de cada 75 a 15 fps, y vuelta a 1x al perderlo.
+  Un cartel de ~10 px de alto, que sin zoom no se habría leído nunca (el mínimo es 22 px), se anunció a
+  los 7,6 s, después de tres lecturas ilegibles. Uno más cercano se anunció a 1,0 s. En las imágenes de
+  evidencia el recorte se ajusta al LED sin margen, y el "1" de 115 entró completo.
+- **`--bus-full-res` (4x) no sirve en la Zero 2 W**: 10 fps, 65 MB libres, y la cámara se trabó con el
+  primer ómnibus (`Camera frontend has timed out`), lo que terminó en un reinicio del daemon. Se sacó de
+  `/etc/default/virovision`; la opción queda en el código para otra placa, con la advertencia en la
+  ayuda, en el README y en el ADR 0006.
+- De paso: se borraron los worktrees `viro_vision-zoom` y `viro_vision-review`, y se volvió a crear el
+  del zoom para estos documentos. `viro_vision-case` se dejó porque tiene trabajo sin commitear de otra
+  sesión.
+
+**Pendiente**: la prueba en la calle, con y sin zoom (`--no-bus-zoom`). Medir a qué distancia se anuncia
+la línea. Si el cuello resulta ser el detector, que de lejos no encuentra el cartel, encarar la fase 2:
+mover también su zona de entrada. Abrir el PR a `staging`.
+
+## 2026-10-22 (cont.): vuelven los márgenes del cartel para el OCR
+
+- **Pedido del usuario**: el "1" del número de línea sigue siendo un problema leyendo el box del YOLO tal
+  cual (decisión del 2026-10-21). Vuelve la holgura, la mayor a la izquierda y "un poquito al resto, como
+  antes": `SIGN_MARGINS = (0.18, 0.06, 0.06)`. Son los valores por defecto de `expand_banner`, medidos
+  sobre las 117 imágenes de evaluación, pero ahora se pasan explícitamente desde ViroVision.
+- **Interacción con el zoom**: el lector descartaba una lectura sólo si el zoom cortaba el box crudo.
+  Ahora mira el box con márgenes (`_with_margins`): si el margen izquierdo cae fuera del recorte de la
+  Pi, el pipeline lo cortaría en silencio y se volvería a perder el primer dígito. Test nuevo en
+  `test_bus.py` (195 pasan).
+- La app sigue mostrando exactamente el recorte del OCR, con el margen incluido.
+- Rama `fix/bus-sign-margins`.
+
+## 2026-10-22 (cont. 2): la documentación de los tres pilares, al día con el código
+
+- **Pedido del usuario**: actualizar toda la documentación (app, ML, hardware y carcasa) con lo
+  trabajado en septiembre y octubre. Pidió tono formal, en tercera persona y sin raya larga, y usar
+  `tackle-ticket` para encontrar lo que faltara mencionar. Rama `docs/october-knowledgebase`.
+- **Método**: tres auditorías en paralelo, una por pilar, que contrastaron cada documento con el
+  código. Encontraron unas ochenta discrepancias, cada una con su fuente. Lo más repetido:
+  - el Coral TPU, la Camera Module 3 y el DAC I2S seguían en READMEs, ADRs y la skill;
+  - la Pi 3 B+ figuraba como placa vigente;
+  - la batería figuraba en nulo y la carcasa como "pendiente";
+  - `PROJECT-STATUS.md` decía "última actualización 2026-09-16" y "todo está en `main`";
+  - faltaban el catálogo, la evidencia, el zoom, los márgenes, el reentrenamiento en la V100, la
+    batería, el arranque en 16 s y la carcasa v0.10 a v0.12.
+- **Decisiones del usuario**:
+  - la carcasa se documenta hasta la v0.12, leyendo el worktree `viro_vision-case` sin tocarlo,
+    porque esa rama es de otra sesión;
+  - el reentrenamiento en la V100 con ~500 fotos es un hecho. Sus épocas, métricas y pesos no
+    constan en ningún repositorio y quedan como `PENDIENTE`.
+- **El "1" y los márgenes, explicados**: el usuario reportó que a veces el "1" se perdía, y la
+  sospecha era que se confundía con una arista del box por los keypoints. No es así:
+  - el detector es un YOLO11n de **cajas** (dos clases, `bus` y `bus_sign`), no un modelo de pose;
+  - el box se ajusta a los LEDs, el número de línea está a la izquierda del cartel y el "1" es un
+    trazo vertical fino;
+  - si el borde izquierdo del recorte cae sobre él, el detector de texto del OCR lo pierde o lo toma
+    por el borde ("15" por 115, ya visto el 2026-09-15).
+  Por eso el margen izquierdo es el triple del derecho. Quedó escrito en el ADR 0006, la tesis
+  (§7.4.6 y anexo 12.8), `ml.md` y `hardware/raspi/README.md`.
+- **Fecha corregida**: los márgenes volvieron el 2026-10-22 (#122), no el 10-23 como decía la entrada
+  anterior de esta bitácora. Se corrigió el encabezado y el docstring de `SIGN_MARGINS` en `bus.py`.
+- **Qué se tocó**:
+  - reescritos: `PROJECT-STATUS.md`, `ROADMAP.md`, `docs/README.md`, los READMEs de `app/`,
+    `hardware/`, `hardware/raspi/` y `ml/`, y la skill (SKILL.md y sus referencias, en español);
+  - notas de actualización fechadas en los ADRs 0001, 0002, 0003, 0004, 0006 y 0007;
+  - campaña nueva `docs/mediciones/2026-10-22-zoom-omnibus.md`;
+  - en la tesis: el capítulo 3 sin el Coral, la línea de tiempo y el flujo de revisión multi-modelo
+    en el 5, la etapa 4 del 6, el 7 (placa vigente, batería, §7.3.5 nueva sobre la carcasa, V100,
+    cifras del 2026-10-12, márgenes, §7.4.10 nueva sobre el zoom, catálogo, app y conteos), el 8
+    (`.apk`, la función `evidence`, journal persistente, `tools/ap.py`) y el anexo (perfil GATT
+    completo, V100, márgenes, resultados vigentes).
+- **Conteos corridos**: app, 332 tests en 36 suites; daemon, 195 pasan y 2 se omiten; pipeline de
+  ómnibus, 96.
+
+**Pendiente**:
+- Métricas del detector reentrenado en la V100.
+- Prueba en la calle con y sin zoom.
+- Leer `/etc/default/virovision` de la placa para dejar en el README el nombre exacto del `.rpk` (la
+  placa estaba en modo AP).
+- Pushear la rama de la carcasa y pasar su README a la v0.12.
+- Reemplazar las rayas largas que quedan en las secciones viejas de los documentos que no se
+  reescribieron.
+
+## 2026-10-22 (cont. 3): sin rayas largas en la documentación, y la tesis al Doc
+
+- **Pedido del usuario**: completar lo pendiente de la entrada anterior y dejar la tesis en el Google
+  Doc, como siempre.
+- **Rayas largas**: se reemplazaron unas 380 en los ADRs (179), la skill y los documentos generales
+  (unas 135) y los de operación (66), por comas, dos puntos o paréntesis según el caso. Quedan
+  adentro de los bloques de código (comentarios de shell) y en lo que no se edita por regla: la
+  bitácora, las campañas de `docs/mediciones/` y el README de la carcasa, que es de su rama.
+- **README raíz y `CLAUDE.md`**: seguían diciendo "Coral TPU + Camera Module 3"; el README pasó a
+  español y al estado vigente.
+- **La placa**: no apareció por BLE (`tools/ap.py`: "No apareció"), así que el contenido de
+  `/etc/default/virovision` sigue pendiente.
+- **Ediciones hechas directo en el Google Doc, traídas al repo** (regla de `docs/tesis/README.md`:
+  leer el Doc antes de publicar). Las encontró una comparación del Doc contra `63dae5e`, el commit del
+  que se publicó:
+  - en el capítulo 2, el alcance ("captura una imagen del entorno", "se integra") y dos objetivos
+    reescritos, uno eliminado (OCR de etiquetas) y la "Nota de edición" borrada;
+  - en el 3.1, el texto del equipo sobre la AI Camera (precio y por qué se compró), en tercera persona;
+  - en el capítulo 6 y el 12.1, la referencia al anexo y el enlace publicado del Gantt;
+  - en el anexo, la línea cortada "L: Po" de la entrevista;
+  - las referencias internas pasan de "§" a "sec.", como las había dejado el equipo.
+  No se trajo la fórmula de exactitud del Doc (`VP/Total`, le falta VN) ni los conteos viejos del
+  capítulo 7. Quedan dos comentarios abiertos de Francisco en el Doc: la nota de edición y el
+  entregable 12 (el manual, quizá un audio en la app).
+- **La tesis, publicada en el Google Doc por la API** (conector de Google Docs, aprobado por el admin
+  de WyeWorks). No se pegó el cuerpo entero, porque el Doc tiene imágenes que el equipo agregó ahí (el
+  Gantt del capítulo 6 y su anexo) y se habrían perdido: `docs/tesis/sync_doc.py` compara cada sección
+  del Doc con el repo y reemplaza sólo las que difieren, de abajo hacia arriba, con el `revisionId`
+  como guarda. Fueron unas 50 secciones en 23 tandas, incluidas las nuevas 7.3.5, 7.4.10 y 8.6.3 y los
+  renumerados 7.4.11, 7.4.12 y 8.6.4. Dos errores del script aparecieron en el camino y se corrigieron
+  (un título que perdía su estilo cuando la sección empieza con una tabla, y un renumerado que usaba
+  una posición ya corrida); el título roto de la 8.6 se reparó a mano. Verificado al final: ninguna
+  sección difiere, las tres imágenes siguen y los títulos están en orden.
+- **Quedaron sin tocar, a propósito**: la 2.3 (en el repo la tabla tiene asteriscos de negrita mal
+  formados, y ahí está anclado un comentario de Francisco) y la 12.2.3 (en el repo hay emojis con la
+  codificación rota y faltan las comillas; además, un integrante del equipo estaba editando esa sección
+  en el Doc durante la sesión). Hay que traer esas dos al repo desde el Doc.
+- Pendiente en el Doc: actualizar el índice (la API no lo refresca).
+- **La 2.3 y la 12.2.3, traídas del Doc al repo.** La 2.3 vuelve a ser una lista numerada con el
+  título de cada entregable en negrita (el repo tenía asteriscos sueltos de una conversión vieja). En
+  la 12.2.3 el repo tenía la pregunta 17 duplicada y los emojis rotos; quedó una sola vez, con la
+  versión que el equipo había revisado en el Doc (comillas y erratas corregidas), por decisión del
+  usuario. En el Doc sigue la copia literal de esa tabla que alguien agregó el 2026-10-22, con dos
+  títulos vacíos: la resuelve quien la agregó. Un emoji de la 12.2.2 («algún comercio ð️») viene roto
+  desde la exportación de la encuesta, en el Doc y en el repo; no se adivinó cuál era.
+
+## 2026-10-22 — Carcasa v0.12: lo que mostró la impresión de la v0.11
+
+Se imprimieron las dos versiones de la v0.11. La de tapa de cámara necesitaba muchos más ajustes, así que
+**se descarta** (`export.sh` ya no la genera; el código queda para limpiar). La integrada pasa a
+`via_clara_v0_12.scad`:
+
+- **Cámara:** las guías calzan bien con la placa, pero el lente no entraba. Del centro de la guía delantera
+  a la pared del frente ahora hay 5,0 mm (`CAM_GUIDE_TO_FRONT`; antes 2,65): la nariz crece 2,35 mm.
+- **Trabas delanteras:** estaban encima de las guías de la cámara, pegadas a ellas, y no podían flexionar:
+  costaba cerrarlas y se partieron. El gancho pasó detrás de las guías (x −33) y la viga tiene 0,6 mm libres
+  debajo (`SNAP_UNDER_GAP`).
+- **Zócalos de los hexágonos:** salieron llenos (hexágonos de 2,6 entre caras y 1,2 de profundidad, los
+  cerraban los perímetros). Ahora son agujeros redondos de Ø 3,4 × 1,5.
+- **Ventana de la corredera:** 1 mm más ancha (5,2).
+- **Botón y brazo del auricular:** perfectos, sin cambios.
+- **Flex de la cámara tapando el switch:** probablemente la cámara estaba montada al revés; a confirmar.
+
+Piezas de prueba en `export.sh`:
+
+- `test_nose_left/right`: la nariz cortada en x −28.
+- `test_nose_*_slot_plus02`: la misma nariz con la ranura de la cámara 0,2 más ancha (`RIB_GAP` 0,25), para
+  comparar.
+- `test_pads`: la pared con los 4 postes.
+
+**Pendiente:** el resultado de esas pruebas; elegir el `RIB_GAP`; sacar el código de la versión con tapa;
+actualizar el README a la v0.12.
+
+### Pruebas de la v0.12 → v0.13 (`via_clara_v0_13.scad`)
+
+- **Ranura de la cámara:** la de 0,2 más ancha calzó mejor; queda `RIB_GAP` 0,25.
+- **Flex:** se forzaba. La cámara se corrió 1 mm hacia adelante (`CAM_BACK_X` −37,5): del conector al borde
+  de la Pi hay 4,2 mm.
+- **Componente en la esquina:** un componente chico del lado del lente, en la esquina del borde del
+  conector y el borde de arriba, chocaba con la guía delantera. Esa esquina de la guía queda abierta
+  (`CAM_CORNER_FREE` 7 × 3,5).
+- **Zócalos:** los agujeros redondos de Ø 3,4 siguen chicos, así que el hexágono real es mayor que 2,2
+  (¿se midió la rosca?). `test_hex_sizes` trae zócalos de 3,0 a 5,5 entre caras para encontrarlo; `test_pads`
+  espera esa medida.
+
+**Pendiente:** el tamaño del hexágono, la nariz v0.13 probada, sacar el código de la versión con tapa y
+actualizar el README.
+
+### Pruebas de la v0.13 → v0.14, carcasa completa (`via_clara_v0_14.scad`)
+
+- **Cámara:** quedó perfecta (ranura de 1,62, 4,2 mm para el flex, esquina abierta).
+- **Hexágonos:** entran en el zócalo de 5,0 entre caras (`test_hex_sizes`; el 2,2 del principio era el
+  agujero de arriba). Pero un zócalo así pide un poste de ~8 mm, que caería sobre el header, los puertos y
+  los componentes de fuera del anillo libre de Ø 6. Por eso cada poste mide Ø 5,4, termina 0,1 por encima del
+  hexágono y tiene un perno de Ø 1,8 × 1 que entra en su agujero. Imprime hacia arriba, sin soportes.
+- **Tapita del botón (pieza 06):** eliminada; el botón queda sujeto en su bolsillo.
+- **Auricular:** es redondo, de Ø 14 × 5. La copa ahora es redonda, de Ø 15 × 6, y lleva una **rejilla a click**
+  (pieza 07): un disco con ranuras y seis dedos con reborde que entran en una ranura de la copa, sin dedos
+  del lado del tubo del brazo.
+
+**Pendiente:** imprimir la v0.14 completa y probarla; actualizar el README (todavía describe la v0.11); sacar
+el código de la versión con tapa; commitear.
+
+### v0.15 (`via_clara_v0_15.scad`), revisión del usuario sobre la v0.14
+
+- **Hexágonos:** el usuario prefiere zócalos hexagonales huecos (5,0 entre caras, como el número 5 de
+  `test_hex_sizes`) en vez del perno. El poste resultante (Ø 8,2) se recorta a 0,3 del header y de los puertos
+  (`pi_tall_parts`), donde queda 0,8 de pared en una cara plana. La maqueta de componentes bajos ahora supone
+  que no hay nada dentro de su huella: hay que verificarlo en la placa real.
+- **Tapa del auricular:** sólida, con una ranura de 1,6 × 8 hacia el oído (+X, supuesto), y el mismo click.
+- **Corredera:** perilla 1 mm más saliente (2,5); agarra la palanca con un hueco rectangular a medida (0,1 de
+  luz por lado) en vez de la herradura, con paredes 1 mm más largas; la carrera sigue exactamente a la palanca
+  y la ventana no cambió de tamaño.
+- **Botón:** cilindro liso de Ø 5 que se pega al pulsador, 2 mm más largo.
+- La carpeta del escritorio de la v0.14 quedó sin imprimir; la v0.15 va en `~/Desktop/VIA_CLARA_v0_15/`.
+
+### v0.16 (`via_clara_v0_16.scad`), impresión de la v0.15
+
+La v0.15 impresa quedó casi perfecta. Lo único: los zócalos hexagonales levantaban la placa y las mitades no
+cerraban. Los zócalos pasan a 3,5 de profundidad (2 mm más; `SOCKET_DEPTH`). Sólo cambia la mitad derecha
+(`~/Desktop/VIA_CLARA_v0_16/`). Si el conjunto real es más grueso que la maqueta, el header queda más cerca de
+la pared que los 0,6 previstos: revisarlo al cerrar.
+
+### v0.17 (`via_clara_v0_17.scad`)
+
+El auricular de Ø 14 no entró en la copa de Ø 15. Para probar, la copa pasa a Ø 17 (`CUP_D`); la tapa a click
+crece con ella. Falta saber si el problema era la contracción del agujero o algo que sobresale del auricular.
+
+### v0.18 (en curso): switch deslizante en la pared
+
+El usuario compró un switch deslizante con brida de dos tornillos (separación medida 13,5, brida de 4 de
+ancho). Va cableado al HAT y pegado del lado de adentro de la cara cabeza, con la perilla por la ventana: reemplaza
+la llave del HAT y la corredera impresa (pieza 05). La ventana pasa a 4,2 de ancho (1 mm menos). Antes de tocar
+la mitad izquierda, `test_panel_switch` prueba 5 separaciones de pernos (13,0 a 14,0) para la brida.
+
+### v0.19 (en curso): segunda prueba del switch
+
+De la prueba de la v0.18, la separación de 14,0 fue la más cercana pero le faltaba 0,5; los pernos de Ø 1,5
+quedaron flacos y cortos. `test_panel_switch` pasa a una sola ventana con pernos a 14,5, de Ø 3 y 2 mm de alto.
+Si calza, va a la mitad izquierda.
+
+Tras dos pruebas más (pernos de Ø 2,9 y luego de Ø 2,7 a 14,7), el usuario fijó la medida: pernos de Ø 2,3 a 14,8.
+
+### v0.20 (`via_clara_v0_20.scad`): la versión para imprimir completa
+
+El switch de panel queda integrado en la mitad izquierda. La ventana mide 4,2 × 7,4 y tiene dos pernos de Ø 2,3,
+a 14,8 entre centros y 2 mm de alto, para los agujeros de la pestaña; se fija con gotita. La ventana bajó 2 mm
+respecto de la de la corredera: probé una pestaña de 20 mm centrada en el lugar viejo y chocaba con la esquina
+redondeada de arriba de la cámara. El largo real de la pestaña no está medido. Se eliminan la corredera (pieza 05)
+y sus verificaciones; en su lugar está `panel_switch`, que comprueba que los pernos no toquen la mitad derecha, el
+hardware ni el paso del flex. Las curvas pasan a 128 segmentos. `export.sh`: 36 ok. Copia en
+`~/Desktop/VIA_CLARA_v0_20/`.
+
+**Resultado (2026-10-30):** el usuario la imprimió y la armó completa con todo el hardware; quedó perfecta.
+
+Pendientes: README y PROJECT-STATUS siguen describiendo la v0.11; sacar el código de la variante `cap`; commit y
+PR a staging.
+
+## 2026-10-31 — Carcasa v0.20 al repo, con todas las versiones
+
+La v0.20 se imprimió y se armó completa (2026-10-30): quedó perfecta. A pedido del usuario, los STL de todas
+las versiones (v0.9 a v0.20, con las piezas de prueba y los LEEME) pasan al repo, en
+`hardware/case-via-clara/versions/`, en vez de quedar sólo en el escritorio o ir al Drive. El README de la
+carcasa y el PROJECT-STATUS se pusieron al día con la v0.20; la rama se integró con `staging`.
+
+**Pendiente**: sacar del `.scad` el código de la variante con tapa (ya no se exporta); los postes 1 mm más
+bajos, si el usuario lo retoma.
+
+## 2026-11-02 — Modo producto y modo desarrollo en la app
+
+**Pedido**: que la app quede limpia para quien la usa y que lo de desarrollo (fotos, campos de la
+lectura, selector de modelo) se vea sólo a pedido. La telemetría a Supabase no cambia: el ajuste es
+sólo de interfaz.
+
+- Ajustes suma "Modo de la app", con dos opciones: **Modo producto** (por defecto) y **Modo
+  desarrollo**. Es un `radiogroup` y no un interruptor, por la misma razón que "Dónde se escucha", y
+  la elección se dice en voz alta. Se guarda en el teléfono (`services/storage/appModePreference.ts`);
+  cualquier valor raro o una falla de lectura cae en modo producto.
+- En **modo producto**, Inicio muestra el modo, sus dos botones y el de leer. No muestra los campos
+  de la lectura (producto, marca, detalle, línea, destino), la foto del dispositivo, los ómnibus
+  detectados, el aviso de "no disponible en esta versión" ni las líneas de estado o error. Queda una
+  sola línea, "El dispositivo no pudo sacar la foto", porque es la única falla que se resuelve ahí
+  mismo. El selector de modelo de Ajustes también queda sólo en desarrollo.
+- La decisión vive en una función pura (`features/reader/homeView.ts`) con sus tests.
+- No cambia nada de lo que se registra: el pipeline, la telemetría y la subida de evidencia no leen
+  el modo.
+
+- Revisión multi-modelo (Opus, Sonnet y Haiku; Codex no corrió: la CLI pide `gpt-5.5`, que no está
+  disponible con la cuenta de ChatGPT). Sin hallazgos críticos ni mayores. Se aplicaron: la falla de
+  captura pasa a un campo tipado (`failure`) en vez de comparar el texto en español; esa línea va sin
+  el rótulo "Última lectura"; una elección de modo hecha antes de que cargue la guardada ya no se pisa;
+  sin modelo de nube, el aviso pasa a la pista de VoiceOver del botón de leer en modo producto.
+- A pedido del usuario, en modo producto: Inicio deja la última lectura escrita en una sola línea (la
+  frase que se dijo, campo `resultPhrase`), para que VoiceOver pueda volver a ella; y la pestaña
+  Dispositivo esconde su línea de estado (la conexión se dice por voz y la cuenta el botón).
+
+**Pendientes**: `services/evidence` sigue guardando las fotos en `cache/evidence-shown/` aunque no se
+muestren; no hay test del provider (el repo no tiene `@testing-library/react-native`); verificar en
+el iPhone que el título "Modo de la app" no se diga dos veces con VoiceOver.
+
+## 2026-11-02 — Revisión de toda la base (app, placa, Supabase)
+
+**Pedido**: revisar la base entera con el flujo `tackle-review` y corregir errores, optimizaciones y
+fallas. Rama `fix/codebase-review`, desde `staging`. Cinco revisores en paralelo (Opus sobre
+`app/src/services` y `features`, Opus sobre `hardware/raspi`, Sonnet sobre la interfaz y Supabase,
+Sonnet sobre los contratos entre los tres pilares, Haiku sobre tests y CI) y cuatro rondas de
+re-revisión sobre lo corregido. Codex no corrió (la CLI pide `gpt-5.5`, que la cuenta de ChatGPT no
+tiene).
+
+Lo corregido, por pilar:
+
+- **App.** El envío de audio a la placa no recibía la señal de corte, así que el límite de 8 s nunca
+  llegaba al POST. La copia de la lectura de ómnibus a la placa salía con la salida en el teléfono
+  (dos voces) y sin red con la placa (síntesis pagada para nadie): ahora sólo con salida
+  "dispositivo" y la placa alcanzable. Al conectar se lee una vez la característica `mode`, porque
+  la placa no la notifica al suscribirse y un daemon reiniciado volvía en reposo mientras la app
+  seguía en ómnibus; al perder el enlace se olvida el modo. La telemetría sin red descartaba un lote
+  entero a los tres `record()`: un fallo de red ya no cuenta como intento (un timeout o una
+  respuesta de error sí) y, sin red, se deja de disparar un envío por evento. Una elección de salida
+  o de modelo hecha antes de que cargue la guardada ya no se pisa. Se registran las fallas de
+  `readWifi` y el estado de `BleRadioOffError`; `Speech.stop()` quedó dentro del `try`.
+- **Placa.** Un botón durante la carga del OCR al arrancar (20 a 120 s) no decía «preparando»
+  porque esperaba el lock de la carga; ahora lo dice antes de esperar, una sola vez aunque haya dos
+  pulsaciones. El zoom del cartel se deshace antes de esperar a los hilos (la foto de supermercado
+  del mismo doble clic salía recortada) y al empezar cada corrida. La evidencia en el hilo de OCR
+  quedó protegida (una excepción ahí mataba la lectura con el modo "activo"), la línea de tiempo se
+  reinicia por corrida y `setup.sh` reinicia el servicio en un redeploy.
+- **Supabase.** El proxy de visión valida también la ruta por proveedor (antes cualquier endpoint
+  del host recibía la clave), limita el cuerpo contando bytes, no sigue redirecciones, corta la
+  llamada si el teléfono se va (con un límite de 60 s hasta los headers), no devuelve el nombre del
+  secreto ni el error interno y pasa `retry-after`. La función de evidencia tiene un freno por IP.
+  **Hay que redesplegar las dos funciones** para que valga.
+- **Contratos.** Las referencias de evidencia aceptan más de tres dígitos de track (placa, app y
+  función), porque pasado el track 999 todo daba 404.
+- **CI.** Un job nuevo corre los tests de Python de la placa (verificado en un venv limpio); un test
+  de avisos dejó de depender de un `sleep` fijo.
+
+**Pendientes** (encontrados, no corregidos):
+
+- **Decisión del equipo: la clave del AP es fija y pública** (`virovision2026`, en el repo) y el
+  servidor HTTP de la placa no pide autenticación: cualquiera que se una al AP puede bajar las fotos
+  del entorno del usuario o reproducir audio por el parlante. Lo propone una clave por unidad
+  publicada por la característica `wifi` y un token por sesión en los endpoints. Contradice lo
+  aceptado en el ADR 0003, así que va con ADR.
+- Verificar en la función desplegada qué header de IP sobrescribe el edge (el freno por IP puede ser
+  esquivable).
+- Telemetría sin clave de idempotencia (un lote reintentado se inserta dos veces).
+- Menores de accesibilidad: el botón de leer en `loading` muestra sólo el spinner, sin el texto; la
+  línea de estado de Conectar usa `accessibilityLiveRegion` sin anuncio en iOS; la imagen de Inicio
+  sin `accessible`.
+- Código muerto: `features/auth` y sus claves de `es.ts`; `settings.intro` y `connection.connecting`;
+  en la placa, los comandos `measure`/`photo` y la característica `transfer`.
+- Placa: carrera de `camera.start()` contra `restart_camera`; `play_sequence` puede pisar un `play`;
+  el apagado espera al executor; `instalar-daemon.sh` borra la instalación antes de que `setup.sh`
+  termine bien.
+
+## 2026-11-03 — La clave fija del AP, riesgo aceptado
+
+Del pendiente de la revisión de ayer: el equipo eligió **dejar la clave fija del AP y el HTTP sin
+autenticación como riesgo aceptado** para el prototipo, porque hay una sola placa y no hay un
+adversario plausible en el alcance de la tesis. Quedó escrito como actualización del ADR 0003, como
+fila en la tabla de riesgos de la tesis (sec. 6.7) y en el comentario de `ap.py`. Para una versión
+distribuible: clave por unidad y luego token por sesión (trabajo futuro).
+
+**Desplegadas** `vision` y `evidence` con los cambios de #126 (token nuevo en
+`~/.config/virovision/supabase-token`; el anterior daba 401). Verificado: una ruta fuera de la lista
+(`/v1/files`) se rechaza y `evidence` contesta 405 a un GET. Falta una lectura de supermercado real
+desde la app para confirmar el camino completo.
+
+## 2026-11-07 — Placa nueva y el modo de la app como desplegable
+
+**Placa nueva, misma microSD.** La Zero 2 W se rompió de nuevo y se compró otra; la tarjeta es la
+misma, así que arrancó con todo lo que tenía. Se le sumó la red del laboratorio (`TIC.nmconnection`
+en `bootfs`, 2,4 GHz, WPA2/WPA3), pero la red rechazó la clave (`need-auth → no-secrets` en el log de
+NetworkManager): queda por confirmar. En TIC, además, `virovision.local` no resolvía. El despliegue
+se hizo por el hotspot del iPhone: cámara verificada con `rpicam-still`, y el daemon de `staging`
+(PR #126; sólo cambiaban `bus.py` y `evidence.py`) instalado sobre el `.venv`, con el `.tgz` de
+`bootfs` y el `instalar-daemon.sh` puestos al día. Con la placa de vuelta en modo producto, el
+usuario reportó que todo funciona desde la app (lectura de supermercado incluida, lo que cierra el
+pendiente del despliegue del proxy del 2026-11-03) salvo el auricular.
+
+**Audio de la placa nueva: se oye muy bajo, pendiente.** El software quedó descartado: el overlay
+está cargado, el GPIO 12 es PWM0 y `speaker-test`/`aplay` reproducen sin errores en los dos canales;
+sólo se escuchó un pitido muy bajo. Quedó cambiado en la tarjeta `audio_pwm_mode=2` (copia en
+`config.txt.antes-pwm2`), sin veredicto, y el PCM al 100 %. Se retoma en otra sesión.
+
+**El modo de la app es un desplegable** (pedido del usuario: dos botones ocupaban mucho para algo
+que sólo usa el equipo). Se extrajo `components/dropdown-select.tsx` del selector de modelo, y los
+dos selectores lo usan. La revisión multi-modelo encontró dos cosas que se corrigieron: el
+«Modo producto.» hablado espera 600 ms a que el menú se cierre, porque si no se pisaba con
+VoiceOver leyendo el botón al que vuelve el foco (una primera versión demoraba el cambio entero, y la
+segunda vuelta mostró que así VoiceOver leía el valor viejo); y volver a elegir el modelo vigente
+sigue guardándolo.
+La tarjeta del modo perdió su encabezado, que se decía dos veces.
+
+El reporte «en modo producto no se oculta el modelo» no se reprodujo en el código: la tarjeta del
+modelo está detrás de `isDevelopment` desde el PR #125. Se sospecha un build anterior; a confirmar
+con el build instalado.
+
+### Pendientes
+
+- Audio de la placa nueva (ver arriba).
+- Confirmar la clave de la red TIC.
+- Confirmar qué build mostraba el modelo en modo producto.
+
+## 2026-11-09 — Carcasa v0.21 a v0.26: la cámara girada
+
+Esta entrada resume las sesiones de la carcasa del 2026-10-31 al 2026-11-09, que no se habían commiteado.
+
+**El problema.** Con la v0.20 armada y puesta en la patilla derecha, la foto salía girada 90°. El detector
+de ómnibus corre dentro del sensor IMX500, así que el giro no se arregla por software: hay que girar la
+cámara en la carcasa.
+
+**Dos alternativas, impresas las dos.**
+
+- **v0.21**: la v0.20 girada entera, con la cara de la HAT arriba. El elástico y el brazo pasan a la cara que
+  apoya en la patilla, sobre la junta. Antes hubo un intento con el corte en Z = 0, que se descartó: el
+  usuario quería rotar todo tal cual.
+- **v0.22**: la v0.20 con **sólo la cámara girada** un cuarto de vuelta en su plano, con sus guías. El
+  conector queda hacia abajo, y el flex baja, va por el piso y sube frente a la Pi. El usuario resuelve el
+  recorrido del flex.
+
+Las dos pasaron una revisión multi-modelo (Sonnet, Haiku y Codex; Opus no corrió por el límite de gasto de
+la organización). Se corrigió, entre otras cosas, que el componente de la esquina de la cámara entraba
+primero al deslizar la placa y rozaba la guía. **El usuario eligió la v0.22.**
+
+**Lo que pidió después**, cada cambio entregado en una versión nueva:
+
+- **v0.23**: la cámara 2 mm más lejos de las placas, porque ahí va enrollado el flex. La tapa del auricular,
+  1,5 mm más alta (`GRILLE_RAISE`), porque no hacía click; con tapas de prueba de 1 y 2 mm.
+- **v0.24**: la ranura de la microSD 1 mm hacia la junta. La guía delantera de la cámara, abierta en toda
+  la franja de abajo, en las dos mitades. **Se imprimió y armó: "está bien de bien".**
+- **v0.25**, con lo que mostró la v0.24:
+  - el botón, centrado en la cara externa;
+  - el mini HDMI y el micro USB de la Pi sobresalen 2 mm del borde, no 0,8, y el conjunto entraba a la
+    fuerza. El hueco interior crece 1,2 mm de cada lado y la carcasa pasa a 39,8 mm de alto. Se descartaron
+    las guías en la pared porque caían sobre las trabas de la cara de abajo;
+  - los zócalos hexagonales, 2 mm más profundos (5,5);
+  - la patilla del lente pasaba justo por encima del brazo del auricular: los puentes del elástico suben y
+    el zócalo del brazo baja (`ELASTIC_Z`, `ARM_Z`). El transductor sigue a la patilla, para no moverse
+    respecto de la oreja;
+  - ganchos de las trabas más anchos (7 y 5 mm) y diente de 0,5.
+- **v0.26**: la patilla todavía tocaba el brazo. Ahora quedan 11 mm entre sus ejes (5,5 arriba y 5,5 abajo
+  del centro), lo máximo que entra en la parte plana de la cara.
+
+**Impresión** (FLSUN T1 Max, PLA, fuzzy skin). La 02 va boca arriba. La 01 boca abajo da un exterior muy
+prolijo, pero el borde de la junta pierde definición y las trabas no enganchan bien. Se recomendó apagar el
+fuzzy skin en los primeros 3 mm y compensar la pata de elefante (0,2).
+
+**En el repo.** La rama `feat/case-v0-26` sale de `staging` y reemplaza el modelo vigente (v0.20 → v0.26).
+`versions/` suma de la v0.21 a la v0.26, con sus STL, su LEEME y su `.scad`. `export.sh`: 36 ok. El trabajo
+viejo de la rama `fix/case-v0-21` quedó en un `git stash` del worktree.
+
+### Pendientes
+
+- Imprimir y armar la v0.26: probar la patilla con el brazo, los conectores de la Pi, los zócalos de 5,5 y
+  las trabas nuevas.
+- Probar la 01 boca abajo sin fuzzy skin en el borde; si sigue sin enganchar, un chaflán de 0,4 en la junta.
+
+## 2026-11-09 — La tesis, revisada con los comentarios del equipo
+
+**Pedido**: el equipo comentó y corrigió el Doc, sobre todo las partes escritas con IA (negritas,
+tono). Iterar sobre eso, con foco en el desarrollo propio (OCR, YOLO, app, carcasa), benchmarks al
+día, problemas con su solución y alternativas, y el cambio de alcance de supermercado.
+
+- **El Doc estaba adelante del repo.** Desde el 22 de octubre el equipo reescribió en el Doc el marco
+  teórico (que pasó a ser el capítulo 3, antes que el estado del arte), sacó negritas y frases de
+  remate, agregó citas numeradas y la sec. 7.2.9. Se importó el Doc entero al repo antes de tocar
+  nada (commit propio; `03-marco-teorico.md` y `04-estado-del-arte.md` cambiaron de número). El
+  conversor (en el scratchpad, no versionado) arma el Markdown desde `read_doc`; quedó verificado con
+  `sync_doc.py --report` en `ops=0`. Se perdió y se repuso la fila del riesgo de la clave fija del AP
+  (#127), que nunca había llegado al Doc.
+- **Capítulo 7 reescrito**: prosa llana, sin negritas en el cuerpo ni etiquetas tipo «Problema.»; en
+  cada componente, problema, alternativas y solución. Nuevo: 7.3.6 (fallas de hardware: conector de
+  cámara, sensor suelto al cerrar la carcasa, placa reemplazada el 7 de noviembre, audio bajo), 7.6.7
+  (modo producto y desarrollo), 7.8.2 (la revisión de toda la base, #126), la tabla de la carcasa
+  hasta la v0.25, y 7.5.4 con el alcance en tres pasos (canasta básica, alimentos, todo producto
+  alimenticio; la canasta queda como conjunto de evaluación). Cifras al 9 de noviembre: 345 pruebas
+  en la app, 197 en la placa, 122 PRs. Trece títulos renombrados en el Doc con `replaceAllText` antes
+  del sync, para que no quedaran secciones duplicadas.
+- **Comentarios atendidos**: tamaños de YOLO11 (3.4), Gemma para el respaldo (3.6), 3.9 escrita, 4.1
+  en tercera persona, 4.3.1 coherente con el enlace real, 4.4 con Tesseract, PaddleOCR y RapidOCR,
+  ADR 0005 (5.3), cifras de 5.4, «hoy no cuantificado» (6.6). En 2.1 se menciona el cambio de alcance.
+- **Sin dato, quedó PENDIENTE**: las métricas del reentrenamiento en la V100 (no están en ningún repo
+  ni en el Drive) y el resultado de Tesseract sobre las 117 imágenes.
+
+### Pendientes
+
+- Métricas del reentrenamiento en la V100 (7.4.3, 12.7): las tiene quien corrió el entrenamiento.
+- Comentarios que son decisión del equipo: objetivos opcionales a trabajo futuro (2.2.3, 10), rehacer
+  los diagramas de 7.1.3, el manual de usuario como audio en la app, el registro de reuniones (5.6).
+- Agregar a la bibliografía la documentación de YOLO11 de Ultralytics y RapidOCR (se citan en 3.4 y 4.4).
+- Actualizar el índice del Doc a mano (la API no lo refresca).
+
+## 2026-11-10 — Carcasa v0.27: la copa del auricular, aparte
+
+Pedidos del usuario para el brazo del auricular, para que el cable pase más fácil:
+
+- **La copa, separada del brazo.** Es una pieza nueva (08) que se encastra en la punta del brazo igual
+  que el brazo en la carcasa: un enchufe de 5,6 × 5,6 × 4,4 en el brazo, un zócalo con 0,35 de luz por
+  lado en un saliente de la copa, y gotita si queda flojo. La copa se imprime con el piso abajo, sin
+  soportes, porque el saliente ocupa todo su largo.
+- **El canal ya no dobla a 90°.** Dentro del enchufe de la carcasa el cable bajaba recto y doblaba en
+  esquina hacia el tubo; ahora dobla con 3 mm de radio. El paso por la pared de la carcasa pasa a Ø 3,8 y se
+  abre en embudo hacia adentro. Se interpretó así «el encastre a la placa por dentro»; a confirmar con el
+  usuario.
+- **Pared del tubo más fina**: canal de Ø 3,4 (era 2,6), pared de 1 mm.
+
+Al principio, el brazo salió en dos sólidos: el enchufe nuevo sólo tocaba la punta del tubo. Además, el
+redondeo del zócalo estrechaba la boca y el enchufe chocaba al entrar. Se corrigieron las dos cosas, y se
+sumaron dos verificaciones: `cup`, la copa contra la carcasa y el transductor, y `cup_insert`, la copa
+deslizándose sobre el enchufe. `export.sh`: 40 ok. Cambian la 01 (el paso del cable), la 03 y la 08 nueva;
+la 02 es igual a la de la v0.26. Rama `feat/case-v0-27`, sin commitear; STL en
+`~/Desktop/Modelos 3D/VIA_CLARA_v0_27/` y en `versions/v0_27/`.
+
+### 2026-11-11: v0.28, el brazo con más luz en la copa
+
+El usuario imprimió la v0.27: todo salió bien salvo el brazo, que no calzaba en la copa, sobre todo el
+enchufe rectangular. En el modelo el encastre estaba centrado y con 0,35 de luz por lado (se verificó con un
+corte). La causa es la impresión: el zócalo de la copa queda acostado y su techo sale en puente, así que el
+hueco se achica. Como el usuario sólo reimprime el brazo, la copa queda igual y el enchufe del brazo pasa a
+5,1 × 5,1 (`CUP_PLUG_FIT`, 0,6 de luz por lado). Se confirmó que la copa, las mitades, el botón y la tapa
+dan la misma geometría que en la v0.27: mismos triángulos y mismo volumen. `export.sh`: 40 ok. STL en
+`~/Desktop/Modelos 3D/VIA_CLARA_v0_28/` y `versions/v0_28/`.
+
+### 2026-11-12: v0.29, el encastre de la copa al revés
+
+El usuario avisó que la parte del brazo que entra en la copa es demasiado chica. La v0.28 se había hecho
+sobre un supuesto equivocado: que en la v0.27 el brazo no entraba. En realidad quedaba flojo, y achicar el
+enchufe a 5,1 lo empeoró. La v0.29 lo agranda a 6,0 × 6,0, con esquinas de 0,8 (la luz queda en 0,15 por
+lado en el zócalo de 6,3 de la copa ya impresa). Suma tres puntas de prueba (5,8, 6,0 y 6,2), sólo el
+enchufe impreso acostado como el brazo, para probar en la copa antes de imprimir el brazo entero.
+`export.sh`: 40 ok. Lección: ante «no calza bien», preguntar si entra justo o queda flojo antes de cambiar
+la medida.
+
+### Pendientes
+
+- ~~Probar las puntas `test_cup_plug_*` de la v0.29 en la copa~~: el enchufe de 6,0 calzó perfecto (confirmado por el usuario el 2026-11-12). La v0.29 es la carcasa final, impresa.
+- Commit y PR de la v0.27 a la v0.29 (rama `feat/case-v0-27`).
+- ~~Lo pendiente de la v0.26~~: el usuario confirmó el 2026-11-12 que no queda nada por probar; la carcasa
+  está impresa y es la versión final.
+
+## 2026-11-12 — Tesis: alcance, periferia, carcasa hasta la v0.29 y trabajo futuro
+
+**Pedido**: reescribir el alcance del modo supermercado como una ampliación de la canasta básica (se
+cumplía con margen y sin costo de latencia), contar que el modo ómnibus sin conexión importa sobre todo
+en la periferia y el interior, donde las líneas llevan letras, y volcar lo nuevo: carcasa, impresoras,
+interruptor, cámara girada, modo producto, audio, limitaciones y trabajo futuro.
+
+- **El equipo seguía editando el capítulo 3 en el Doc** (YOLO y OCR pasaron a 3.3.2 y 3.3.3, más
+  ajustes en 2.4.2, 4.1.1 y 4.1.2). Se trajeron al repo antes de publicar y en esta pasada no se tocaron
+  los capítulos 3 y 4. Se comparó el Doc contra el estado publicado el 2026-11-09 (`git archive` de ese
+  commit) para separar lo del equipo de lo propio.
+- **7.5.4** pasa a «Ampliación del alcance»: la canasta básica se cumplió, el modelo daba para más
+  (yerba suelta), la latencia y el costo no cambiaron, y la canasta queda como conjunto de evaluación. Se
+  dice además que el texto de la app («productos de supermercado») es más amplio que el prompt (sólo
+  alimentos). En 2.1, la canasta básica queda como alcance original.
+- **Periferia**: 7.2.4 da el motivo del modo sin conexión; 7.4.8 describe los prefijos que acepta el
+  intérprete (CE, BT, D, E, G, L; 55 de 147 códigos del catálogo); la nueva 7.4.13 cuenta qué está
+  soportado, qué casi no está medido (en las 117 imágenes hay sólo una línea con letras, la G) y qué no
+  se anuncia (las líneas fuera del STM).
+- **Carcasa** hasta la v0.29, con el cambio de la Ender 3 V3 a la FLSUN T1 Max, el interruptor de panel
+  pegado y la cámara girada (el YOLO corre en el sensor). **Audio**: el auricular de 4 Ω, 260 Ω + 47 µF
+  y los pines 12/14 (#130).
+- **Nuevas**: 7.9 (limitaciones del prototipo) y el capítulo 10 (trabajo futuro): placa dedicada,
+  batería mayor, amplificador, prueba en la calle, líneas periféricas e interior, respaldo local de
+  supermercado, objetivos opcionales, seguridad y Google Play.
+
+### Pendientes
+
+- Las métricas de la V100 siguen sin dato.
+- La bibliografía todavía no tiene la documentación de Ultralytics (YOLO11) ni la de RapidOCR.
+- Actualizar el índice del Doc a mano.
+- PR de `docs/thesis-team-review` a `staging`.
+
+## 2026-11-12: el audio PWM pasa al pin 12, del lado de la microSD
+
+**Qué.** El auricular resultó ser de **4 Ω**, no de 16 a 32 Ω. Con los 100 Ω en serie le llegaba un 4 % de
+la tensión, lo que alcanza para explicar el volumen casi nulo de la placa nueva, y el pico de corriente
+(3,3 V / 104 Ω, unos 32 mA) superaba los 16 mA que admite un GPIO. Se definió una resistencia de 260 Ω
+(unos 12,5 mA de pico) más un capacitor de acople de 47 a 100 µF en serie, que corta la continua de 1,65 V
+del PWM en silencio. Para que esos dos componentes entren en la carcasa, la salida se mudó de
+`pins_12_13` (señal en el pin 32, masa en el 34) a **`pins_18_19`: señal en el pin 12, masa en el 14**. Es
+el único otro par con PWM en el header y el más cercano a la microSD; el pin 6 se descartó como masa porque
+cae en la zona que tocan los pogo pins.
+
+**En el repo.** `setup.sh` escribe ahora el `dtoverlay=audremap,pins_18_19` (antes se ponía a mano) y borra
+cualquier línea `audremap` anterior. Se actualizaron el README de `raspi/` y el de `hardware/`, la guía de QA
+de supermercado y la skill.
+
+### Pendientes
+
+- La tarjeta de la placa ya tiene `pins_18_19` (cambiado desde la Mac, copia en `config.txt.antes-pins18`;
+  `audio_pwm_mode=2` sigue sin veredicto). Falta soldar el auricular en los pines 12 y 14 con la
+  resistencia y el capacitor, y probar.
+- El pin 35 (GPIO 19) pasa a ser salida: tiene que quedar libre.
+
+**Después, en la misma sesión.** Soldado en los pines 12 y 14, el audio funcionó pero muy bajo. Se
+evaluaron alternativas de amplificación: la placa original de los auriculares (descartada: el
+amplificador está dentro de un chip JieLi con Bluetooth, cargador y lector de microSD, y por USB no se
+enumeró en la Mac), un seguidor de dos transistores, LM386 (electronica.uy), PAM8403 mini
+(MercadoLibre), PAM8302 y MAX98357A, con el espacio libre en la carcasa v0.29 calculado desde el modelo
+(~26 × 24 × 7 mm junto al header). **Con el tutor se decidió dejar el prototipo sin amplificador** y
+documentarlo como trabajo futuro. Un hallazgo para el informe: la salida directa es la que **menos**
+consume (~10 mW al sonar, menos del 1 % de la placa), no la que más. También quedó documentada la
+prueba del circuito RC (260 Ω + 47 µF: funciona, volumen muy bajo) y por qué el volumen la vuelve
+inviable para la calle: desde un GPIO de 16 mA, ningún circuito pasivo entrega más de ~1 mW en 4 Ω
+(el RC da ~0,16 mW; un clase D a 5 V, hasta 3 W).
+
+Quedó en el [ADR 0012](architecture/adr/0012-audio-del-prototipo-sin-amplificador.md), en la tesis
+(sec. 7.3.1, 7.3.3 y la nueva sec. 10.1), en `REUNIONES-TUTOR.md`, en `PROJECT-STATUS.md`, en los README
+de hardware y en la skill.
+
+### Pendientes (actualizado)
+
+- Medir con un multímetro en serie la corriente del transductor durante una lectura, y verificar si
+  el PWM se detiene en silencio.
+- Amplificación (trabajo futuro): MAX98357A en los mismos pines.
+
+## 2026-11-12 (cont.): el audio sin amplificador, el camino del modelo de nube y el audio de la app, en la tesis
+
+- **PR #130 integrado con `staging`** (merge de `staging` en la rama, no rebase, para no reescribir una
+  rama que otra sesión tiene en su checkout). Los conflictos venían de que el PR editaba la tesis y los
+  README de antes del #132. En los README, la skill y PROJECT-STATUS se tomó la versión del PR (ADR 0012:
+  el transductor de 4 Ω sale del pin 12 con 260 Ω y 47 µF, sin amplificador, decidido con el tutor) y se
+  quitaron las menciones del #132 que lo daban por «propuesta abierta».
+- **Corrección de fondo**: lo que tiene 4 Ω es el propio transductor de conducción ósea, sacado de unos
+  auriculares comerciales; la tesis hablaba de «un auricular de 4 ohmios» aparte.
+- **Tesis**: 7.3.1 (fila y párrafo del audio), 7.3.3 (consumo del audio, ~10 mW), 7.3.6 (las dos
+  pruebas, 7 y 12 de noviembre), 7.9 y una nueva **10.2 «Amplificación del audio del dispositivo»** con
+  el techo de ~1 mW de un GPIO y la tabla de alternativas (MAX98357A recomendado); las 10.2 a 10.5
+  pasan a 10.3 a 10.6.
+- **7.2.2** cuenta ahora las tres etapas: Gemma en el teléfono (ago-12/13), la nube con la restricción
+  de gratuidad para el usuario (ADR 0006, 30/8) y el paso de Flash a Flash Lite, y la medición del 2/9
+  que dejó luna por defecto y qwen como alternativa.
+- **Nueva 7.6.8 «Retroalimentación auditiva continua»**: el catálogo de avisos de la app, quién dice
+  cada uno y por qué.
+
+## 2026-11-17: marco teórico completo (seguimiento, mAP, cuantización, VLM, BLE y WiFi)
+
+- **Importado del Doc** lo que el equipo editó desde el 12/11: 4.1 y 4.2 (la conclusión de 4.1.3 pasó
+  a 7.3.1; los productos de 4.2 con su nombre como subtítulo) y una sección nueva **7.3.6 «Desglose de
+  costos»** (borrador del equipo, con la impresión de la carcasa sin costo todavía). «Fallas de
+  hardware» pasa a 7.3.7 y se actualizaron sus referencias (7.3.1, 7.2.1, 7.3.2, 6.7).
+- **Capítulo 3** (Magui no llegó a terminarlo; lo completó Juan Lucas):
+  - nuevas **3.1.3** (modelos de lenguaje y multimodales: tókenes, transformer, VLM, prompt, salida
+    estructurada, alucinación), **3.3.4** (seguimiento por detección: IoU, método húngaro, SORT con
+    Kalman, ByteTrack, ciclo de vida de la pista, fragmentación, votos y ventanas de supresión),
+    **3.5.1** (BLE: GAP, GATT, UUID, notificación, ATT MTU) y **3.5.2** (WiFi, punto de acceso, HTTP);
+  - en 3.1.1, particiones, hiperparámetros, aumentación y pseudoetiquetado; en 3.2, IoU, AP y mAP
+    (mAP@0,5 y @0,5:0,95 se usaban sin definir); en 3.3.1, supresión de no máximos; en 3.3.3, nitidez
+    por varianza del laplaciano y similitud de cadenas (Levenshtein, Ratcliff/Obershelp);
+  - **3.4 reescrita** como teoría (borde y nube, cuantización PTQ/QAT, aceleradores, inferencia en el
+    sensor, formatos de intercambio); el relato del spike de Gemma ya está en 7.2.2;
+  - referencias rotas de la reestructuración arregladas (4.1.1→3.1.1, 3.4/3.5→3.3.2/3.3.3, estado del
+    arte 3.6/3.4→4.6/4.4, 4.3), negritas fuera del cuerpo, erratas, y «desde 2024» con fuente (RN 0.76).
+- **7.4.9**: los parámetros del seguidor (IoU 0,3, perdida a los 0,5 s, recuperable 5 s con IoU 0,2).
+- **Bibliografía**: 22 fuentes nuevas, 77 a 98, en una sección al final para no correr la numeración.
+
+### Pendientes
+
+- Audio por PWM y filtro (teoría para 3.7) y el amplificador comprado: probarlo y documentarlo.
+- 7.3.6: costo de la impresión de la carcasa, número de figura y la referencia a conclusiones.
+- Índice del Doc a mano (3.1.3, 3.3.4, 3.5.1, 3.5.2, 7.3.6, 7.3.7).
+
+## 2026-11-17 (cont.): reentreno de la V100, bibliografía única, figuras en el cuerpo y comentarios de Pancho
+
+- **Importado del Doc** lo que el equipo editó en el día (36 secciones):
+  - comillas “”, cita antes del punto y citas nuevas en 3.1;
+  - costos de 7.3.6 (impresión 0,86 USD, total 211,12 USD);
+  - el diagrama de Pancho en 7.4.1;
+  - 2.4.4, que se integró en la introducción;
+  - 2.3 sin el entregable de documentación técnica.
+  
+  Con un conversor nuevo de Doc a Markdown (en el scratchpad). `sync_doc.py` ahora trata las imágenes
+  flotantes (posicionadas) como imágenes, porque antes habría borrado el diagrama de 7.4.1.
+- **Reentreno de la V100**, con los datos sacados de `best.pt` y `results.csv`, que el usuario dejó en el
+  Escritorio:
+  - corrida del 15/10, 395 fotos (`find-bus-sign-7`), 120 épocas, lote 16;
+  - AdamW automático, con casi toda la aumentación por defecto: no es la tabla del script, y la tesis lo
+    aclara;
+  - validación, época 105: P 0,940, R 0,926, mAP50 0,967, mAP50-95 0,739.
+  
+  En la tesis:
+  - 7.4.3 cuenta la corrida, con la Figura 16;
+  - 7.4.5 compara CPU contra V100 sin borrar las métricas viejas, avisa que las particiones son
+    distintas y suma las Figuras 17 y 18;
+  - 6.6, 7.9 y el anexo 12.7 quedaron actualizados, con las Figuras 19 a 21.
+  
+  Los archivos quedaron en `docs/mediciones/2026-10-15-reentreno-v100/`. Queda abierto evaluar el
+  pipeline completo con este detector sobre las 117 imágenes.
+- **Comentarios de Pancho**:
+  - 4.5 escrita: conjuntos de datos, por qué un detector entrenado no escala a un supermercado, apps de
+    asistencia y VLM. También se escribió 4.6, que tenía una sola frase.
+  - 7.4.7: se sacó el pendiente de Tesseract.
+  - 5.6: se sacó el pendiente del registro de reuniones.
+  - Quedan para el equipo: el título de la portada (“discapacidad visual”), los diagramas de 7.1.3 y los
+    colores de 7.4.1.
+- **Bibliografía**:
+  - una sola lista numerada del 1 al 98, sin subtítulos (en el Doc cada tema reiniciaba en 1);
+  - la documentación interna va con viñetas;
+  - las citas de autor y año de 4.4 y 7.6 pasaron a número;
+  - 30 entradas nunca se citan en el texto.
+- **Figuras en el cuerpo**, con numeración global:
+  - capítulo 2: los gráficos de la encuesta que cita el texto (Figuras 1 a 13). Antes «Figura N» era el
+    número de pregunta; ahora las preguntas sin gráfico se citan como «pregunta N, anexo 12.2.x»;
+  - 4.7: el RTT promedio por protocolo (Figura 14), con aviso de que las condiciones de la medición no
+    quedaron registradas;
+  - 7.4.1: Figura 15;
+  - reentreno: Figuras 16 a 21.
+  
+  Pancho sacó del Doc los diagramas de 7.1.3 para rehacerlos. Cuando vuelvan, pasan a ser las Figuras 15
+  y 16, y las siguientes se corren dos lugares.
+  
+  Copias en `docs/tesis/figuras/`. Convenciones nuevas en `docs/tesis/README.md` y en la skill.
+
+### Pendientes
+
+- Evaluar el pipeline sobre las 117 imágenes con el detector de la V100.
+- Condiciones de la medición de RTT por protocolo (Pancho).
+- 7.3.6: “(referencia a conclusiones)” y el capítulo 9.
+- Índice del Doc a mano.
+
+## 2026-11-18: revisión del documento completo y publicación
+
+- **Revisión de toda la tesis** con `tackle-review`. La primera ronda la hicieron Opus, Sonnet, Haiku y Codex
+  sobre el documento entero; la segunda, Opus, Sonnet y Codex sobre los cambios; la tercera, Codex, que no
+  encontró nada. Las correcciones se repartieron por capítulo entre cinco agentes.
+- **Lo grave que se corrigió:**
+  - los párrafos de Bluetooth y WiFi de 4.7, copiados de blogs, se reescribieron con las especificaciones;
+  - el dato del censo (decía MIDES 2011, 7,6%) pasó a INE 2011: 15,9% de la población, con discapacidad
+    en general;
+  - se agregaron fuentes que faltaban: OMS, Turing, Deep Blue, LeCun, RFC 6455 y 7252, MQTT y la
+    Ley 18.331;
+  - se corrigió la cita \[6\] de 3.1.2;
+  - se bajaron las afirmaciones exageradas: la introducción, la canasta básica «cumplida» y la
+    validación con usuarios;
+  - se resolvieron contradicciones: el n de la encuesta por pregunta (25 o 26), la prueba de campo del
+    19/10, el recuento de ADR y de PR, la línea G, la tabla de OCR y dónde se guarda la evidencia;
+  - se sumaron los riesgos de seguridad a 6.7 y la protección de datos en 8.6.3;
+  - 4.5 y 4.6 quedaron completas y 12.9 dejó de estar vacía.
+- **Bibliografía**: 107 entradas, del 99 al 107 nuevas, en formato APA.
+- **Figuras 1 a 23** en el cuerpo:
+  - el diagrama nuevo de Pancho en 7.5.1 es la Figura 19;
+  - el ícono pasa a ser la Figura 20;
+  - las curvas del anexo, las Figuras 21 a 23.
+- **`sync_doc.py`** ahora parchea párrafos y celdas en lugar de reescribir secciones enteras, lo que
+  reduce la carga a un tercio. Con `--reinsert` también reescribe las secciones que tienen figuras. Doc
+  sincronizado con ops=0 y las 23 figuras con su imagen.
+
+### Pendientes (resueltos el mismo día con el usuario)
+
+- **Gemini en la compilación**: es deliberado mientras dure la evaluación de la tesis y se retira después;
+  queda declarado en 7.2.3, 8.7.7 y en el requisito RNF-06.
+- **Datos personales en el anexo**: el usuario decidió dejarlos como están.
+- **Costos**: los precios de 7.3.6 son los pagados en Uruguay, como ya dice el texto.
+- **Broker MQTT**: confirmado que sólo se usó para medir; 4.7 ya lo dice.
+- **Documento de requisitos**: escrito como anexo 12.12 (10 funcionales, 10 no funcionales, restricciones
+  y riesgos con remisión a 6.7 y 8.7.7), y 2.3 lo referencia.
+- **Hilos del Doc**: respondidos y resueltos desde jlabreu24 los de Tesseract (7.4.7), 5.6, métricas V100
+  (7.4.3) y el anexo de la otra corrida. Quedan abiertos portada y título, diagramas, la cita de
+  conclusiones de Pancho y el comentario de audio de 3.7.
+- **Sigue pendiente**: el patrón híbrido BLE + WiFi de 4.7 no tiene cita, y el índice del Doc se actualiza
+  a mano (todavía muestra los subtítulos viejos de la bibliografía).
+
+## 2026-11-18: PAM8403 instalado y el volumen del dispositivo desde la app
+
+**Qué.** El volumen de la salida directa (ADR 0012) era inviable para la calle, así que se compraron dos
+PAM8403 mini (uno de repuesto) y se instaló uno: 5 V en el pin 2, GND en el 6, la entrada de un canal en el
+pin 12 con su GND en el 14, y el transductor en la salida + y − del mismo canal. Se retiraron los 260 Ω y
+los 47 µF. El problema se invirtió: al 90 % con que arrancaba el daemon, **demasiado fuerte**, y la placa no
+tiene botones de volumen.
+
+**Cómo se resolvió.**
+- **Parche inmediato desde la microSD**: un archivo `VOLUMEN` en `bootfs` (0 a 100) hace que
+  `modo-red.sh` instale un drop-in que reaplica ese nivel 40 s después de que arranca el daemon.
+- **El volumen se elige en la app**: Ajustes → *Volumen del dispositivo*. Comando nuevo
+  `{"cmd":"volume","value":N}`; la placa lo aplica, lo guarda en `/var/lib/virovision/volume` (gana sobre
+  `--volume` en cada arranque) y lo publica como `vol` en `status`. El control es un único elemento
+  ajustable para VoiceOver y TalkBack (pasos de 10) con botones − y + y una barra tocable para quien ve; se
+  armó con primitivas de React Native para no sumar un módulo nativo, que obligaría a un build nuevo.
+  Manda una sola escritura al terminar el gesto (400 ms).
+- **El nivel por defecto baja de 90 a 50 %**, para una placa a la que nadie le eligió uno.
+
+Quedó en el ADR 0012 (actualización: PAM8403 instalado), el ADR 0003 (actualización: el comando y el
+campo), la tabla de comandos de la tesis (sec. 7.1.4) y los README de `raspi/` y `raspi/boot/`.
+
+### Pendientes
+
+- Desplegar el daemon nuevo en la placa y, una vez que el control de la app funcione, **borrar `VOLUMEN`
+  de `bootfs`**: si queda, pisa el nivel elegido 40 s después de cada arranque.
+- La tesis (sec. 7.3.1, 7.3.3 y 10.1) todavía describe el prototipo sin amplificador: actualizarla con el
+  PAM8403.
+- Medir el consumo del amplificador junto con el de la placa.
+
+## 2026-11-18 (cont.): el PAM8403 satura, y actualizar el daemon desde la microSD
+
+**La saturación.** Con el PAM8403 soldado, todo audio sale saturado y al terminar queda un ruido blanco
+fuerte. No es el volumen: el pin 12 entrega una onda cuadrada de 0 a 3,3 V (el audio va en el ancho de
+los pulsos), y bajar el volumen cambia el ancho, no la amplitud. El PAM8403, con 24 dB fijos, espera
+una señal de nivel de línea. El arreglo es un filtro a la entrada: 10 kΩ en serie (en el cable, con
+termocontraíble) y 1 kΩ más 22 nF a masa, soldados sobre los pads L y GND del módulo; divide por diez y
+corta por encima de unos 8 kHz, como el filtro que las Raspberry con jack traen en su placa. Usar otro
+pin no cambia nada: la Zero no tiene salida analógica.
+
+**El daemon por la tarjeta.** Sin red en la placa, el control de volumen (#135) no podía llegar por
+SSH. `modo-red.sh` suma un paso: si en `bootfs` hay un `virovision-update.tgz` con el paquete
+`virovision/`, lo instala antes de que arranque el daemon, guarda el anterior y renombra el tgz a
+`.aplicado`. La placa tenía el daemon de #126; entre eso y `staging` sólo cambió código Python, sin
+dependencias nuevas. Se quitó `VOLUMEN` de la tarjeta: el volumen pasa a elegirse desde la app.
+
+### Pendientes
+
+- Soldar el filtro de entrada del PAM8403 y probar.
+- Si después del filtro queda ruido en silencio: que el daemon apague el pin entre audios.
+- Actualizar las sec. 7.3.1, 7.3.3 y 10.1 de la tesis: el prototipo ya tiene amplificador.
+
+**El soplido que no para.** Con el daemon nuevo, después de cada audio el PAM8403 queda sonando fuerte
+indefinidamente: el PWM sigue conmutando sin audio. El daemon ahora desconecta el pin (GPIO 18 a salida
+en bajo con `pinctrl`) tras 1 s sin sonar nada y lo reconecta antes del próximo audio; también al
+arrancar. Va a la placa por la tarjeta (`virovision-update.tgz`).
+
+## 2026-11-19: el audio con el PAM8403 queda funcionando
+
+Con el daemon nuevo (volumen y pin desconectado entre audios) se resolvió el soplido posterior a cada
+audio, pero la voz seguía saturada. La resistencia en serie sola no alcanzaba: con 10 kΩ seguía
+saturando y con 20 kΩ la voz quedaba lejana bajo un soplido fuerte, porque una resistencia atenúa voz y
+ruido por igual. Un capacitor de 47 µF se descartó por cálculo (20.000 veces el valor necesario). Con
+20 kΩ y 1 nF mejoró mucho; el circuito final es un **filtro de dos etapas** con los componentes del kit
+cerámico: 10 kΩ + 4,7 nF (472) y 10 kΩ + 2 × 1 nF (102) en paralelo, con el volumen del dispositivo al
+máximo desde la app. Corte calculado ~2,1 kHz, −50 dB a 100 kHz. Montado sin placa (la primera
+resistencia en el cable con termocontraíble) y entró en la carcasa muy justo. Resultado: **funciona muy
+bien**; queda un ruido de fondo leve, de cuantización del PWM, que sólo se va con I2S.
+
+Documentado en el ADR 0012 (actualización 2026-11-19, con la tabla de intentos), la tesis (sec. 7.3.1,
+7.3.3, el relato de la placa nueva, 7.9 y la sec. 10.2 reescrita), los README de hardware, el estado
+del proyecto y la skill. **No se pasó al Google Doc**: el equipo lo decide después.
+
+### Pendientes
+
+- ~~Pasar los cambios de la tesis al Google Doc~~: publicado el 2026-11-19 con el ok del tutor (`sync_doc.py`, diez secciones; antes se trajeron al repo las ediciones del equipo en 7.2.6 y 7.3.5).
+- (#136 y #137 mergeados a `staging` el 2026-11-19.)
+- Medir el consumo de la placa con el amplificador.
+
+## 2026-11-19 (cont.): la carcasa en la tesis, con figuras
+
+Con el ok del tutor se publicó en el Doc el capítulo del audio (PR #138). Después, a pedido del usuario,
+la sec. 7.3.5 sumó cinco figuras del modelo final (exterior, cara de la cabeza, interior, despiece y una
+comparación v0.9 / v0.20 / v0.29) en `docs/tesis/figuras/carcasa-*.png`, y dos hallazgos nuevos: el espacio
+interior (de 16,5 a ~23 mm, conectores, cable plano, patilla, y el amplificador que entró justo) y las trabas
+a presión (el clic: v0.11, v0.23, v0.25 y el encastre de la copa). La versión final se imprimió en la FLSUN.
+Las figuras 15 a 23 pasaron a 20 a 28 (en el Doc, con `replaceAllText`). La guía de armado decía «Pulsador
+6 x 6»: corregido a «SMD 4 x 4» y regenerado con `export.sh`. Las imágenes entraron al Doc por
+`insertInlineImage` desde el raw de GitHub (repo público). Índice actualizado desde Chrome y uniformado con
+`toc_style.py`. **No se tocaron las correcciones del tutor**: se ven cuando él avise que terminó.
+
+### Pendientes
+
+- Fotos reales de la carcasa impresa y armada, si el equipo las tiene (hoy son renders del modelo).
+- Correcciones del tutor, cuando avise.
+
+## 2026-11-20: tres arreglos de producto (permiso de Wi‑Fi, cámara al primer uso, audios que se pisan)
+
+Probando en casa el dispositivo completo, el usuario reportó tres problemas. La telemetría (Supabase,
+`events`) confirmó los tres y cambió el diagnóstico del segundo.
+
+**El permiso de Wi‑Fi en cada encendido.** iOS muestra «¿Querés unirte a ViroVision?» cada vez que se
+llama a `NEHotspotConfiguration` con el teléfono fuera de esa red, aunque la configuración ya esté
+guardada (`services/wifi/join.ts`). Como la placa levanta el AP segundos después de anunciar BLE, la app
+siempre llegaba a llamarla. Ahora la app recuerda la red a la que el teléfono ya se unió
+(`services/storage/joinedNetwork.ts`) y, al conectar, no pregunta: espera hasta 20 s a que iOS vuelva
+sola (`mayPrompt: false`, evento `wifi.notJoined` si no vuelve, sin aviso). El permiso queda para cuando
+una lectura de supermercado necesita la foto (`joinNetwork`); el modo ómnibus no lo pide nunca. Límite
+que no se puede esquivar: con el teléfono en el Wi‑Fi de casa, iOS no se cambia sola a la red de la placa,
+y ahí el permiso aparece al usar supermercado.
+
+**La cámara al primer uso.** La telemetría del 2026-11-20 a las 12:16 mostró que la red estaba lista y la
+cámara también: el pedido de foto llegó en el mismo instante en que el modo pasaba de ómnibus a
+supermercado, y la captura se cruzó en picamera2 con el bucle de cuadros del modo ómnibus que todavía no
+había terminado. La captura se colgó 8 s, el reinicio de la cámara no pudo cerrar el sensor y el daemon se
+reinició (por eso «al reconectar anda»). Otros días hubo además fotos pedidas con el teléfono uniéndose
+todavía al AP y 503 con la cámara arrancando. Arreglos: en la placa, la foto espera (hasta 4 s) a que el
+modo ómnibus suelte la cámara (`BusWatcher.wait_released`, `release_camera_for`), también cuando la app
+avisa con `X-Mode` que la foto es para otro modo; en la app, la lectura espera la escritura del modo, la
+red de la placa (con «Conectando con el dispositivo…» a los 3 s) y reintenta los 503, todo dentro de un
+tope total de 30 s por ciclo (`READING_TOTAL_CAP_MS`). Frases nuevas en `es.ts` para red y cámara.
+
+**Los audios que se pisan.** Al cambiar de modo nada cancelaba la lectura de supermercado en curso
+(nube, síntesis y POST a la placa), y en la placa la cola de clips de ómnibus arrancaba encima del audio
+que estaba sonando y lo dejaba huérfano. Ahora un cambio de modo corta las dos salidas, cancela la
+lectura (termina en silencio, sin «tardó demasiado»), y la placa rechaza con 409 un audio de un modo que
+ya se dejó. La cola de ómnibus espera a que termine la frase anterior, con un tope de 20 s por clip.
+
+Revisión multi-modelo (Opus, Sonnet y Haiku, cuatro rondas; Codex no corrió porque la cuenta rechazó el
+modelo): siete hallazgos importantes, todos corregidos.
+
+### Pendientes
+
+- Daemon de esta rama ya instalado en la placa (2026-11-20, por SSH tras `tools/ap.py`, respaldo en
+  `/home/virovision/virovision.bak-*`): arranque limpio, foto con `X-Mode` en 0,24 s y `/audio` de otro
+  modo rechazado con 409. Falta la app nueva (build) para la prueba completa: encender, abrir la app (sin
+  permiso si ya se unió antes), supermercado al primer intento, y supermercado → ómnibus sin audios
+  superpuestos. Probado el 2026-11-23 con el build de TestFlight: los tres arreglos funcionan.
+- Sin test: el arranque fallido del modo ómnibus y la espera de cámara de `__main__.py`.
+- Riesgo aceptado: si la escritura del modo no llega a la placa en 1,5 s, la foto se saca igual.
+
+## 2026-11-23: un solo aviso de conexión en modo producto
+
+Con los tres arreglos del 2026-11-20 probados en el dispositivo, quedó un detalle: en modo producto la
+app decía dos frases al conectar, «Dispositivo conectado.» (el enlace BLE) y después «Red con el
+dispositivo lista.» (el Wi‑Fi). Para quien usa el producto son dos pasos de algo que parece que todavía
+puede fallar, sin nada que hacer en el medio. Ahora el modo producto dice una sola frase,
+«Dispositivo emparejado.», cuando el dispositivo está listo para usarse; el modo desarrollo conserva las
+dos, porque al equipo le sirve distinguir un problema de BLE de uno de Wi‑Fi.
+
+«Listo» es la red de la placa lista (supermercado necesita la foto), pero no se espera para siempre: el
+modo ómnibus anda sin esa red. Por eso la frase también sale cuando el teléfono está en otra red (el
+Wi‑Fi de casa) y, si nada se resuelve, a los 25 s del enlace (`PAIRED_FALLBACK_MS`, por encima de los
+20 s que se le dan a iOS para reasociarse sola). Una conexión muda nunca es aceptable. Si la red falla,
+se dice sólo la frase de falla, y «emparejado» recién cuando la red vuelve, para no sonar a que la falla
+se resolvió. La lógica vive en `app/src/features/device/pairedNotice.ts`, con sus tests.
+
+### Pendientes
+
+- Probar en el dispositivo con el build siguiente: encender la placa y abrir la app en modo producto
+  debe decir sólo «Dispositivo emparejado.».
+
+## 2026-11-23 (cont.): los arreglos de producto, documentados en la tesis
+
+PR #141 mergeado a `staging` (sale a TestFlight). Se documentaron los cuatro ajustes de noviembre
+(permiso de WiFi, cámara en la primera lectura, audios superpuestos al cambiar de modo y el aviso único
+«Dispositivo emparejado») en la nueva sec. 7.6.9 de `docs/tesis/07-desarrollo.md`, en prosa para pasar al
+Doc oficial, y se actualizaron la tabla de avisos de la sec. 7.6.8 y el bloque 2 de
+`docs/qa-avisos-de-sistema.md`.
+
+### Pendientes
+
+- Pasar la sec. 7.6.9 y la tabla de la 7.6.8 al Doc oficial (lo hace el equipo).
+- Probar «Dispositivo emparejado» en el dispositivo con el build del PR #141.
+
+## 2026-11-23 (cont.): el repo en inglés, y ninguna atribución de IA
+
+El equipo pidió que todo lo que no es documentación quede en inglés, PRs incluidos, y que ningún PR
+ni commit lleve atribución de IA. Se hizo en tres partes:
+
+- **PRs en GitHub.** Se sacó la línea "Generated with Claude Code" de todas las descripciones que la
+  tenían (la última pasada encontró dos más, #101 y #102) y se tradujeron al inglés el título y la
+  descripción de los PRs que estaban en español (del #10 al #142), sin nota de traducción. Las frases
+  literales que el producto dice o muestra quedaron en español, citadas tal cual.
+- **Código.** Se tradujeron los comentarios y las líneas de log que quedaban en español: los scripts
+  de arranque de la microSD, `tools/ap.py`, `tools/say.py`, dos tests de la placa y
+  `app/jest/styleMock.js`. Los nombres que viven en la tarjeta (`modo-red.sh`, `SIN-AP`, `VOLUMEN`,
+  `.aplicado`, …) no se renombraron: las tarjetas grabadas y las unidades de systemd los usan por
+  nombre. La migración ya aplicada de `eventos` tampoco se tocó (el log de migraciones es de sólo
+  agregar).
+- **Reglas.** ADR 0009 enmendado; `CLAUDE.md`, `convenciones.md` y la plantilla de PR dicen ahora que
+  los PRs van en inglés y que no se agrega atribución de IA aunque un recordatorio de la herramienta
+  lo pida. La documentación sigue en español.
+
+### Pendientes
+
+- Si alguna vez se regraban todas las microSD, renombrar los archivos de la tarjeta al inglés.
+
+## 2026-11-23 (cont.): revisión del codebase entero
+
+Se corrió la revisión multi-modelo (`tackle-review`) sobre todo el código, no sobre un diff: Opus
+(app y daemon), Sonnet (servicios de la app), Haiku (funciones de Supabase, CI y tests de la placa)
+y Codex, con una segunda vuelta de Opus y Codex sobre los arreglos. Lo que se arregló:
+
+- **App.** La cola de GATT ya no queda trabada detrás de una operación colgada (se libera a los
+  5 s), y un listener que falla no silencia a los demás. Un cambio de modo mientras se carga el OCR
+  ya no deja el botón de leer deshabilitado. Una falla de red que se repite en cada latido de 15 s
+  se dice una sola vez, y el reintento no vuelve a mostrar el aviso de iOS para unirse. Los botones
+  de modo de Inicio quedan habilitados durante una lectura (cambiar de modo la cancela).
+- **Telemetría.** Un envío exitoso descuenta sólo las pérdidas que informó; un 429 del freno no
+  cuenta como intento fallido.
+- **Placa.** Repetir la última lectura respeta la salida elegida (antes sonaba siempre en la placa).
+  Un arranque de ómnibus que llega después de salir del modo no deja el detector prendido. No se
+  saca una foto si ya hay una transferencia en curso. Dos `play` simultáneos ya no superponen
+  decodificadores. `--no-audio` también silencia el modo ómnibus. La actualización del código desde
+  la tarjeta vuelve atrás si falla a mitad de camino.
+- **Supabase.** `telemetry` y `evidence` limitan el cuerpo mientras lo leen (antes lo cargaban
+  entero), las tres funciones rechazan un JSON `null` con 400 y `telemetry` tiene freno por IP. El
+  freno, la IP del cliente y el lector quedaron en `supabase/functions/_shared/http.ts`.
+- **CI.** Los builds ya no llevan claves de proveedores (el secret de Gemini se seguía incrustando
+  aunque la app siempre usa el proxy, ADR 0008); las notas y los mensajes de commit pasan por `env`
+  y no por interpolación en el shell; `GITHUB_TOKEN` queda de sólo lectura.
+
+### Pendientes
+
+- **Desplegar las funciones de Supabase** (`vision`, `telemetry`, `evidence`): el merge no las
+  despliega.
+- Borrar los secrets `EXPO_PUBLIC_GEMINI_API_KEY` (y los demás de proveedores, si aparecen) del
+  repo en GitHub: ya no se usan.
+- Hallazgos que quedaron sin tocar: el archivo `VOLUMEN` de la tarjeta sobrescribe el volumen de la
+  app (se decide si se retira); el error "cámara no arrancó" en modo ómnibus va a telemetría pero la
+  app no lo dice; el filtro de ecos de modo recuerda una sola escritura; faltan tests de
+  `DeviceProvider`; los tests de la placa que dependen de `sleep` pueden ser inestables en CI.
+
+## 2026-11-23 (cont.): los pendientes de la revisión, y ninguna clave en los builds
+
+Se cerraron los hallazgos que la revisión del codebase había dejado abiertos, y se documentó todo en
+la tesis (sec. 7.8.5) para pasarlo al Doc oficial.
+
+- **Claves.** Se borró el secret `EXPO_PUBLIC_GEMINI_API_KEY` del repositorio y la línea de Gemini
+  del `app/.env` local: el modo supermercado usa OpenAI y Qwen (Groq), los dos por el proxy. La app
+  lee las claves de proveedor sólo con `__DEV__`, así que un build de distribución no puede llevar
+  ninguna (verificado exportando el paquete con claves ficticias). `npm run keys` exige el proxy.
+  ADR 0008 enmendado.
+- **App.** La cola de GATT devuelve un error a quien espera una operación colgada (10 s); el error
+  «modo ómnibus no disponible» del dispositivo se dice con una frase fija; el filtro de ecos de modo
+  recuerda todas las escrituras en vuelo; las decisiones de la red (decir una falla una vez, pedir
+  unirse una vez por red) pasaron a `networkCheck.ts` con pruebas; un enlace que se cae durante la
+  conexión ya no se informa como conectado; una foto sin respuesta HTTP hace volver a verificar la
+  red; el limitador lanza al estar cancelado; el selector de salida de audio usa `DropdownSelect`.
+- **Placa.** Se retiró el parche `VOLUMEN` de la microSD (anulaba el volumen elegido en la app); el
+  watchdog de red reintenta el AP en modo producto sin bloquear el latido; `hush` corre fuera del
+  event loop; la evidencia se poda fuera del lock del modo ómnibus y cada corrida usa su propio
+  timeline; las pruebas que dependían de `sleep` se sincronizan con eventos.
+- **Servidor y CI.** `evidence` ya no sobrescribe una imagen guardada; la acción de Expo quedó fijada
+  a un commit.
+
+### Pendientes
+
+- **Rotar la clave de Gemini** en Google AI Studio: viajó en builds anteriores.
+- La prueba nueva de `test_link.py` sólo corre en la placa (en la Mac falta `dbus_next`).

@@ -112,7 +112,10 @@ class FakePicamera2:
         self.camera_num = camera_num
         self.options = {}
         self.sensor_resolution = (4056, 3040)
+        self.camera_properties = {"ScalerCropMaximum": (0, 0, 4056, 3040)}
         self.closed = False
+        self.config: dict = {}
+        self.controls: list = []
 
     def create_preview_configuration(self, **kwargs):
         return kwargs
@@ -123,6 +126,15 @@ class FakePicamera2:
     def configure(self, config):
         if FakePicamera2.fail_on == "configure":
             raise RuntimeError("Failed to configure")
+        self.config = config
+
+    def camera_configuration(self):
+        # What libcamera settles on: the binned mode for a small stream, unless the raw size is asked.
+        raw = self.config.get("raw", {}).get("size", (2028, 1520))
+        return {"main": self.config["main"], "raw": {"size": raw}}
+
+    def set_controls(self, controls):
+        self.controls.append(controls)
 
     def start(self):
         pass
@@ -175,3 +187,37 @@ def test_a_half_started_camera_is_closed_and_the_detector_dropped(picamera2):
     assert not c.start()
     assert picamera2.opened and picamera2.opened[-1].closed
     assert c.sensor is None and not c.available
+
+
+def test_bus_mode_zooms_up_to_what_the_sensor_mode_really_has(picamera2):
+    """2026-10-19. A 1024 px frame over the 2028 px binned mode can be zoomed 2x before the ISP starts
+    inventing pixels; over the full 4056 px mode, 4x."""
+    import types
+
+    for full_res, max_crop_width in ((False, 2048), (True, 1024)):
+        c = Camera(model="/home/virovision/models/bus_sign.rpk", full_res=full_res)
+        c._load_model = lambda: types.SimpleNamespace(camera_num=1)
+        assert c.start()
+        full, min_size, size = c.zoom_bounds()
+        assert full == (0, 0, 4056, 3040) and size == (1024, 766)
+        assert min_size[0] == max_crop_width
+
+
+def test_the_zoom_is_asked_of_the_isp_and_undone_with_none(picamera2):
+    import types
+
+    c = Camera(model="/home/virovision/models/bus_sign.rpk")
+    c._load_model = lambda: types.SimpleNamespace(camera_num=1)
+    assert c.start()
+    c.set_zoom((100.4, 200, 2048, 1536))
+    c.set_zoom(None)
+    assert picamera2.opened[-1].controls == [
+        {"ScalerCrop": (100, 200, 2048, 1536)},
+        {"ScalerCrop": (0, 0, 4056, 3040)},
+    ]
+
+
+def test_without_a_camera_there_is_nothing_to_zoom():
+    c = Camera()
+    assert c.zoom_bounds() is None
+    c.set_zoom((0, 0, 10, 10))  # no camera: nothing to do, and no crash

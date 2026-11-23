@@ -18,6 +18,9 @@ defaults:
   run:
     working-directory: ./app
 
+permissions:
+  contents: read
+
 jobs:
   publish-preview:
     name: Publish preview update
@@ -31,11 +34,14 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: app/package-lock.json
-      - uses: expo/expo-github-action@v8
+      - uses: expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e # v8, pinned: this job holds EXPO_TOKEN
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - name: Install dependencies
         run: npm ci
       - name: Publish EAS Update (preview)
-        run: eas update --branch preview --message "${{ github.event.head_commit.message || github.sha }}" --non-interactive
+        # Through env, not interpolated into the script: a commit message is untrusted shell input.
+        env:
+          MESSAGE: ${{ github.event.head_commit.message || github.sha }}
+        run: eas update --branch preview --message "$MESSAGE" --non-interactive

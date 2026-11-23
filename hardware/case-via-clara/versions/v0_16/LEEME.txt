@@ -1,0 +1,10 @@
+VIA Clara v0.16
+
+Sólo cambia la mitad derecha (02_right_half): los 4 zócalos hexagonales son 2 mm más profundos (3,5 en vez
+de 1,5), porque en la v0.15 levantaban la placa y las dos mitades no cerraban.
+
+Las demás piezas son las de ~/Desktop/VIA_CLARA_v0_15/ (01, 03, 04, 05, 07).
+
+Imprimir 02_right_half como siempre: cara externa abajo, zócalos abiertos hacia arriba, sin soportes
+adentro. Después de imprimir, cortar los 8 puentes de las vigas de las trabas.
+00_assembly_check: sólo para mirar el armado, NO se imprime.

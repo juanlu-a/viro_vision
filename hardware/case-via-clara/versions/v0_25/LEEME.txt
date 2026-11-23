@@ -1,0 +1,36 @@
+VIA Clara v0.25 (2026-11-09): la v0.24 con lo que mostró su impresión
+
+1. Botón centrado en la cara externa: a lo largo (a mitad de camino entre la nariz y la cola) y a lo
+   alto. Sigue fuera del disipador de la Pi.
+
+2. Conectores de la Pi (mini HDMI y micro USB): sobresalen 2 mm del borde de la placa, y el modelo
+   contaba 0,8. El hueco interior es 1,2 mm más alto de cada lado, con 0,2 de luz; la carcasa pasa de
+   37,2 a 39,8 mm de alto. Se eligió agrandar en lugar de hacer guías porque las guías caían justo
+   sobre las trabas de la cara de abajo.
+
+3. Zócalos hexagonales 2 mm más profundos (5,5 en lugar de 3,5), para que los hexágonos no hagan
+   tope antes de tiempo.
+
+4. Patilla y brazo del auricular: la patilla pasaba justo por encima del brazo.
+   - Los dos puentes del elástico suben 2,5 mm, y con ellos sube la patilla.
+   - El zócalo del brazo baja 3,5 mm, así que el brazo sale por debajo de la patilla. Entre el eje
+     de la patilla y el del brazo hay ahora 6,5 mm; con una patilla de hasta ~6 mm de alto no se tocan.
+   - El auricular queda en el mismo lugar respecto de la patilla, o sea de la oreja.
+
+5. Trabas más robustas: los ganchos del cuerpo miden 7 mm de ancho (antes 5), los de atrás 5 (antes
+   4), y el diente que engancha 0,5 mm (antes 0,4).
+
+Piezas:
+  01_left_half_v0_25.stl          mitad del lado de la cabeza
+  02_right_half_v0_25.stl         mitad externa, con el botón
+  03_bone_arm_v0_25.stl           brazo (nuevo: sale más abajo)
+  04_mode_button_v0_25.stl        botón (igual)
+  07_transducer_cover_v0_25.stl   tapa del auricular (igual a la v0.24, +1,5)
+  00_assembly_check_v0_25.stl     todo armado, sólo para mirar
+
+pruebas/:
+  test_pads       los zócalos hexagonales nuevos, para probar con la Pi antes de la carcasa
+  test_nose_*     la nariz de cada mitad
+
+cara_cabeza / cara_externa: cómo quedan los puentes, el brazo y el botón.
+modelo/: el .scad, la guía y export.sh.

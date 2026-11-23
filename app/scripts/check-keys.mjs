@@ -76,31 +76,19 @@ if (proxy !== '') {
   process.exit(0);
 }
 
-if (withKey.length > 0) {
-  console.log(`✅ Supermarket mode available with: ${withKey.join(', ')}.`);
-  const withoutKey = providers.filter((p) => !withKey.includes(p));
-  if (withoutKey.length > 0) {
-    console.log(`ℹ️  With no key, these stay out of the selector: ${withoutKey.map((p) => `${p} (${KEY_OF[p]})`).join(', ')}.`);
-  }
-  process.exit(0);
-}
-
+// Without the proxy a release build has no way into supermarket mode: provider keys are read only in
+// development builds (`__DEV__`, see src/services/vision/config.ts), so they never reach a bundle.
 console.error(`
 ❌ This build would go out WITHOUT supermarket mode.
 
    The selector offers: ${providers.join(', ')}
-   Keys present:        none of those
    Proxy:               not configured
+   Keys in the env:     ${withKey.length > 0 ? `${withKey.join(', ')} (ignored: development builds only)` : 'none'}
 
    The app does not break —it says "no configurado" and bus mode keeps reading— but half its purpose
    does not exist in this build, and that is not visible until you open it.
 
-   To fix it, load ONE of these as a repo secret (or in app/.env for a local build):
-${providers.map((p) => `     · ${KEY_OF[p]}`).join('\n')}
-     · EXPO_PUBLIC_VISION_PROXY_URL   ← the preferable one: the keys stay on the server (ADR 0008)
-
-   RULE (ADR 0008): a FREE key with no card may go into the bundle; a PAID one may not. The bundle is
-   readable, and the worst case of a stolen free key is a burnt quota — the worst case of a paid one
-   is the project's card. Paid keys wait for the proxy.
+   To fix it, set EXPO_PUBLIC_VISION_PROXY_URL (repo secret, or app/.env for a local build). The
+   provider keys stay on the server (ADR 0008); a release bundle never carries one.
 `);
 process.exit(1);

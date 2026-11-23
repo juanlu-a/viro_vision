@@ -13,7 +13,7 @@ name: TestFlight
 #
 # Before compiling it runs lint + typecheck + tests: a build that reaches the testers has to have
 # gone through the same as a PR. It requires the secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (an
-# App Store Connect API key with the Admin role) and, optionally, the EXPO_PUBLIC_*_API_KEY ones.
+# App Store Connect API key with the Admin role). Provider keys never go in the build (ADR 0008).
 on:
   push:
     branches: [main, staging]
@@ -47,6 +47,9 @@ env:
   # happened).
   DESTINATION: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.destination == 'external')) && 'external' || 'internal' }}
 
+permissions:
+  contents: read
+
 jobs:
   testflight:
     name: Build and upload (${{ ((github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && inputs.destination == 'external')) && 'external · Testers ViroVision' || 'internal · Equipo ViroVision' }})
@@ -55,16 +58,9 @@ jobs:
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      # They are inlined into the JS bundle during the archive (EXPO_PUBLIC_*), same as the local
-      # .env. One key per selector provider (ADR 0006). The missing ones simply leave their model out
-      # of the selector in that build; they break nothing. CAREFUL: they stay readable inside the
-      # .ipa/.apk until ADR 0008's proxy is deployed.
-      EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
-      EXPO_PUBLIC_OPENAI_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENAI_API_KEY }}
-      EXPO_PUBLIC_ANTHROPIC_API_KEY: ${{ secrets.EXPO_PUBLIC_ANTHROPIC_API_KEY }}
-      EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
-      # With the proxy deployed (ADR 0008) the four keys above stop being needed here: the server
-      # holds them and the build goes out with none. See docs/supabase.md.
+      # No provider keys here (ADR 0008): an EXPO_PUBLIC_* value is inlined into the bundle and stays
+      # readable inside the .ipa/.apk. The proxy below holds them on the server; with it set, the
+      # app never calls a provider directly (`services/cloud/transport.ts`).
       EXPO_PUBLIC_VISION_PROXY_URL: ${{ secrets.EXPO_PUBLIC_VISION_PROXY_URL }}
       # Telemetry (the `events` table). Since 2026-09-08 the technical information is NOT on the
       # screens: without this secret the build goes to TestFlight with no diagnosis at all. It is not
@@ -137,8 +133,11 @@ jobs:
       - name: Archive, export and upload
         run: bash scripts/testflight.sh
       - name: Assign to the group and submit to Beta App Review
+        # Through env and not `${{ }}` inside the script: a quote in the notes would break the
+        # command, and the step holds the store credentials.
+        env:
+          NOTES: ${{ inputs.notes }}
         run: |
-          NOTES="${{ inputs.notes }}"
           if [ -z "$NOTES" ]; then NOTES="$(git log -1 --pretty=%s) · branch ${GITHUB_REF_NAME}"; fi
           if [ "$DESTINATION" = internal ]; then EXTRA=(--group "Equipo ViroVision" --internal); else EXTRA=(--group "Testers ViroVision"); fi
           node scripts/testflight-distribute.mjs \

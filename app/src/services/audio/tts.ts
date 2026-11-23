@@ -27,7 +27,6 @@ export interface SpeakOptions {
  */
 export function speak(text: string, options: SpeakOptions = {}): Promise<void> {
   const { language = 'es-UY', interrupt = true } = options;
-  if (interrupt) Speech.stop();
   return new Promise<void>((resolve) => {
     let settled = false;
     const done = () => {
@@ -36,6 +35,9 @@ export function speak(text: string, options: SpeakOptions = {}): Promise<void> {
       resolve();
     };
     try {
+      // Inside the `try`: a native throw from `stop()` would otherwise escape synchronously and
+      // break the "never rejects" contract the announcement path relies on.
+      if (interrupt) Speech.stop();
       Speech.speak(text, { language, onDone: done, onStopped: done, onError: done });
     } catch {
       done();

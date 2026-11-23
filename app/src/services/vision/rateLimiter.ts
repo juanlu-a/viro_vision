@@ -9,7 +9,7 @@
  * It uses `Date.now()` on purpose, not `performance.now()`: the quota window is wall-clock time on
  * the server side, not a measured duration.
  */
-import { VisionQuotaError } from './errors';
+import { VisionQuotaError, VisionStreamError } from './errors';
 import type { VisionProviderId } from './types';
 
 /** The quota window. */
@@ -108,7 +108,9 @@ export async function acquireSlot(modelId: string, options: SlotOptions = {}): P
     // First of all: if it is already cancelled, there is no point asking for a slot or waiting for
     // one. Without this check, a signal aborted *before* reaching here would sleep the whole
     // minute, because the 'abort' event already fired and `delay`'s listener never triggers.
-    if (options.signal?.aborted) return;
+    // It throws rather than returning: a caller that forgot to re-check the signal would otherwise
+    // go on to send without a slot.
+    if (options.signal?.aborted) throw new VisionStreamError('cancelled');
 
     const t = now();
     const recent = prune(modelId, t);

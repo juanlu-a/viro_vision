@@ -59,6 +59,8 @@ export const NOTICES = {
    * `services/ble/serialize.ts`.
    */
   connected: { clip: null, say: strings.connection.connectedAnnounce },
+  /** Product mode's single "the device is usable" notice, in place of `connected` + `networkReady`. */
+  paired: { clip: null, say: strings.connection.pairedAnnounce },
   /** The board cannot announce its own absence. */
   connectionLost: { clip: null, say: strings.connection.lost },
   networkReady: { clip: null, say: strings.connect.wifiReadyAnnounce },
@@ -83,6 +85,12 @@ export const NOTICES = {
    * triggers it, being the only one that knows whether its OCR has finished loading.
    */
   busWarmingUp: { clip: 'bus_warming_up.wav', say: strings.reader.announceBusWarmingUp },
+  /**
+   * The board could not start bus mode (the camera did not come up, or there is no detector). Until
+   * 2026-11-23 this only reached telemetry, and a user who had heard «preparando» was left in
+   * silence. Phone only: there is no recorded clip, and the board is the one in trouble.
+   */
+  busUnavailable: { clip: null, say: strings.reader.announceBusUnavailable },
   /**
    * The chirp at the instant a reading is requested. It goes with the modes and not with the link
    * because it belongs to the reading: it confirms the button did something during the seconds the

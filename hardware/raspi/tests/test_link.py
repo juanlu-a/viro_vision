@@ -76,9 +76,19 @@ def test_a_link_that_is_already_gone_does_not_stop_the_startup():
     from virovision.link import CentralWatcher
 
     class _Bus:
+        def __init__(self):
+            self.calls = 0
+
         async def call(self, message):
+            self.calls += 1
             raise RuntimeError("org.bluez.Error.NotConnected")
 
     watcher = CentralWatcher()
-    watcher._at_startup = ["/org/bluez/hci0/dev_4A_BF_11_22_33_44"]
-    asyncio.run(watcher.drop_links_from_before(_Bus()))  # no exception
+    watcher._at_startup = [
+        "/org/bluez/hci0/dev_4A_BF_11_22_33_44",
+        "/org/bluez/hci0/dev_4A_BF_11_22_33_55",
+    ]
+    bus = _Bus()
+    asyncio.run(watcher.drop_links_from_before(bus))  # no exception
+    assert bus.calls == 2, "a link already gone does not stop the next one from being dropped"
+    assert watcher._at_startup == [], "and it is not retried later as if it were still from before"

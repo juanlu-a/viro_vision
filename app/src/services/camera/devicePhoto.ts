@@ -37,6 +37,11 @@ interface Deps {
   now?: () => number;
   timeoutMs?: number;
   save?: (bytes: Uint8Array) => string;
+  /**
+   * The mode the photo is for. The board waits for bus mode's frame loop to let go of the camera
+   * when the photo is not for bus, even if the mode write has not landed yet (2026-11-20).
+   */
+  mode?: string;
 }
 
 function saveToCache(bytes: Uint8Array): string {
@@ -50,14 +55,18 @@ function saveToCache(bytes: Uint8Array): string {
 
 export async function downloadDevicePhoto(
   address: { ip: string; port: number },
-  { fetchImpl = fetch, now = Date.now, timeoutMs = 20_000, save = saveToCache }: Deps = {}
+  { fetchImpl = fetch, now = Date.now, timeoutMs = 20_000, save = saveToCache, mode }: Deps = {}
 ): Promise<DevicePhoto> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const t0 = now();
   let response: Response;
   try {
-    response = await fetchImpl(deviceUrl(address, '/photos/latest'), { signal: controller.signal, cache: 'no-store' });
+    response = await fetchImpl(deviceUrl(address, '/photos/latest'), {
+      signal: controller.signal,
+      cache: 'no-store',
+      ...(mode ? { headers: { 'X-Mode': mode } } : null),
+    });
   } catch (err) {
     clearTimeout(timer);
     throw new HttpDownloadError(controller.signal.aborted ? `the device did not answer in ${timeoutMs / 1000} s` : err instanceof Error ? err.message : String(err));

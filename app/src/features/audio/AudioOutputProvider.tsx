@@ -7,7 +7,7 @@
  * provider's job is to put the stored value into that module state once, and to re-render Settings
  * when it changes.
  */
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   loadAudioOutputPreference,
@@ -25,12 +25,16 @@ const AudioOutputContext = createContext<AudioOutputValue | null>(null);
 
 export function AudioOutputProvider({ children }: { children: React.ReactNode }) {
   const [output, setState] = useState<AudioOutput>(DEFAULT_AUDIO_OUTPUT);
+  // A choice made before the stored one loads wins: otherwise the late load reverted it in memory
+  // while storage kept the new one (same guard as `AppModeProvider`).
+  const chosen = useRef(false);
 
   // Restored once. Until it resolves the default (the phone) is in force, which is the safe side to
   // be on: the phone is the only output that is certainly there.
   useEffect(() => {
     let alive = true;
     void loadAudioOutputPreference().then((stored) => {
+      if (chosen.current) return;
       // The module state is set even if this provider has already unmounted: it is what the reading
       // pipeline reads, and it does not belong to the React tree.
       setAudioOutput(stored);
@@ -48,6 +52,7 @@ export function AudioOutputProvider({ children }: { children: React.ReactNode })
         // Module state first, React second: a reading that starts in this same tick has to see the
         // new value, and it does not read React. Persisting is last and unawaited — the choice is
         // already in force, and a storage failure must not block it.
+        chosen.current = true;
         setAudioOutput(next);
         setState(next);
         void saveAudioOutputPreference(next);

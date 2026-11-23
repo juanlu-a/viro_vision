@@ -30,17 +30,27 @@ import queue
 import shutil
 import subprocess
 import threading
+import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 log = logging.getLogger(__name__)
 
 # Set at startup so the level is the same after every boot. Before this it was whatever `amixer` had
 # been left at by hand, which on 2026-09-11 meant the first real reading came out too quiet to use.
 #
-# 90 and not 100: PWM audio clips at the top, and clipping is *worse* than quieter — a distorted
-# sentence is harder to understand than a soft one, and understanding it is the entire point.
-DEFAULT_VOLUME_PERCENT = 90
+# 50 since 2026-11-18. It was 90 while the transducer hung straight off the GPIO, where the problem was
+# being heard at all (ADR 0012: under 1 mW). With the PAM8403 amplifier in between (ADR 0012, update
+# of 2026-11-18) 90 % was far too loud on a bone-conduction transducer pressed against the head. Half
+# is a starting point; the user's own level comes from the app (`cmd: 'volume'`) and is persisted, so
+# this only applies to a board that was never told one. Still under 100 for the original reason: PWM
+# audio clips at the top, and a distorted sentence is harder to understand than a soft one.
+DEFAULT_VOLUME_PERCENT = 50
+
+# Where the level the user chose survives a reboot. Under /var/lib because the daemon runs as root
+# (`virovision.service`) and this is state, not configuration: `/etc/default/virovision` is what the
+# team writes by hand, this is what the user writes from the app.
+VOLUME_FILE = Path("/var/lib/virovision/volume")
 
 # Tried in order; the first control that exists wins. `Softvol` is the one an I2S DAC will need (the
 # MAX98357A has no volume control of its own), `PCM` is what the Pi's own output is called.
@@ -71,6 +81,62 @@ def set_output_volume(percent: int = DEFAULT_VOLUME_PERCENT) -> bool:
         return False
     log.info("audio: %s at %d%%", control, percent)
     return True
+
+
+class Volume:
+    """The output level the user chose from the app, applied and remembered across reboots.
+
+    Since 2026-11-18, when the amplifier made the fixed startup level unusable and the device has no
+    volume buttons. **The persisted value wins over `--volume`**: the flag is the team's default for a
+    fresh board, the file is what the person wearing the device asked for, and a reboot that put the
+    level back to the default would be the device ignoring them.
+
+    `apply` is injectable so tests do not need `amixer`; the file path too, so they do not need root.
+    A failed write is logged and the level still applies: losing the setting at the next reboot is
+    better than refusing to change the volume now.
+    """
+
+    def __init__(self, path: Path = VOLUME_FILE, default: int = DEFAULT_VOLUME_PERCENT, apply: Optional[Callable[[int], bool]] = None) -> None:
+        self._path = Path(path)
+        self._apply = apply or set_output_volume
+        self._lock = threading.Lock()
+        self.current = _clamp(self._read(default))
+
+    def apply_current(self) -> bool:
+        """At startup: put the remembered (or default) level on the mixer."""
+        return self._apply(self.current)
+
+    def set(self, percent: int) -> int:
+        """Clamp, apply and persist. Returns the level now in force. Runs on a worker thread: `amixer`
+        is a process, and the BLE loop must not wait for it."""
+        percent = _clamp(percent)
+        with self._lock:
+            self._apply(percent)
+            self.current = percent
+            self._write(percent)
+        return percent
+
+    def _read(self, default: int) -> int:
+        try:
+            return int(self._path.read_text().strip())
+        except (OSError, ValueError):
+            # Missing on a fresh board; garbage if someone edited it by hand. Either way, the default.
+            return default
+
+    def _write(self, percent: int) -> None:
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            # Write and rename: a power cut halfway through (this board runs on a battery) must leave
+            # the old level, not an empty file.
+            tmp = self._path.with_suffix(".tmp")
+            tmp.write_text(f"{percent}\n")
+            tmp.replace(self._path)
+        except OSError as exc:
+            log.warning("audio: could not remember the volume in %s: %s", self._path, exc)
+
+
+def _clamp(percent: int) -> int:
+    return max(0, min(100, int(percent)))
 
 
 def _find_control() -> Optional[str]:
@@ -104,21 +170,88 @@ def command_for(path: str) -> Optional[list]:
     return [*player, path]
 
 
+# The PWM pin keeps switching after a clip ends. Straight into an earphone that was inaudible; into
+# the PAM8403 amplifier (2026-11-18) it is a loud hiss that never stops. So between clips the pin is
+# taken away from the PWM block and held low, and handed back right before the next clip.
+# GPIO 18 is where `audremap,pins_18_19` puts the left channel (ADR 0012); ALT5 is PWM0 on it.
+AUDIO_GPIO = 18
+PWM_FUNCTION = "a5"
+# How long the output has to be idle before the pin is parked: a bus announcement is two or three
+# clips in a row, and parking between them would put a click in the middle of the sentence.
+PARK_AFTER_S = 1.0
+
+
+class PwmGate:
+    """Connects and disconnects the PWM audio pin with `pinctrl` (Raspberry Pi OS). Best-effort: a
+    board without `pinctrl`, or the Mac, gets a gate that does nothing, and the audio still plays."""
+
+    def __init__(self, gpio: int = AUDIO_GPIO, run: Optional[Callable[[list], None]] = None) -> None:
+        self._gpio = str(gpio)
+        self._run = run or _run_quietly
+        self._enabled = run is not None or shutil.which("pinctrl") is not None
+        self.is_open = True  # the overlay leaves the pin on PWM at boot
+        if not self._enabled:
+            log.info("audio: no pinctrl, the PWM pin stays connected between clips")
+
+    def open(self) -> None:
+        if self._enabled and not self.is_open:
+            self._run(["pinctrl", "set", self._gpio, PWM_FUNCTION])
+        self.is_open = True
+
+    def park(self) -> None:
+        if self._enabled and self.is_open:
+            # Output low and not input: a floating amplifier input picks up hum.
+            self._run(["pinctrl", "set", self._gpio, "op", "dl"])
+        self.is_open = False
+
+
+# How long any one clip may play before it is taken for a hung decoder and cut: the longest reading
+# is a few seconds. It bounds both a queued bus clip and the sentence the queue waits behind.
+PLAY_WAIT_CAP_S = 20.0
+
+
+def _end(process: subprocess.Popen) -> None:
+    """Terminates `process` and makes sure it is gone: a decoder that ignores SIGTERM is killed."""
+    try:
+        process.terminate()
+        process.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+            process.wait(timeout=1)  # reaped, so `poll()` sees it gone
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    except OSError:
+        pass
+
+
+def _run_quietly(command: list) -> None:
+    try:
+        subprocess.run(command, check=True, capture_output=True, timeout=5)
+    except (OSError, subprocess.SubprocessError) as exc:
+        log.warning("audio: %s failed: %s", " ".join(command), exc)
+
+
 class Player:
     """Plays files on the device's speaker, one at a time."""
 
-    def __init__(self) -> None:
+    def __init__(self, gate: Optional[PwmGate] = None) -> None:
+        self._gate = gate
+        if gate is not None:
+            gate.park()  # nothing is playing yet, and the overlay left the pin hissing since boot
+        self._idle_since: Optional[float] = None
         self._process: Optional[subprocess.Popen] = None
         self._queue: queue.Queue = queue.Queue()
         self._queue_lock = threading.Lock()
         self._worker: Optional[threading.Thread] = None
-        # Guards `_process` and `_generation`. `stop` comes from the BLE loop (`hush`), the clips
+        # Guards `_process` and `_generation`. `stop` comes from an executor thread (`hush`), the clips
         # start on the audio worker and the readings on the HTTP thread: unguarded, a clip the worker
         # was launching while `stop` ran was never stopped — the board talking over the phone it had
         # just been told to yield to (2026-10-06).
         self._process_lock = threading.Lock()
         # Bumped by every `stop`. A clip dequeued before a stop must not start after it.
         self._generation = 0
+        self._parker: Optional[threading.Thread] = None
         # Reported once, at startup, because it is the difference between "the audio did not arrive"
         # and "the audio arrived and there was nothing to play it with" — and on a device with no
         # screen the log is the only place anyone can tell them apart.
@@ -139,8 +272,16 @@ class Player:
         self.stop()
         try:
             with self._process_lock:
+                # Two `play` calls at once (an HTTP reading and a notice) can both pass `stop()` before
+                # either launches: the second would start on top of the first and orphan it, out of
+                # reach of any later `stop`. Whatever is still running here is ended (and waited for,
+                # so it has let go of the sound card) under the lock. Only that race pays the wait.
+                previous = self._process
+                if previous is not None and previous.poll() is None:
+                    _end(previous)
                 # Output to DEVNULL: mpg123 and aplay write progress to stderr, and at one line per
                 # reading the journal would be mostly theirs.
+                self._open_gate()
                 process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 self._process = process
         except (OSError, subprocess.SubprocessError) as exc:
@@ -183,16 +324,99 @@ class Player:
             if command is None:
                 log.warning("audio: nothing can play %s", path)
                 continue
+            process = self._launch_after_current(command, generation)
+            if process is None:
+                continue  # stopped meanwhile, or it could not start: this clip is not to be heard
+            try:
+                process.wait(timeout=PLAY_WAIT_CAP_S)
+            except subprocess.TimeoutExpired:
+                log.warning("audio: %s still playing after %.0f s; cutting it", path, PLAY_WAIT_CAP_S)
+                _end(process)
+
+    def _launch_after_current(self, command: list, generation: int) -> Optional[subprocess.Popen]:
+        """Starts a queued clip once nothing else is playing. The check and the launch happen under
+        one lock hold; a `play` that slips in between the wait and the launch is waited for again."""
+        while True:
+            if not self._wait_for_current(generation):
+                return None
             try:
                 with self._process_lock:
                     if generation != self._generation:
-                        continue  # stopped after this clip was dequeued: it is not to be heard
+                        return None
+                    current = self._process
+                    if current is not None and current.poll() is None:
+                        continue
+                    self._open_gate()
                     process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     self._process = process
+                    return process
             except (OSError, subprocess.SubprocessError) as exc:
-                log.warning("audio: could not play %s: %s", path, exc)
-                continue
-            process.wait()
+                log.warning("audio: could not play %s: %s", command[-1], exc)
+                return None
+
+    def _wait_for_current(self, generation: int) -> bool:
+        """Waits for whatever `play` started to finish before the queue starts its own clip.
+
+        Until 2026-11-20 the worker launched its process over the one `play` had started and
+        overwrote `_process`: a mode notice or a supermarket reading still talking was heard under the
+        bus clips, and it was orphaned, so no later `stop` could cut it. Waiting (and not killing)
+        because what `play` started is a whole sentence the user asked for; the bus clips can start a
+        second later. False when a `stop` came meanwhile.
+
+        Capped: a decoder that hangs must not hold every bus clip behind it. Past the cap it is
+        terminated, the way `play` would have cut it."""
+        watched = None
+        deadline = 0.0
+        while True:
+            with self._process_lock:
+                if generation != self._generation:
+                    return False
+                current = self._process
+            if current is None or current.poll() is not None:
+                return True
+            if current is not watched:
+                # Per process: a newer `play` that replaced the one being waited for gets its own cap.
+                watched, deadline = current, time.monotonic() + PLAY_WAIT_CAP_S
+            if time.monotonic() >= deadline:
+                log.warning("audio: pid %d still playing after %.0f s; cutting it for the queue", current.pid, PLAY_WAIT_CAP_S)
+                _end(current)
+                return True
+            try:
+                current.wait(timeout=0.2)
+            except subprocess.TimeoutExpired:
+                pass
+
+    def _open_gate(self) -> None:
+        """Called with `_process_lock` held, right before a player starts."""
+        if self._gate is None:
+            return
+        self._gate.open()
+        self._idle_since = None
+        if self._parker is None or not self._parker.is_alive():
+            self._parker = threading.Thread(target=self._park_when_idle, name="audio-park", daemon=True)
+            self._parker.start()
+
+    def _park_when_idle(self) -> None:
+        """Parks the pin once nothing has played for `PARK_AFTER_S`, then exits; the next clip starts
+        it again. Polls instead of hooking every exit path (`play`, the queue, `stop`): three places
+        to forget one in, and a missed one is the endless hiss this exists to stop."""
+        while True:
+            time.sleep(0.2)
+            with self._process_lock:
+                process = self._process
+                busy = (process is not None and process.poll() is None) or not self._queue.empty()
+                if busy:
+                    self._idle_since = None
+                    continue
+                now = time.monotonic()
+                if self._idle_since is None:
+                    self._idle_since = now
+                    continue
+                if now - self._idle_since < PARK_AFTER_S:
+                    continue
+                self._gate.park()
+                self._parker = None
+                return
 
     def stop(self) -> None:
         """Silence whatever is playing, and drop whatever was queued behind it."""

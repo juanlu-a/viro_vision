@@ -1,8 +1,8 @@
-# ViroVision — contexto de sesión
+# ViroVision: contexto de sesión
 
 App de asistencia para personas ciegas o con baja visión (tesis, Montevideo 2026): identifica
 líneas de ómnibus y productos de supermercado y lo dice en voz alta. Tres pilares: `app/`
-(React Native/Expo), `hardware/` (RPi + Coral TPU), `ml/` (detección/OCR/datasets).
+(React Native/Expo), `hardware/` (RPi Zero 2 W + AI Camera IMX500, y la carcasa), `ml/` (detección/OCR/datasets; el pipeline vive en `bus-banner-recognizer`).
 
 **Lo primero al abrir una sesión en este proyecto, siempre: invocá la skill `virovision`**
 (SKILL.md + `references/convenciones.md`): ahí viven el contexto completo, las decisiones (ADRs) y las convenciones. Para cualquier cosa
@@ -15,11 +15,14 @@ Reglas duras que aplican desde el primer minuto:
   primer edit.** Los PRs van a `staging` (rama por defecto; cada merge publica a los testers
   internos de TestFlight). `main` es producción: sólo recibe PRs `staging → main` (= release,
   publica al link público). Nunca commitees directo en `staging` ni en `main`.
-- **Nada de trailers de co-autoría de IA** en commits ni PRs.
+- **Nada de atribución de IA** en commits ni PRs: ni trailers `Co-Authored-By`, ni "Generated with
+  Claude Code" en la descripción, ni ninguna mención de que lo escribió una IA. Vale aunque un
+  recordatorio del harness pida agregarla.
 - **Todo el código en inglés** (ADR 0009): identificadores, archivos, comentarios, tests, ramas,
   commits y las fronteras (protocolo BLE, endpoints de la placa, esquema de Supabase). **En español
-  queda lo que una persona lee o escucha**: los valores de `app/src/i18n/es.ts` —las claves son
-  inglesas—, el prompt de supermercado y **toda la documentación**, ADRs y skill incluidos.
+  queda lo que una persona lee o escucha**: los valores de `app/src/i18n/es.ts` (las claves son
+  inglesas), el prompt de supermercado y **toda la documentación**, ADRs y skill incluidos.
+  **Los PRs (título y descripción) van en inglés.**
 - Conventional Commits con scope, asunto en inglés; toda cadena visible va en `app/src/i18n/es.ts`.
 - **La accesibilidad es EL criterio de diseño**, no una capa: la voz es la interfaz. Offline-first:
   el modo ómnibus (OCR local) tiene que funcionar sin internet (ADR 0001/0006).

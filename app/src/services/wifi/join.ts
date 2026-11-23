@@ -166,7 +166,9 @@ export async function probeDevice(address: DeviceAddress, { fetchImpl = fetch, t
 export type NetworkOutcome =
   /** The device answers. `via` says whether the system had to be asked (= the user saw a prompt). */
   | { ok: true; via: 'already' | 'joined' }
-  | { ok: false; reason: 'unavailable' | 'refused' | 'unreachable'; message: string };
+  | { ok: false; reason: 'unavailable' | 'refused' | 'unreachable'; message: string }
+  /** `mayPrompt: false` and the phone did not come onto the network by itself within the wait. */
+  | { ok: false; reason: 'notJoined'; message: string };
 
 interface ReachDeps {
   probe?: (address: DeviceAddress, timeoutMs: number) => Promise<boolean>;
@@ -188,6 +190,13 @@ interface ReachDeps {
   /** Probe-only budget, for a device on the same network as the phone (no AP, nothing to join). */
   plainMs?: number;
   intervalMs?: number;
+  /**
+   * False for a network this phone has already joined (2026-11-20): the system is never asked, so
+   * there is no prompt. iOS rejoins a saved network by itself when it is in range and the phone is
+   * not on another one it prefers; this only waits `rejoinMs` for that to happen.
+   */
+  mayPrompt?: boolean;
+  rejoinMs?: number;
 }
 
 /**
@@ -220,6 +229,8 @@ export async function reachDeviceNetwork(
     settleMs = 8_000,
     plainMs = 9_000,
     intervalMs = 300,
+    mayPrompt = true,
+    rejoinMs = 20_000,
   }: ReachDeps = {}
 ): Promise<NetworkOutcome> {
   const unreachable = (): NetworkOutcome => ({ ok: false, reason: 'unreachable', message: target.ip });
@@ -229,6 +240,16 @@ export async function reachDeviceNetwork(
     while (true) {
       if (await probe(target, 3_000)) return { ok: true, via: 'already' };
       if (now() >= deadline) return unreachable();
+      await sleep(intervalMs);
+    }
+  }
+
+  if (!mayPrompt) {
+    // The network is saved on the phone: waiting for iOS to rejoin it costs no prompt, asking does.
+    const deadline = now() + rejoinMs;
+    while (true) {
+      if (await probe(target, joinProbeTimeoutMs)) return { ok: true, via: 'already' };
+      if (now() >= deadline) return { ok: false, reason: 'notJoined', message: target.ip };
       await sleep(intervalMs);
     }
   }

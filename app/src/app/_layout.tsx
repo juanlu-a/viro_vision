@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { isProxyConfigured } from '@/services/cloud';
 import { errorDetail, errorType, record, startTelemetry, isTelemetryConfigured } from '@/services/telemetry';
+import { AppModeProvider } from '@/features/appMode/AppModeProvider';
 import { AudioOutputProvider } from '@/features/audio/AudioOutputProvider';
 import { DeviceProvider } from '@/features/device/DeviceProvider';
 import { ProductModelProvider } from '@/features/reader/ProductModelProvider';
@@ -69,7 +70,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <>
+    <AppModeProvider>
       {/* The supermarket model is chosen in Settings and used on Home: the state has to be a single
           one, above both tabs. */}
       <ProductModelProvider>
@@ -86,7 +87,7 @@ export default function RootLayout() {
           </DeviceProvider>
         </AudioOutputProvider>
       </ProductModelProvider>
-    </>
+    </AppModeProvider>
   );
 }
 

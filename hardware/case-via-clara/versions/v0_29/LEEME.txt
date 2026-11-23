@@ -1,0 +1,17 @@
+VIA Clara v0.29 (2026-11-12): el encastre del brazo en la copa, más grande
+
+En la v0.28 achiqué el enchufe del brazo (de 5,6 a 5,1) creyendo que en la v0.27 no entraba. Era al
+revés: quedaba flojo, y la v0.28 lo dejaba todavía más chico. En esta versión el enchufe es de
+6,0 x 6,0 (esquinas de 0,8), así que quedan 0,15 mm de luz por lado en el zócalo de la copa que ya
+imprimiste (6,3 x 6,3). La copa no cambia.
+
+Recomendado primero (pruebas/): tres puntas de brazo sueltas, sólo el enchufe, impresas acostadas como
+el brazo. Son chicas y salen rápido:
+  test_cup_plug_5_8   5,8 mm  (0,25 de luz por lado: la más floja)
+  test_cup_plug_6_0   6,0 mm  (0,15: la del brazo de esta versión)
+  test_cup_plug_6_2   6,2 mm  (0,05: la más justa)
+Probalas en la copa. Si la de 6,0 calza bien, imprimí el brazo (03) de esta carpeta. Si calza mejor
+otra, decime cuál y te hago el brazo con esa medida.
+
+Las demás piezas son idénticas a la v0.27.
+modelo/: el .scad, la guía y export.sh.

@@ -39,7 +39,7 @@ código: vive en la tarjeta.
 **Cable USB (gadget Ethernet): sin probar.** La Zero 2 W puede exponer una interfaz de red por su
 puerto USB de datos (`dtoverlay=dwc2` en `config.txt` + `modules-load=dwc2,g_ether` en `cmdline.txt`,
 las dos cosas se editan desde la Mac en `bootfs`). Sería el reemplazo natural del RJ45 que perdimos
-—cable directo, sin tocarle el WiFi a nadie, con el AP arriba— pero **todavía nadie lo probó en esta
+(cable directo, sin tocarle el WiFi a nadie, con el AP arriba), pero **todavía nadie lo probó en esta
 placa**: si lo probás, escribí acá qué pasó en vez de dejarlo como promesa.
 
 ## Redes WiFi: la placa guarda varias
@@ -85,7 +85,7 @@ La Pi 3 B+ es dual band; la Zero 2 W **sólo 2,4 GHz**.
 - El drop-in de systemd lo escribe `modo-red.sh` en cada arranque: **no editarlo a mano**. Otra vía para
   bajar el AP sin tocar la tarjeta: `hardware/raspi/tools/ap.py` (por BLE, ~5 s), la placa vuelve a la WiFi conocida.
 
-## Cable Ethernet directo Mac ↔ Pi — SÓLO con una placa que tenga RJ45 (la 3 B+ prestada)
+## Cable Ethernet directo Mac ↔ Pi: SÓLO con una placa que tenga RJ45 (la 3 B+ prestada)
 
 > ⚠️ **No aplica a la Zero 2 W**, que no tiene puerto Ethernet. Esto se escribió entre el 2026-09-09
 > y el 2026-09-18, mientras se trabajaba con la 3 B+ prestada, y queda porque esa placa puede volver.
@@ -152,7 +152,7 @@ con el reloj atrasado) y `getent hosts deb.debian.org` antes de instalar nada.
 - **No copies código a la placa con el `tar` de macOS.** El `tar` de macOS mete los `._` de los
   atributos extendidos, y al extraer con GNU tar en la Pi el 2026-09-18 **todos los `.py` quedaron en
   0 bytes**: nombres y fechas correctos, contenido vacío. El daemon arrancaba, importaba módulos
-  vacíos, salía con código 0 y systemd lo reiniciaba en bucle — sin una sola excepción en el log. Lo
+  vacíos, salía con código 0 y systemd lo reiniciaba en bucle, sin una sola excepción en el log. Lo
   que sí funciona es `scp virovision/*.py placa:…/virovision/`, y **verificar los bytes de los dos
   lados** (`cat *.py | wc -c`), no que los archivos existan.
 - **El daemon NO se reinstala solo.** `instalar-daemon.sh` está protegido por la centinela

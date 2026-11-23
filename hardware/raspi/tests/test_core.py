@@ -115,6 +115,35 @@ def test_photo_with_a_camera_transfers_what_was_captured(loop):
     assert join(n.of(TRANSFER)) == b"JPEG" * 100
 
 
+def test_a_second_photo_during_a_transfer_does_not_start_a_capture(loop):
+    """The capture starts the moment it is called (a camera lock, seconds): a photo that cannot be
+    sent because another transfer is running must not take one for nobody."""
+    started = []
+    release = asyncio.Event()
+
+    async def capture():
+        await release.wait()
+        return b"JPEG"
+
+    def start_capture():
+        # Counted at call time, like the device's capture (a future already running in the executor).
+        started.append(1)
+        return capture()
+
+    core, n = build(loop, start_capture)
+
+    async def scenario():
+        core.write_control(b'{"cmd":"photo"}')
+        await asyncio.sleep(0)
+        core.write_control(b'{"cmd":"photo"}')
+        release.set()
+        await _drain(loop)
+
+    loop.run_until_complete(scenario())
+    assert started == [1]
+    assert {"t": "error", "msg": "a transfer is already in progress"} in n.events()
+
+
 def test_ap_turns_on_for_a_bounded_time_and_says_so(loop):
     calls = []
     core, n = build(loop, ap_control=calls.append)
@@ -329,3 +358,42 @@ def test_restart_camera_without_a_camera_says_so(loop):
     core.write_control(b'{"cmd":"restart_camera"}')
     loop.run_until_complete(_drain(loop))
     assert [e["msg"] for e in n.events()] == ["no camera to restart"]
+
+
+def test_volume_sets_the_level_and_pushes_the_new_status(loop):
+    """The app's slider settles on what the board reports back, so the status has to follow the
+    change; otherwise the slider shows the requested level until the next 15 s heartbeat."""
+    asked = []
+    n = Notifications()
+    core = Core(loop, lambda: {"vol": asked[-1] if asked else None}, None, bytes, n, set_volume=lambda p: asked.append(p) or p)
+    core.write_control(b'{"cmd":"volume","value":35}')
+    _until(loop, lambda: any(json.loads(v).get("vol") == 35 for v in n.of(STATUS)))
+    assert asked == [35] and n.events() == []
+
+
+def test_volume_out_of_range_is_clamped_before_it_reaches_the_mixer(loop):
+    asked = []
+    n = Notifications()
+    core = Core(loop, lambda: {}, None, bytes, n, set_volume=lambda p: asked.append(p) or p)
+    core.write_control(b'{"cmd":"volume","value":250}')
+    # Until the status that follows the mixer is out, not just until the mixer ran: that status is
+    # scheduled when the executor finishes, and a loop closed before it left the coroutine unawaited.
+    _until(loop, lambda: n.of(STATUS))
+    loop.run_until_complete(_drain(loop))
+    assert asked == [100]
+
+
+def test_volume_without_a_value_is_an_error_not_a_crash(loop):
+    """`int(None)` raised inside the D-Bus setter before `write_control` caught bad fields."""
+    n = Notifications()
+    core = Core(loop, lambda: {}, None, bytes, n, set_volume=lambda p: p)
+    core.write_control(b'{"cmd":"volume"}')
+    loop.run_until_complete(_drain(loop))
+    assert [e["t"] for e in n.events()] == ["error"]
+
+
+def test_volume_on_a_board_without_a_mixer_says_so(loop):
+    core, n = build(loop)
+    core.write_control(b'{"cmd":"volume","value":40}')
+    loop.run_until_complete(_drain(loop))
+    assert [e["msg"] for e in n.events()] == ["this device has no volume control"]
