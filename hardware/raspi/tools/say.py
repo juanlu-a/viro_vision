@@ -34,10 +34,7 @@ from bleak import BleakClient, BleakScanner
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from virovision.notices import CLIPS, EARCON_FILE, NOTICES  # noqa: E402
-
-SERVICE = "4380c500-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_CONTROL = "4380c502-7ca3-4e37-b27d-f60e8d8d73d1"
-CH_EVENT = "4380c503-7ca3-4e37-b27d-f60e8d8d73d1"
+from virovision.profile import CH_CONTROL, CH_EVENT, SERVICE_UUID as SERVICE  # noqa: E402
 
 # How long a notice takes to say. Clips run from 0.1 s (the chirp) to 4 s (the audio test phrase);
 # with less than this, `--all` talks over itself and none is heard whole.
@@ -68,7 +65,7 @@ async def main() -> int:
 
     print("looking for the board (the phone app has to be closed)…")
     device = await BleakScanner.find_device_by_filter(
-        lambda d, ad: SERVICE in (ad.service_uuids or []), timeout=15.0
+        lambda d, ad: SERVICE.lower() in [u.lower() for u in (ad.service_uuids or [])], timeout=15.0
     )
     if device is None:
         print("not found: is it on, and is the app closed?")

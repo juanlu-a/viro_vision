@@ -272,6 +272,15 @@ class Player:
         self.stop()
         try:
             with self._process_lock:
+                # Two `play` calls at once (an HTTP reading and a notice) can both pass `stop()` before
+                # either launches: the second would start on top of the first and orphan it, out of
+                # reach of any later `stop`. Whatever is still running here is cut, under the lock.
+                previous = self._process
+                if previous is not None and previous.poll() is None:
+                    try:
+                        previous.terminate()
+                    except OSError:
+                        pass
                 # Output to DEVNULL: mpg123 and aplay write progress to stderr, and at one line per
                 # reading the journal would be mostly theirs.
                 self._open_gate()

@@ -1137,3 +1137,44 @@ def test_a_photo_waits_for_the_frame_loop_to_let_go_of_the_camera():
     leave.set()
     assert watcher.wait_released(2)
     stopper.join(2)
+
+
+@pytest.mark.parametrize("target", ["phone", "device"])
+def test_a_repeat_follows_the_chosen_output_like_the_reading(target):
+    """A click inside bus mode repeats the last reading. It used to play the clips on the board
+    whatever the output was, and send nothing: with the output on the phone, the user heard the
+    repeat from the wrong speaker, or nothing at all."""
+
+    class CameraWithoutModel:
+        sensor = None
+
+    played, emitted = [], []
+    watcher = BusWatcher(CameraWithoutModel(), played.append, emitted.append)
+    watcher.audio_target = target
+    watcher._last_announcement = ["bus.wav", "115.wav"]
+    watcher._last_result_event = {"t": "result", "event": {"label": "115"}}
+
+    assert watcher.repeat_last() is True
+    assert played == ([["bus.wav", "115.wav"]] if target == "device" else [])
+    assert emitted == [{"t": "result", "event": {"label": "115"}}]
+
+
+def test_a_bus_start_that_runs_after_the_user_left_does_not_leave_the_watcher_on(loop):
+    """Start and stop are separate executor jobs and can run out of order: a start that runs, or
+    finishes, after the mode already changed must leave the watcher stopped."""
+    bus = FakeBus()
+    core, _ = build(loop, bus)
+
+    core._start_bus()  # the mode is not BUS: a start arriving late does nothing
+    assert bus.running is False
+
+    core.modes.current = Mode.BUS
+
+    def start_while_the_user_leaves():
+        core.modes.current = Mode.IDLE
+        bus.running = True
+        return True
+
+    bus.start = start_while_the_user_leaves
+    core._start_bus()
+    assert bus.running is False

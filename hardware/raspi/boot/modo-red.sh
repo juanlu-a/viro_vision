@@ -99,11 +99,20 @@ if [ -f "$UPD" ] && [ -d "$APP/virovision" ]; then
   if tar xzf "$UPD" -C "$TMP" && [ -f "$TMP/virovision/__main__.py" ]; then
     find "$TMP" -name '._*' -delete
     rm -rf "$APP/virovision.anterior"
-    mv "$APP/virovision" "$APP/virovision.anterior"
-    mv "$TMP/virovision" "$APP/virovision"
-    chown -R virovision:virovision "$APP/virovision"
-    mv "$UPD" "$UPD.aplicado"
-    echo "daemon updated from the card ($(ls "$APP/virovision" | wc -l) files)"
+    # Chained, with no `set -e` in this script: if the first `mv` failed, the second would put the new
+    # package INSIDE the old one and the tgz would still be marked applied.
+    if mv "$APP/virovision" "$APP/virovision.anterior"; then
+      if mv "$TMP/virovision" "$APP/virovision" && chown -R virovision:virovision "$APP/virovision"; then
+        mv "$UPD" "$UPD.aplicado"
+        echo "daemon updated from the card ($(ls "$APP/virovision" | wc -l) files)"
+      else
+        rm -rf "$APP/virovision"
+        mv "$APP/virovision.anterior" "$APP/virovision"
+        echo "daemon update failed: previous version restored, the tgz stays for the next boot"
+      fi
+    else
+      echo "daemon update failed: could not move the installed package aside"
+    fi
   else
     echo "virovision-update.tgz has no virovision/__main__.py: not applied"
   fi
