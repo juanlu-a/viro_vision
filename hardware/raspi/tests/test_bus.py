@@ -251,24 +251,25 @@ def test_the_same_bus_seen_twice_is_announced_once():
 
 
 def test_a_bus_is_announced_once_even_if_the_tracker_sees_several():
-    """«Se acerca un ómnibus» salía una vez por track, y un ómnibus que se pierde y vuelve es un
-    track nuevo. Probando con videos el 2026-09-15 la frase se repitió muchas veces seguidas: los
-    cortes del video rompían el seguimiento. La frase no distingue un ómnibus de otro, así que
-    repetirla no agrega nada."""
+    """«Se acerca un ómnibus» was said once per track, and a bus that is lost and comes back is a new
+    track. Testing with videos on 2026-09-15 the phrase was repeated many times in a row: the cuts
+    in the video broke the tracking. The phrase does not tell one bus from another, so repeating it
+    adds nothing."""
 
     class CameraWithoutModel:
         sensor = None
 
     watcher = BusWatcher(CameraWithoutModel(), lambda files: None, lambda event: None)
-    assert watcher._presence_is_worth_saying(), "el primero sí"
-    assert not watcher._presence_is_worth_saying(), "un instante después, no"
-    watcher._last_voice_at -= PRESENCE_SILENCE_S + 1  # pasó la ventana
-    assert watcher._presence_is_worth_saying(), "más tarde vuelve a ser noticia"
+    assert watcher._presence_is_worth_saying(), "the first one, yes"
+    assert not watcher._presence_is_worth_saying(), "an instant later, no"
+    watcher._last_voice_at -= PRESENCE_SILENCE_S + 1  # the window has passed
+    assert watcher._presence_is_worth_saying(), "later it is news again"
 
 
 def test_the_line_silences_the_presence_that_would_follow_it():
-    """Decir «se acerca un ómnibus» después de haber dicho «ómnibus 115, Luis Braille» es contar algo
-    que el usuario ya sabe, y así llegaba: el anuncio de la línea no armaba la ventana de silencio."""
+    """Saying «se acerca un ómnibus» after having said «ómnibus 115, Luis Braille» tells the user
+    something they already know, and that is how it arrived: the line announcement did not arm the
+    silence window."""
 
     class Event:
         kind = "reading"
@@ -284,8 +285,8 @@ def test_the_line_silences_the_presence_that_would_follow_it():
         sensor = None
 
     watcher = BusWatcher(CameraWithoutModel(), lambda files: None, lambda event: None)
-    watcher._files_for = lambda number, destination: []  # los .wav viven en la placa, no acá
-    watcher._result_event = lambda event: {}  # el evento BLE tiene su propio test
+    watcher._files_for = lambda number, destination: []  # the .wav files live on the board, not here
+    watcher._result_event = lambda event: {}  # the BLE event has its own test
     watcher._handle(Event())
     assert not watcher._presence_is_worth_saying()
 

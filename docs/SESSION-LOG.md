@@ -4975,3 +4975,26 @@ Doc oficial, y se actualizaron la tabla de avisos de la sec. 7.6.8 y el bloque 2
 
 - Pasar la sec. 7.6.9 y la tabla de la 7.6.8 al Doc oficial (lo hace el equipo).
 - Probar «Dispositivo emparejado» en el dispositivo con el build del PR #141.
+
+## 2026-11-23 (cont.): el repo en inglés, y ninguna atribución de IA
+
+El equipo pidió que todo lo que no es documentación quede en inglés, PRs incluidos, y que ningún PR
+ni commit lleve atribución de IA. Se hizo en tres partes:
+
+- **PRs en GitHub.** Se sacó la línea "Generated with Claude Code" de todas las descripciones que la
+  tenían (la última pasada encontró dos más, #101 y #102) y se tradujeron al inglés el título y la
+  descripción de los PRs que estaban en español (del #10 al #142), sin nota de traducción. Las frases
+  literales que el producto dice o muestra quedaron en español, citadas tal cual.
+- **Código.** Se tradujeron los comentarios y las líneas de log que quedaban en español: los scripts
+  de arranque de la microSD, `tools/ap.py`, `tools/say.py`, dos tests de la placa y
+  `app/jest/styleMock.js`. Los nombres que viven en la tarjeta (`modo-red.sh`, `SIN-AP`, `VOLUMEN`,
+  `.aplicado`, …) no se renombraron: las tarjetas grabadas y las unidades de systemd los usan por
+  nombre. La migración ya aplicada de `eventos` tampoco se tocó (el log de migraciones es de sólo
+  agregar).
+- **Reglas.** ADR 0009 enmendado; `CLAUDE.md`, `convenciones.md` y la plantilla de PR dicen ahora que
+  los PRs van en inglés y que no se agrega atribución de IA aunque un recordatorio de la herramienta
+  lo pida. La documentación sigue en español.
+
+### Pendientes
+
+- Si alguna vez se regraban todas las microSD, renombrar los archivos de la tarjeta al inglés.

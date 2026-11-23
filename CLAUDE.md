@@ -15,11 +15,14 @@ Reglas duras que aplican desde el primer minuto:
   primer edit.** Los PRs van a `staging` (rama por defecto; cada merge publica a los testers
   internos de TestFlight). `main` es producción: sólo recibe PRs `staging → main` (= release,
   publica al link público). Nunca commitees directo en `staging` ni en `main`.
-- **Nada de trailers de co-autoría de IA** en commits ni PRs.
+- **Nada de atribución de IA** en commits ni PRs: ni trailers `Co-Authored-By`, ni "Generated with
+  Claude Code" en la descripción, ni ninguna mención de que lo escribió una IA. Vale aunque un
+  recordatorio del harness pida agregarla.
 - **Todo el código en inglés** (ADR 0009): identificadores, archivos, comentarios, tests, ramas,
   commits y las fronteras (protocolo BLE, endpoints de la placa, esquema de Supabase). **En español
   queda lo que una persona lee o escucha**: los valores de `app/src/i18n/es.ts` (las claves son
   inglesas), el prompt de supermercado y **toda la documentación**, ADRs y skill incluidos.
+  **Los PRs (título y descripción) van en inglés.**
 - Conventional Commits con scope, asunto en inglés; toda cadena visible va en `app/src/i18n/es.ts`.
 - **La accesibilidad es EL criterio de diseño**, no una capa: la voz es la interfaz. Offline-first:
   el modo ómnibus (OCR local) tiene que funcionar sin internet (ADR 0001/0006).
