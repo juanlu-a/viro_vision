@@ -28,23 +28,47 @@
  */
 
 /**
+ * How long one operation may hold the queue. react-native-ble-plx reads and writes have no timeout of
+ * their own, so a read that hangs on a half-dead link would otherwise hold every operation behind
+ * it, including the button chirp and the `hush` that keeps two voices from overlapping. Past this
+ * the queue moves on; the hung operation itself still settles (or not) for its own caller.
+ */
+export const GATT_QUEUE_RELEASE_MS = 5_000;
+
+/**
  * Runs `operation`s one after another, never concurrently.
  *
  * Each call resolves or rejects exactly as its operation does; a failure does **not** poison the
- * queue, because the announcement path must survive a read that timed out on a dead link.
+ * queue, because the announcement path must survive a read that timed out on a dead link. An
+ * operation that never settles releases the queue after `releaseMs`.
  */
-export function createSerializer(): <T>(operation: () => Promise<T>) => Promise<T> {
+export function createSerializer(
+  releaseMs: number = GATT_QUEUE_RELEASE_MS
+): <T>(operation: () => Promise<T>) => Promise<T> {
   let tail: Promise<unknown> = Promise.resolve();
   return <T>(operation: () => Promise<T>): Promise<T> => {
     // `then(op, op)`, not `then(op)`: a rejected predecessor must still let the next one run. The
     // alternative is a queue that stops forever the first time the board goes out of range.
     const result = tail.then(operation, operation);
     // The chain keeps the *settling*, never the rejection: an unhandled rejection here would be
-    // reported as a crash in a release build even though the caller handled its own error.
-    tail = result.then(
-      () => undefined,
-      () => undefined
+    // reported as a crash in a release build even though the caller handled its own error. It
+    // starts counting `releaseMs` only once this operation is the one running.
+    tail = tail.then(
+      () => releaseAfter(result, releaseMs),
+      () => releaseAfter(result, releaseMs)
     );
     return result;
   };
+}
+
+/** Settles when `operation` settles or `ms` pass, whichever comes first; never rejects. */
+function releaseAfter(operation: Promise<unknown>, ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    operation.then(done, done);
+  });
 }

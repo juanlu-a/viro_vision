@@ -72,9 +72,13 @@ export class EventQueue {
     }
   }
 
-  /** Called when a batch uploaded fine: the counter travelled with it and does not need repeating. */
-  clearDropped(): void {
-    this.dropped = 0;
+  /**
+   * Called when a batch uploaded fine: the `reported` drops travelled with it and do not need
+   * repeating. Only those are subtracted: events evicted while the upload was in flight were not in
+   * the marker that was sent, and clearing the whole counter would lose them silently.
+   */
+  clearDropped(reported: number = this.dropped): void {
+    this.dropped = Math.max(0, this.dropped - reported);
   }
 
   /** Gives a batch up for lost without re-queuing it, adding it to the counter that travels later. */

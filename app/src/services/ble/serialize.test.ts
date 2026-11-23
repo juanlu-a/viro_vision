@@ -96,4 +96,27 @@ describe('createSerializer', () => {
     // Resolves on its own without the operation having finished.
     await expect(started.promise).resolves.toBeUndefined();
   });
+
+  it('moves on when an operation hangs, so a dead read cannot hold the chirp forever', async () => {
+    const serialize = createSerializer(20);
+    void serialize(() => new Promise<never>(() => {}));
+    const next = deferred<void>();
+    void serialize(async () => next.resolve());
+    await expect(next.promise).resolves.toBeUndefined();
+  });
+
+  it('does not release the queue early while the running operation is still in time', async () => {
+    const serialize = createSerializer(1_000);
+    const first = deferred<void>();
+    let secondStarted = false;
+    void serialize(() => first.promise);
+    const second = serialize(async () => {
+      secondStarted = true;
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(secondStarted).toBe(false);
+    first.resolve();
+    await second;
+    expect(secondStarted).toBe(true);
+  });
 });

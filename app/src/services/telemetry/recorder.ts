@@ -214,7 +214,7 @@ export async function flush(): Promise<void> {
     }
     state.offline = false;
     if (!r.ok) throw new Error(String(r.status));
-    state.queue.clearDropped();
+    state.queue.clearDropped(dropped);
     state.attempts = 0;
   } catch {
     state.attempts += 1;
