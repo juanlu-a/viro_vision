@@ -68,7 +68,7 @@ describe('the notice catalogue', () => {
     // is the phone's, because when the app announces that the device connected the device has only
     // just come to exist for it, and the user is holding the phone to pair. It is also what stops a
     // notice's BLE write from racing the connection sequence, which is how it was found.
-    for (const id of ['connected', 'connectionLost', 'networkReady', 'networkFailed'] as const) {
+    for (const id of ['connected', 'paired', 'connectionLost', 'networkReady', 'networkFailed'] as const) {
       expect(NOTICES[id].clip).toBeNull();
     }
   });

@@ -58,7 +58,7 @@ export default function ConnectScreen() {
       onRefresh={async () => {
         // Connected already means fresh: the status arrives on its own every 15 s, so the gesture
         // only confirms out loud — a silent gesture is indistinguishable from a broken one.
-        if (isConnected) await notify('connected');
+        if (isConnected) await notify(isDevelopment ? 'connected' : 'paired');
         else if (!isBusy) await connect();
       }}>
       <ScreenHeader title={t.title} subtitle={t.intro} />

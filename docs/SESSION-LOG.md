@@ -4938,6 +4938,27 @@ modelo): siete hallazgos importantes, todos corregidos.
   `/home/virovision/virovision.bak-*`): arranque limpio, foto con `X-Mode` en 0,24 s y `/audio` de otro
   modo rechazado con 409. Falta la app nueva (build) para la prueba completa: encender, abrir la app (sin
   permiso si ya se unió antes), supermercado al primer intento, y supermercado → ómnibus sin audios
-  superpuestos.
+  superpuestos. Probado el 2026-11-23 con el build de TestFlight: los tres arreglos funcionan.
 - Sin test: el arranque fallido del modo ómnibus y la espera de cámara de `__main__.py`.
 - Riesgo aceptado: si la escritura del modo no llega a la placa en 1,5 s, la foto se saca igual.
+
+## 2026-11-23: un solo aviso de conexión en modo producto
+
+Con los tres arreglos del 2026-11-20 probados en el dispositivo, quedó un detalle: en modo producto la
+app decía dos frases al conectar, «Dispositivo conectado.» (el enlace BLE) y después «Red con el
+dispositivo lista.» (el Wi‑Fi). Para quien usa el producto son dos pasos de algo que parece que todavía
+puede fallar, sin nada que hacer en el medio. Ahora el modo producto dice una sola frase,
+«Dispositivo emparejado.», cuando el dispositivo está listo para usarse; el modo desarrollo conserva las
+dos, porque al equipo le sirve distinguir un problema de BLE de uno de Wi‑Fi.
+
+«Listo» es la red de la placa lista (supermercado necesita la foto), pero no se espera para siempre: el
+modo ómnibus anda sin esa red. Por eso la frase también sale cuando el teléfono está en otra red (el
+Wi‑Fi de casa) y, si nada se resuelve, a los 25 s del enlace (`PAIRED_FALLBACK_MS`, por encima de los
+20 s que se le dan a iOS para reasociarse sola). Una conexión muda nunca es aceptable. Si la red falla,
+se dice sólo la frase de falla, y «emparejado» recién cuando la red vuelve, para no sonar a que la falla
+se resolvió. La lógica vive en `app/src/features/device/pairedNotice.ts`, con sus tests.
+
+### Pendientes
+
+- Probar en el dispositivo con el build siguiente: encender la placa y abrir la app en modo producto
+  debe decir sólo «Dispositivo emparejado.».

@@ -22,6 +22,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useAppMode } from '@/features/appMode/AppModeProvider';
 import { notify } from '@/features/audio/systemNotice';
 import type { AudioOutput } from '@/features/audio/audioOutput';
 import { strings } from '@/i18n';
@@ -39,6 +40,7 @@ import { deviceUrl, type DeviceAddress } from '@/services/wifi/deviceHttp';
 import { loadJoinedNetwork, saveJoinedNetwork } from '@/services/storage/joinedNetwork';
 import { reachDeviceNetwork } from '@/services/wifi/join';
 
+import { createPairedAnnouncer } from './pairedNotice';
 import { MODE_FROM_GATT, GATT_MODE, type DeviceStatus, type WifiCredentials } from './gatt';
 import { DeviceNoAddressError, type ConnectionState, type DeviceInfo } from './types';
 
@@ -98,6 +100,23 @@ const initialConnection: ConnectionState = { status: 'idle', device: null, messa
  * and iOS throttles timers in the background on its own.
  */
 const RETRIES_MS = [1_000, 2_000, 3_000, 5_000];
+/**
+ * How long product mode waits for the network before saying «Dispositivo emparejado» anyway: past
+ * the 20 s `reachDeviceNetwork` gives iOS to rejoin a known network on its own, with some slack.
+ */
+const PAIRED_FALLBACK_MS = 25_000;
+
+/**
+ * Module-level, like the reading pipeline's state: there is one device and one provider, and the
+ * callbacks below are made once. Product until the stored app mode says otherwise, which is the same
+ * default `AppModeProvider` starts from.
+ */
+let productModeNow = true;
+const paired = createPairedAnnouncer({
+  sayPaired: () => void notify('paired'),
+  isProductMode: () => productModeNow,
+  fallbackMs: PAIRED_FALLBACK_MS,
+});
 
 function errorMessage(err: unknown): string {
   if (err instanceof BleNotImplementedError) return strings.connection.unavailable;
@@ -124,6 +143,14 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
   const [deviceVolume, setDeviceVolume] = useState<number | null>(null);
 
   const credentials = useRef<WifiCredentials | null>(null);
+  // Product mode says one «Dispositivo emparejado» when the device is usable, instead of the link
+  // and the network as two notices (2026-11-23). Mirrored into the module so the announcer reads it
+  // at the instant: the user can switch modes in Settings while connected.
+  const { isDevelopment } = useAppMode();
+  useEffect(() => {
+    productModeNow = !isDevelopment;
+  }, [isDevelopment]);
+  useEffect(() => () => paired.reset(), []);
   const autoConnect = useRef(true);
   const retry = useRef(0);
   const connecting = useRef(false);
@@ -172,6 +199,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     // announcement, never a real one. A network that failed and came back has to be announced again.
     announcedReadyFor.current = null;
     setWifi('error');
+    paired.networkFailed();
     // The reason lives in the table and nowhere else (2026-10-06): the user never hears an IP, a
     // system error string or a step of the join. They hear one fixed sentence, because a silent
     // failure leaves them waiting for a button that never comes.
@@ -220,6 +248,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // bus mode does not need this network. The next `status` heartbeat checks again.
         setWifi('off');
         record('wifi.notJoined', { ms: Date.now() - t0, detail: { ip: target.ip } });
+        paired.networkAbsent();
         return false;
       }
       if (outcome.ok) {
@@ -235,7 +264,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // table, it is just not worth saying out loud again.
         if (announcedReadyFor.current !== target.ip) {
           announcedReadyFor.current = target.ip;
-          void notify('networkReady');
+          if (productModeNow) paired.networkReady();
+          else void notify('networkReady');
         }
         return true;
       }
@@ -363,7 +393,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       // tab, so the only way to learn about it was to look at the screen — which is the one thing
       // this app's user cannot do. It is announced from here and not from an effect on `status` so a
       // re-render cannot say it twice.
-      void notify('connected');
+      // Product mode waits for the device to be usable and says it once (see `pairedNotice.ts`).
+      if (productModeNow) paired.linked();
+      else void notify('connected');
       setAddress(device.address);
       setAp(device.ap);
       const run = networkSyncRun.current;
@@ -411,6 +443,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     const unsubscribes = [
       client.onDisconnect(() => {
         record('ble.lost');
+        paired.reset();
         announcedReadyFor.current = null;
         networkSyncRun.current += 1; // invalidates any network wait in flight
         // And forgets what was synced: the next connection has to check the network again even if
@@ -489,6 +522,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     // would reconnect on its own a second later and the button would be useless.
     autoConnect.current = false;
     record('ble.disconnected');
+    paired.reset();
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
