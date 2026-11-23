@@ -376,7 +376,11 @@ def test_volume_out_of_range_is_clamped_before_it_reaches_the_mixer(loop):
     n = Notifications()
     core = Core(loop, lambda: {}, None, bytes, n, set_volume=lambda p: asked.append(p) or p)
     core.write_control(b'{"cmd":"volume","value":250}')
-    _until(loop, lambda: asked == [100])
+    # Until the status that follows the mixer is out, not just until the mixer ran: that status is
+    # scheduled when the executor finishes, and a loop closed before it left the coroutine unawaited.
+    _until(loop, lambda: n.of(STATUS))
+    loop.run_until_complete(_drain(loop))
+    assert asked == [100]
 
 
 def test_volume_without_a_value_is_an_error_not_a_crash(loop):

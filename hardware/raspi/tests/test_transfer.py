@@ -3,6 +3,7 @@ photo or is WiFi needed?). A mis-packed header or one chunk too many inflates or
 and decides an architecture wrongly, with no visible error on the device."""
 
 import os
+import random
 import sys
 
 import pytest
@@ -19,7 +20,7 @@ from virovision.transfer import (  # noqa: E402
 
 
 def test_round_trip_recovers_the_payload():
-    payload = os.urandom(53_000)
+    payload = random.Random(0).randbytes(53_000)  # seeded: a failure reproduces
     chunks = split(payload, 182)
     assert join(chunks) == payload
 

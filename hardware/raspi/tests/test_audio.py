@@ -10,6 +10,8 @@ handler that answers the phone would die with it).
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from virovision.audio import Player, command_for  # noqa: E402
@@ -37,23 +39,45 @@ def test_a_format_nobody_can_play_is_none_instead_of_a_guess():
     assert command_for("/tmp/audio-1") is None
 
 
-def test_playing_a_format_nobody_can_play_does_not_raise():
+def test_playing_a_format_nobody_can_play_does_not_raise(monkeypatch, caplog):
     # The caller is the HTTP handler answering the phone: an exception here would be a 500 on a
     # request that did deliver its audio.
-    Player().play("/tmp/audio-1.bin")
+    import virovision.audio as audio
+
+    launched = []
+    monkeypatch.setattr(audio.subprocess, "Popen", lambda *a, **k: launched.append(a))
+    player = Player()
+    player.play("/tmp/audio-1.bin")
+    assert launched == [], "no decoder is guessed for it"
+    assert player._process is None
+    assert "nothing can play /tmp/audio-1.bin" in caplog.text
 
 
-def test_playing_with_no_decoder_installed_does_not_raise():
+def test_playing_with_no_decoder_installed_does_not_raise(monkeypatch, caplog):
     """On the Mac neither mpg123 nor aplay exists, which is exactly the board's state before
     `setup.sh` runs. It has to end in a log line, not in an exception."""
-    Player().play("/tmp/does-not-exist.mp3")
+    import virovision.audio as audio
+
+    def missing(*_args, **_kwargs):
+        raise FileNotFoundError("mpg123")
+
+    monkeypatch.setattr(audio.subprocess, "Popen", missing)
+    player = Player()
+    player.play("/tmp/does-not-exist.mp3")
+    assert player._process is None
+    assert "could not play /tmp/does-not-exist.mp3" in caplog.text
 
 
-def test_stopping_with_nothing_playing_is_safe():
+def test_stopping_with_nothing_playing_is_safe(monkeypatch):
     # `stop()` is called on every new reading and on shutdown, most of the time with nothing playing.
+    import virovision.audio as audio
+
+    monkeypatch.setattr(audio.subprocess, "Popen", lambda *a, **k: pytest.fail("stop must not launch anything"))
     player = Player()
     player.stop()
     player.stop()
+    assert player._process is None
+    assert player._generation == 2, "each stop still invalidates whatever was queued before it"
 
 
 def test_the_volume_is_clamped_instead_of_passed_through():
@@ -208,8 +232,10 @@ def test_the_pwm_pin_is_parked_once_the_output_is_idle_and_reconnected_for_the_n
 
         def __init__(self, command, **kwargs):
             self.done = False
+            self.polls = 0
 
         def poll(self):
+            self.polls += 1
             return 0 if self.done else None
 
         def wait(self, timeout=None):
@@ -227,7 +253,12 @@ def test_the_pwm_pin_is_parked_once_the_output_is_idle_and_reconnected_for_the_n
     player.play("/tmp/a.wav")
     assert commands == [["pinctrl", "set", "18", "a5"]]
     commands.clear()
-    time.sleep(0.5)
+    # Three of the parker's ticks while it plays: an idle pin would have been parked by the second.
+    playing = player._process
+    deadline = time.monotonic() + 3
+    while playing.polls < 3 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert playing.polls >= 3
     assert commands == [], "still playing: the pin stays on PWM"
 
     player._process.done = True

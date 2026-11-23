@@ -115,13 +115,18 @@ def test_logging_from_inside_the_relay_does_not_recurse():
 
 def test_an_emit_that_raises_never_reaches_the_code_that_logged():
     relay = LogRelay()
+    attempts = []
 
     def emit(event):
+        attempts.append(event["msg"])
         raise RuntimeError("Event loop is closed")
 
     relay.attach(emit)
     relay.subscriber_ready()
-    _logger(relay).error("at shutdown")  # must not raise
+    logger = _logger(relay)
+    logger.error("at shutdown")  # must not raise
+    logger.error("and after")
+    assert attempts == ["at shutdown", "and after"], "a failed emit leaves the relay live for the next line"
 
 
 def test_a_replayed_event_says_how_old_it_is_and_still_fits():
