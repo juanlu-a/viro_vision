@@ -213,6 +213,12 @@ export async function flush(): Promise<void> {
       state.cancel(timer);
     }
     state.offline = false;
+    if (r.status === 429) {
+      // The function's per-IP brake: the batch is fine, the timing is not. Re-queued without counting
+      // an attempt, like an offline send, or a busy minute would throw good events away as poison.
+      state.queue.returnBatch(batch);
+      return;
+    }
     if (!r.ok) throw new Error(String(r.status));
     state.queue.clearDropped(dropped);
     state.attempts = 0;

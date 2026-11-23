@@ -383,8 +383,8 @@ async def _main(args: argparse.Namespace) -> None:
     # is pushed again the moment each one is.
     async def _bring_camera_up() -> None:
         if not await loop.run_in_executor(None, camera.start):
-            # A user already in bus mode heard «preparando» and would get silence forever: the error
-            # event lets the app say something instead (and puts it in telemetry).
+            # A user already in bus mode heard «preparando» and then nothing: the error event at least
+            # puts it in the app's telemetry (ADR 0011). The app does not speak it yet.
             if bus_watcher is not None and service.core.modes.current is Mode.BUS:
                 service.core.emit_event({"t": "error", "msg": "bus unavailable: camera did not start"})
             return

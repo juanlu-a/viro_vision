@@ -474,7 +474,7 @@ async function readBus(uri: string, isStale: () => boolean, cancel: AbortSignal)
     // The first load downloads ~250 MB: if someone reports that "the first time it does not work",
     // this number says whether it was downloading or whether it hung.
     // A mode change while the model downloads resets the status to idle; a stale reading must not
-    // write over it, or Home stays "busy" with every button disabled until the next mode change.
+    // write over it, or Home's read button stays disabled until the next mode change.
     const load = await loadOcr((p) => {
       if (!isStale()) update({ progress: p });
     });

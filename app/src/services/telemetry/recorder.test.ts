@@ -162,6 +162,21 @@ describe('flush', () => {
     expect(notice?.detail?.droppedEvents).toBe(1); // and the loss is declared
   });
 
+  it('a 429 from the function brake never gives a batch up: the batch is fine, only the timing is not', async () => {
+    const tooMany = (async () => ({ ok: false, status: 429 })) as unknown as typeof fetch;
+    const stop = start(tooMany);
+    record('reading.ok', { detail: { kept: true } });
+    for (let i = 0; i < 5; i++) await flush();
+    stop();
+
+    const { impl, bodies } = recordingFetch();
+    const stop2 = start(impl);
+    await flush();
+    stop2();
+    expect(bodies[0].events.some((e: any) => e.detail?.kept === true)).toBe(true);
+    expect(bodies[0].events.some((e: any) => e.type === 'app.error')).toBe(false);
+  });
+
   it('a network failure never gives a batch up: offline is the normal case on the street, not a poisoned batch', async () => {
     let calls = 0;
     const rejects = (async () => {

@@ -95,7 +95,6 @@ export async function readCapped(request: Request, max: number): Promise<string 
   return new TextDecoder().decode(bytes);
 }
 
-
 /** True for a parsed JSON body that is an object (not `null`, an array or a primitive). */
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
