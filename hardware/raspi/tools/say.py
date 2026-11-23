@@ -1,26 +1,27 @@
-"""Hace que la placa diga un aviso de sistema, por BLE, desde la Mac.
+"""Makes the board say a system notice, over BLE, from the Mac.
 
-Existe por lo que pasó el 2026-09-16. Los avisos de sistema (ADR 0003, act. 2026-09-16) recorren un
-camino largo —ajuste en la app → `notify` → escritura en `control` → `notices.py` → `aplay`— y
-**cada eslabón falla en silencio**: un clip que no está, un nombre mal escrito, un daemon viejo que
-no conoce el comando. Sin esto, la única forma de probarlo era instalar un build en el teléfono y
-ponerse los anteojos, y ahí ya no se distingue cuál de los eslabones se cortó.
+It exists because of what happened on 2026-09-16. System notices (ADR 0003, upd. 2026-09-16) travel
+a long path (setting in the app → `notify` → write to `control` → `notices.py` → `aplay`) and
+**every link fails silently**: a missing clip, a misspelled name, an old daemon that does not know
+the command. Without this, the only way to test it was to install a build on the phone and put the
+glasses on, and by then there is no telling which link broke.
 
-Es la contraparte de `ap.py` y comparte su forma: lee `status`, escribe en `control`, sin emparejarse.
+It is the counterpart of `ap.py` and shares its shape: reads `status`, writes to `control`, no
+pairing.
 
 ```sh
 cd hardware/raspi
 ./.venv-mac/bin/python tools/say.py                    # connected.wav
-./.venv-mac/bin/python tools/say.py mode_bus.wav       # uno en particular
-./.venv-mac/bin/python tools/say.py --all              # los diez, en fila
-./.venv-mac/bin/python tools/say.py --list             # qué nombres acepta la placa
+./.venv-mac/bin/python tools/say.py mode_bus.wav       # a specific one
+./.venv-mac/bin/python tools/say.py --all              # all of them, one after another
+./.venv-mac/bin/python tools/say.py --list             # which names the board accepts
 ```
 
-**La app del teléfono tiene que estar cerrada**, por el mismo motivo que en `ap.py`: mientras una
-central está conectada la placa deja de anunciar y el escaneo no la encuentra.
+**The phone app has to be closed**, for the same reason as in `ap.py`: while a central is connected
+the board stops advertising and the scan does not find it.
 
-Un nombre que la placa no conoce vuelve como evento `error` en vez de romper nada, y eso también es
-parte de lo que conviene ver funcionando.
+A name the board does not know comes back as an `error` event instead of breaking anything, and that
+is also worth seeing work.
 """
 
 import asyncio
@@ -38,14 +39,14 @@ SERVICE = "4380c500-7ca3-4e37-b27d-f60e8d8d73d1"
 CH_CONTROL = "4380c502-7ca3-4e37-b27d-f60e8d8d73d1"
 CH_EVENT = "4380c503-7ca3-4e37-b27d-f60e8d8d73d1"
 
-# Lo que tarda un aviso en decirse. Los clips van de 0,1 s (el chirp) a 4 s (la frase de prueba de
-# audio); con menos que esto, `--all` los pisa entre sí y no se escucha ninguno entero.
+# How long a notice takes to say. Clips run from 0.1 s (the chirp) to 4 s (the audio test phrase);
+# with less than this, `--all` talks over itself and none is heard whole.
 BETWEEN_CLIPS_S = 4.5
 
 
 def listing() -> str:
     lines = [f"  {clip:<24} {text}" for clip, text in sorted(NOTICES.items())]
-    lines.append(f"  {EARCON_FILE:<24} (el chirp del botón, no es una frase)")
+    lines.append(f"  {EARCON_FILE:<24} (the button chirp, not a phrase)")
     return "\n".join(lines)
 
 
@@ -60,17 +61,17 @@ async def main() -> int:
 
     unknown = [c for c in clips if c not in CLIPS]
     if unknown:
-        # Atajado acá y no en la placa: mandar un nombre inventado prueba el rechazo, pero un error
-        # de tipeo mientras se depura otra cosa sólo confunde.
-        print(f"la placa no conoce: {', '.join(unknown)}\n\nacepta:\n{listing()}")
+        # Caught here and not on the board: sending a made-up name tests the rejection, but a typo
+        # while debugging something else only confuses.
+        print(f"the board does not know: {', '.join(unknown)}\n\nit accepts:\n{listing()}")
         return 2
 
-    print("buscando la placa (la app del teléfono tiene que estar cerrada)…")
+    print("looking for the board (the phone app has to be closed)…")
     device = await BleakScanner.find_device_by_filter(
         lambda d, ad: SERVICE in (ad.service_uuids or []), timeout=15.0
     )
     if device is None:
-        print("no apareció: ¿está prendida, y la app cerrada?")
+        print("not found: is it on, and is the app closed?")
         return 1
 
     async with BleakClient(device) as client:
@@ -83,13 +84,13 @@ async def main() -> int:
                 return
             if event.get("t") == "error":
                 errors.append(event.get("msg", ""))
-                print(f"  ← la placa avisa: {event.get('msg')}")
+                print(f"  ← the board reports: {event.get('msg')}")
 
         await client.start_notify(CH_EVENT, on_event)
         for clip in clips:
             print(f"→ {clip}")
-            # `response=False`: es la misma escritura sin respuesta que usa la app, así que lo que se
-            # prueba acá es el camino de verdad y no uno parecido.
+            # `response=False`: the same write-without-response the app uses, so what is tested here
+            # is the real path and not a lookalike.
             await client.write_gatt_char(
                 CH_CONTROL, json.dumps({"cmd": "say", "clip": clip}).encode(), response=False
             )
@@ -97,9 +98,9 @@ async def main() -> int:
         await client.stop_notify(CH_EVENT)
 
         if errors:
-            print(f"\n{len(errors)} aviso(s) de error de la placa: algo del camino no está en su lugar")
+            print(f"\n{len(errors)} error report(s) from the board: something on the path is not in place")
             return 1
-    print("\nsin errores de la placa: escuchá si salió por el parlante")
+    print("\nno errors from the board: listen for it on the speaker")
     return 0
 
 

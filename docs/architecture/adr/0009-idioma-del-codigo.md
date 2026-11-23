@@ -1,6 +1,6 @@
 # ADR 0009: El código en inglés, la app y la tesis en español
 
-- **Status:** Accepted (2026-09-09)
+- **Status:** Accepted (2026-09-09), enmendado el 2026-11-23 (PRs en inglés, también los viejos)
 - **Date:** 2026-09-09
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** app, hardware, backend, convenciones
@@ -102,3 +102,34 @@ En español, porque lo lee o lo escucha una persona:
   porque el contrato entre la app y la placa es justamente donde la mezcla más molesta (los dos lados
   se leen juntos) y porque el costo de moverlo sólo crece con cada unidad de hardware y cada fila de
   telemetría.
+
+## Enmienda 2026-11-23: los PRs en inglés, también los anteriores
+
+La decisión original ya pedía mensajes de PR en inglés "de acá en adelante", pero en la práctica
+siguieron saliendo títulos y descripciones en español (de #72 a #142 hubo una veintena). Se precisa:
+
+- **El título y la descripción de todo PR van en inglés**, igual que el código. Las únicas cadenas
+  en español dentro de un PR son las literales que el producto dice o muestra («Dispositivo
+  emparejado», "Se acerca un ómnibus"), citadas tal cual.
+- **Los PRs anteriores se tradujeron** (del #10 al #142), sólo en GitHub: título y descripción,
+  sin nota de que se tradujeron. A diferencia de los commits, editar un PR no reescribe la historia
+  de Git, así que el argumento de "no vale la pena" no aplica. Los commits viejos siguen como están.
+- **Los comentarios que quedaban en español** se tradujeron: los scripts de arranque de la microSD
+  (`hardware/raspi/boot/`, comentarios y líneas de log), las herramientas `tools/ap.py` y
+  `tools/say.py`, los tests de la placa y `app/jest/styleMock.js`.
+
+Lo que sigue en español, a propósito:
+
+- **La documentación entera** (`docs/`, ADRs, la skill, la tesis), como dice la decisión original.
+- **Los nombres que viven en la microSD y en la placa**: `modo-red.sh`, `instalar-daemon.sh`, los
+  archivos `SIN-AP` y `VOLUMEN`, `virovision.anterior/`, el sufijo `.aplicado`, el drop-in
+  `10-sin-ap.conf` y la centinela `/var/lib/virovision-instalado`. Las tarjetas ya grabadas y las
+  unidades de systemd los referencian por nombre; renombrarlos obliga a regrabar cada tarjeta y deja
+  una ventana en que la placa y el repo no coinciden, el mismo problema que se aceptó una vez con
+  `--sin-ap`. Se renombran sólo si alguna vez se regraban todas las tarjetas.
+- **La migración `20260907190000_eventos.sql`**: ya está aplicada y el log de migraciones es de sólo
+  agregar (lo dice la migración siguiente, que la traduce con `rename`).
+- **Las etiquetas de la guía de armado** (`via_clara_v0_29_guide.scad`), porque las lee una persona
+  en las imágenes.
+- **Los datos de prueba con caracteres no ASCII** (`ñ`, nombres de calles), que existen para probar
+  UTF-8 y no son prosa.

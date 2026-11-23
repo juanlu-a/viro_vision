@@ -277,6 +277,12 @@ daemon (`--no-ap`) y el esquema de Supabase (tabla `events`, y el vocabulario `r
 **El criterio para no volver a deslizarse**: *¿lo lee una persona o lo lee una máquina?* La regla
 anterior no era enunciable así, y por eso se corrió dos veces.
 
+**Enmienda 2026-11-23**: los PRs (título y descripción) van en inglés, y los anteriores se
+tradujeron en GitHub; se tradujeron también los comentarios que quedaban en español (scripts de
+arranque, `tools/`, tests de la placa). Quedan en español, a propósito, los nombres que viven en la
+microSD y la placa (`modo-red.sh`, `SIN-AP`, `VOLUMEN`, …), la migración ya aplicada de `eventos` y
+las etiquetas de la guía de armado de la carcasa.
+
 ### ADR 0010: Un solo tema (oscuro) y una sola línea de estado · **Accepted (2026-09-14)**
 
 Antes había selector de tema (sistema / claro / oscuro) persistido, y la pantalla de Inicio repetía

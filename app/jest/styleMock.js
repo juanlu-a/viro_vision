@@ -1,5 +1,5 @@
 /**
- * Stub para imports de CSS. `constants/theme.ts` importa `@/global.css` (NativeWind lo procesa en
- * Metro), pero Jest no sabe parsear CSS. Sin esto, cualquier test que toque los tokens revienta.
+ * Stub for CSS imports. `constants/theme.ts` imports `@/global.css` (NativeWind processes it in
+ * Metro), but Jest cannot parse CSS. Without this, any test that touches the tokens blows up.
  */
 module.exports = {};

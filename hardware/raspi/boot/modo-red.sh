@@ -1,13 +1,13 @@
 #!/bin/sh
-# ViroVision — interruptor de modo de red. Lo corre virovision-modo-red.service en cada arranque,
-# antes del daemon.
+# ViroVision — network mode switch. virovision-modo-red.service runs it on every boot, before the
+# daemon.
 #
-#   /boot/firmware/SIN-AP existe   -> desarrollo: --no-ap, la placa se queda en la WiFi conocida y
-#                                     hay SSH, pero la app va a decir "red apagada".
-#   /boot/firmware/SIN-AP no está  -> producto: la placa levanta su propio AP al arrancar (ADR 0003)
-#                                     y deja cualquier otra red, así que NO hay SSH.
+#   /boot/firmware/SIN-AP exists   -> development: --no-ap, the board stays on the known WiFi and
+#                                     there is SSH, but the app will say "red apagada".
+#   /boot/firmware/SIN-AP missing  -> product: the board brings up its own AP on boot (ADR 0003)
+#                                     and leaves any other network, so there is NO SSH.
 #
-# El modo se cambia desde cualquier computadora: la partición es FAT, se crea o se borra el archivo.
+# The mode is switched from any computer: the partition is FAT, so the file is created or deleted.
 
 LOG=/var/log/virovision-firstrun.log
 exec >>"$LOG" 2>&1
@@ -15,9 +15,9 @@ set -x
 
 DROPIN=/etc/systemd/system/virovision.service.d/10-sin-ap.conf
 
-# Este script está en la cadena crítica del arranque: el daemon no arranca —y la placa no anuncia—
-# hasta que termina. Por eso cada paso trabaja sólo si algo cambió (2026-10-06: corría 3,5 s en
-# cada arranque, 2,4 de ellos en un `daemon-reload` que casi nunca hacía falta).
+# This script is on the boot's critical path: the daemon does not start (and the board does not
+# advertise) until it finishes. So every step only does work if something changed (2026-10-06: it
+# took 3.5 s on every boot, 2.4 of them in a `daemon-reload` that was almost never needed).
 RELOAD_UNITS=0
 if [ -f /boot/firmware/SIN-AP ]; then
   mkdir -p "$(dirname "$DROPIN")"
@@ -34,34 +34,34 @@ EOF
     install -m 644 "$NEW" "$DROPIN" && rm -f "$NEW"
     RELOAD_UNITS=1
   fi
-  echo "modo DESARROLLO (--no-ap): hay SSH, la app no verá red de la placa"
+  echo "DEVELOPMENT mode (--no-ap): SSH available, the app will not see the board's network"
 else
   if [ -e "$DROPIN" ]; then
     rm -f "$DROPIN"
     RELOAD_UNITS=1
   fi
   rmdir "$(dirname "$DROPIN")" 2>/dev/null || true
-  echo "modo PRODUCTO: la placa levanta su AP, no habrá SSH"
+  echo "PRODUCT mode: the board brings up its AP, no SSH"
 fi
 
-# Perfiles WiFi dejados en bootfs desde otra computadora (*.nmconnection): se instalan en cada
-# arranque y NetworkManager los recarga. Permite sumar una red (oficina, casa de alguien) sin SSH.
+# WiFi profiles left on bootfs from another computer (*.nmconnection): installed on every boot and
+# reloaded by NetworkManager. Adds a network (an office, someone's home) without SSH.
 for f in /boot/firmware/*.nmconnection; do
   [ -f "$f" ] || continue
-  # macOS deja un `._nombre` al lado de cada archivo que copia a una FAT. Sin este filtro se instala
-  # como si fuera un perfil y NetworkManager escupe un error por cada arranque.
+  # macOS leaves a `._name` next to every file it copies to a FAT volume. Without this filter it is
+  # installed as if it were a profile and NetworkManager logs an error on every boot.
   case "$(basename "$f")" in ._*) continue ;; esac
   dst="/etc/NetworkManager/system-connections/$(basename "$f")"
   cmp -s "$f" "$dst" && continue
-  install -m 600 -o root -g root "$f" "$dst" && echo "perfil WiFi instalado: $dst" && RELOAD_NM=1
+  install -m 600 -o root -g root "$f" "$dst" && echo "WiFi profile installed: $dst" && RELOAD_NM=1
 done
 if [ -n "$RELOAD_NM" ]; then
   nmcli connection reload 2>/dev/null || true
 fi
 
-# Avisos de sistema pregrabados (ADR 0003, act. 2026-09-16). Van por la tarjeta y no por `scp` para
-# que una placa en modo producto -sin SSH- también se pueda actualizar, que es exactamente la
-# situación en la que se descubrió que faltaban. Idempotente: se recopian en cada arranque, y son
+# Prerecorded system notices (ADR 0003, upd. 2026-09-16). They travel on the card rather than by
+# `scp` so that a board in product mode (no SSH) can be updated too, which is exactly the situation
+# in which they were found missing. Idempotent: they are copied again on every boot, and they are
 # 800 KB.
 SRC=/boot/firmware/announcements-system
 DST=/home/virovision/announcements/system
@@ -74,24 +74,24 @@ if [ -d "$SRC" ]; then
     cmp -s "$w" "$DST/$(basename "$w")" && continue
     install -m 644 -o virovision -g virovision "$w" "$DST/$(basename "$w")" && n=$((n + 1))
   done
-  # Y se borra lo que la tarjeta ya no trae: el catálogo se achicó una vez (de 10 a 6 avisos el
-  # 2026-09-17) y los que sobran son clips que nadie puede pedir, indistinguibles de un aviso que
-  # alguien grabó y se olvidó de rutear. La tarjeta es la fuente; esto la hace fuente de verdad.
-  # Acotado a propósito: sólo `*.wav` sueltos en este directorio, que es nuestro.
+  # And whatever the card no longer carries is deleted: the catalog shrank once (from 10 to 6 notices
+  # on 2026-09-17), and the leftovers are clips nobody can request, indistinguishable from a notice
+  # someone recorded and forgot to route. The card is the source; this makes it the source of truth.
+  # Deliberately narrow: only loose `*.wav` files in this directory, which is ours.
   for w in "$DST"/*.wav; do
     [ -f "$w" ] || continue
-    [ -f "$SRC/$(basename "$w")" ] || { rm -f "$w" && echo "aviso retirado: $(basename "$w")"; }
+    [ -f "$SRC/$(basename "$w")" ] || { rm -f "$w" && echo "notice removed: $(basename "$w")"; }
   done
-  echo "avisos de sistema actualizados: $n en $DST"
+  echo "system notices updated: $n in $DST"
 fi
 
-# Actualización del código del daemon desde la tarjeta (2026-11-18), para cuando no hay SSH:
-# `instalar-daemon.sh` está detrás de su centinela y sólo instala la primera vez. Si existe
-# /boot/firmware/virovision-update.tgz con el paquete `virovision/` (sólo el código Python: no toca
-# el .venv ni corre apt, así que no sirve si cambian las dependencias), reemplaza el paquete
-# instalado antes de que arranque el daemon, guarda el anterior en `virovision.anterior/` y renombra
-# el tgz a `.aplicado` para no reaplicarlo en cada arranque. Volver atrás: mover
-# `virovision.anterior` a `virovision` por SSH, o dejar en la tarjeta un tgz con la versión vieja.
+# Daemon code update from the card (2026-11-18), for when there is no SSH: `instalar-daemon.sh` is
+# behind its sentinel and only installs the first time. If /boot/firmware/virovision-update.tgz
+# exists with the `virovision/` package (Python code only: it does not touch the .venv or run apt,
+# so it is no use if the dependencies change), it replaces the installed package before the daemon
+# starts, keeps the previous one in `virovision.anterior/` and renames the tgz to `.aplicado` so it
+# is not applied again on every boot. To roll back: move `virovision.anterior` to `virovision` over
+# SSH, or leave a tgz with the old version on the card.
 UPD=/boot/firmware/virovision-update.tgz
 APP=/home/virovision/virovision
 if [ -f "$UPD" ] && [ -d "$APP/virovision" ]; then
@@ -103,18 +103,18 @@ if [ -f "$UPD" ] && [ -d "$APP/virovision" ]; then
     mv "$TMP/virovision" "$APP/virovision"
     chown -R virovision:virovision "$APP/virovision"
     mv "$UPD" "$UPD.aplicado"
-    echo "daemon actualizado desde la tarjeta ($(ls "$APP/virovision" | wc -l) archivos)"
+    echo "daemon updated from the card ($(ls "$APP/virovision" | wc -l) files)"
   else
-    echo "virovision-update.tgz no trae virovision/__main__.py: no se aplica"
+    echo "virovision-update.tgz has no virovision/__main__.py: not applied"
   fi
   rm -rf "$TMP"
 fi
 
-# Volumen fijado desde la tarjeta (2026-11-18): con el amplificador PAM8403 el 90 % del daemon es
-# demasiado fuerte y una placa en modo producto no tiene SSH para bajarlo. Si existe
-# /boot/firmware/VOLUMEN con un número de 0 a 100, un drop-in reaplica ese nivel 40 s después de que
-# arranca el daemon (que fija el suyo al iniciar). Es un parche hasta que el volumen se elija desde
-# la app: al borrar el archivo, el drop-in se retira.
+# Volume set from the card (2026-11-18): with the PAM8403 amplifier the daemon's 90 % is too loud,
+# and a board in product mode has no SSH to turn it down. If /boot/firmware/VOLUMEN exists with a
+# number from 0 to 100, a drop-in reapplies that level 40 s after the daemon starts (it sets its own
+# on startup). A stopgap until the volume is chosen from the app: deleting the file removes the
+# drop-in.
 VOLDROPIN=/etc/systemd/system/virovision.service.d/20-volumen.conf
 VOL=$(tr -cd '0-9' < /boot/firmware/VOLUMEN 2>/dev/null)
 if [ -n "$VOL" ] && [ "$VOL" -le 100 ]; then
@@ -130,13 +130,13 @@ EOF
     install -m 644 "$NEW" "$VOLDROPIN" && rm -f "$NEW"
     RELOAD_UNITS=1
   fi
-  echo "volumen fijado desde la tarjeta: ${VOL}%"
+  echo "volume set from the card: ${VOL}%"
 elif [ -e "$VOLDROPIN" ]; then
   rm -f "$VOLDROPIN"
   RELOAD_UNITS=1
 fi
 
-# Sólo si algún drop-in cambió: sin eso systemd no lo ve, y con él son 2,4 s.
+# Only if a drop-in changed: without it systemd does not see the change, and with it it costs 2.4 s.
 if [ "$RELOAD_UNITS" = 1 ]; then
   systemctl daemon-reload
 fi

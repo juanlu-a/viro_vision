@@ -196,22 +196,22 @@ def test_every_notice_the_app_can_ask_for_is_in_the_set():
 
 
 def test_the_phone_can_silence_the_speaker(loop):
-    """Reportado el 2026-09-18 probando en la placa: con la salida en dispositivo, «Probar audio»
-    sonaba por el parlante; cambiando el ajuste a teléfono y tocando el botón otra vez, el celular
-    arrancaba la misma frase **sin cortar la de la placa**, y quedaban dos voces encimadas.
+    """Reported on 2026-09-18 while testing on the board: with the output on the device, «Probar audio»
+    played on the speaker; switching the setting to phone and tapping the button again, the phone
+    started the same phrase **without cutting the board's**, leaving two voices on top of each other.
 
-    Cada salida sabía interrumpirse a sí misma —`Speech.stop()` de un lado, el `aplay` anterior del
-    otro— y ninguna a la otra. Para quien no ve la pantalla, dos voces simultáneas no son
-    información: son ruido, que es el mismo motivo por el que una lectura nueva ya cortaba a la
-    anterior (`audio.py`)."""
-    silencios = []
-    core, notifications = build(loop, hush=lambda: silencios.append("stop"))
+    Each output knew how to interrupt itself (`Speech.stop()` on one side, the previous `aplay` on
+    the other) and neither the other one. For someone who cannot see the screen, two simultaneous
+    voices are not information: they are noise, which is the same reason a new reading already cut
+    the previous one (`audio.py`)."""
+    hushes = []
+    core, notifications = build(loop, hush=lambda: hushes.append("stop"))
 
     async def scenario():
         core.write_control(json.dumps({"cmd": "hush"}).encode())
         await _drain(loop)
-        assert silencios == ["stop"]
-        # Sin evento de error: `hush` es un comando válido, no algo que la placa no entiende.
+        assert hushes == ["stop"]
+        # No error event: `hush` is a valid command, not something the board does not understand.
         assert [e for e in notifications.events() if e["t"] == "error"] == []
 
     loop.run_until_complete(scenario())

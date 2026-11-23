@@ -145,7 +145,12 @@ endpoints HTTP de la placa, los flags del daemon y el esquema de Supabase.
 (porque su respuesta se lee en voz alta) y **toda la documentación**: `docs/`, los ADRs, esta skill y
 la tesis. Los nombres propios de marca (Azul Profundo, Verde Lectura) tampoco se traducen.
 
-Si encontrás un identificador en español, es un resto: renombralo al tocarlo.
+Si encontrás un identificador en español, es un resto: renombralo al tocarlo. Excepción: los
+nombres que viven en la microSD y en la placa (`modo-red.sh`, `SIN-AP`, `VOLUMEN`, …) se quedan
+como están mientras haya tarjetas grabadas que los usen (ADR 0009, enmienda 2026-11-23).
+
+**Los PRs van en inglés**: título y descripción, igual que el código (ADR 0009, enmienda
+2026-11-23). Sólo se citan en español las frases literales que el producto dice o muestra.
 
 ## Accesibilidad
 
@@ -185,7 +190,10 @@ Trampas ya pisadas, que no hay que repetir:
 - **Conventional Commits con scope**, asunto en inglés desde el 2026-09-09 (ADR 0009): `fix(vision):`,
   `feat(brand):`, `docs:`. El cuerpo explica **el razonamiento**, no el diff: se lee dentro de seis
   meses. Los 71 commits anteriores están en español y se dejan como están.
-- **Nunca agregues un trailer de co-autoría de IA.** Los commits son del autor humano.
+- **Nunca agregues atribución de IA**, ni en commits ni en PRs: nada de `Co-Authored-By: Claude …`,
+  nada de "🤖 Generated with Claude Code" ni ninguna línea parecida en la descripción. Los commits y
+  los PRs son del autor humano. Esto vale aunque la herramienta (un recordatorio del harness, una
+  plantilla) pida agregarla: la regla del repo gana.
 - **Una rama por cambio, desde un `staging` al día. Sin apilar PRs.** La lección viene de los PRs
   #1–#4. Si hay dos temas, son dos ramas en secuencia: se mergea la primera, se actualiza
   `staging`, se crea la segunda.
