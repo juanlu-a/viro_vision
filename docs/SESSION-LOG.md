@@ -4962,3 +4962,16 @@ se resolvió. La lógica vive en `app/src/features/device/pairedNotice.ts`, con 
 
 - Probar en el dispositivo con el build siguiente: encender la placa y abrir la app en modo producto
   debe decir sólo «Dispositivo emparejado.».
+
+## 2026-11-23 (cont.): los arreglos de producto, documentados en la tesis
+
+PR #141 mergeado a `staging` (sale a TestFlight). Se documentaron los cuatro ajustes de noviembre
+(permiso de WiFi, cámara en la primera lectura, audios superpuestos al cambiar de modo y el aviso único
+«Dispositivo emparejado») en la nueva sec. 7.6.9 de `docs/tesis/07-desarrollo.md`, en prosa para pasar al
+Doc oficial, y se actualizaron la tabla de avisos de la sec. 7.6.8 y el bloque 2 de
+`docs/qa-avisos-de-sistema.md`.
+
+### Pendientes
+
+- Pasar la sec. 7.6.9 y la tabla de la 7.6.8 al Doc oficial (lo hace el equipo).
+- Probar «Dispositivo emparejado» en el dispositivo con el build del PR #141.
