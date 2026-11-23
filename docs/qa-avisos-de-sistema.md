@@ -102,8 +102,10 @@ cd hardware/raspi
 
 Es la línea de base: así funcionaba antes de todo esto, y tiene que seguir igual.
 
-- [ ] Conectar → **«Dispositivo conectado»** por el teléfono.
-- [ ] Se une al WiFi → **«Red con el dispositivo lista»** por el teléfono.
+- [ ] Modo producto: conectar → una sola frase, **«Dispositivo emparejado»**, por el teléfono, cuando
+      la red queda lista (o si el teléfono está en otra red, o a los 25 s como máximo). Desde 2026-11-23.
+- [ ] Modo desarrollo: conectar → **«Dispositivo conectado»** y, al unirse al WiFi, **«Red con el
+      dispositivo lista»**, las dos por el teléfono.
 - [ ] Cambiar de modo (app y botón) → anuncio por el teléfono.
 - [ ] Doble click → chirp por el teléfono, y la lectura del modo por el teléfono.
 
