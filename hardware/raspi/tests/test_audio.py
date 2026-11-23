@@ -297,12 +297,12 @@ def test_the_bus_clips_wait_for_the_sentence_play_started_instead_of_talking_ove
 
     monkeypatch.setattr(audio.subprocess, "Popen", Process)
     player = Player()
-    player.play("/tmp/modo-omnibus.wav")
+    player.play("/tmp/mode-bus.wav")
     player.play_sequence(["/tmp/115.wav"])
     worker = player._worker
     # The notice is still talking: the bus clip must not have started.
     assert "/tmp/115.wav" not in finish
-    finish["/tmp/modo-omnibus.wav"].set()
+    finish["/tmp/mode-bus.wav"].set()
     for _ in range(50):
         if "/tmp/115.wav" in finish:
             break
