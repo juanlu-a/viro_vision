@@ -200,6 +200,9 @@ export const es = {
     // Said aloud, not shown: a bare «Conectado» is enough on screen, where it sits next to the
     // device name, but on its own in the ear it does not say connected to what.
     connectedAnnounce: 'Dispositivo conectado.',
+    // Product mode only (2026-11-23): one sentence once the device is usable, instead of the link
+    // and the network as two separate steps, which read as "something might still go wrong".
+    pairedAnnounce: 'Dispositivo emparejado.',
     // Amber on the Device tab: the Bluetooth link is up but the photo path is not. Only what is
     // missing, in brackets. The reason goes to telemetry; the remedy, when there is one, is spoken.
     connectedWithoutWifi: 'Conectado (falta el WiFi)',

@@ -59,6 +59,8 @@ export const NOTICES = {
    * `services/ble/serialize.ts`.
    */
   connected: { clip: null, say: strings.connection.connectedAnnounce },
+  /** Product mode's single "the device is usable" notice, in place of `connected` + `networkReady`. */
+  paired: { clip: null, say: strings.connection.pairedAnnounce },
   /** The board cannot announce its own absence. */
   connectionLost: { clip: null, say: strings.connection.lost },
   networkReady: { clip: null, say: strings.connect.wifiReadyAnnounce },

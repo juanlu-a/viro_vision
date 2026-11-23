@@ -107,7 +107,7 @@ describe('notify', () => {
     setAudioOutput('device');
     boardIsThere();
 
-    for (const id of ['connected', 'connectionLost', 'networkReady', 'networkFailed'] as const) {
+    for (const id of ['connected', 'paired', 'connectionLost', 'networkReady', 'networkFailed'] as const) {
       await expect(notify(id)).resolves.toBe('phone');
     }
     expect(played).toEqual([]);
