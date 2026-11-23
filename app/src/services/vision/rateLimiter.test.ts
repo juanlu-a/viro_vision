@@ -91,13 +91,15 @@ describe('acquireSlot', () => {
 
     // Without the `aborted` check at the top of every turn, this would spin forever: the fake clock
     // does not advance on its own and nobody is going to free the slot.
-    await acquireSlot('model', {
-      now: clock.now,
-      maxPerWindow: 1,
-      signal: controller.signal,
-      onWait: () => controller.abort(),
-      sleep: async () => {},
-    });
+    await expect(
+      acquireSlot('model', {
+        now: clock.now,
+        maxPerWindow: 1,
+        signal: controller.signal,
+        onWait: () => controller.abort(),
+        sleep: async () => {},
+      }),
+    ).rejects.toMatchObject({ name: 'VisionStreamError', detail: 'cancelled' });
   });
 });
 

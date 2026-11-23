@@ -197,7 +197,10 @@ class BleClientPlx implements BleClient {
     // (battery, crash) comes back idle, and without this read the app kept showing — and waiting
     // in — the mode from before the drop while nothing on the board was watching for buses.
     const mode = await this.readMode(device);
-    if (mode !== null && current()) emit(this.modeListeners, mode);
+    // A link that dropped during these reads has already been reported (`onDisconnect`); answering
+    // "connected" now would put the provider back in a state the radio no longer has.
+    if (!current()) throw new BleNotConnectedError();
+    if (mode !== null) emit(this.modeListeners, mode);
     return {
       id: device.id,
       name: device.name ?? device.localName ?? DEVICE_ADVERTISED_NAME,

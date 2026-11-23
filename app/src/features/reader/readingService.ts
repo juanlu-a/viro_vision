@@ -225,8 +225,13 @@ let readingAbort: AbortController | null = null;
  * bus mode, so it can wait for the frame loop to release the camera.
  */
 let pendingModeWrite: Promise<void> | null = null;
-/** The app's mode before that write: the only board report the echo filter may drop. */
-let modeBeforeWrite: Mode | null = null;
+/**
+ * The modes the app left through writes still in flight: the only board reports the echo filter may
+ * drop. Every in-flight write counts, not only the last one: after a fast A → B → C the board can
+ * still report A (B's write not applied yet) and, remembering only "B before C", that stale A used
+ * to flip the app back and cancel the reading just started.
+ */
+const modesLeftInFlight: { write: Promise<void>; from: Mode }[] = [];
 const listeners = new Set<() => void>();
 
 export function configureReader(next: ReaderDeps): void {
@@ -420,12 +425,12 @@ export function applyGesture(gesture: Gesture): void {
       MODE_WRITE_WAIT_MS,
     );
     pendingModeWrite = write;
-    modeBeforeWrite = previous;
+    const entry = { write, from: previous };
+    modesLeftInFlight.push(entry);
     void write.then(() => {
-      if (pendingModeWrite === write) {
-        pendingModeWrite = null;
-        modeBeforeWrite = null;
-      }
+      const index = modesLeftInFlight.indexOf(entry);
+      if (index !== -1) modesLeftInFlight.splice(index, 1);
+      if (pendingModeWrite === write) pendingModeWrite = null;
     });
   }
   // Asked SEPARATELY from the mode change, because the two answers differ: a double click in
@@ -440,7 +445,7 @@ export function setModeFromDevice(mode: Mode): void {
   // fast bus → supermarket): applying that echo would flip the app back, cancel the reading just
   // started and announce a mode the user already left. The write's own echo arrives after it.
   // Only that echo: any other mode is a real press on the board and wins as always.
-  if (pendingModeWrite && mode !== state.mode && mode === modeBeforeWrite) {
+  if (mode !== state.mode && modesLeftInFlight.some((entry) => entry.from === mode)) {
     record('mode.echoIgnored', { detail: { reported: mode, current: state.mode } });
     return;
   }
@@ -661,7 +666,7 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   const pressedAt = Date.now();
   const cancel = new AbortController();
   const controller = new AbortController();
-  cancel.signal.addEventListener('abort', () => controller.abort());
+  cancel.signal.addEventListener('abort', () => controller.abort(), { once: true });
   // The photo comes over the device's WiFi: wait for the phone to be on it, and for the mode just
   // written to reach the board. Both happen in the first seconds after connecting or switching.
   // Synchronous in the usual case: every extra await here is time iOS may not give a locked phone.
@@ -768,14 +773,15 @@ export async function requestReading(source: 'device' | 'app'): Promise<void> {
   }
 }
 
-/**
- * Waits, bounded, for the phone to be on the device's network (`isDeviceReady`: connected, joined,
- * answering). True at once in the usual case. False when it never came or the mode changed meanwhile.
- */
+/** Whether the phone is on the device's network right now (true when the deps cannot tell). */
 function isNetworkReady(): boolean {
   return deps.isNetworkReady ? deps.isNetworkReady() : true;
 }
 
+/**
+ * Waits, bounded, for the phone to be on the device's network (`isDeviceReady`: connected, joined,
+ * answering). True at once in the usual case. False when it never came or the mode changed meanwhile.
+ */
 async function waitForDeviceNetwork(isStale: () => boolean, limitMs: number): Promise<boolean> {
   const t0 = Date.now();
   let told = false;
@@ -842,6 +848,6 @@ export function resetReaderForTests(): void {
   modeEpoch = 0;
   readingAbort = null;
   pendingModeWrite = null;
-  modeBeforeWrite = null;
+  modesLeftInFlight.length = 0;
   listeners.clear();
 }

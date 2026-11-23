@@ -664,6 +664,17 @@ describe('review follow-ups', () => {
     ack();
   });
 
+  it('ignores a stale echo from two writes back after fast mode changes', () => {
+    configureReader(deps({ writeMode: () => new Promise<void>(() => {}) }));
+    applyGesture('click'); // idle → bus, write pending
+    applyGesture('longPress'); // bus → idle... and back
+    applyGesture('doubleClick'); // idle → supermarket, three writes pending
+
+    setModeFromDevice('bus'); // the board catching up with the FIRST write, not a press
+
+    expect(getReaderState().mode).toBe('supermarket');
+  });
+
   it('still applies a real button press on the board while the app is writing its mode', () => {
     configureReader(deps({ writeMode: () => new Promise<void>(() => {}) }));
     applyGesture('click'); // idle → bus, write pending

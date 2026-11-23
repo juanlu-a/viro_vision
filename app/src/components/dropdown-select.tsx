@@ -2,7 +2,8 @@
  * A one-line trigger that opens a modal menu: the dropdown behind the model and app-mode choices.
  *
  * Extracted from `ModelSelector` when the app-mode choice became a dropdown too, so the
- * two cannot drift apart in how they sound. The accessible grammar is the one `ModelSelector` had:
+ * choices cannot drift apart in how they sound; the audio output uses it as well (with an icon per
+ * option, since 2026-11-23). The accessible grammar is the one `ModelSelector` had:
  * the trigger is a `button` whose label already says what is in force ("Modelo seleccionado: X"),
  * and the menu is a `radiogroup` whose options carry `checked`. A dropdown and not inline options
  * because it does not inflate the screen, and the trigger says the current value without opening it.
@@ -29,6 +30,8 @@ export interface DropdownOption<T extends string> {
   label: string;
   /** Read by the screen reader on the option, inside the menu. */
   hint?: string;
+  /** Drawn on the option and, for the option in force, on the trigger. Decoration only. */
+  icon?: keyof typeof Ionicons.glyphMap;
 }
 
 type Props<T extends string> = {
@@ -58,6 +61,7 @@ export function DropdownSelect<T extends string>({
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const current = options.find((option) => option.value === value);
+  const triggerIcon = current?.icon ?? icon;
   const choose = (next: T) => {
     setOpen(false);
     if (next !== value) Haptics.selectionAsync().catch(() => {});
@@ -76,9 +80,9 @@ export function DropdownSelect<T extends string>({
         className={`min-h-touch flex-row items-center gap-two rounded-md border border-border-strong bg-surface-elevated px-three active:opacity-85 ${
           disabled ? 'opacity-50' : ''
         }`}>
-        {icon && (
+        {triggerIcon && (
           <Ionicons
-            name={icon}
+            name={triggerIcon}
             size={20}
             color={theme.primary}
             accessibilityElementsHidden
@@ -125,6 +129,15 @@ export function DropdownSelect<T extends string>({
                   className={`min-h-touch flex-row items-center gap-three rounded-md px-three active:opacity-85 ${
                     selected ? 'bg-primary' : ''
                   }`}>
+                  {option.icon && (
+                    <Ionicons
+                      name={option.icon}
+                      size={20}
+                      color={selected ? theme.onPrimary : theme.primary}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no-hide-descendants"
+                    />
+                  )}
                   <ThemedText
                     type="smallBold"
                     themeColor={selected ? 'onPrimary' : 'text'}

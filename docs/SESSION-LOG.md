@@ -5034,3 +5034,31 @@ y Codex, con una segunda vuelta de Opus y Codex sobre los arreglos. Lo que se ar
   app (se decide si se retira); el error "cámara no arrancó" en modo ómnibus va a telemetría pero la
   app no lo dice; el filtro de ecos de modo recuerda una sola escritura; faltan tests de
   `DeviceProvider`; los tests de la placa que dependen de `sleep` pueden ser inestables en CI.
+
+## 2026-11-23 (cont.): los pendientes de la revisión, y ninguna clave en los builds
+
+Se cerraron los hallazgos que la revisión del codebase había dejado abiertos, y se documentó todo en
+la tesis (sec. 7.8.5) para pasarlo al Doc oficial.
+
+- **Claves.** Se borró el secret `EXPO_PUBLIC_GEMINI_API_KEY` del repositorio y la línea de Gemini
+  del `app/.env` local: el modo supermercado usa OpenAI y Qwen (Groq), los dos por el proxy. La app
+  lee las claves de proveedor sólo con `__DEV__`, así que un build de distribución no puede llevar
+  ninguna (verificado exportando el paquete con claves ficticias). `npm run keys` exige el proxy.
+  ADR 0008 enmendado.
+- **App.** La cola de GATT devuelve un error a quien espera una operación colgada (10 s); el error
+  «modo ómnibus no disponible» del dispositivo se dice con una frase fija; el filtro de ecos de modo
+  recuerda todas las escrituras en vuelo; las decisiones de la red (decir una falla una vez, pedir
+  unirse una vez por red) pasaron a `networkCheck.ts` con pruebas; un enlace que se cae durante la
+  conexión ya no se informa como conectado; una foto sin respuesta HTTP hace volver a verificar la
+  red; el limitador lanza al estar cancelado; el selector de salida de audio usa `DropdownSelect`.
+- **Placa.** Se retiró el parche `VOLUMEN` de la microSD (anulaba el volumen elegido en la app); el
+  watchdog de red reintenta el AP en modo producto sin bloquear el latido; `hush` corre fuera del
+  event loop; la evidencia se poda fuera del lock del modo ómnibus y cada corrida usa su propio
+  timeline; las pruebas que dependían de `sleep` se sincronizan con eventos.
+- **Servidor y CI.** `evidence` ya no sobrescribe una imagen guardada; la acción de Expo quedó fijada
+  a un commit.
+
+### Pendientes
+
+- **Rotar la clave de Gemini** en Google AI Studio: viajó en builds anteriores.
+- La prueba nueva de `test_link.py` sólo corre en la placa (en la Mac falta `dbus_next`).

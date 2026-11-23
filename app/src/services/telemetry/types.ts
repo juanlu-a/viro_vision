@@ -56,6 +56,8 @@ export type EventType =
   | 'wifi.failed'
   // A network this phone already joined did not come back by itself; nothing was asked (no prompt).
   | 'wifi.notJoined'
+  // A photo got no HTTP answer with the network marked ready: the next heartbeat checks it again.
+  | 'wifi.recheck'
   // What the device reports about itself
   | 'device.status'
   | 'device.warning'

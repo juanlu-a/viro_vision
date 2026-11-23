@@ -209,7 +209,7 @@ def test_the_phone_can_silence_the_speaker(loop):
 
     async def scenario():
         core.write_control(json.dumps({"cmd": "hush"}).encode())
-        await _drain(loop)
+        await _until(lambda: hushes)
         assert hushes == ["stop"]
         # No error event: `hush` is a valid command, not something the board does not understand.
         assert [e for e in notifications.events() if e["t"] == "error"] == []

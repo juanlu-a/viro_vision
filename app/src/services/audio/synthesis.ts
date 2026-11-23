@@ -31,7 +31,8 @@ import { SpeechNotConfiguredError, SpeechHttpError } from './errors';
 /** Turned on with `EXPO_PUBLIC_AUDIO_FILE_ENABLED=1`. See the comment above. */
 export const isSynthesisEnabled = (process.env.EXPO_PUBLIC_AUDIO_FILE_ENABLED ?? '') === '1';
 
-const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
+// Development only, like the vision keys (`vision/config.ts`): a release bundle never carries it.
+const openaiApiKey = __DEV__ ? (process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '') : '';
 
 const OPENAI_SPEECH_URL = 'https://api.openai.com/v1/audio/speech';
 

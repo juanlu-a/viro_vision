@@ -31,34 +31,72 @@
  * How long one operation may hold the queue. react-native-ble-plx reads and writes have no timeout of
  * their own, so a read that hangs on a half-dead link would otherwise hold every operation behind
  * it, including the button chirp and the `hush` that keeps two voices from overlapping. Past this
- * the queue moves on; the hung operation itself still settles (or not) for its own caller.
+ * the queue moves on.
  */
 export const GATT_QUEUE_RELEASE_MS = 5_000;
 
 /**
+ * How long a caller waits for its own operation. A healthy GATT operation takes milliseconds; one
+ * still pending after this is on a link that is not coming back, and a caller left waiting for it
+ * (a connect reading the status, a setting write) would hang with it.
+ */
+export const GATT_CALLER_DEADLINE_MS = 10_000;
+
+/** A GATT operation that did not settle within `GATT_CALLER_DEADLINE_MS`. */
+export class GattTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`GATT operation did not answer within ${ms} ms`);
+    this.name = 'GattTimeoutError';
+  }
+}
+
+/**
  * Runs `operation`s one after another, never concurrently.
  *
- * Each call resolves or rejects exactly as its operation does; a failure does **not** poison the
- * queue, because the announcement path must survive a read that timed out on a dead link. An
- * operation that never settles releases the queue after `releaseMs`.
+ * Each call resolves or rejects exactly as its operation does, or with `GattTimeoutError` past
+ * `callerMs`; a failure does **not** poison the queue, because the announcement path must survive a
+ * read that timed out on a dead link. An operation that never settles releases the queue after
+ * `releaseMs`.
  */
 export function createSerializer(
-  releaseMs: number = GATT_QUEUE_RELEASE_MS
+  releaseMs: number = GATT_QUEUE_RELEASE_MS,
+  callerMs: number = GATT_CALLER_DEADLINE_MS
 ): <T>(operation: () => Promise<T>) => Promise<T> {
   let tail: Promise<unknown> = Promise.resolve();
   return <T>(operation: () => Promise<T>): Promise<T> => {
     // `then(op, op)`, not `then(op)`: a rejected predecessor must still let the next one run. The
     // alternative is a queue that stops forever the first time the board goes out of range.
-    const result = tail.then(operation, operation);
+    const running = tail.then(operation, operation);
+    // Both clocks start when this operation starts, not when it was queued.
+    const result = tail.then(
+      () => withDeadline(running, callerMs),
+      () => withDeadline(running, callerMs)
+    );
     // The chain keeps the *settling*, never the rejection: an unhandled rejection here would be
-    // reported as a crash in a release build even though the caller handled its own error. It
-    // starts counting `releaseMs` only once this operation is the one running.
+    // reported as a crash in a release build even though the caller handled its own error.
     tail = tail.then(
-      () => releaseAfter(result, releaseMs),
-      () => releaseAfter(result, releaseMs)
+      () => releaseAfter(running, releaseMs),
+      () => releaseAfter(running, releaseMs)
     );
     return result;
   };
+}
+
+/** `operation`, or a `GattTimeoutError` past `ms`. */
+function withDeadline<T>(operation: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new GattTimeoutError(ms)), ms);
+    operation.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 }
 
 /** Settles when `operation` settles or `ms` pass, whichever comes first; never rejects. */

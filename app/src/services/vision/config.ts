@@ -2,10 +2,11 @@
  * Cloud vision configuration (supermarket mode, ADR 0006 + ADR 0008), read from public env vars
  * (see app/.env.example).
  *
- * ⚠️ `EXPO_PUBLIC_*` vars are inlined into the bundle at build time: a build compiled without a key
- * cannot recover it at runtime and —the other way around— a build compiled WITH a key carries it
- * readable inside the `.ipa`. That is why the keys' destination is the ADR 0008 proxy; this direct
- * path stays as the development one, against a local `.env`.
+ * ⚠️ `EXPO_PUBLIC_*` vars are inlined into the bundle at build time, so a build compiled WITH a key
+ * carries it readable inside the `.ipa`/`.apk`. The keys live in the ADR 0008 proxy, and since
+ * 2026-11-23 a release build cannot carry one even by accident: every key below is read only when
+ * `__DEV__` (Metro replaces it with `false` in a release bundle and drops the branch, string
+ * included). The direct path is a development convenience against a local `.env`, nothing more.
  *
  * When there is no key at all, supermarket mode says it is not configured instead of breaking —
  * the same pattern as the Supabase stub.
@@ -15,18 +16,16 @@ import { isProxyConfigured } from '@/services/cloud';
 import type { ModelProfile, VisionProviderId } from './types';
 
 /** Gemini: free tier with no card (aistudio.google.com). It is the mode's default. */
-export const geminiApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+export const geminiApiKey = __DEV__ ? (process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '') : '';
 
 /** OpenAI: requires credit with a card. */
-export const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
+export const openaiApiKey = __DEV__ ? (process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '') : '';
 
 /** Anthropic: requires credit with a card (a Claude subscription does NOT enable the API). */
-export const anthropicApiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
+export const anthropicApiKey = __DEV__ ? (process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '') : '';
 
 /** Groq: free tier with no card (console.groq.com). */
-export const groqApiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
-
-
+export const groqApiKey = __DEV__ ? (process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '') : '';
 
 const API_KEYS: Record<VisionProviderId, string> = {
   gemini: geminiApiKey,

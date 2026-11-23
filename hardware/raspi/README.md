@@ -652,10 +652,10 @@ dispositivo** de la app, que manda `{"cmd":"volume","value":N}`. La placa lo apl
 nivel de una placa a la que nadie le eligió uno (por defecto **50**; era 90 cuando el transductor
 colgaba directo del GPIO, y con el amplificador PAM8403 resultó demasiado fuerte).
 
-> ⚠️ **El archivo `VOLUMEN` de `bootfs` es un parche previo al control de la app** (2026-11-18,
-> `boot/modo-red.sh`): reaplica su nivel 40 s después de que arranca el daemon. **Una vez que el
-> volumen se elige desde la app hay que borrarlo de la tarjeta**, o pisa el nivel elegido 40 s
-> después de cada arranque. Al borrarlo, `modo-red.sh` retira el drop-in en el arranque siguiente.
+> El archivo `VOLUMEN` de `bootfs` fue un parche previo al control de la app (2026-11-18): reaplicaba
+> un nivel fijo 40 s después de que arrancaba el daemon. Ya no se lee: `boot/modo-red.sh` retira en
+> cada arranque el drop-in `20-volumen.conf` si quedó instalado, de modo que nada pisa el nivel
+> elegido en la app. Si el archivo sigue en la tarjeta, puede borrarse sin consecuencias.
 
 ### Por dónde sale el sonido físicamente
 

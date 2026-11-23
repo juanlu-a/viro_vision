@@ -261,6 +261,11 @@ Las defensas reales: allowlist de hosts (sin ella es un SSRF que regala la clave
 
 **Estado: escrito, sin desplegar.** Falta crear el proyecto Supabase.
 
+**Enmienda 2026-11-23**: ninguna clave en un build de distribución. El secret de Gemini que la CI
+seguía incrustando se borró, los workflows ya no pasan claves de proveedor y la app lee las claves
+sólo con `__DEV__` (Metro descarta la rama en producción). `npm run keys` exige el proxy. Modelos en
+uso: OpenAI y Qwen (Groq), los dos por el proxy.
+
 ### ADR 0009: El código en inglés, la app y la tesis en español · **Accepted (2026-09-09)**
 
 Antes la regla era mixta: identificadores en inglés, comentarios y cadenas en español, con los

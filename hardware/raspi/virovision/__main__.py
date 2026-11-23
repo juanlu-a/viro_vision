@@ -383,8 +383,8 @@ async def _main(args: argparse.Namespace) -> None:
     # is pushed again the moment each one is.
     async def _bring_camera_up() -> None:
         if not await loop.run_in_executor(None, camera.start):
-            # A user already in bus mode heard «preparando» and then nothing: the error event at least
-            # puts it in the app's telemetry (ADR 0011). The app does not speak it yet.
+            # A user already in bus mode heard «preparando» and then nothing: the error event reaches
+            # the app, which records it and says a fixed sentence (`busUnavailable`, ADR 0011).
             if bus_watcher is not None and service.core.modes.current is Mode.BUS:
                 service.core.emit_event({"t": "error", "msg": "bus unavailable: camera did not start"})
             return
@@ -451,6 +451,20 @@ async def _main(args: argparse.Namespace) -> None:
         await loop.run_in_executor(None, lambda: network.refresh(wait_s=AP_REFRESH_WAIT_S))
         service.notify_status()
 
+    async def _recover_network() -> None:
+        # In product mode the AP IS the board's network: if every boot attempt failed (or it went
+        # down), bring it back instead of hunting for a client network the board may not know.
+        if not args.no_ap:
+            log.warning("no network and no AP: retrying the AP")
+            await loop.run_in_executor(None, ap.turn_on)
+            await loop.run_in_executor(None, lambda: network.refresh(wait_s=AP_REFRESH_WAIT_S))
+            service.notify_status()
+        else:
+            await loop.run_in_executor(None, ap.reconnect)
+
+    # Not awaited from the heartbeat: `nmcli con up` can block for its whole timeout, and the status
+    # push and the SIGTERM check must not wait for it. Held so two recoveries never overlap.
+    recovery: asyncio.Task | None = None
     no_network_since = None
     heartbeats = 0
     while not stop.is_set():
@@ -468,17 +482,18 @@ async def _main(args: argparse.Namespace) -> None:
             if heartbeats % 4 == 0:
                 await report_visibility(adapter, centrals)
             # Network watchdog: if it is not an AP and it has gone more than a minute with no network,
-            # ask NM to connect. A device on no network at all is useless and cannot be fixed remotely.
+            # bring the AP back (product mode) or ask NM to connect. A device on no network at all is
+            # useless and cannot be fixed remotely.
             if not ap.on and network.current[0] is None:
                 no_network_since = no_network_since or loop.time()
                 if loop.time() - no_network_since > 60:
-                    log.warning("no network for %d s: reconnecting", int(loop.time() - no_network_since))
-                    # Guarded: `nmcli` failing to even run (a timeout, NM restarting) raised out of
-                    # the heartbeat and ended the daemon (2026-10-06). It is retried next minute.
-                    try:
-                        await loop.run_in_executor(None, ap.reconnect)
-                    except Exception as exc:  # noqa: BLE001
-                        log.error("reconnecting failed: %s", exc)
+                    if recovery is None or recovery.done():
+                        log.warning("no network for %d s: recovering", int(loop.time() - no_network_since))
+                        # A failure (an `nmcli` timeout, NM restarting) is only logged: it once
+                        # raised out of the heartbeat and ended the daemon (2026-10-06). It is
+                        # retried next minute.
+                        recovery = asyncio.create_task(_recover_network(), name="network-recovery")
+                        recovery.add_done_callback(_log_task_failure)
                     no_network_since = None
             else:
                 no_network_since = None

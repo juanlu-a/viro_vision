@@ -9,7 +9,7 @@
  * board goes out of range routinely, and a queue that stops at the first rejection would take the
  * announcement path down with it.
  */
-import { createSerializer } from './serialize';
+import { createSerializer, GattTimeoutError } from './serialize';
 
 /** A deferred promise, so a test can decide exactly when an operation finishes. */
 function deferred<T>() {
@@ -118,5 +118,10 @@ describe('createSerializer', () => {
     first.resolve();
     await second;
     expect(secondStarted).toBe(true);
+  });
+
+  it('gives up on a hung operation for its caller, so a connect or a setting write cannot hang with it', async () => {
+    const serialize = createSerializer(20, 30);
+    await expect(serialize(() => new Promise<never>(() => {}))).rejects.toBeInstanceOf(GattTimeoutError);
   });
 });

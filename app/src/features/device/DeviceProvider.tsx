@@ -36,10 +36,11 @@ import { encodeBase64 } from '@/services/ble/base64';
 import { downloadDevicePhoto, type DevicePhoto } from '@/services/camera';
 import { handleEvidence } from '@/services/evidence';
 import { errorDetail, errorType, record } from '@/services/telemetry';
-import { deviceUrl, type DeviceAddress } from '@/services/wifi/deviceHttp';
+import { deviceUrl, HttpDownloadError, type DeviceAddress } from '@/services/wifi/deviceHttp';
 import { loadJoinedNetwork, saveJoinedNetwork } from '@/services/storage/joinedNetwork';
 import { reachDeviceNetwork } from '@/services/wifi/join';
 
+import { createNetworkCheckGate } from './networkCheck';
 import { createPairedAnnouncer } from './pairedNotice';
 import { MODE_FROM_GATT, GATT_MODE, type DeviceStatus, type WifiCredentials } from './gatt';
 import { DeviceNoAddressError, type ConnectionState, type DeviceInfo } from './types';
@@ -188,17 +189,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
    */
   const announcedReadyFor = useRef<string | null>(null);
 
-  /**
-   * The failure last said out loud, as `reason@ip`. A check that failed is retried on every `status`
-   * heartbeat (15 s), and each retry that fails the same way used to say the failure sentence again:
-   * the user heard "no pude usar la red" every 15 s for as long as it lasted. The retry stays; the
-   * sentence is said once per distinct failure, and again only after the network was ready or the
-   * link started over.
-   */
-  const announcedFailure = useRef<string | null>(null);
-
-  /** The SSID a check was last allowed to prompt for: a heartbeat retry does not prompt for it again. */
-  const promptedFor = useRef<string | null>(null);
+  /** Which failures were already said, and which network was already prompted for (`networkCheck.ts`). */
+  const gate = useRef(createNetworkCheckGate());
 
   /**
    * The network follows the AP: join when the device has one up, and check that the device answers
@@ -216,10 +208,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     // system error string or a step of the join. They hear one fixed sentence, because a silent
     // failure leaves them waiting for a button that never comes.
     record('wifi.failed', { detail: { reason, ip, ...extra } });
-    // Said once per distinct failure (see `announcedFailure`); every retry is still recorded above.
-    const key = `${reason}@${ip ?? ''}`;
-    if (announcedFailure.current === key) return;
-    announcedFailure.current = key;
+    // Said once per distinct failure (`networkCheck.ts`); every retry is still recorded above.
+    if (!gate.current.shouldAnnounceFailure(reason, ip)) return;
     // Two reasons never fix themselves, and "still trying" would be false for them: no credentials
     // (the remedy is the user's) and a build with no WiFi module.
     void notify(reason === 'noCredentials' || reason === 'unavailable' ? 'networkUnusable' : 'networkFailed');
@@ -249,14 +239,11 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       // A network this phone already joined is saved on it: iOS rejoins it by itself, and asking the
       // system again is exactly the prompt the user got on every power-on (2026-11-20). So it is
       // only waited for; the prompt is left to a reading that needs the photo (`joinNetwork`).
-      // A heartbeat retry does not prompt again for a network it already prompted for: a user who
-      // dismissed the iOS alert would otherwise get it every 15 s. A retry that never got as far as
-      // prompting (the credentials read failed the first time) still may. The next reading that
-      // needs the photo always asks (`joinNetwork`, `mayPromptAlways`).
-      const alreadyPrompted = retry && ssid !== null && promptedFor.current === ssid;
-      const mayPrompt =
-        mayPromptAlways || (!alreadyPrompted && (ssid === null || (await loadJoinedNetwork()) !== ssid));
-      if (mayPrompt && ssid !== null) promptedFor.current = ssid;
+      // A heartbeat retry does not prompt again for a network it already prompted for; a reading that
+      // needs the photo always may (`networkCheck.ts`).
+      const promptQuery = { ssid, retry, always: mayPromptAlways };
+      const joinedSsid = gate.current.needsJoinedSsid(promptQuery) ? await loadJoinedNetwork() : null;
+      const mayPrompt = gate.current.mayPrompt({ ...promptQuery, joinedSsid });
       if (!current()) return false;
       promptingRun.current = mayPrompt && ssid !== null ? run : 0;
       setWifi('joining');
@@ -276,8 +263,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       }
       if (outcome.ok) {
         if (ssid) void saveJoinedNetwork(ssid);
-        announcedFailure.current = null;
-        promptedFor.current = null;
+        gate.current.ready();
         setWifi('ready');
         // The time until the device answers is what separates "it is slow" from "it does not work":
         // on 2026-09-06 the network never became ready and without this number there was no way to
@@ -334,7 +320,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
    */
   const startNetworkTransition = useCallback(() => {
     announcedReadyFor.current = null;
-    announcedFailure.current = null;
+    gate.current.transition();
     networkSyncRun.current += 1;
     syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     setAddress(null);
@@ -471,8 +457,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         record('ble.lost');
         paired.reset();
         announcedReadyFor.current = null;
-        announcedFailure.current = null;
-        promptedFor.current = null;
+        gate.current.reset();
         networkSyncRun.current += 1; // invalidates any network wait in flight
         // And forgets what was synced: the next connection has to check the network again even if
         // the device comes back with the very same address, or `wifi` stays 'off' for good.
@@ -523,6 +508,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
         // failed on it (bringing the AP up, the camera). Only the table: since 2026-10-06 the user
         // never sees nor hears the board's own error strings — they are diagnosis, not guidance.
         record('device.warning', { detail: { message: errorDetail(message) } });
+        // The one board error the user must hear about: bus mode could not start, after «preparando»
+        // or the mode announcement promised a reading. A fixed sentence, never the board's string.
+        if (typeof message === 'string' && message.startsWith('bus unavailable')) void notify('busUnavailable');
       }),
     ];
     // The first connection comes out of the mount effect but on the next tick: the effect only
@@ -560,8 +548,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     networkSyncRun.current += 1;
     syncedNetwork.current = { ap: false, ip: null, ok: false, running: false };
     announcedReadyFor.current = null;
-    announcedFailure.current = null;
-    promptedFor.current = null;
+    gate.current.reset();
     await getBleClient().disconnect();
     setConnection(initialConnection);
     setAddress(null);
@@ -628,7 +615,18 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       if (!address) throw new DeviceNoAddressError();
       // The caller sets the deadline. With the screen locked the whole cycle has seconds, not the
       // 20 s the download would take by default (`readingService.ts`).
-      return downloadDevicePhoto(address, options);
+      try {
+        return await downloadDevicePhoto(address, options);
+      } catch (err) {
+        // No HTTP answer at all: the phone may have left the device's network while the link stayed
+        // up, and "ready" was cached for the whole link. Forgetting it makes the next heartbeat check
+        // again instead of offering a photo that cannot arrive. An HTTP error means the network works.
+        if (!(err instanceof HttpDownloadError) && syncedNetwork.current.ok) {
+          syncedNetwork.current = { ...syncedNetwork.current, ok: false, running: false };
+          record('wifi.recheck', { detail: { message: errorDetail(err) } });
+        }
+        throw err;
+      }
     },
     [address]
   );

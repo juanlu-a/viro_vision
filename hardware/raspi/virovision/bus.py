@@ -353,9 +353,9 @@ class BusWatcher:
         # without this a stop landing between `start`'s last `_wanted` check and `running = True` saw
         # nothing running, returned, and left the camera watching in another mode (2026-10-06).
         self._run_lock = threading.Lock()
-        # The frame thread's own run: its watcher and its jobs queue. `_queue_read` is called by the
-        # `Watcher` with no way to pass them, and a frame loop of a previous run that outlived `stop`
-        # must feed ITS queue, not the new run's (2026-10-06).
+        # The frame thread's own run: its watcher, queues and timeline. `_queue_read` and `_handle` are
+        # called with no way to pass them, and a frame loop of a previous run that outlived `stop`
+        # must feed ITS queue and timeline, not the new run's (2026-10-06).
         self._run_local = threading.local()
         self.unavailable_reason: Optional[str] = None
         """Why the last `start` could not watch, in words the app can show; None when it started, or
@@ -467,6 +467,12 @@ class BusWatcher:
             self.unavailable_reason = f"could not start: {exc}"
             log.error("bus mode could not start: %s", exc)
             return False
+        # Before the run lock, not under it: making room may prune hundreds of MB on the SD card, and
+        # a `stop` (a mode change, a photo waiting for the camera) waits on that lock. Starts are
+        # already serialized by `_build_lock`, and the `_wanted` check right after catches a stop that
+        # landed during the prune.
+        if self._evidence is not None:
+            self._evidence.begin_run()
         if not self._wanted:
             log.info("bus: the mode was left while it was being prepared; not starting")
             return False
@@ -486,8 +492,6 @@ class BusWatcher:
             # From the full view, always: a frame loop of the previous run still inside its `aim`
             # may have re-zoomed after `_halt`'s reset, and this run's fresh zoom assumes no crop.
             self._undo_zoom()
-            if self._evidence is not None:
-                self._evidence.begin_run()
             self._threads = [
                 # The run's state goes in as arguments, bound HERE: `Thread.start()` returns before the
                 # target's first line, and a thread that read `self._stop` itself could pick up the
@@ -495,7 +499,7 @@ class BusWatcher:
                 threading.Thread(target=self._read_loop, args=(self._jobs, self._results), name="bus-ocr", daemon=True),
                 threading.Thread(
                     target=self._frame_loop,
-                    args=(self._stop, self._jobs, self._results, self._watcher),
+                    args=(self._stop, self._jobs, self._results, self._watcher, self._timeline),
                     name="bus-frames",
                     daemon=True,
                 ),
@@ -688,10 +692,15 @@ class BusWatcher:
                 **options,
             )
 
+    def _this_run(self) -> tuple:
+        """(watcher, jobs, results, timeline) of the run the calling frame loop belongs to; the
+        current ones outside a frame loop."""
+        return getattr(self._run_local, "run", None) or (self._watcher, self._jobs, self._results, self._timeline)
+
     def _queue_read(self, frame, banner_box, bus_box):
         """The reader the `Watcher` calls. Hands the job to the OCR thread and returns None, which is
         how `async_reads` says "in progress": the camera loop must not wait 0.9 s here."""
-        watcher, jobs, results = getattr(self._run_local, "run", None) or (self._watcher, self._jobs, self._results)
+        watcher, jobs, results, timeline = self._this_run()
         track_id = watcher.reading_track
         track = next((t for t in watcher.tracker.tracks if t.id == track_id), None)
         attempts = track.read_attempts if track is not None else 0
@@ -709,7 +718,7 @@ class BusWatcher:
             height, width = image.shape[:2]
             banner_box = view.to_frame(banner_box) if banner_box is not None else None
             bus_box = view.to_frame(bus_box).clip(width, height) if bus_box is not None else None
-        self._timeline.read_queued(track_id, attempts, banner_box, bus_box)
+        timeline.read_queued(track_id, attempts, banner_box, bus_box)
         jobs.put((image, banner_box, bus_box, track_id, attempts))
         return None
 
@@ -787,7 +796,7 @@ class BusWatcher:
         return zoom
 
     def _frame_loop(
-        self, stop: threading.Event, jobs: queue.Queue, results: queue.Queue, watcher: Any
+        self, stop: threading.Event, jobs: queue.Queue, results: queue.Queue, watcher: Any, timeline: Optional[Timeline] = None
     ) -> None:
         """Drains frames for as long as the mode lasts — through camera restarts included.
 
@@ -801,7 +810,9 @@ class BusWatcher:
         from bus_banner.imx500 import detections_from_tensors
 
         # This run's (see `_start_locked`): a loop that outlives `stop` must not feed the next run.
-        self._run_local.run = (watcher, jobs, results)
+        if timeline is None:
+            timeline = self._timeline
+        self._run_local.run = (watcher, jobs, results, timeline)
         zoom = self._new_zoom()
         frame_number = 0
         beat_at = time.monotonic()
@@ -854,9 +865,9 @@ class BusWatcher:
                     beat_at = time.monotonic()
                     frames = with_detections = buses = signs = 0
 
-                self._drain_results(frame_number, results, watcher)
+                self._drain_results(frame_number, results, watcher, timeline)
                 events = watcher.process(frame, detections, frame_number)
-                self._timeline.frame(watcher.tracker.tracks, detections)
+                timeline.frame(watcher.tracker.tracks, detections)
                 for event in events:
                     if stop.is_set():
                         break  # left mid-frame: nothing more is said
@@ -903,7 +914,9 @@ class BusWatcher:
             request.release()
         return detections, frame, view
 
-    def _drain_results(self, frame_number: int, results: queue.Queue, watcher) -> None:
+    def _drain_results(self, frame_number: int, results: queue.Queue, watcher, timeline: Optional[Timeline] = None) -> None:
+        if timeline is None:
+            timeline = self._timeline
         while True:
             try:
                 track_id, reading, ocr_ms, evidence = results.get_nowait()
@@ -912,7 +925,7 @@ class BusWatcher:
             if reading is SKIPPED:
                 watcher.submit_reading(track_id, None, frame_number)
                 continue
-            self._timeline.read_done(track_id, reading, ocr_ms, evidence)
+            timeline.read_done(track_id, reading, ocr_ms, evidence)
             watcher.submit_reading(track_id, reading, frame_number)
 
     def _is_an_echo(self, number: str, destination: str) -> bool:
@@ -939,6 +952,7 @@ class BusWatcher:
         return True
 
     def _handle(self, event, frame=None, detections: Optional[list] = None) -> None:
+        watcher, _, _, timeline = self._this_run()
         if event.kind == "bus":
             # Kept even when the phrase is silenced below: the picture is of what the sensor took for
             # a bus, which is the question whether or not it was said. And named in the journal
@@ -958,7 +972,7 @@ class BusWatcher:
             log.info("bus: track %d is a bus, saying so%s", event.track, seen)
             self._announce_presence()
         elif event.kind == "reading":
-            self._timeline.decided(event, self._evidence.track_ref(event.track) if self._evidence else None)
+            timeline.decided(event, self._evidence.track_ref(event.track) if self._evidence else None)
             echo = self._is_an_echo(event.number, event.destination)
             if self._evidence is not None:
                 self._evidence.decided(event, announced=not echo)
@@ -972,8 +986,8 @@ class BusWatcher:
             self._speak(self._last_announcement)
             self._emit(self._last_result_event)
         elif event.kind == "lost":
-            track = next((t for t in self._watcher.tracker.recent if t.id == event.track), None)
-            self._timeline.lost(event, bool(track and track.announced_reading))
+            track = next((t for t in watcher.tracker.recent if t.id == event.track), None)
+            timeline.lost(event, bool(track and track.announced_reading))
 
     def _warming_up(self) -> None:
         """Says «preparando la lectura» through whichever output the user chose.
