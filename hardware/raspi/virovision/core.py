@@ -298,8 +298,12 @@ class Core:
             # The phone is about to speak: the board goes quiet. One voice at a time, whichever side
             # it comes from (ADR 0003, 2026-09-18 update). No reply and no event: it is the most
             # urgent thing the app can ask for and there is nothing to answer.
+            # Off the loop: `Player.stop` takes the lock a clip launch holds through `pinctrl` (up to
+            # 5 s) and through ending a stubborn decoder, and the loop must keep serving BLE meanwhile.
+            # Every other command that makes sound already runs in the executor, so the order between
+            # them is unchanged.
             if self._hush is not None:
-                self._hush()
+                self._in_executor(self._hush)
                 log.info("hush: speaker cut off")
         elif name == "status":
             self._schedule(self._notify(STATUS, self.read_status()))

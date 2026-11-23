@@ -419,20 +419,27 @@ def test_a_silent_camera_is_reopened_by_the_watchdog():
         def restart(self):
             self.restarts += 1
 
+    class Ticks:
+        """A stop event whose `wait` is one watchdog tick that never sleeps: `ticks` of them, then
+        stop. The test drives the watchdog tick by tick instead of racing its 1 s clock."""
+
+        def __init__(self, ticks):
+            self.left = ticks
+            self.restarts_per_tick = []
+
+        def wait(self, _timeout):
+            self.restarts_per_tick.append(camera.restarts)
+            self.left -= 1
+            return self.left < 0
+
     camera = SilentCamera()
     watcher = BusWatcher(camera, lambda files: None, lambda event: None)
-    watcher._last_frame_at = time.monotonic()
-    threading.Thread(target=watcher._watchdog, args=(watcher._stop,), daemon=True).start()
-    try:
-        watcher._last_frame_at -= FRAME_SILENCE_S + 1  # as if the camera had been quiet that long
-        deadline = time.monotonic() + 5
-        while camera.restarts == 0 and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert camera.restarts == 1
-        time.sleep(1.5)
-        assert camera.restarts == 1, "the restart takes seconds; it must not fire again meanwhile"
-    finally:
-        watcher._stop.set()
+    watcher._last_frame_at = time.monotonic() - FRAME_SILENCE_S - 1  # as if the camera had been quiet that long
+    ticks = Ticks(3)
+    watcher._watchdog(ticks)
+    # Tick 1 reopens it; ticks 2 and 3 see the clock it reset and leave it alone.
+    assert ticks.restarts_per_tick == [0, 1, 1, 1]
+    assert camera.restarts == 1, "the restart takes seconds; it must not fire again meanwhile"
 
 
 def test_bus_mode_runs_against_a_pipeline_package_without_signs_expected():
@@ -689,28 +696,51 @@ def test_two_overlapping_starts_launch_one_set_of_threads(tmp_path):
     and each launched three threads on the same camera."""
     launched = []
     building = threading.Event()
+    release = threading.Event()
+    second_waiting = threading.Event()
 
     class Camera:
         sensor = object()
 
+    class SpyLock:
+        """The build lock, telling the test when the second start is about to block on it."""
+
+        def __init__(self):
+            self._lock = threading.Lock()
+
+        def acquire(self, blocking=True):
+            if blocking:
+                second_waiting.set()
+            return self._lock.acquire(blocking)
+
+        def release(self):
+            self._lock.release()
+
     watcher = BusWatcher(Camera(), lambda files: None, lambda e: None, announcements=tmp_path)
+    watcher._build_lock = SpyLock()
 
     def slow_build():
         building.set()
-        time.sleep(0.2)
+        assert release.wait(5)
         watcher._pipeline = object()
 
     watcher._build = slow_build
     watcher._frame_loop = lambda *_: launched.append("frames")
     watcher._read_loop = lambda *_: None
     watcher._watchdog = lambda *_: None
+    results = []
     with patch("virovision.bus.is_available", return_value=True):
-        first = threading.Thread(target=watcher.start)
+        first = threading.Thread(target=lambda: results.append(("first", watcher.start())))
         first.start()
-        building.wait(2)
-        assert watcher.start(), "the second start waits for the first and finds it running"
-        first.join()
+        assert building.wait(5)
+        second = threading.Thread(target=lambda: results.append(("second", watcher.start())))
+        second.start()
+        assert second_waiting.wait(5)  # the second start overlaps the build, as on the board
+        release.set()
+        first.join(5)
+        second.join(5)
     watcher.stop()
+    assert ("second", True) in results, "the second start waits for the first and finds it running"
     assert launched == ["frames"]
 
 
@@ -725,9 +755,11 @@ def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path)
 
     watcher = BusWatcher(Camera(), lambda files: None, lambda e: None, announcements=tmp_path)
 
+    release = threading.Event()
+
     def slow_build():
         building.set()
-        time.sleep(0.2)
+        assert release.wait(5)
         watcher._pipeline = object()
 
     watcher._build = slow_build
@@ -738,9 +770,10 @@ def test_leaving_bus_mode_while_it_is_still_building_cancels_the_start(tmp_path)
     with patch("virovision.bus.is_available", return_value=True):
         first = threading.Thread(target=lambda: result.append(watcher.start()))
         first.start()
-        building.wait(2)
+        assert building.wait(5)
         watcher.stop()  # the user switched modes; this must not wait for the build
-        first.join()
+        release.set()
+        first.join(5)
     assert result == [False]
     assert launched == []
     assert not watcher.running

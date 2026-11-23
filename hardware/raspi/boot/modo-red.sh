@@ -119,30 +119,14 @@ if [ -f "$UPD" ] && [ -d "$APP/virovision" ]; then
   rm -rf "$TMP"
 fi
 
-# Volume set from the card (2026-11-18): with the PAM8403 amplifier the daemon's 90 % is too loud,
-# and a board in product mode has no SSH to turn it down. If /boot/firmware/VOLUMEN exists with a
-# number from 0 to 100, a drop-in reapplies that level 40 s after the daemon starts (it sets its own
-# on startup). A stopgap until the volume is chosen from the app: deleting the file removes the
-# drop-in.
+# Retired volume stopgap (2026-11-18): a VOLUMEN file on the card installed a drop-in that reapplied
+# its level 40 s after the daemon started. The level is now chosen from the app and persisted by the
+# daemon, so a leftover drop-in would override the user's choice on every start: always remove it.
 VOLDROPIN=/etc/systemd/system/virovision.service.d/20-volumen.conf
-VOL=$(tr -cd '0-9' < /boot/firmware/VOLUMEN 2>/dev/null)
-if [ -n "$VOL" ] && [ "$VOL" -le 100 ]; then
-  mkdir -p "$(dirname "$VOLDROPIN")"
-  NEW=$(mktemp)
-  cat > "$NEW" <<EOF
-[Service]
-ExecStartPost=/bin/sh -c '(sleep 40; amixer -M -q set PCM ${VOL}%%) >/dev/null 2>&1 &'
-EOF
-  if cmp -s "$NEW" "$VOLDROPIN"; then
-    rm -f "$NEW"
-  else
-    install -m 644 "$NEW" "$VOLDROPIN" && rm -f "$NEW"
-    RELOAD_UNITS=1
-  fi
-  echo "volume set from the card: ${VOL}%"
-elif [ -e "$VOLDROPIN" ]; then
+if [ -e "$VOLDROPIN" ]; then
   rm -f "$VOLDROPIN"
   RELOAD_UNITS=1
+  echo "retired the card volume drop-in"
 fi
 
 # Only if a drop-in changed: without it systemd does not see the change, and with it it costs 2.4 s.

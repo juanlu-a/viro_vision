@@ -244,7 +244,7 @@ class Player:
         self._queue: queue.Queue = queue.Queue()
         self._queue_lock = threading.Lock()
         self._worker: Optional[threading.Thread] = None
-        # Guards `_process` and `_generation`. `stop` comes from the BLE loop (`hush`), the clips
+        # Guards `_process` and `_generation`. `stop` comes from an executor thread (`hush`), the clips
         # start on the audio worker and the readings on the HTTP thread: unguarded, a clip the worker
         # was launching while `stop` ran was never stopped — the board talking over the phone it had
         # just been told to yield to (2026-10-06).
