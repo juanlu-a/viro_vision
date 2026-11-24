@@ -190,10 +190,14 @@ Detalle en [`ci-cd.md`](ci-cd.md).
 
 ### Tesis (`docs/tesis/`)
 
-Capítulos 1 a 8, 10, 11 y 12 escritos, con el capítulo 10 (trabajo futuro) y la sección 7.9
-(limitaciones del prototipo) nuevos. Falta el capítulo 9 (conclusiones, hoy un marcador de lugar) y los
-`PENDIENTE` declarados en el resto: prueba en la calle y pruebas con usuarios. La bibliografía es una
-sola lista numerada (1 a 98) y las figuras van numeradas en el cuerpo (2026-11-17).
+Reestructurada el 2026-11-24 según la revisión del director: 13 capítulos. El 2 va de contexto y
+relevamiento a requisitos (traídos del anexo), objetivos y alcance; el 7 es «Diseño y desarrollo»; el 9
+es «Evaluación», nuevo (datos, métricas con unidad y denominador, resultados, requisitos, amenazas a la
+validez); conclusiones pasa al 10, trabajo futuro al 11, bibliografía al 12 y anexo al 13. Las 58 tablas
+llevan número, título y cita, y `build.py` lo exige. Falta el capítulo 10 (conclusiones, un marcador de
+lugar) y los `PENDIENTE` declarados: datos que sólo tiene el equipo (censo, peso, licencias,
+consentimiento), prueba en la calle y pruebas con usuarios. La bibliografía es una sola lista numerada
+(1 a 110).
 
 ## Pendientes de cuentas y configuración (sólo los puede hacer el equipo)
 

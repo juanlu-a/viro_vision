@@ -498,7 +498,7 @@ Tabla 55: Resultado vigente del pipeline de ómnibus (12 de octubre de 2026).
 | **Detector** | **Número** | **Destino** | **Lectura completa** | **Detección p50** |
 |---|---|---|---|---|
 | Dos etapas (ómnibus COCO más cartel de una clase) | 0,917 | 0,893 | 0,917 | 35 ms |
-| Dos clases (el modelo que corre en el sensor) | 0,917 | 0,857 | 0,875 | 18 ms |
+| Una etapa, dos clases (entrenado en CPU) | 0,917 | 0,857 | 0,875 | 18 ms |
 
 Una sola imagen (el cuadro nocturno de la línea 109) mueve estas cifras unos dos puntos según la versión de las bibliotecas. Fuente: README del repositorio bus-banner-recognizer, sección *Results*.
 
@@ -555,22 +555,26 @@ H(s) = 1 / (R1 · R2 · C1 · C2 · s² + (R1 · C1 + R2 · C2 + R1 · C2) · s 
 
 Con los valores del circuito, R1 · R2 · C1 · C2 = 9,4 × 10⁻¹⁰ s² y R1 · C1 + R2 · C2 + R1 · C2 = 87 µs. Las raíces del denominador ubican los dos polos en 2,1 kHz y 12,6 kHz, y el factor de calidad es Q = √(9,4 × 10⁻¹⁰) / 87 µs ≈ 0,35. Un Q menor que 0,5 indica un filtro sobreamortiguado: la respuesta desciende de forma monótona, sin un pico de resonancia que realce ninguna frecuencia de la voz. La frecuencia de −3 dB del conjunto es de unos 2,1 kHz, menor que la de cualquiera de las dos etapas por separado.
 
-La Tabla 57 resume la atenuación del filtro en las frecuencias de interés, calculada con esa función de transferencia, y la Figura 30 muestra su respuesta completa.
+Ese cálculo supone que nada carga la salida del filtro. En el circuito real, la entrada del amplificador, de unos 18 kΩ (sec. 13.12.5), queda en paralelo con C2. Esa carga tiene dos efectos. En la banda de la voz forma un divisor con R1 y R2 que baja el nivel en unos 6,5 dB, 20 · log(18 / (18 + 20)), que es la misma reducción de ganancia que se calcula en la sec. 13.12.5. Y, medido respecto de ese nivel, el corte de −3 dB sube a unos 3,5 kHz, porque la carga amortigua la segunda etapa. A frecuencias altas la carga casi no influye, y la atenuación desde la entrada del filtro sigue siendo de unos 51,5 dB a 100 kHz.
+
+La Tabla 57 resume la atenuación del filtro en las frecuencias de interés, sin carga y con la entrada del amplificador, y la Figura 30 muestra la respuesta completa en los dos casos. Las dos son cálculos: la respuesta del circuito no se midió.
 
 Tabla 57: Atenuación calculada del filtro de entrada del amplificador en las frecuencias de interés.
 
-| **Frecuencia** | **Atenuación** | **Qué representa** |
-|---|---|---|
-| 300 Hz | 0,1 dB | Extremo inferior de la banda telefónica de la voz |
-| 1 kHz | 0,9 dB | Centro de la voz |
-| 2,1 kHz | 3 dB | Corte del conjunto |
-| 3,4 kHz | 5,8 dB | Extremo superior de la banda telefónica |
-| 20 kHz | 25 dB | Límite de la audición |
-| 100 kHz | 52 dB | Cota inferior de la frecuencia de conmutación del PWM |
+| **Frecuencia** | **Sin carga** | **Con la entrada del amplificador (18 kΩ)** | **Qué representa** |
+|---|---|---|---|
+| 300 Hz | 0,1 dB | 6,5 dB | Extremo inferior de la banda telefónica de la voz |
+| 1 kHz | 0,9 dB | 6,8 dB | Centro de la voz |
+| 2,1 kHz | 3,0 dB | 7,8 dB | Corte del filtro sin carga |
+| 3,4 kHz | 5,8 dB | 9,4 dB | Extremo superior de la banda telefónica; casi el corte del filtro cargado (3,5 kHz) |
+| 20 kHz | 25 dB | 26 dB | Límite de la audición |
+| 100 kHz | 51,5 dB | 51,5 dB | Cota inferior de la frecuencia de conmutación del PWM |
+
+Las atenuaciones se miden desde la entrada del filtro. Con la carga, los 6,5 dB a baja frecuencia son el divisor con la entrada del amplificador; el filtrado propiamente dicho es la caída adicional respecto de ese valor, que es de 0,3 dB a 1 kHz y de 2,9 dB a 3,4 kHz.
 
 <!-- imagen del Doc: figuras/filtro-audio-respuesta.png -->
 
-Figura 30: Respuesta en frecuencia calculada del filtro de entrada del amplificador, con la banda telefónica de la voz sombreada.
+Figura 30: Respuesta en frecuencia calculada del filtro de entrada del amplificador, sin carga y con la entrada del amplificador, con la banda telefónica de la voz sombreada.
 
 Fuente: elaboración propia (figuras/src/audio_circuit.py).
 
@@ -578,7 +582,7 @@ La voz queda prácticamente intacta hasta 1 kHz y pierde algo de brillo en sus a
 
 ### 13.12.4 Por qué dos etapas y no una
 
-El cálculo explica los intentos que registra el ADR 0012. Una resistencia sola, de 10 o de 20 kΩ, divide por igual la voz y la conmutación: bajó la saturación, pero la voz se oía lejana y acompañada de un soplido durante todo el audio. Un filtro de una etapa, de 20 kΩ y 1 nF, tiene su corte en 1 / (2π · 20 kΩ · 1 nF) ≈ 8 kHz y atenúa 22 dB a 100 kHz; mejoró notablemente el resultado, pero dejó un soplido audible. Una etapa de 10 kΩ y 4,7 nF atenuaría 29 dB a 100 kHz. La segunda etapa agrega la pendiente de 40 dB por década y lleva la atenuación a 52 dB, con la que el soplido dejó de ser molesto. Bajar más el corte de una sola etapa habría atenuado también la voz.
+El cálculo explica los intentos que registra el ADR 0012. Una resistencia sola, de 10 o de 20 kΩ, divide por igual la voz y la conmutación: bajó la saturación, pero la voz se oía lejana y acompañada de un soplido durante todo el audio. Calculados sin carga, como los del ADR 0012, un filtro de una etapa, de 20 kΩ y 1 nF, tiene su corte en 1 / (2π · 20 kΩ · 1 nF) ≈ 8 kHz y atenúa 22 dB a 100 kHz; mejoró notablemente el resultado, pero dejó un soplido audible. Una etapa de 10 kΩ y 4,7 nF atenuaría 29 dB a 100 kHz. La segunda etapa agrega la pendiente de 40 dB por década y lleva la atenuación a 51,5 dB, con la que el soplido dejó de ser molesto. Bajar más el corte de una sola etapa habría atenuado también la voz.
 
 ### 13.12.5 El nivel de la señal y la ganancia efectiva
 

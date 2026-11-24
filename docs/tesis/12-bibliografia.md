@@ -119,6 +119,7 @@ Además de las fuentes anteriores, los siguientes documentos del repositorio del
 - Campaña de medición del modo ómnibus sobre el dispositivo, 15 de septiembre de 2026, docs/mediciones/2026-09-15-omnibus-en-placa.md.
 - Reentrenamiento del detector en la GPU V100, 15 de octubre de 2026, docs/mediciones/2026-10-15-reentreno-v100/.
 - Campaña de medición del zoom digital del modo ómnibus, 22 de octubre de 2026, docs/mediciones/2026-10-22-zoom-omnibus.md.
+- Tiempos del modo supermercado según la telemetría, 23 de noviembre de 2026, docs/mediciones/2026-11-23-telemetria-supermercado.md.
 - Informe del spike de visión local, docs/spike-vision-local.md.
 - Pruebas y decisiones, docs/pruebas-y-decisiones.md.
 - Bitácora de sesiones, docs/SESSION-LOG.md.

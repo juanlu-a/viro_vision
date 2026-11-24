@@ -46,15 +46,17 @@ def assemble(only=None):
     return "\n\n".join(parts) + "\n"
 
 
-def check(text):
+def check(text, whole_body):
     """Fail on the conventions that are easy to break by hand."""
     problems = []
     if "—" in text:
         problems.append("em dash found: use commas, colons or parentheses")
     for match in re.finditer(r"^#{1,6}\s*$", text, re.M):
         problems.append(f"empty heading at offset {match.start()}")
-    problems += check_captions(text, "Tabla", "Tablas")
-    problems += check_captions(text, "Figura", "Figuras")
+    problems += uncaptioned_tables(text)
+    if whole_body:
+        problems += check_captions(text, "Tabla", "Tablas")
+        problems += check_captions(text, "Figura", "Figuras")
     if problems:
         sys.exit("\n".join(problems))
 
@@ -67,30 +69,44 @@ def captions(text, word):
 def check_captions(text, word, plural):
     """Captions numbered 1..N in order, and each one cited somewhere outside its caption.
 
-    Only applies to the whole body: a single chapter starts mid-sequence.
+    Only for the whole body: a single chapter starts mid-sequence and cites other chapters.
     """
     problems = []
     found = captions(text, word)
     numbers = [n for n, _ in found]
-    if numbers and numbers[0] == 1 and numbers != list(range(1, len(numbers) + 1)):
+    if numbers != list(range(1, len(numbers) + 1)):
         problems.append(f"{word} captions are not numbered 1..N in order: {numbers}")
     body = re.sub(rf"^{word} \d+:.*$", "", text, flags=re.M)
     cited = set()
     for m in re.finditer(rf"\b(?:{word}|{plural}) (\d+(?:(?:, | y | a )\d+)*)", body):
-        cited |= {int(n) for n in re.findall(r"\d+", m.group(1))}
+        cited |= expand(m.group(1))
     for n in numbers:
         if n not in cited:
             problems.append(f"{word} {n} is never cited in the text")
-    if word == "Tabla":
-        lines = text.split("\n")
-        for i, line in enumerate(lines):
-            if line.startswith("|") and (i == 0 or not lines[i - 1].startswith("|")):
-                j = i - 1
-                while j >= 0 and not lines[j].strip():
-                    j -= 1
-                if j < 0 or not re.match(r"Tabla \d+: ", lines[j]):
-                    problems.append(f"table without a 'Tabla N: title.' caption: {line[:60]}")
     return problems
+
+
+def uncaptioned_tables(text):
+    """Every table needs a 'Tabla N: title.' line right above it (whole body or a single chapter)."""
+    problems = []
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if line.startswith("|") and (i == 0 or not lines[i - 1].startswith("|")):
+            j = i - 1
+            while j >= 0 and not lines[j].strip():
+                j -= 1
+            if j < 0 or not re.match(r"Tabla \d+: \S", lines[j]):
+                problems.append(f"table without a 'Tabla N: title.' caption: {line[:60]}")
+    return problems
+
+
+def expand(citation):
+    """'3, 5 y 7' -> {3, 5, 7}; '3 a 5' -> {3, 4, 5}."""
+    numbers = set()
+    for part in re.split(r", | y ", citation):
+        bounds = [int(n) for n in part.split(" a ")]
+        numbers |= set(range(bounds[0], bounds[-1] + 1))
+    return numbers
 
 
 def lists(text):
@@ -114,7 +130,7 @@ def main():
         return
 
     text = assemble(args.chapter)
-    check(text)
+    check(text, whole_body=args.chapter is None)
 
     BUILD.mkdir(exist_ok=True)
     stem = f"chapter-{args.chapter}" if args.chapter else "body"

@@ -19,12 +19,13 @@ OUT = pathlib.Path(__file__).resolve().parent.parent
 R1 = R2 = 10e3
 C1 = 4.7e-9
 C2 = 2e-9  # two 1 nF capacitors in parallel
+RI = 18e3  # PAM8403 input resistance (datasheet)
 
 
-def response(f):
-    """Transfer function of the unloaded two-stage RC ladder."""
+def response(f, load=None):
+    """Two-stage RC ladder, inter-stage loading included; `load` is an optional resistor across C2."""
     s = 2j * np.pi * f
-    z2 = 1 / (s * C2)
+    z2 = 1 / (s * C2) if load is None else 1 / (s * C2 + 1 / load)
     zb = R2 + z2
     zp = 1 / (s * C1 + 1 / zb)
     return zp / (R1 + zp) * z2 / zb
@@ -72,13 +73,14 @@ def draw_circuit():
 
 def draw_response():
     f = np.logspace(1, 6, 600)
-    db = 20 * np.log10(np.abs(response(f)))
     fig, ax = plt.subplots(figsize=(7, 3.6), dpi=200)
-    ax.semilogx(f, db, color="#1f5f4a", lw=2)
+    ax.semilogx(f, 20 * np.log10(np.abs(response(f))), color="#1f5f4a", lw=2, label="Sin carga")
+    ax.semilogx(f, 20 * np.log10(np.abs(response(f, RI))), color="#b5532a", lw=2, ls="--",
+                label="Con la entrada del amplificador (18 kΩ)")
     ax.axvspan(300, 3400, color="#9cc9b6", alpha=0.35, label="Banda de la voz telefónica (300 Hz a 3,4 kHz)")
-    for x, label in [(2.08e3, "−3 dB, 2,1 kHz"), (2e4, "−25 dB, 20 kHz"), (1e5, "−52 dB, 100 kHz")]:
+    for x, label in [(2.08e3, "−3 dB, 2,1 kHz"), (2e4, "−25 dB, 20 kHz"), (1e5, "−51,5 dB, 100 kHz")]:
         y = 20 * np.log10(abs(response(x)))
-        ax.plot([x], [y], "o", color="#b5532a")
+        ax.plot([x], [y], "o", color="#1f5f4a")
         ax.annotate(label, (x, y), textcoords="offset points", xytext=(6, 6), fontsize=8)
     ax.set_xlabel("Frecuencia (Hz)")
     ax.set_ylabel("Ganancia (dB)")

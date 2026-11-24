@@ -41,7 +41,7 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 - **Lo pendiente se declara.** Lo que no está hecho o no está medido se dice, no se omite.
 - **Ninguna credencial se transcribe.** Se nombra la deuda, no el valor.
 - **Comillas “” y cita antes del punto** (convención del equipo en el Doc, 2026-11-17): “así”, y
-  «… del proyecto \[45\].». Las citas son numéricas, \[n\], y remiten a la lista única del capítulo 11.
+  «… del proyecto \[45\].». Las citas son numéricas, \[n\], y remiten a la lista única del capítulo 12.
 - **La bibliografía es una sola lista numerada**, sin subtítulos por tema: si se agrupara, el Doc
   reiniciaría la numeración en cada grupo y las citas dejarían de coincidir. Una fuente nueva se
   agrega al final, para no correr la numeración de las que ya se citan.
@@ -158,5 +158,5 @@ haya cambiado, y recién entonces publicar.
 - Las figuras marcadas.
 - Las columnas reales del tablero de Trello (§5.4).
 - El registro completo de reuniones con el director (§5.6).
-- Verificar la bibliografía contra las fuentes (capítulo 11).
+- Verificar la bibliografía contra las fuentes (capítulo 12).
 - Conclusiones y trabajo futuro.

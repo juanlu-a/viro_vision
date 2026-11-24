@@ -4,7 +4,7 @@ Este capítulo evalúa el sistema terminado. El capítulo 7 describió cada comp
 
 ## 9.1 Enfoque de la evaluación
 
-La evaluación responde a tres preguntas, una por cada objetivo medible del proyecto (sec. 2.4.2, objetivo 7): si el sistema reconoce correctamente lo que anuncia, cuánto tarda en hacerlo y si su funcionamiento es confiable. La primera se mide sobre conjuntos de datos anotados, la segunda con mediciones de tiempo sobre el dispositivo y con la telemetría del sistema en uso, y la tercera con las pruebas automatizadas y las revisiones de código. La cuarta dimensión del objetivo, la utilidad para el usuario, no se evaluó, porque las pruebas con personas ciegas no se realizaron (sec. 9.9).
+El objetivo específico 7 (sec. 2.4.2) pide evaluar el prototipo en tres dimensiones: la precisión del reconocimiento, el tiempo de respuesta y la utilidad para el usuario. La precisión se mide sobre conjuntos de datos anotados, y el tiempo, con mediciones sobre el dispositivo y con la telemetría del sistema en uso. La utilidad para el usuario no se evaluó, porque las pruebas con personas ciegas no se realizaron (sec. 9.9). El equipo agregó un criterio que el objetivo no nombra, la confiabilidad del software, que se evalúa con las pruebas automatizadas y las revisiones de código (sec. 9.7).
 
 Las mediciones se hicieron en tres entornos distintos, y conviene distinguirlos porque sus resultados no son intercambiables. La precisión de los pipelines se midió en la computadora de desarrollo, sobre imágenes fijas; los tiempos de respuesta, sobre el dispositivo real, en su mayoría frente a videos reproducidos en una pantalla; y el comportamiento en uso, con la telemetría que la aplicación registra mientras el equipo usa el sistema. Sólo una prueba se hizo en la calle (sec. 9.4.4).
 
@@ -17,7 +17,7 @@ La evaluación usa cuatro conjuntos de datos, cada uno con un alcance distinto.
 
 El primero es la partición de validación del conjunto de entrenamiento del detector, sobre la que se calculan las métricas de detección. Pertenece a la versión 7 del conjunto find-bus-sign, de 395 fotografías, cuya partición no quedó registrada en el repositorio, y es además la partición con la que se eligió la mejor época del entrenamiento (sec. 7.3.3 y 7.3.4). La versión anterior del detector se evaluó sobre la partición de prueba de la versión 6, de 14 imágenes con 24 carteles.
 
-Para evaluar el pipeline completo de ómnibus se construyó un conjunto propio, anotado con lo que el sistema debe decir, cuya composición se resume en la Tabla 36. Es independiente de las imágenes de entrenamiento, salvo por las 14 imágenes tomadas de Roboflow: pertenecen a la partición de prueba de la versión 6 y no se usaron para entrenar los detectores de esa versión, pero como la partición de la versión 7 no quedó registrada, no puede asegurarse lo mismo para el detector reentrenado.
+El segundo es el conjunto propio que se construyó para evaluar el pipeline completo de ómnibus, anotado con lo que el sistema debe decir, cuya composición se resume en la Tabla 36 y en el anexo 13.11. Es independiente de las imágenes de entrenamiento, salvo por las 14 imágenes tomadas de Roboflow: pertenecen a la partición de prueba de la versión 6 y no se usaron para entrenar los detectores de esa versión, pero como la partición de la versión 7 no quedó registrada, no puede asegurarse lo mismo para el detector reentrenado.
 
 Tabla 36: Composición del conjunto de evaluación del pipeline de ómnibus.
 
@@ -49,7 +49,7 @@ Tabla 37: Métricas de la evaluación, con su unidad y su denominador.
 |---|---|---|---|
 | Precisión y exhaustividad del detector | Caja delimitadora | Una detección es correcta si su IoU con una caja anotada de la misma clase alcanza 0,5 | Detecciones del modelo (precisión) o cajas anotadas (exhaustividad) de la partición de validación |
 | mAP@0,5 y mAP@0,5:0,95 del detector | Caja delimitadora | Área bajo la curva precisión-exhaustividad, promediada por clase; la segunda promedia además sobre umbrales de IoU de 0,5 a 0,95 | Partición de validación |
-| Precisión, exhaustividad y F1 del cartel | Imagen | Una imagen con cartel anotado es un verdadero positivo si el pipeline recorta un cartel en ella | Las 117 imágenes del conjunto de evaluación |
+| Precisión, exhaustividad y F1 del cartel | Imagen | Una imagen con cartel anotado es un verdadero positivo si el pipeline recorta un cartel en ella; F1 es la media armónica de precisión y exhaustividad | Imágenes en las que se recortó un cartel (precisión) o con cartel anotado (exhaustividad), entre las 117 del conjunto |
 | Acierto del número | Imagen | El número anunciado coincide con el esperado, después de normalizar mayúsculas y espacios; una imagen en la que no se anuncia nada cuenta como error | Las 48 imágenes con número esperado |
 | Precisión del número | Imagen | Imágenes con el número correcto, sobre las imágenes en las que se anunció algún número, incluidas las que no tenían número esperado | Imágenes con un número anunciado |
 | Acierto del destino | Imagen | El destino anunciado coincide con el esperado | Las 56 imágenes con destino esperado |
@@ -116,7 +116,7 @@ Tabla 39: Tasas de acierto del pipeline completo sobre las 117 imágenes del con
 
 Fuente: README del repositorio bus-banner-recognizer, sección *Results*, y anexo 13.10.
 
-Con 48 imágenes, cada imagen vale 2,1 puntos de lectura completa, por lo que la diferencia de 4,2 puntos entre los dos esquemas son dos imágenes. Una sola imagen, el cartel nocturno de la línea 109, cambia el resultado del número entre versiones de las bibliotecas (sec. 7.3.5). Las cifras deben leerse, por lo tanto, como un orden de magnitud: con esta configuración el pipeline lee correctamente el número en unas nueve de cada diez imágenes con cartel legible, y el número y el destino a la vez en algo menos.
+Con 48 imágenes, cada imagen vale 2,1 puntos de lectura completa, por lo que la diferencia de 4,2 puntos entre los dos esquemas son dos imágenes. Una sola imagen, el cartel nocturno de la línea 109, cambia el resultado del número entre versiones de las bibliotecas (sec. 7.3.5). Las cifras deben leerse, por lo tanto, como un orden de magnitud: con esta configuración el pipeline lee correctamente el número en unas nueve de cada diez imágenes con número esperado, y el número y el destino a la vez en algo menos.
 
 La precisión del número, que no se guardó para la medición del 12 de octubre, sí está disponible para la del 16 de septiembre con el mismo detector y sin las reglas del catálogo: 0,935, con una exhaustividad de 0,896 y un F1 de 0,915 (resultados guardados del repositorio de visión, results/single_v006). Es decir, de cada cien números anunciados, unos seis eran incorrectos antes de que el catálogo filtrara las lecturas que no corresponden a una línea existente. El catálogo debería reducir esa proporción, pero la reducción no se midió. En la misma medición, el detector encontró el cartel en el 97,1% de las imágenes que lo tenían, con una precisión de 0,776 por imagen (anexo 13.10).
 
@@ -172,17 +172,17 @@ Tabla 42: Duración de las etapas de una lectura del modo supermercado, según l
 
 | **Etapa** | **Lecturas** | **Mediana** | **Percentil 90** |
 |---|---|---|---|
-| Descarga de la fotografía desde el dispositivo | 116 | 282 ms | 908 ms |
+| Descarga de la fotografía desde el dispositivo | 110 | 282 ms | 900 ms |
 | Consulta al modelo gpt-5.6-luna (por defecto) | 81 | 1.941 ms | 3.072 ms |
 | Consulta al modelo qwen/qwen3.8-27b | 27 | 1.142 ms | 1.861 ms |
-| Síntesis de voz en la nube (sólo con salida por el dispositivo) | 45 | 2.202 ms | 3.099 ms |
-| Envío del audio al dispositivo | 45 | 215 ms | 621 ms |
+| Síntesis de voz en la nube (sólo con salida por el dispositivo) | 38 | 2.128 ms | 2.842 ms |
+| Envío del audio al dispositivo (envíos exitosos) | 38 | 230 ms | 657 ms |
 
-Fuente: tabla de eventos de la telemetría (sec. 8.6.2), eventos photo.ok, reading.ok, audio.synthesis y audio.send.
+Fuente: tabla de eventos de la telemetría (sec. 8.6.2), eventos photo.ok, reading.ok, audio.synthesis y audio.send; consulta y resultados en docs/mediciones/2026-11-23-telemetria-supermercado.md.
 
-La telemetría no registra el ciclo completo de una lectura con un único cronómetro, por lo que el tiempo total se estima sumando las medianas de cada etapa, lo que da un valor aproximado. Con la salida por el teléfono, que usa la voz del sistema sin demora apreciable, una lectura con el modelo por defecto demora unos 2,2 segundos desde que se pide la fotografía, dentro del objetivo de 3 a 4 segundos (RNF-02). Con la salida por el dispositivo, la síntesis en la nube y el envío del audio suman unos 2,4 segundos más, y la lectura llega a unos 4,6 segundos, por encima del objetivo. El objetivo se cumple, por lo tanto, sólo con la salida por el teléfono, y la síntesis en la nube es la etapa que habría que acelerar, por ejemplo sintetizando en el teléfono y enviando el audio ya generado. A esos tiempos se suma el del gesto y su llegada por BLE, que no se registra.
+La telemetría no registra el ciclo completo de una lectura con un único cronómetro, por lo que el tiempo total se estima sumando las medianas de cada etapa, lo que da un valor aproximado. Con la salida por el teléfono, que usa la voz del sistema sin demora apreciable, una lectura con el modelo por defecto demora unos 2,2 segundos desde que se pide la fotografía, lo que sugiere que cabe en el objetivo de 3 a 4 segundos (RNF-02), aunque falta confirmarlo con una medición del ciclo completo. Con la salida por el dispositivo, la síntesis en la nube y el envío del audio suman unos 2,4 segundos más, y la lectura llega a unos 4,6 segundos, por encima del objetivo. Según esta estimación, el objetivo se alcanza sólo con la salida por el teléfono, y la síntesis en la nube es la etapa que habría que acelerar, por ejemplo sintetizando en el teléfono y enviando el audio ya generado. A esos tiempos se suma el del gesto y su llegada por BLE, que no se registra.
 
-Las cifras corresponden al uso del sistema por el equipo durante el desarrollo, con un único teléfono y en distintas condiciones de red, y no a un protocolo de prueba. Son, aun así, la medición más cercana al uso real de la que se dispone, y reemplazan a la estimación de unos 3 segundos que se hizo al diseñar el enlace (sec. 7.1.5).
+Las cifras corresponden al uso del sistema por el equipo durante el desarrollo, con un único teléfono y en distintas condiciones de red, y no a un protocolo de prueba. Son, aun así, la medición más cercana al uso real de la que se dispone, y reemplazan a la estimación de entre 3 y 3,5 segundos que se hizo al diseñar el enlace (sec. 7.1.5).
 
 
 ## 9.6 Resultados del enlace y del dispositivo
@@ -238,9 +238,9 @@ La aplicación registra eventos de ejecución en el servidor propio, con el tiem
 
 ### 9.7.5 Segunda revisión completa y retiro de las claves de la aplicación
 
-El 23 de noviembre de 2026, con el producto ya completo, se repitió la revisión de toda la base de código (PR #145 y PR #146). Esta vez sí participó Codex junto a los tres modelos de Anthropic: Opus revisó la aplicación y el servicio del dispositivo, Sonnet los servicios de la aplicación, Haiku las funciones del servidor, la integración continua y las pruebas del dispositivo, y Codex hizo una pasada transversal centrada en defectos de corrección. Después de cada corrección, Opus y Codex revisaron sólo lo modificado, para detectar defectos introducidos por los propios arreglos. Como en la revisión de noviembre (sec. 9.7.2), los defectos no se manifestaban en las pruebas porque dependían de una secuencia de eventos poco frecuente, pero varios tenían consecuencias directas sobre lo que escucha el usuario.
+El 23 de noviembre de 2026, con el producto ya completo, se repitió la revisión de toda la base de código (PR #145 y PR #146). Esta vez sí participó Codex junto a los tres modelos de Anthropic: Opus revisó la aplicación y el servicio del dispositivo, Sonnet los servicios de la aplicación, Haiku las funciones del servidor, la integración continua y las pruebas del dispositivo, y Codex hizo una pasada transversal centrada en defectos de corrección. Después de cada corrección, Opus y Codex revisaron sólo lo modificado, para detectar defectos introducidos por los propios arreglos. Como en la primera revisión, del 2 y 3 de noviembre (sec. 9.7.2), los defectos no se manifestaban en las pruebas porque dependían de una secuencia de eventos poco frecuente, pero varios tenían consecuencias directas sobre lo que escucha el usuario.
 
-El hallazgo de mayor gravedad fue de seguridad. Desde la puesta en marcha del intermediario propio (ADR 0008) ninguna solicitud de la aplicación iba directo a un proveedor, pero la integración continua seguía pasando al compilado una credencial de Gemini guardada como secreto del repositorio. Como las variables públicas de Expo se copian dentro del código de la aplicación, cada versión distribuida por TestFlight y Google Play llevaba esa credencial legible, aunque no la usara. Se eliminó el secreto, se retiraron de los flujos de compilación las cuatro credenciales de proveedores, y se cambió la aplicación para que sólo las lea en una compilación de desarrollo: en una compilación de distribución el empaquetador reemplaza la condición por un valor falso y descarta el texto de la credencial. Se verificó compilando el paquete de producción con credenciales ficticias, que no aparecieron en el resultado, mientras que la dirección del intermediario sí. El modo supermercado usa hoy los modelos de OpenAI y Qwen (este último servido por Groq), ambos a través del intermediario, de modo que la aplicación ya no necesita ninguna credencial.
+El hallazgo de mayor gravedad fue de seguridad. Desde la puesta en marcha del intermediario propio (ADR 0008) ninguna solicitud de la aplicación iba directo a un proveedor, pero la integración continua seguía pasando al compilado una credencial de Gemini guardada como secreto del repositorio. Como las variables públicas de Expo se copian dentro del código de la aplicación, cada versión distribuida por TestFlight y cada paquete instalable de Android generado por la integración continua llevaba esa credencial legible, aunque no la usara. Se eliminó el secreto, se retiraron de los flujos de compilación las cuatro credenciales de proveedores, y se cambió la aplicación para que sólo las lea en una compilación de desarrollo: en una compilación de distribución el empaquetador reemplaza la condición por un valor falso y descarta el texto de la credencial. Se verificó compilando el paquete de producción con credenciales ficticias, que no aparecieron en el resultado, mientras que la dirección del intermediario sí. El modo supermercado usa hoy los modelos de OpenAI y Qwen (este último servido por Groq), ambos a través del intermediario, de modo que la aplicación ya no necesita ninguna credencial.
 
 En la aplicación se corrigieron cuatro defectos que afectaban la retroalimentación auditiva. La cola que ordena las operaciones Bluetooth (sec. 7.5.5) esperaba indefinidamente a una operación colgada, y con ella quedaban detenidos la confirmación acústica del botón y la orden que silencia el dispositivo antes de que hable el teléfono; ahora la cola sigue adelante a los 5 segundos y quien pidió la operación recibe un error a los 10. Un cambio de modo durante la carga inicial del modelo de OCR dejaba el botón de lectura deshabilitado hasta el siguiente cambio de modo. Cuando la red del dispositivo fallaba de manera persistente, cada latido de estado, uno cada 15 segundos, repetía la frase de falla y podía volver a mostrar el permiso de iOS para unirse a la red; desde entonces la falla se dice una vez y el reintento es silencioso, y esa decisión se separó en un módulo propio con pruebas (app/src/features/device/networkCheck.ts). Por último, el error del dispositivo cuando el modo ómnibus no puede arrancar, por ejemplo porque la cámara no inició, sólo llegaba a la telemetría, y el usuario, que ya había escuchado “preparando la lectura”, quedaba en silencio; ahora escucha una frase fija con la acción que puede tomar, coherente con el ADR 0011.
 
@@ -261,15 +261,15 @@ Tabla 44: Estado de los requisitos al cierre del informe.
 | RF-01 | Cumplido en laboratorio | Modo vigilancia probado en la placa contra videos (sec. 7.3.9 y 9.4.3) |
 | RF-02 | Cumplido en laboratorio | Lectura completa de 87,5% sobre el conjunto de evaluación; en la única prueba en la calle, el cartel se leyó tarde (sec. 9.4.2 y 9.4.4) |
 | RF-03 | Cumplido | Selección por área de la caja delimitadora (sec. 7.3.1); no se midió con varios ómnibus reales |
-| RF-04 | Cumplido; precisión no medida | Quince de quince lecturas correctas sobre una imagen (sec. 9.5) |
+| RF-04 | Implementado; reconocimiento sin verificar sobre un conjunto representativo | Quince de quince lecturas correctas sobre una sola imagen (sec. 9.5) |
 | RF-05 | Cumplido | Treinta gestos sin errores (sec. 9.6); calibrado con personas videntes |
 | RF-06 | Cumplido | sec. 7.1.2 |
 | RF-07 | Cumplido | sec. 7.2.4 y 7.5.5 |
 | RF-08 | Cumplido con iPhone | sec. 7.5.5 y 7.5.10; no verificado con Android |
 | RF-09 | Cumplido | sec. 7.5.4 y 7.5.6 |
-| RF-10 | Cumplido sólo en el modo desarrollo | sec. 7.6.4 |
+| RF-10 | No cumplido en el modo producto | La imagen sólo se muestra en el modo desarrollo, como herramienta del equipo (sec. 7.6.4) |
 | RNF-01 | Cumplido | Detección en el sensor y OCR en la placa, sin conexión (sec. 7.3.2 y 7.2.6) |
-| RNF-02 | Cumplido sólo con salida por el teléfono | Unos 2,2 s con salida por el teléfono y unos 4,6 s por el dispositivo (sec. 9.5) |
+| RNF-02 | Estimado: dentro del objetivo con salida por el teléfono, fuera con salida por el dispositivo | Suma de medianas por etapa: unos 2,2 s por el teléfono y unos 4,6 s por el dispositivo, sin el gesto ni su llegada por BLE; falta medir el ciclo completo (sec. 9.5) |
 | RNF-03 | Cumplido | Sólo se anuncia lo que el catálogo confirma (sec. 7.3.8 y 7.3.9) |
 | RNF-04 | Cumplido | sec. 7.1.2 |
 | RNF-05 | Parcial | Contraste verificado de forma automatizada (sec. 9.7.1); sin pruebas con usuarios de lectores de pantalla |
@@ -277,7 +277,7 @@ Tabla 44: Estado de los requisitos al cierre del informe.
 | RNF-07 | Cumplido | Unos USD 0,0003 por lectura (sec. 7.4.2) |
 | RNF-08 | Cumplido | sec. 7.5.4 y 7.6.3 |
 | RNF-09 | Cumplido; autonomía no medida | sec. 7.2.4 y 7.2.8 |
-| RNF-10 | Cumplido para el desarrollo | La evidencia debe retirarse antes de una versión pública (sec. 8.6.3) |
+| RNF-10 | Parcial | La evidencia se guarda en un almacenamiento privado, restringido al equipo, y debe retirarse antes de una versión pública (sec. 8.6.3 y 5.7); no se hizo un análisis formal de cumplimiento de la ley [PENDIENTE: base legal y registro de la base de datos, si corresponde] |
 | RNF-11 | Cumplido | Costo de reproducción de 211,12 USD (sec. 7.2.9); la comparación con los productos comerciales se presenta en el cap. 10 |
 
 
