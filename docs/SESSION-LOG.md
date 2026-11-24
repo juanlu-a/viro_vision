@@ -5082,4 +5082,22 @@ pruebas de `DeviceProvider` y las pruebas con `sleep`).
 
 ### Pendientes
 
-- La prueba nueva de `test_link.py` sólo corre en la placa (en la Mac falta `dbus_next`).
+Ninguno de la revisión. La prueba nueva de `test_link.py`, que sólo corre en la placa, se ejecutó en
+la Zero 2 W el mismo día (ver abajo).
+
+## 2026-11-24 (cont.): `test_link.py` corrido en la placa
+
+`tests/test_link.py` se saltea en la Mac y en CI porque necesita `dbus_next`, que sólo está en la
+Pi, así que la aserción nueva del PR #146 (un enlace viejo que ya no existe no impide cortar el
+siguiente, y la lista queda vacía) no había corrido nunca. Se corrió en la placa: se bajó el AP por
+BLE con `tools/ap.py`, se entró por SSH desde la WiFi de casa y se ejecutaron las funciones de test
+con el Python del daemon. **Los 6 tests pasaron.**
+
+El entorno del daemon en la placa no tiene `pytest`, y no se instaló: el archivo se copió a `/tmp`,
+se llamaron sus funciones directamente con un sustituto mínimo de `pytest.importorskip`, y los
+temporales se borraron al terminar. Para correr la suite completa en la placa habría que instalar
+`requirements-dev.txt` en su `.venv`, algo que conviene decidir antes de hacerlo, porque suma
+dependencias a una tarjeta de 512 MB de RAM.
+
+La placa quedó en la WiFi de casa con el AP apagado hasta el próximo reinicio, que la devuelve al
+modo producto.
