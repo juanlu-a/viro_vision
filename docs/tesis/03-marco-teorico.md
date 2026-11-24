@@ -4,19 +4,9 @@
 
 La inteligencia artificial (*artificial intelligence*, AI), abreviada IA en español, es un campo de la informática dedicado al desarrollo de sistemas capaces de realizar tareas asociadas con capacidades de la inteligencia humana, como el aprendizaje, el razonamiento, la comprensión del lenguaje y la interpretación de información visual \[1\]. Estas capacidades se implementan mediante procedimientos computacionales y no implican que los sistemas reproduzcan el funcionamiento de la mente humana.
 
-Sus antecedentes modernos se remontan, entre otros trabajos, al artículo *Computing Machinery and Intelligence*, publicado por Alan Turing en 1950 \[99\]. En él se planteó la posibilidad de que las máquinas manifestaran un comportamiento inteligente y se propuso el denominado juego de imitación, posteriormente conocido como prueba de Turing. Esta prueba evalúa si un interrogador puede distinguir, mediante una conversación escrita, las respuestas de una máquina de las de una persona; no constituye una demostración de que la máquina piense como un ser humano.
+Como campo de investigación, la IA suele situarse a partir del encuentro de Dartmouth de 1956 \[2\], \[3\], precedido por el planteo de Alan Turing sobre la posibilidad de que una máquina manifestara un comportamiento inteligente \[99\], y pasó por sistemas especializados en tareas delimitadas, como el que venció al campeón mundial de ajedrez en 1997 \[100\]. Para este proyecto interesa el giro posterior: el aumento de la capacidad de cómputo y la disponibilidad de grandes conjuntos de datos llevaron al aprendizaje profundo, que en 2012 mejoró de forma considerable la clasificación de imágenes con una red neuronal entrenada en unidades de procesamiento gráfico (*graphics processing units*, GPU) \[4\], y más recientemente a los modelos multimodales, capaces de procesar imagen y texto a la vez. Ambos son la base de los dos pipelines del sistema: un detector de objetos para el modo ómnibus y un modelo multimodal para el modo supermercado. El aprendizaje automático \[5\] y el aprendizaje profundo \[101\] se desarrollan en las sec. 3.1.1 y 3.1.2, y los modelos de lenguaje y multimodales, en la sec. 3.1.3.
 
-El establecimiento de la IA como campo de investigación suele situarse en el encuentro de Dartmouth de 1956 \[2\]. Su propuesta \[3\], redactada en 1955 por John McCarthy, Marvin Minsky, Nathaniel Rochester y Claude Shannon, ya utilizaba el término *artificial intelligence* y planteaba investigar cómo las máquinas podían utilizar el lenguaje, formar conceptos y resolver problemas. Por ello, este encuentro representa un hito fundacional del campo, más que la creación de una única “primera inteligencia artificial”.
-
-En las décadas posteriores se desarrollaron sistemas especializados en tareas concretas. Un hito fue la victoria de Deep Blue, de IBM, sobre el campeón mundial de ajedrez Garry Kasparov en 1997 \[100\]. Este resultado mostró la capacidad de un sistema para superar el desempeño humano en una tarea delimitada, sin implicar una capacidad general para resolver cualquier problema.
-
-Posteriormente, el aumento de la capacidad de cómputo, la disponibilidad de grandes conjuntos de datos y los avances en los métodos de aprendizaje favorecieron el desarrollo del aprendizaje profundo (*deep learning*). Un ejemplo relevante para la visión por computadora fue el trabajo de Krizhevsky, Sutskever y Hinton, *AlexNet* \[4\], publicado en 2012: una red neuronal profunda logró mejorar considerablemente los resultados de clasificación de imágenes en ImageNet, utilizando entrenamiento acelerado mediante unidades de procesamiento gráfico (*graphics processing units*, GPU), procesadores capaces de realizar numerosos cálculos en paralelo.
-
-Más recientemente, la IA generativa (*generative AI*), orientada a producir contenido como texto, imágenes o audio, y los modelos multimodales (*multimodal models*), capaces de procesar diferentes tipos de datos, han ampliado las aplicaciones de estas tecnologías. Estos avances conviven con sistemas especializados en tareas como el reconocimiento de imágenes y la detección de objetos.
-
-Dentro de este campo, el aprendizaje automático \[5\] (*machine learning*, ML) comprende los métodos que aprenden patrones a partir de datos. El aprendizaje profundo \[101\] (*deep learning*, DL), a su vez, es una subcategoría del aprendizaje automático basada en redes neuronales con múltiples capas de procesamiento. Sus fundamentos se desarrollan en las sec. 3.1.1 y 3.1.2, y los modelos de lenguaje y multimodales en la sec. 3.1.3.
-
-### 3.1.1 Machine Learning
+### 3.1.1 Aprendizaje automático
 
 El aprendizaje automático (*machine learning*, ML) es una subdisciplina de la inteligencia artificial que permite desarrollar sistemas que aprenden patrones a partir de datos, sin definir explícitamente todas las reglas necesarias para resolver una tarea. El resultado de este aprendizaje es un modelo: una representación matemática de relaciones presentes en los datos que permite generar predicciones ante nuevas entradas. En este contexto, una predicción puede ser tanto un valor numérico como la identificación de una categoría; por ejemplo, determinar si una imagen contiene un ómnibus.
 
@@ -39,7 +29,7 @@ Para poder medir la generalización, el conjunto de datos se divide en tres part
 
 Cuando los ejemplos etiquetados son pocos se recurre a dos técnicas. La aumentación de datos (*data augmentation*) genera, durante el entrenamiento, variantes de cada imagen mediante transformaciones que no cambian su etiqueta, como modificar el brillo, rotar levemente o recortar \[93\]. Las transformaciones deben elegirse según la tarea: reflejar horizontalmente una fotografía de un ómnibus produce otra fotografía verosímil, pero reflejar un cartel produce texto espejado, que nunca aparece en la realidad. El pseudoetiquetado (*pseudo-labeling*), por su parte, utiliza las predicciones de un modelo ya entrenado como etiquetas de ejemplos que no las tenían \[94\]. Suele emplearse un modelo grande y preciso para etiquetar los datos con los que luego se entrena uno pequeño, y las etiquetas generadas se revisan, porque los errores del modelo etiquetador se transmiten al modelo entrenado.
 
-### 3.1.2 Deep Learning y redes neuronales
+### 3.1.2 Aprendizaje profundo y redes neuronales
 
 El aprendizaje profundo (*deep learning*, DL) es una subcategoría del aprendizaje automático basada en redes neuronales artificiales (*artificial neural networks*) con múltiples capas de procesamiento. Estas redes toman una inspiración general de la interconexión de las neuronas biológicas, aunque constituyen modelos matemáticos y no reproducciones del cerebro humano.
 
@@ -57,7 +47,7 @@ El aprovechamiento de este conocimiento se denomina aprendizaje por transferenci
 
 En detección de objetos, este procedimiento permite especializar un modelo en determinadas clases, entendidas como las categorías que debe identificar. Para ello se utilizan imágenes anotadas que indican tanto la clase de cada objeto como su ubicación mediante rectángulos delimitadores (*bounding boxes*). Cuando las categorías de destino difieren de las originales, también se adapta la salida del detector para representar las clases requeridas.
 
-Un ejemplo de este procedimiento es partir de YOLO11n preentrenado y ajustarlo para detectar dos clases de interés: ómnibus y carteles de ómnibus. El entrenamiento reutiliza los parámetros compatibles del modelo original y los adapta mediante ejemplos de ambas categorías. Así, se obtiene un detector especializado a partir de una red que ya posee capacidades de reconocimiento visual. La familia YOLO se desarrolla en la sec. 3.3.2; los detalles del entrenamiento realizado corresponden al capítulo de implementación (sec. 7.4.3).
+Un ejemplo de este procedimiento es partir de YOLO11n preentrenado y ajustarlo para detectar dos clases de interés: ómnibus y carteles de ómnibus. El entrenamiento reutiliza los parámetros compatibles del modelo original y los adapta mediante ejemplos de ambas categorías. Así, se obtiene un detector especializado a partir de una red que ya posee capacidades de reconocimiento visual. La familia YOLO se desarrolla en la sec. 3.3.2; los detalles del entrenamiento realizado corresponden al capítulo de implementación (sec. 7.3.4).
 
 ### 3.1.3 Modelos de lenguaje y modelos multimodales
 
@@ -67,11 +57,13 @@ Un modelo multimodal de visión y lenguaje (*vision-language model*, VLM) extien
 
 La instrucción que se le da al modelo se denomina indicación o *prompt*. Con ella se define la tarea, el idioma y la forma de la respuesta, y su redacción influye en el resultado tanto como la elección del modelo. Cuando otra parte de un sistema debe procesar la respuesta, se solicita una salida estructurada (*structured output*): en lugar de texto libre, el modelo devuelve un objeto en formato JSON con campos predefinidos, y algunos proveedores permiten exigir un esquema que la respuesta debe cumplir \[88\]. Esto permite validar cada campo antes de usarlo.
 
-Estos modelos tienen tres limitaciones relevantes para una aplicación de asistencia. La primera es la alucinación (*hallucination*): el modelo puede generar una respuesta fluida y convincente que no corresponde a la imagen, por ejemplo una marca que no figura en el envase \[87\]. La segunda es el tamaño: los modelos con mejores resultados tienen miles de millones de parámetros y se ejecutan en servidores del proveedor, a los que se accede por una interfaz de programación (*application programming interface*, API) a través de Internet, con un costo por *token* procesado y una latencia que depende de la red. La tercera deriva de la anterior: existen modelos pequeños que pueden ejecutarse en un teléfono, pero en las pruebas de este proyecto no lograron interpretar la imagen o superaron el tiempo de respuesta objetivo (sec. 7.2.2). El uso de estos modelos en el modo supermercado se describe en las sec. 7.2.2 y 7.5.
+Estos modelos tienen tres limitaciones relevantes para una aplicación de asistencia. La primera es la alucinación (*hallucination*): el modelo puede generar una respuesta fluida y convincente que no corresponde a la imagen, por ejemplo una marca que no figura en el envase \[87\]. La segunda es el tamaño: los modelos con mejores resultados tienen miles de millones de parámetros y se ejecutan en servidores del proveedor, a los que se accede por una interfaz de programación (*application programming interface*, API) a través de Internet, con un costo por *token* procesado y una latencia que depende de la red. La tercera deriva de la anterior: existen modelos pequeños que pueden ejecutarse en un teléfono, pero en las pruebas de este proyecto no lograron interpretar la imagen o superaron el tiempo de respuesta objetivo (sec. 7.4.2). El uso de estos modelos en el modo supermercado se describe en las sec. 7.4.2 y 7.4.
 
 ## 3.2 Evaluación de modelos de reconocimiento
 
-Toda comparación entre alternativas de reconocimiento necesita un criterio numérico común. Las cuatro métricas que este trabajo utiliza se construyen sobre la matriz de confusión \[8\], es decir, sobre el cruce entre lo que el sistema respondió y lo que correspondía responder: verdaderos positivos (VP), falsos positivos (FP), verdaderos negativos (VN) y falsos negativos (FN).
+Toda comparación entre alternativas de reconocimiento necesita un criterio numérico común. Las cuatro métricas que este trabajo utiliza se construyen sobre la matriz de confusión \[8\], es decir, sobre el cruce entre lo que el sistema respondió y lo que correspondía responder: verdaderos positivos (VP), falsos positivos (FP), verdaderos negativos (VN) y falsos negativos (FN). La Tabla 3 define cada métrica y su significado en el sistema.
+
+Tabla 3: Métricas de evaluación utilizadas en este trabajo.
 
 | **Métrica** | **Definición** | **Qué significa en ViroVision** |
 |---|---|---|
@@ -122,7 +114,9 @@ Ultralytics proporciona modelos YOLO11 de detección preentrenados sobre el data
 
 Para realizar esta adaptación se utiliza un conjunto de imágenes anotadas con las clases y los rectángulos delimitadores de los objetos de interés. El entrenamiento ajusta los parámetros del modelo a la tarea de destino, permitiendo obtener un detector especializado a partir de los pesos preentrenados.
 
-YOLO11 ofrece cinco tamaños de modelo de detección, identificados por una letra: n (nano), s (small), m (medium), l (large) y x (extra large). Todos comparten la misma arquitectura y difieren en la cantidad de capas y de canales, y por lo tanto en la cantidad de parámetros y en el cálculo necesario por imagen. La tabla resume los valores publicados por Ultralytics para entradas de 640×640 píxeles, con el mAP@0,5:0,95 (sec. 3.2) sobre el conjunto de validación de COCO:
+YOLO11 ofrece cinco tamaños de modelo de detección, identificados por una letra: n (nano), s (small), m (medium), l (large) y x (extra large). Todos comparten la misma arquitectura y difieren en la cantidad de capas y de canales, y por lo tanto en la cantidad de parámetros y en el cálculo necesario por imagen. La Tabla 4 resume los valores publicados por Ultralytics para entradas de 640×640 píxeles, con el mAP@0,5:0,95 (sec. 3.2) sobre el conjunto de validación de COCO:
+
+Tabla 4: Tamaños del modelo YOLO11 de detección, según los valores publicados por Ultralytics.
 
 | **Modelo** | **Parámetros (millones)** | **Operaciones (GFLOPs)** | **mAP@0,5:0,95 (COCO)** |
 |---|---|---|---|
@@ -132,7 +126,7 @@ YOLO11 ofrece cinco tamaños de modelo de detección, identificados por una letr
 | YOLO11l | 25,3 | 86,9 | 53,4 |
 | YOLO11x | 56,9 | 194,9 | 54,7 |
 
-Fuente: documentación de modelos YOLO11 de Ultralytics \[19\]. Pasar de la variante n a la x mejora el mAP en unos 15 puntos, a cambio de unas 22 veces más parámetros y 30 veces más operaciones. En un dispositivo con recursos limitados el tamaño suele estar determinado por la memoria disponible antes que por la precisión deseada; en este proyecto, la memoria del sensor de la cámara sólo admite la variante n (sec. 7.4.3). La variante x se utilizó, en cambio, fuera del dispositivo, para generar etiquetas de entrenamiento por pseudoetiquetado (sec. 3.1.1 y 7.4.2).
+Fuente: documentación de modelos YOLO11 de Ultralytics \[19\]. Pasar de la variante n a la x mejora el mAP en unos 15 puntos, a cambio de unas 22 veces más parámetros y 30 veces más operaciones. En un dispositivo con recursos limitados el tamaño suele estar determinado por la memoria disponible antes que por la precisión deseada; en este proyecto, la memoria del sensor de la cámara sólo admite la variante n (sec. 7.3.4). La variante x se utilizó, en cambio, fuera del dispositivo, para generar etiquetas de entrenamiento por pseudoetiquetado (sec. 3.1.1 y 7.3.3).
 
 La comparación con otras alternativas se presenta en la sec. 4.6 del estado del arte. La justificación de la elección del modelo y los detalles de su entrenamiento para el proyecto se desarrollan en el capítulo 7.
 
@@ -154,7 +148,7 @@ Finalmente, reconocer caracteres no equivale a interpretar o validar su signific
 
 Cuando el texto esperado pertenece a un conjunto cerrado y conocido, como los destinos de una red de transporte, el posprocesamiento puede comparar la lectura con cada valor posible y elegir el más parecido. Para ello se usan medidas de similitud entre cadenas de caracteres. La distancia de edición de Levenshtein cuenta la cantidad mínima de inserciones, eliminaciones y sustituciones necesarias para transformar una cadena en otra \[89\]. El algoritmo de Ratcliff y Obershelp, descrito por Ratcliff y Metzener \[90\] e implementado en la biblioteca estándar de Python \[91\], busca recursivamente las subcadenas comunes más largas y devuelve una razón entre 0 y 1, donde 1 indica cadenas idénticas. Con cualquiera de ellas, la lectura “BRALLE” resulta mucho más parecida a “BRAILLE” que a cualquier otro destino. Este mecanismo exige resguardos: una lectura muy corta o muy dañada puede quedar cerca de un valor real pero equivocado, por lo que conviene fijar un umbral mínimo de similitud y exigir una diferencia apreciable con el segundo candidato.
 
-Las herramientas existentes se presentan en la sec. 4.4 del estado del arte. Su comparación experimental y la selección utilizada en el sistema se desarrollan en la sec. 7.4.7, y la corrección contra el catálogo de líneas en la sec. 7.4.8.
+Las herramientas existentes se presentan en la sec. 4.4 del estado del arte. Su comparación experimental y la selección utilizada en el sistema se desarrollan en la sec. 7.3.7, y la corrección contra el catálogo de líneas en la sec. 7.3.8.
 
 ### 3.3.4 Seguimiento de objetos en video
 
@@ -166,9 +160,9 @@ El algoritmo SORT (*Simple Online and Realtime Tracking*) combina la asociación
 
 Toda pista tiene un ciclo de vida. Nace cuando aparece una detección que no se asocia con ninguna existente, y suele confirmarse recién después de varios cuadros consecutivos, para no crear pistas a partir de detecciones espurias. Si deja de recibir detecciones, por ejemplo porque un objeto se interpone, no se elimina de inmediato: se conserva durante una cantidad de cuadros, y si el objeto reaparece cerca de su última posición recupera su identidad. Pasado ese plazo, la pista se da por perdida. Los dos errores característicos del seguimiento son la fragmentación, cuando un mismo objeto recibe identidades distintas en distintos momentos, y el intercambio de identidad (*identity switch*), cuando dos objetos que se cruzan intercambian sus pistas.
 
-El seguimiento permite, además, acumular información a lo largo del tiempo. Dado que la cámara se encuentra fija respecto de quien la porta, el área del rectángulo de un vehículo que se acerca crece de un cuadro a otro, y la de uno que se aleja disminuye. A su vez, las lecturas de un mismo objeto en cuadros distintos pueden combinarse: exigir que dos o más lecturas independientes coincidan antes de aceptar un resultado reduce los errores aislados de un único cuadro, a costa de una demora mayor. Por último, la identidad de la pista sirve para evitar repeticiones: un sistema que anuncia lo que ve puede decir una sola vez lo que corresponde a cada pista. Como una fragmentación produce una pista nueva para un objeto ya anunciado, en la práctica se agrega una ventana de tiempo durante la cual no se repite el mismo anuncio, cualquiera sea la pista que lo origine.
+El seguimiento permite, además, acumular información a lo largo del tiempo. Dado que la cámara se encuentra fija respecto de quien la porta, el área del rectángulo de un vehículo que se acerca crece de un cuadro a otro, y la de uno que se aleja disminuye. El supuesto tiene un límite: la persona mueve la cabeza, y un giro desplaza y cambia de tamaño todos los rectángulos de la imagen a la vez, lo que puede romper la asociación por IoU y alterar la estimación de si un vehículo se acerca. A su vez, las lecturas de un mismo objeto en cuadros distintos pueden combinarse: exigir que dos o más lecturas independientes coincidan antes de aceptar un resultado reduce los errores aislados de un único cuadro, a costa de una demora mayor. Por último, la identidad de la pista sirve para evitar repeticiones: un sistema que anuncia lo que ve puede decir una sola vez lo que corresponde a cada pista. Como una fragmentación produce una pista nueva para un objeto ya anunciado, en la práctica se agrega una ventana de tiempo durante la cual no se repite el mismo anuncio, cualquiera sea la pista que lo origine.
 
-La aplicación de estos conceptos en el modo ómnibus, con asociación voraz por IoU sin predicción de movimiento, se describe en la sec. 7.4.9.
+La aplicación de estos conceptos en el modo ómnibus, con asociación voraz por IoU sin predicción de movimiento, se describe en la sec. 7.3.9.
 
 ## 3.4 Inteligencia artificial en el borde
 
@@ -184,7 +178,7 @@ Los aceleradores pueden ser un componente separado, como el Coral Edge TPU, que 
 
 Para trasladar un modelo del entorno donde se entrena al dispositivo donde se ejecuta se utilizan formatos de intercambio, como ONNX (*Open Neural Network Exchange*), y entornos de ejecución optimizados para cada plataforma, como ONNX Runtime, LiteRT o ExecuTorch \[39\], \[41\], \[42\], \[44\]. Un mismo modelo exportado a un formato estándar puede ejecutarse así en procesadores distintos, sin depender de la biblioteca con la que se entrenó.
 
-La aplicación de estos conceptos en el proyecto (la división de tareas entre el dispositivo y la nube, la evaluación de modelos multimodales en el teléfono, la inferencia en el sensor y la cuantización del detector) se describe en las sec. 7.2.2, 7.2.4, 7.2.5 y 7.4.5.
+La aplicación de estos conceptos en el proyecto (la división de tareas entre el dispositivo y la nube, la evaluación de modelos multimodales en el teléfono, la inferencia en el sensor y la cuantización del detector) se describe en las sec. 7.4.2, 7.3.2, 7.2.6 y 9.4.1.
 
 ## 3.5 Comunicación inalámbrica de corto alcance
 
@@ -204,7 +198,7 @@ WiFi es la denominación comercial de las redes locales inalámbricas basadas en
 
 Un dispositivo embebido puede ocupar cualquiera de los dos roles. Como estación, se conecta a una red existente y depende de ella. Como punto de acceso, crea su propia red, a la que el teléfono se une directamente, sin necesidad de un enrutador ni de conexión a Internet. Sobre esa red se utilizan los protocolos habituales de TCP/IP; en particular, el protocolo de transferencia de hipertexto (*Hypertext Transfer Protocol*, HTTP) implementa el modelo de petición y respuesta, en el que el cliente solicita un recurso, por ejemplo una fotografía, y el servidor lo devuelve \[97\].
 
-Ambas tecnologías se complementan: BLE puede mantener un canal de control permanente y de bajo consumo, mientras que WiFi se enciende sólo cuando hay que transferir un volumen grande de datos. Las alternativas de comunicación se comparan en la sec. 4.7, y la arquitectura adoptada en ViroVision se describe en las sec. 7.1.4 y 7.2.1.
+Ambas tecnologías se complementan: BLE puede mantener un canal de control permanente y de bajo consumo, mientras que WiFi se enciende sólo cuando hay que transferir un volumen grande de datos. Las alternativas de comunicación se comparan en la sec. 4.7, y la arquitectura adoptada en ViroVision se describe en las sec. 7.1.4 y 7.1.5.
 
 ## 3.6 Desarrollo móvil multiplataforma
 
@@ -216,9 +210,7 @@ React Native permite escribir la lógica de la aplicación una sola vez y ejecut
 
 ### 3.6.2 Arquitectura: de Bridge a Bridgeless (JSI)
 
-Históricamente, React Native se apoyaba en un “puente” (*bridge*) asíncrono que serializaba mensajes en formato JSON entre el hilo de JavaScript y el hilo nativo, lo cual podía agregar latencia en interacciones complejas, como animaciones o gestos. Desde la versión 0.76, publicada en octubre de 2024, la Nueva Arquitectura de React Native está habilitada por defecto y reemplaza este puente por el JSI (JavaScript Interface), una capa de interoperabilidad que permite que el código JavaScript invoque directamente métodos nativos en memoria compartida, sin serialización intermedia (“arquitectura Bridgeless”) \[98\].
-
-La nueva arquitectura elimina la serialización entre la capa de JavaScript y la capa nativa \[98\]. Este aspecto es relevante para ViroVision, cuya aplicación reacciona a los resultados del sistema de reconocimiento y emite la retroalimentación auditiva; el proyecto no midió el efecto de este cambio sobre la latencia de la aplicación.
+Desde la versión 0.76, publicada en octubre de 2024, React Native usa por defecto una arquitectura que reemplaza el puente asíncrono entre JavaScript y el código nativo, que serializaba cada mensaje, por una interfaz de llamadas directas (JSI) \[98\]. La aplicación de ViroVision usa esa arquitectura, pero el proyecto no midió su efecto ni influyó en ninguna decisión, por lo que no se desarrolla más.
 
 ### 3.6.3 API de accesibilidad de React Native
 
@@ -239,13 +231,19 @@ Los sistemas operativos móviles incluyen un motor de síntesis que funciona sin
 
 Para una persona ciega o con baja visión, el audio es el canal principal de información. Esto plantea requisitos que no aparecen en una aplicación convencional. El primero es la convivencia con el lector de pantalla (VoiceOver en iOS, TalkBack en Android), que también habla: la aplicación debe decidir si su voz interrumpe, atenúa o se mezcla con la del lector, y una mala elección corta los mensajes que el usuario necesita para navegar. Los sistemas operativos gestionan esta convivencia mediante sesiones de audio, que definen cómo se combina el sonido de una aplicación con el del resto del sistema. El segundo es la latencia: entre el pedido del usuario y la respuesta no hay otra forma de saber que el sistema está trabajando, por lo que una espera larga se percibe como una falla. El tercero es la brevedad y el orden de los mensajes: el usuario escucha la frase completa antes de poder actuar, de modo que conviene decir primero el dato que más información aporta.
 
-La aplicación de estos criterios en el sistema (la elección entre la voz del sistema, la síntesis en la nube y los audios pregrabados, y la configuración de la sesión de audio) se describe en las sec. 7.4.12, 7.5.3 y 7.6.3.
+La aplicación de estos criterios en el sistema (la elección entre la voz del sistema, la síntesis en la nube y los audios pregrabados, y la configuración de la sesión de audio) se describe en las sec. 7.3.12, 7.4.4 y 7.5.4.
+
+La señal de audio, una vez generada, tiene que llegar a un transductor, y en un sistema embebido ese camino no siempre es analógico. Una computadora de placa única sin conversor digital a analógico puede producir audio mediante modulación de ancho de pulso (*pulse width modulation*, PWM): un pin digital conmuta entre dos niveles de tensión a una frecuencia muy superior a la del sonido, y el valor de cada muestra de audio se codifica en la fracción del período en que el pin permanece en el nivel alto, llamada ciclo de trabajo. La señal que sale del pin es una onda cuadrada de amplitud constante; el audio está en su valor medio, que varía al ritmo de la voz. Para recuperarlo se usa un filtro pasabajos, que deja pasar las frecuencias de la voz y elimina la conmutación, de modo que a su salida queda aproximadamente ese valor medio \[108\]. Un filtro formado por una resistencia R y un capacitor C tiene una frecuencia de corte f = 1 / (2π · R · C), por encima de la cual atenúa 20 dB por década; dos etapas en cascada forman un filtro de segundo orden, que atenúa 40 dB por década. Las Raspberry Pi con conector de auriculares incluyen un filtro de este tipo en la propia placa; la Zero 2 W no lo trae.
+
+El nivel de esa señal tampoco es el de un parlante. Un amplificador clase D, como el que usa el dispositivo, vuelve a conmutar la señal a alta frecuencia y entrega potencia al transductor con una eficiencia alta, adecuada para un equipo a batería; su entrada espera una señal analógica de nivel de línea, del orden de algunas décimas de voltio. Por último, un transductor de conducción ósea transmite la vibración a través de los huesos del cráneo en lugar de hacerlo por el aire del conducto auditivo, por lo que deja los oídos libres para los sonidos del entorno, un requisito para quien depende del oído para desplazarse (sec. 2.2). La aplicación de estos conceptos al dispositivo se describe en la sec. 7.2.2 y los cálculos del circuito, en el anexo 13.12.
 
 ## 3.8 Criterios de accesibilidad: WCAG
 
 Las Pautas de Accesibilidad para el Contenido Web (*Web Content Accessibility Guidelines*, WCAG) del W3C, en su versión 2.2, constituyen el marco de referencia normativo para accesibilidad digital y se aplican, con las adaptaciones correspondientes, a interfaces móviles \[57\]. Se organizan en cuatro principios (perceptible, operable, comprensible y robusto) y en tres niveles de conformidad: A, AA y AAA.
 
-Los criterios que este trabajo utiliza como requisitos verificables son:
+Los criterios que este trabajo utiliza como requisitos verificables se presentan en la Tabla 5.
+
+Tabla 5: Criterios de WCAG 2.2 adoptados como requisitos verificables.
 
 | **Criterio** | **Exigencia** | **Aplicación en ViroVision** |
 |---|---|---|
@@ -256,7 +254,7 @@ Los criterios que este trabajo utiliza como requisitos verificables son:
 | 1.4.4 Redimensionado del texto, nivel AA | El texto debe poder ampliarse sin pérdida de contenido | Soporte de tamaños de texto dinámicos del sistema |
 | 2.5.5 Tamaño del objetivo, nivel AAA | Objetivo táctil de al menos 44 × 44 píxeles CSS | Dimensionado de los controles |
 
-La relación de contraste se define entre las luminancias relativas de dos colores como (L₁ + 0,05) / (L₂ + 0,05), donde L₁ es la luminancia del más claro. Al ser una fórmula cerrada, el cumplimiento de estos criterios puede verificarse automáticamente, y este trabajo lo incorpora como prueba automatizada que bloquea la integración ante un cambio que rompa el criterio (sec. 7.8.1).
+La relación de contraste se define entre las luminancias relativas de dos colores como (L₁ + 0,05) / (L₂ + 0,05), donde L₁ es la luminancia del más claro. Al ser una fórmula cerrada, el cumplimiento de estos criterios puede verificarse automáticamente, y este trabajo lo incorpora como prueba automatizada que bloquea la integración ante un cambio que rompa el criterio (sec. 9.7.1).
 
-El cumplimiento de WCAG es una condición necesaria pero no suficiente. Una interfaz puede satisfacer todos los criterios verificables y resultar inutilizable para una persona ciega si el orden de lectura, la cantidad de gestos necesarios o la ausencia de retroalimentación audible no se consideraron. Por ello, las pruebas con lectores de pantalla reales y con usuarios ciegos forman parte de la validación necesaria del sistema; las pruebas con usuarios ciegos quedan pendientes (sec. 7.9).
+El cumplimiento de WCAG es una condición necesaria pero no suficiente. Una interfaz puede satisfacer todos los criterios verificables y resultar inutilizable para una persona ciega si el orden de lectura, la cantidad de gestos necesarios o la ausencia de retroalimentación audible no se consideraron. Por ello, las pruebas con lectores de pantalla reales y con usuarios ciegos forman parte de la validación necesaria del sistema; las pruebas con usuarios ciegos quedan pendientes (sec. 9.9).
 

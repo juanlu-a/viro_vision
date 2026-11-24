@@ -27,7 +27,7 @@ Donde el texto viejo dice "never a cloud API", léase **"never a cloud API *as t
   offline-first, así que una cuenta no aporta nada y Apple no la exige. El código de auth está
   **archivado, no borrado**: existe en el repo pero no está cableado a la navegación.
 
-### ADR 0003: Enlace placa ↔ teléfono · **Proposed (2026-09-04); actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena), 2026-09-20 (conectarse rápido y sin volver a pedir permiso), 2026-10-22 (placa real, cola GATT, una voz por vez, arranque en 16 s) y 2026-11-03 (clave fija del AP y HTTP sin autenticación: riesgo aceptado para el prototipo)**
+### ADR 0003: Enlace placa ↔ teléfono · **Accepted el 2026-11-24 (pedido del director); propuesto 2026-09-04; actualizado 2026-09-05 (la foto va por WiFi), 2026-09-11 (segundo plano verificado), 2026-09-15 (ómnibus respeta el ajuste), 2026-09-16 (el ajuste vale para TODO lo que suena), 2026-09-20 (conectarse rápido y sin volver a pedir permiso), 2026-10-22 (placa real, cola GATT, una voz por vez, arranque en 16 s) y 2026-11-03 (clave fija del AP y HTTP sin autenticación: riesgo aceptado para el prototipo)**
 
 Estaba reservado "hasta tener hardware"; el 2026-09-04 el equipo decidió lo que no dependía de medir y
 dejó escrito el umbral para lo que sí. **Contexto que lo disparó**: ómnibus corre **entero en la
@@ -126,7 +126,7 @@ que decir `already` siempre.
   la placa anuncia por BLE antes de abrir la cámara y el AP; dnsmasq sin ping. Anuncia a los 16,2 s,
   la cámara está lista a los 21,3 s y el OCR a los 33,6 s.
 
-### ADR 0004: Runtime de inferencia on-device · **Proposed; actualizado 2026-08-22: se resuelve por caso de uso**
+### ADR 0004: Runtime de inferencia on-device · **Superseded por el 0006 (cerrado 2026-11-24); actualizado 2026-08-22: se resuelve por caso de uso**
 
 Proponía **Gemma vía LiteRT-LM**. El spike lo midió: el camino de visión de LiteRT-LM **no funciona
 en iOS** (bug de la librería, aislado con evidencia); el mismo modelo por **ExecuTorch/MLX** sí ve,
@@ -148,7 +148,7 @@ comparación en el informe.
 
 Buena parte ya está implementada (tokens, `theme.test.ts`, tipografía de marca); falta escribirla.
 
-### ADR 0006: Pipelines por caso de uso · **Proposed (2026-08-22), a validar con tutor; actualizado 2026-08-30, 2026-09-01, 2026-09-07, 2026-10-19 (zoom) y 2026-10-22 (márgenes, V100 y catálogo)**
+### ADR 0006: Pipelines por caso de uso · **Accepted el 2026-11-24 (pedido del director); propuesto 2026-08-22; actualizado 2026-08-30, 2026-09-01, 2026-09-07, 2026-10-19 (zoom) y 2026-10-22 (márgenes, V100 y catálogo)**
 
 **Qué cambió**: deja de haber un runtime único (lo que buscaba ADR 0004). Cada caso de uso tiene su
 pipeline. *(Texto original del 2026-08-22; la detección pasó al sensor IMX500 el 2026-09-07, ver más abajo.)* **Bondis = local** (la latencia manda): detección **preentrenada en la Coral TPU** del
@@ -225,7 +225,7 @@ literal `null`, el parser lo rechazaba y la frase caía al fallback de texto cru
 campos en null, y el fallback distingue prosa de basura con una regla simple (**la prosa no parsea
 como JSON**).
 
-### ADR 0007: Botones físicos y modos de operación · **Proposed (2026-08-22); a validar con tutor**
+### ADR 0007: Botones físicos y modos de operación · **Accepted el 2026-11-24 (pedido del director); propuesto 2026-08-22**
 
 **Qué cambió**: hasta ahora no había ninguna interfaz de entrada física especificada. El
 reconocimiento funciona por **modos explícitos** activados con el botón del dispositivo, nunca

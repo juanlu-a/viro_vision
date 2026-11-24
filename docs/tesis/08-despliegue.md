@@ -4,6 +4,10 @@ Este capítulo describe cómo el sistema llega desde el repositorio hasta el usu
 
 ## 8.1 Stack de despliegue
 
+La Tabla 31 resume las herramientas que intervienen en el despliegue.
+
+Tabla 31: Herramientas del stack de despliegue.
+
 | **Función** | **Herramienta** |
 |---|---|
 | Control de versiones y alojamiento | Git · GitHub |
@@ -15,7 +19,9 @@ Este capítulo describe cómo el sistema llega desde el repositorio hasta el usu
 
 ## 8.2 Modelo de ramas y canales
 
-El proyecto asocia cada rama de larga vida a un canal de distribución real, de modo que fusionar es publicar:
+El proyecto asocia cada rama de larga vida a un canal de distribución real, de modo que fusionar es publicar (Tabla 32).
+
+Tabla 32: Ramas de larga vida y su canal de distribución.
 
 | **Rama** | **Canal iOS** | **Canal Android** | **Audiencia** |
 |---|---|---|---|
@@ -33,13 +39,7 @@ El flujo de integración se ejecuta en cada *pull request* dirigido a staging o 
 1. Calidad: instalación determinista de dependencias, análisis estático, verificación de tipos y la suite completa de pruebas.
 1. Compilación de verificación: exportación del paquete para ambas plataformas, que confirma que el proyecto compila de punta a punta antes de invertir treinta minutos en una compilación real.
 
-### 8.3.1 Verificación de las credenciales del despliegue
-
-Además de los controles habituales, el flujo ejecuta una verificación de correspondencia entre los modelos ofrecidos y las credenciales configuradas. Existe por un fallo real: cuando un proveedor salió del selector de modelos, la única credencial que el repositorio tenía configurada dejó de corresponder a un modelo del registro. La compilación fue exitosa, el paquete se publicó al canal de pruebas, y el modo supermercado quedó sin ningún modelo disponible. La aplicación degradó correctamente (anunció que no estaba configurada y no falló), pero el defecto no se detectó hasta que alguien la abrió.
-
-El control compara los proveedores que el código ofrece contra las credenciales presentes en el entorno y detiene la publicación antes de la compilación. Las pruebas unitarias no detectan este tipo de defecto, porque el defecto reside en la relación entre el código y su configuración de despliegue.
-
-Antes de que existiera el proxy de visión, el ADR 0008 fijó una regla transitoria sobre credenciales: una credencial de un servicio gratuito sin tarjeta asociada podía viajar en el paquete, porque su peor caso es una cuota consumida que se repone, mientras que una credencial de un servicio con cobro asociado no podía incluirse, porque su peor caso es el medio de pago del proyecto. Con el proxy desplegado, la política vigente es que ninguna credencial de proveedor es necesaria en el paquete (sec. 8.6.1).
+Además de los controles habituales, el flujo verifica, antes de compilar, que cada proveedor que ofrece el código tenga la configuración que necesita, un control que surgió de un fallo real que las pruebas unitarias no podían detectar (anexo 13.13.1).
 
 ## 8.4 Distribución iOS
 
@@ -63,9 +63,9 @@ Los artefactos se nombran con versión y número de compilación: un nombre gen�
 
 ### 8.6.1 Función de proxy de visión
 
-Desplegada y activa desde el 2 de septiembre de 2026. Su diseño está descrito en la sec. 7.2.3. Desde el punto de vista del despliegue interesan tres aspectos:
+Desplegada y activa desde el 2 de septiembre de 2026. Su diseño está descrito en la sec. 7.1.6. Desde el punto de vista del despliegue interesan tres aspectos:
 
-1. La política es que las credenciales de los proveedores vivan en el almacén de secretos del proyecto, y no en el repositorio ni en el paquete de la aplicación; las excepciones históricas se describen en la sec. 8.7.7. Las compilaciones distribuidas sólo necesitan dos valores de configuración, la dirección del proxy y la de telemetría, que son direcciones y no claves. El código admite además una clave anónima pública de Supabase, que por diseño puede viajar en el paquete porque el acceso a los datos queda protegido por las políticas de seguridad a nivel de fila (sec. 8.6.2), y claves directas de proveedor para el desarrollo local sin proxy.
+1. La política es que las credenciales de los proveedores vivan en el almacén de secretos del proyecto, y no en el repositorio ni en el paquete de la aplicación; las excepciones históricas se describen en la sec. 8.7.5. Las compilaciones distribuidas sólo necesitan dos valores de configuración, la dirección del proxy y la de telemetría, que son direcciones y no claves. El código admite además una clave anónima pública de Supabase, que por diseño puede viajar en el paquete porque el acceso a los datos queda protegido por las políticas de seguridad a nivel de fila (sec. 8.6.2), y claves directas de proveedor para el desarrollo local sin proxy.
 1. Los códigos de error se eligieron para que el cliente pueda reaccionar: 400 ante un destino que no figura en la lista blanca, 405 ante un método incorrecto, 502 si no se alcanza al proveedor, y 503 (y no 500) cuando falta una credencial, porque el servicio se encuentra sin configurar. El mensaje de ese error nombra el proveedor cuya credencial falta, aunque no la credencial en sí; es una limitación conocida, porque revela a cualquier cliente qué proveedores están configurados. El limitador devuelve 429 con el mismo código de error que usan los proveedores, de modo que el cliente ya sabe esperar en lugar de abortar.
 1. Limitación conocida: el limitador por dirección de origen mantiene su contador en memoria del proceso, y la plataforma ejecuta varias instancias simultáneas, cada una con su propio contador. En consecuencia, el límite efectivo es mayor que el configurado y el limitador sólo dificulta el abuso, sin impedirlo; la protección de fondo es el tope de gasto de cada proveedor (sec. 6.7).
 
@@ -79,11 +79,11 @@ El esquema se gestiona por migraciones que se agregan y no se editan. La migraci
 
 ### 8.6.3 Función de evidencia y su almacenamiento
 
-Desplegada el 12 de octubre de 2026, es la tercera función. Recibe las fotos del modo ómnibus (el cuadro en que se detectó cada ómnibus y cada recorte del cartel que leyó el OCR, sec. 7.7.3) y las guarda en un contenedor de almacenamiento privado, creado por su propia migración. El camino tiene tres pasos: el dispositivo guarda las imágenes y avisa por Bluetooth; la aplicación las baja por WiFi y registra en el momento un evento de telemetría con lo que leyó el OCR y la ruta de cada imagen; las imágenes quedan en cola en el teléfono y se suben cuando hay internet.
+Desplegada el 12 de octubre de 2026, es la tercera función. Recibe las fotos del modo ómnibus (el cuadro en que se detectó cada ómnibus y cada recorte del cartel que leyó el OCR, sec. 7.6.4) y las guarda en un contenedor de almacenamiento privado, creado por su propia migración. El camino tiene tres pasos: el dispositivo guarda las imágenes y avisa por Bluetooth; la aplicación las baja por WiFi y registra en el momento un evento de telemetría con lo que leyó el OCR y la ruta de cada imagen; las imágenes quedan en cola en el teléfono y se suben cuando hay internet.
 
 Las rutas son deterministas: el evento es correcto aunque la imagen llegue una hora después, y ningún lado tiene que avisarle al otro dónde quedó nada. Como la telemetría, la función no exige sesión (ADR 0008) y aplica topes: cuatro archivos por pedido, 2 MB por archivo y sólo imágenes JPEG, verificadas por sus primeros bytes (docs/supabase.md). Es una herramienta de desarrollo y temporal: son fotos de la calle, con personas, y se retira antes de la versión final.
 
-Esas imágenes (cuadros completos y recortes del cartel) son datos personales en los términos de la Ley 18.331, porque pueden contener personas identificables y matrículas de vehículos \[107\]. Su finalidad es construir el conjunto de evaluación del modo ómnibus y revisar qué vio el sistema en cada anuncio (sec. 7.4.9); se guardan en el almacenamiento privado del proyecto en el servidor, al que sólo accede el equipo, y en el teléfono sólo se muestran en el modo desarrollo (sec. 7.7.3). Su uso se limita al desarrollo: la función debe deshabilitarse y las imágenes almacenadas eliminarse antes de cualquier versión pública.
+Esas imágenes (cuadros completos y recortes del cartel) son datos personales en los términos de la Ley 18.331, porque pueden contener personas identificables y matrículas de vehículos \[107\]. Su finalidad es construir el conjunto de evaluación del modo ómnibus y revisar qué vio el sistema en cada anuncio (sec. 7.3.9); se guardan en el almacenamiento privado del proyecto en el servidor, al que sólo accede el equipo, y en el teléfono sólo se muestran en el modo desarrollo (sec. 7.6.4). Su uso se limita al desarrollo: la función debe deshabilitarse y las imágenes almacenadas eliminarse antes de cualquier versión pública.
 
 ### 8.6.4 Riesgo operativo declarado
 
@@ -97,7 +97,9 @@ Instalar software en un dispositivo embebido sin pantalla y sin teclado es un pr
 
 La tarjeta que corre en el dispositivo tiene una partición de arranque en formato FAT, legible y escribible desde cualquier computadora. El proyecto la usa deliberadamente como superficie de administración: el modo de red, los perfiles de red inalámbrica y los archivos de audio de los avisos de sistema se instalan dejando archivos en esa partición, que un servicio lee en cada arranque.
 
-Esto responde a la restricción de la sec. 7.3.4: un dispositivo en modo producto no tiene acceso remoto por la red conocida, de modo que si la única vía de administración fuera la red, cualquier error de configuración dejaría al dispositivo irrecuperable sin desarmarlo. Desde septiembre existe además la vía por Bluetooth de la sec. 8.7.2, que evita retirar la tarjeta en el caso habitual; la tarjeta sigue siendo el recurso que no depende de que el servicio esté funcionando.
+Esto responde a la restricción de la sec. 7.2.5: un dispositivo en modo producto no tiene acceso remoto por la red conocida, de modo que si la única vía de administración fuera la red, cualquier error de configuración dejaría al dispositivo irrecuperable sin desarmarlo. Desde septiembre existe además la vía por Bluetooth del anexo 13.13.2, que evita retirar la tarjeta en el caso habitual; la tarjeta sigue siendo el recurso que no depende de que el servicio esté funcionando. La Tabla 33 enumera los archivos de control que admite la partición de arranque.
+
+Tabla 33: Archivos de control en la partición de arranque y su efecto.
 
 | **Se deja en la partición de arranque** | **Efecto en el siguiente arranque** |
 |---|---|
@@ -107,74 +109,37 @@ Esto responde a la restricción de la sec. 7.3.4: un dispositivo en modo product
 
 El dispositivo conserva varios perfiles de red simultáneos, uno por cada entorno donde se trabajó. Es la diferencia entre poder llevarlo a probar a otro lugar y tener que reconfigurarlo.
 
-### 8.7.2 Vías de acceso y la regla que las ordena
+### 8.7.2 Acceso, despliegue y diagnóstico
 
-Existen cuatro formas de alcanzar el dispositivo, y no son equivalentes:
+El dispositivo puede alcanzarse por cuatro vías, de las cuales la principal es una herramienta que apaga su punto de acceso a través de Bluetooth: en unos cinco segundos la placa vuelve a la red conocida y queda accesible sin abrir la carcasa ni retirar la tarjeta. El equipo adoptó una regla después de perder sesiones a mitad de una copia de archivos: no desplegar desde una computadora con una sola interfaz de red, porque al unirse al punto de acceso del dispositivo se queda sin internet y el sistema operativo vuelve por sí solo a la red conocida, cortando la transferencia. El procedimiento de despliegue consta de cinco pasos: llevar el dispositivo a la red conocida, detener el servicio, instalar la versión nueva conservando un respaldo de la anterior, dejar el paquete también en la tarjeta y verificar el estado antes de volver a modo producto. Desde el 23 de septiembre de 2026 el registro del servicio, único diagnóstico del dispositivo en uso, se conserva entre reinicios. El detalle de cada vía, del procedimiento con sus restricciones y del diagnóstico está en el anexo 13.13.
 
-| **Vía** | **Cuándo sirve** | **Limitación** |
-|---|---|---|
-| Apagar el punto de acceso por Bluetooth (hardware/raspi/tools/ap.py) | La vía principal, incluso en modo producto: en unos 5 s el dispositivo vuelve a la red inalámbrica conocida y queda accesible por SSH, sin abrir la carcasa ni tocar la tarjeta | Dura hasta el siguiente reinicio; exige que la aplicación del teléfono esté cerrada, porque con una central conectada el dispositivo deja de anunciarse |
-| Red inalámbrica conocida (modo desarrollo, desde la tarjeta) | Sesiones largas de despliegue | Exige apagar el dispositivo y retirar la tarjeta para cambiar de modo |
-| Cable de red | Siempre, incluso en modo producto | Sólo en una placa con conector RJ45, como la de reemplazo que se usó en septiembre; la Raspberry Pi Zero 2 W, placa vigente desde el 19 de septiembre de 2026, no lo tiene |
-| Unirse al punto de acceso del dispositivo | Cualquier modo | Desaconsejado, ver abajo |
-
-La herramienta de Bluetooth existe para no depender de la tarjeta: en modo producto el dispositivo levanta su punto de acceso y abandona la red conocida, de modo que no hay acceso remoto, y retirar la tarjeta obliga a apagarlo y abrir la carcasa. La herramienta escribe en la característica de control del perfil GATT, la misma que usa la aplicación, y no requiere emparejamiento.
-
-La regla operativa que el proyecto adoptó, después de perder sesiones a mitad de una copia de archivos, es: no desplegar desde una máquina con una sola interfaz de red. Un equipo que sólo tiene radio inalámbrica, al unirse al punto de acceso del dispositivo, se queda sin salida a internet; y el sistema operativo, al detectar una red sin salida, vuelve por sí mismo a la red conocida, de modo que la conexión no se sostiene. Una transferencia cortada por la mitad deja el servicio del dispositivo en un estado inconsistente.
-
-El punto de acceso sí acepta conexiones remotas: lo que se pierde al unirse a él es el acceso a internet de la máquina y no el acceso al dispositivo, porque la red se publica deliberadamente sin anunciar puerta de enlace ni servidor de nombres (sec. 8.7.5).
-
-En las placas con conector RJ45, la interfaz de red del dispositivo tiene dirección fija, y la computadora actúa como encaminador mediante una regla de traducción de direcciones. Se optó por dirección fija y no por asignación dinámica porque, si el dispositivo solicita configuración y nadie responde, el gestor de red da la conexión por fallida y el dispositivo desaparece del enlace hasta que se vuelve a conectar el cable físicamente.
-
-### 8.7.3 El procedimiento de despliegue
-
-El procedimiento verificado consta de cinco pasos y su orden importa:
-
-1. Llevar el dispositivo a la red conocida: apagar su punto de acceso por Bluetooth o, para una sesión larga, pasarlo a modo desarrollo desde la tarjeta y arrancar.
-1. Alcanzarlo por la red conocida y detener el servicio.
-1. Instalar la versión nueva del paquete, conservando un respaldo de la anterior y verificando que el paquete importe correctamente antes de arrancar el servicio.
-1. Actualizar la configuración de arranque y dejar el paquete también en la partición de la tarjeta, de modo que una instalación desde cero no necesite conectividad.
-1. Verificar contra el punto de consulta de salud del dispositivo y volver a modo producto.
-
-Tres restricciones de este procedimiento se identificaron durante las pruebas:
-
-- El instalador automático no se vuelve a ejecutar. Está protegido por un archivo centinela que ya existe, y ese centinela vive en la partición del sistema, no en la de arranque, por lo que no se puede borrar desde otra computadora con la tarjeta puesta. Dejar una versión nueva del paquete en la tarjeta no alcanza: hay que instalarla por acceso remoto.
-- El paquete debe llevar el árbol completo, y no sólo el módulo de la aplicación. Un paquete incompleto instala un servicio a medias, y el síntoma aparece mucho después, sin nada que lo vincule con el día en que se ensambló de forma incorrecta.
-- Una bandera de configuración puede estar repetida en dos archivos distintos. Al renombrar las banderas por el cambio de idioma (ADR 0009), se corrigió la ocurrencia evidente y la otra volvió a imponerse en el arranque siguiente. Desde entonces, al cambiar una bandera se busca en toda la partición y no sólo en el archivo principal.
-
-Adicionalmente, el dispositivo no tiene reloj de tiempo real: arranca creyendo que es la hora del último apagado. Hasta que el reloj se sincroniza por red, el gestor de paquetes rechaza operaciones por considerar los metadatos no vigentes. Por eso el procedimiento evita instalar dependencias mientras no cambien, y se apoya en el entorno virtual ya construido en el dispositivo.
-
-### 8.7.4 Diagnóstico y sus límites
-
-El registro del servicio es el único diagnóstico disponible del dispositivo en uso real: no hay pantalla, y el usuario no puede describir lo que vio.
-
-Durante buena parte del desarrollo el registro no sobrevivía a un reinicio, y así se perdió el registro de la primera prueba realizada en modo producto. La hipótesis inicial atribuyó el problema a la ausencia de reloj de tiempo real; la causa real era otra: el sistema operativo de la placa trae una configuración que guarda el registro sólo en memoria, aunque el directorio del registro persistente exista. Desde el 23 de septiembre de 2026 una configuración propia lo hace persistente (con un tope de 64 MB), forma parte del script de instalación y está aplicada en la placa. En la misma sesión se comprobó su utilidad: una prueba del usuario se leyó entera después de reiniciar, con tres arranques en el registro (docs/SESSION-LOG.md, 23 de septiembre de 2026).
-
-El registro tiene dos complementos: la telemetría que envía la aplicación móvil (sec. 7.8.4), fechada del lado del servidor, y una herramienta que reproduce todos los avisos de sistema en secuencia para verificar el repertorio de audio sin necesidad del teléfono. La falta de reloj de tiempo real sigue vigente y afecta las marcas de tiempo hasta que el reloj se sincroniza por red (sec. 8.7.3).
-
-Una precaución adicional, registrada por el tiempo que demandó: el servicio toma la cámara al arrancar, de modo que cualquier prueba manual de la cámara exige detenerlo primero y volver a iniciarlo al terminar.
-
-### 8.7.5 El punto de acceso y la conectividad del teléfono
+### 8.7.3 El punto de acceso y la conectividad del teléfono
 
 El dispositivo publica una red propia protegida con clave compartida. Una corrección necesaria fue eliminar de su configuración las opciones que anuncian puerta de enlace y servidor de nombres: sin ese ajuste, el teléfono que se unía a la red del dispositivo enrutaba todo su tráfico por ella y quedaba sin acceso a internet, lo que impedía alcanzar la nube en el modo supermercado. La red queda así declarada como de alcance estrictamente local, y el teléfono conserva su conexión de datos.
 
-Ese mismo aislamiento impide que una computadora de una sola interfaz llegue a internet mientras está unida a la red del dispositivo (sec. 8.7.2).
+Ese mismo aislamiento impide que una computadora de una sola interfaz llegue a internet mientras está unida a la red del dispositivo (anexo 13.13.2).
 
-### 8.7.6 El pipeline de visión como dependencia
+### 8.7.4 El pipeline de visión como dependencia
 
 El pipeline de reconocimiento de líneas se instala en el dispositivo como dependencia desde su propio repositorio, y no se copia dentro del paquete del servicio. Esto mantiene el ciclo de trabajo del pilar de aprendizaje automático (entrenar, evaluar, exportar) independiente del ciclo del dispositivo, y permite actualizar el modelo sin reinstalar el servicio.
 
-### 8.7.7 Deuda operativa declarada
+### 8.7.5 Deuda operativa declarada
 
-El procedimiento descrito es reproducible pero no está terminado, y las brechas se declaran porque condicionan la etapa final:
+El procedimiento descrito es reproducible pero no está terminado, y las brechas, reunidas en la Tabla 34, se declaran porque condicionan la etapa final.
+
+Tabla 34: Deuda operativa del despliegue al cierre del informe.
 
 | **Pendiente** | **Consecuencia** |
 |---|---|
 | La tarjeta en uso no se instaló con el script de instalación del repositorio, sino a mano. No existe todavía una imagen reproducible | Reconstruir el dispositivo desde cero no es un procedimiento verificado |
-| Las credenciales de administración del dispositivo se compartieron por un canal no seguro durante el desarrollo, y una clave de servicio quedó en el historial de un repositorio. Además, durante la evaluación de la tesis el flujo de publicación incorpora a la compilación una clave de Gemini de nivel gratuito, sin medio de pago asociado, que puede recuperarse del paquete (sec. 7.2.3) | La rotación de esas credenciales está pendiente. La clave de Gemini se conserva por decisión del equipo mientras dure la evaluación y se retira al cerrarla, junto con el secreto del repositorio. Ambas cosas deben resolverse antes de cualquier distribución más amplia |
+| Las credenciales de administración del dispositivo se compartieron por un canal no seguro durante el desarrollo, y una clave de servicio quedó en el historial de un repositorio. Además, hasta el 23 de noviembre de 2026 el flujo de publicación incorporaba a la compilación una clave de Gemini de nivel gratuito, sin medio de pago asociado, que podía recuperarse de los paquetes ya distribuidos (sec. 7.1.6 y 9.7.5) | La rotación de las credenciales de administración y de la clave de servicio está pendiente, y debe resolverse antes de cualquier distribución más amplia. La clave de Gemini se retiró de los flujos y del repositorio, y el 24 de noviembre de 2026 se eliminó en el proveedor, de modo que la copia que viajó en versiones anteriores ya no sirve |
 | El sistema de aprovisionamiento automático estándar de la imagen no aplica la configuración de red en esta versión | Todo el andamiaje de configuración descrito existe por eso, y debería revisarse si se actualiza la imagen base |
 
 ## 8.8 Estado del despliegue
+
+La Tabla 35 resume el estado del despliegue de cada componente al cierre del informe.
+
+Tabla 35: Estado del despliegue de cada componente.
 
 | **Componente** | **Estado** |
 |---|---|

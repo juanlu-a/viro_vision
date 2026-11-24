@@ -97,7 +97,7 @@ export const es = {
     useBus: 'Líneas de ómnibus',
     useBusDesc: 'Te dice qué ómnibus se aproxima.',
     useProduct: 'Productos de supermercado',
-    useProductDesc: 'Identifica alimentos y productos de supermercado.',
+    useProductDesc: 'Identifica productos alimenticios.',
     testAudioButton: 'Probar audio',
     testAudioHint: 'Reproduce un mensaje de prueba para verificar la salida de voz.',
     testAudioPhrase: 'Hola, soy ViroVision. La salida de audio funciona correctamente.',

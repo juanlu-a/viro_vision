@@ -1,6 +1,6 @@
 # ADR 0004: Runtime de inferencia on-device (Gemma vía LiteRT-LM)
 
-- **Status:** Proposed, a discutir con el tutor (superado en lo central por ADR 0006; actualización 2026-10-22)
+- **Status:** Superseded por el ADR 0006 (cerrado el 2026-11-24 a pedido del director; actualización 2026-10-22)
 - **Date:** 2026-08-11
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, requirement
@@ -166,8 +166,8 @@ Lo que cambia para este ADR:
    modelos **preentrenados** de ExecuTorch (COCO trae la clase "bus"; OCR CRAFT+CRNN en español,
    ~250 MB) lee en fracciones de segundo y devuelve coordenadas, que son lo que permite priorizar
    el ómnibus más cercano. La recomendación pasa de "conservar como comparación" a **"detección +
-   OCR como camino primario del teléfono, VLM local como término de comparación en el informe"**,
-   a validar con el tutor.
+   OCR como camino primario del teléfono, VLM local como término de comparación en el informe"**
+   (luego reemplazada por el ADR 0006).
 
 Consecuencias nuevas: el mínimo de iOS sube a **17.0** (podspec de ExecuTorch); hoy conviven dos
 runtimes en el binario y hay que decidir uno; la cuenta paga de Apple queda desacoplada de la

@@ -18,6 +18,7 @@ con ellos parezcan arbitrarias.
 | [2026-09-04: throughput BLE y tamaño de foto](2026-09-04-ble-throughput.md) | Si la foto del supermercado baja de la placa al teléfono por BLE en menos de 2 s (spike 0 del ADR 0003). No alcanzó: la foto va por WiFi. |
 | [2026-09-15: el modo ómnibus en la placa](2026-09-15-omnibus-en-placa.md) | Latencia del camino de ómnibus entero corriendo en el dispositivo, disparado por el botón (en la Pi 3 B+ prestada). |
 | [2026-10-22: el zoom digital del modo ómnibus](2026-10-22-zoom-omnibus.md) | El zoom del ISP sobre el cartel en la Zero 2 W, contra un video del 115: detecciones, tiempos de anuncio y por qué `--bus-full-res` no entra en esta placa. |
+| [2026-11-23: tiempos del modo supermercado](2026-11-23-telemetria-supermercado.md) | Mediana y percentil 90 de cada etapa de una lectura según la telemetría (foto, modelo, síntesis, envío); el ciclo completo se estima sumando medianas |
 
 Campañas registradas fuera de esta carpeta, que se indexan acá para no perderlas:
 

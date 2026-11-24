@@ -145,13 +145,14 @@ haya dos copias que se desincronicen.
 
 Marcados `PENDIENTE` en `docs/tesis/`; se tratan como trabajo abierto:
 - Evaluación del pipeline completo sobre las 117 imágenes con el detector de la V100 (sus métricas
-  de validación ya están en la tesis, sec. 7.4.5).
+  de validación ya están en la tesis, sec. 9.4.1).
 - Prueba en la calle del modo ómnibus con y sin zoom.
 - Respaldo local del modo supermercado.
 - Las pruebas con usuarios.
-- Ya escritos al 2026-11-12: el capítulo 10 (trabajo futuro) y la sección 7.9 (limitaciones del
-  prototipo). El capítulo 9 (conclusiones) sigue siendo un marcador de lugar, a escribir cuando estén las
-  pruebas.
+- Desde el 2026-11-24 (revisión del director) la tesis tiene 13 capítulos: el 9 es «Evaluación»
+  (resultados, requisitos y amenazas a la validez, 9.9) y el 10 (conclusiones) sigue siendo un marcador
+  de lugar, a escribir cuando estén las pruebas. Toda tabla lleva «Tabla N: título.» arriba y se cita
+  en el texto; `build.py` falla si no.
 
 > Esta skill resume el estado al 2026-11-12. Antes de tratar una decisión como final, verificarla
 > contra el repo vivo y la planilla de trabajo:

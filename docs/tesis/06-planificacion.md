@@ -2,7 +2,7 @@
 
 El proyecto se desarrolló en un período de aproximadamente nueve meses, desde marzo de 2026 hasta el 30 de noviembre de 2026, fecha límite de entrega. El desarrollo se planificó para cerrar a mediados de noviembre, reservando deliberadamente las últimas dos semanas para integración final, corrección de defectos y pruebas conjuntas de los tres pilares.
 
-Aunque la metodología de trabajo fue ágil (sec. 5.1), se complementó con una línea de referencia temporal (anexo 12.1): un desglose de entregables con estimación de complejidad y tiempo, y un cronograma de hitos que ordena las dependencias entre pilares. El sentido de esa línea de referencia en un proyecto iterativo no era fijar el contenido de cada semana, sino hacer visibles las dependencias duras (qué no puede empezar hasta que otra cosa termine) y las paralelizaciones posibles, lo que permitió que tres personas trabajaran sobre tres dominios distintos sin bloquearse.
+Aunque la metodología de trabajo fue ágil (sec. 5.1), se complementó con una línea de referencia temporal (anexo 13.1): un desglose de entregables con estimación de complejidad y tiempo, y un cronograma de hitos que ordena las dependencias entre pilares. El sentido de esa línea de referencia en un proyecto iterativo no era fijar el contenido de cada semana, sino hacer visibles las dependencias duras (qué no puede empezar hasta que otra cosa termine) y las paralelizaciones posibles, lo que permitió que tres personas trabajaran sobre tres dominios distintos sin bloquearse.
 
 ## 6.1 Estructura del desglose y medición del avance
 
@@ -62,30 +62,34 @@ La etapa en la que el sistema pasó de componentes separados a un producto que f
 
 ## 6.6 Etapa 4: validación en campo y cierre (octubre a noviembre de 2026)
 
-La etapa final comprendió:
+La etapa final comprendió las tareas siguientes; para cada una se indica su estado al cierre de este informe.
 
-- Pruebas en campo reales: una parada de ómnibus con vehículos en movimiento y una góndola de supermercado. Salvo una prueba de campo preliminar el 19 de octubre de 2026 (sec. 7.4.10), la evaluación del modo ómnibus se hizo contra video reproducido en pantalla, y cerrar esa brecha fue la prioridad de la etapa.
-- Construcción del conjunto de evaluación del modo supermercado, con fotografías tomadas por el propio dispositivo.
-- Medición del costo de la cuantización INT8 del detector, que no se pudo realizar porque el modelo convertido sólo se carga en el entorno del fabricante (sec. 7.4.5).
-- Entrenamiento del detector en la GPU puesta a disposición por Arnaldo Castro. Realizado el 15 de octubre, con 395 fotografías y 120 épocas; el primer ajuste fino, en CPU, había usado 140 imágenes y 40 épocas. El mAP@0,5:0,95 del detector pasó de 0,391 a 0,739 (sec. 7.4.3 y 7.4.5).
-- Alcance de lectura del cartel: zoom digital del procesador de imagen sobre el cartel (19 de octubre, probado en la placa el 22) y ajuste de los márgenes del recorte (21 y 22 de octubre).
-- Cierre del hardware: la lectura del monitor de batería quedó integrada el 6 de octubre y el arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en OpenSCAD y se iteró sobre impresiones de prueba desde el 14 de octubre; la versión 0.20 se imprimió y se armó con todo el hardware el 30 de octubre, y la versión final, la 0.29, se imprimió y se armó (sec. 7.3.5). El audio sale por PWM hacia el transductor de conducción ósea, ya instalado y conectado a través de una resistencia de 260 ohmios y un capacitor de 47 µF en serie (sec. 7.3.1); quedan pendientes la amplificación y la medición del consumo real.
-- Pruebas de usabilidad con usuarios ciegos y ajuste de los tiempos de interacción.
-- Documentación final, presentación y demostración.
-- Dos semanas de reserva antes del 30 de noviembre para integración, corrección y pruebas conjuntas.
+- Pruebas en campo reales: una parada de ómnibus con vehículos en movimiento y una góndola de supermercado. Salvo una prueba de campo preliminar el 19 de octubre de 2026 (sec. 7.3.10), la evaluación del modo ómnibus se hizo contra video reproducido en pantalla, y cerrar esa brecha fue la prioridad de la etapa. Parcial: la prueba sistemática en la calle no se realizó (sec. 9.4.4).
+- Construcción del conjunto de evaluación del modo supermercado, con fotografías tomadas por el propio dispositivo. No realizada (sec. 9.5).
+- Medición del costo de la cuantización INT8 del detector, que no se pudo realizar porque el modelo convertido sólo se carga en el entorno del fabricante (sec. 9.4.1).
+- Entrenamiento del detector en la GPU puesta a disposición por Arnaldo Castro. Realizado: se ejecutó el 15 de octubre, con 395 fotografías y 120 épocas; el primer ajuste fino, en CPU, había usado 140 imágenes y 40 épocas. El mAP@0,5:0,95 del detector pasó de 0,391 a 0,739 (sec. 7.3.4 y 9.4.1).
+- Alcance de lectura del cartel: zoom digital del procesador de imagen sobre el cartel (19 de octubre, probado en la placa el 22) y ajuste de los márgenes del recorte (21 y 22 de octubre). Realizado y medido contra video; sin prueba en la calle.
+- Cierre del hardware: la lectura del monitor de batería quedó integrada el 6 de octubre y el arranque bajó a 16 segundos hasta que la placa es visible para el teléfono. La carcasa se diseñó en OpenSCAD y se iteró sobre impresiones de prueba desde el 14 de octubre; la versión 0.20 se imprimió y se armó con todo el hardware el 30 de octubre, y la versión final, la 0.29, se imprimió y se armó (sec. 7.2.8). El audio sale por PWM hacia un amplificador PAM8403, con un filtro de entrada de dos etapas, y de ahí al transductor de conducción ósea (sec. 7.2.2). Realizado, salvo la medición del consumo real, que queda pendiente.
+- Pruebas de usabilidad con usuarios ciegos y ajuste de los tiempos de interacción. No realizadas (sec. 9.9).
+- Documentación final, presentación y demostración. Documentación realizada; presentación y demostración, previstas para la defensa.
+- Dos semanas de reserva antes del 30 de noviembre para integración, corrección y pruebas conjuntas. Realizada: en ellas se hizo la integración del producto completo y sus ajustes (sec. 7.5.10) y la segunda revisión del código (sec. 9.7.5).
 
 ## 6.7 Riesgos identificados y su tratamiento
 
-| **Riesgo** | **Estado** | **Mitigación adoptada** |
-|---|---|---|
-| El enlace inalámbrico no alcanza para mover la imagen | Materializado | Medido antes de depender de él; rediseño a dos planos (sec. 7.2) |
-| La inferencia multimodal local no es viable en el teléfono | Materializado | Spike de dos días; se adoptó un pipeline por caso de uso |
-| Rotura del hardware de desarrollo | Materializado | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada (Raspberry Pi 3 B+), dejando constancia de que las mediciones de radio no son transferibles. El 19 de septiembre se volvió a la Raspberry Pi Zero 2 W, y con ella vuelven a valer las mediciones de radio originales. A comienzos de noviembre la placa volvió a dañarse y se reemplazó; como toda la configuración vive en la tarjeta de memoria, la placa nueva funcionó sin reinstalar nada (sec. 7.3.7) |
-| Dependencia de servicios de nube con cuota gratuita | Vigente | Proxy propio que permite rotar o cortar una clave sin publicar una versión; tope de gasto configurado en cada proveedor |
-| Pausa automática del proyecto de backend por inactividad | Materializado | Documentado como riesgo operativo; requiere actividad periódica |
-| La precisión del detector cuantizado es desconocida | Vigente | Receta de validación preparada; medición pendiente (sec. 7.4) |
-| Red local del dispositivo con clave fija y servidor HTTP sin autenticación | Aceptado | Con una sola unidad y sin adversario plausible en el alcance de la tesis, no se mitiga en el prototipo; para una versión distribuible, clave por unidad y token por sesión (ADR 0003, actualización del 3 de noviembre) |
-| Evaluación realizada sobre video y no sobre la calle | Vigente | Prioridad de la etapa 4; la primera prueba de campo (19 de octubre) mostró que el cartel sólo se leía con el ómnibus muy cerca, lo que motivó el zoom digital |
-| Proxy de visión sin autenticación, con un límite de solicitudes por dirección de origen que cada instancia de la plataforma lleva por separado | Aceptado | El abuso de la cuota de los proveedores se acota con la lista de destinos permitidos y el tope de gasto configurado en cada proveedor; aceptado para el prototipo (sec. 7.2.3 y 8.6.1) |
-| Característica de control BLE sin autenticación | Aceptado | Un central cercano podría enviar comandos al dispositivo; se acepta en el prototipo, con una sola unidad, y la clave por unidad queda como trabajo futuro (sec. 7.3.2 y 10.6) |
-| Función de evidencia sin sesión que guarda fotografías de la vía pública, con personas y matrículas | Vigente | Son datos personales; la función se usa sólo durante el desarrollo, en almacenamiento privado, y debe deshabilitarse antes de la versión final (sec. 8.6.3) |
+La Tabla 9 reúne los riesgos del proyecto. Sólo dos se identificaron al inicio, ambos técnicos y ambos tratados de la misma forma, midiendo antes de depender del supuesto; el resto apareció durante el desarrollo, a medida que se incorporaban componentes o se revisaba el código, y se registró en ese momento. El estado distingue los riesgos que se materializaron, los que siguen vigentes al cierre y los que el equipo aceptó para el prototipo de forma explícita. [PENDIENTE: el equipo debe asignar a cada riesgo una probabilidad y un impacto (por ejemplo, alto, medio o bajo); no se registraron durante el proyecto y no se agregan aquí sin su criterio.]
+
+Tabla 9: Riesgos del proyecto, momento en que se identificaron, estado y mitigación.
+
+| **Riesgo** | **Identificación** | **Estado** | **Mitigación adoptada** |
+|---|---|---|---|
+| El enlace inalámbrico no alcanza para mover la imagen | Al inicio, antes de medir | Materializado | Medido antes de depender de él; rediseño a dos planos (sec. 7.1.5) |
+| La inferencia multimodal local no es viable en el teléfono | Al inicio | Materializado | Spike de dos días; se adoptó un pipeline por caso de uso |
+| Rotura del hardware de desarrollo | Durante (septiembre) | Materializado | El conector de cámara de la placa original se rompió; se continuó sobre una placa prestada (Raspberry Pi 3 B+), dejando constancia de que las mediciones de radio no son transferibles. El 19 de septiembre se volvió a la Raspberry Pi Zero 2 W, y con ella vuelven a valer las mediciones de radio originales. A comienzos de noviembre la placa volvió a dañarse y se reemplazó; como toda la configuración vive en la tarjeta de memoria, la placa nueva funcionó sin reinstalar nada (sec. 7.2.10) |
+| Dependencia de servicios de nube con cuota gratuita | Durante (agosto, al adoptar la nube) | Vigente | Proxy propio que permite rotar o cortar una clave sin publicar una versión; tope de gasto configurado en cada proveedor |
+| Pausa automática del proyecto de backend por inactividad | Durante | Materializado | Documentado como riesgo operativo; requiere actividad periódica |
+| La precisión del detector cuantizado es desconocida | Durante (septiembre, al convertir el modelo) | Vigente | Receta de validación preparada; medición pendiente (sec. 7.3) |
+| Red local del dispositivo con clave fija y servidor HTTP sin autenticación | Durante (noviembre, revisión de código) | Aceptado | Con una sola unidad y sin adversario plausible en el alcance de la tesis, no se mitiga en el prototipo; para una versión distribuible, clave por unidad y token por sesión (ADR 0003, actualización del 3 de noviembre) |
+| Evaluación realizada sobre video y no sobre la calle | Durante (octubre, prueba de campo) | Vigente | Prioridad de la etapa 4; la primera prueba de campo (19 de octubre) mostró que el cartel sólo se leía con el ómnibus muy cerca, lo que motivó el zoom digital |
+| Proxy de visión sin autenticación, con un límite de solicitudes por dirección de origen que cada instancia de la plataforma lleva por separado | Durante (septiembre, al diseñar el proxy) | Aceptado | El abuso de la cuota de los proveedores se acota con la lista de destinos permitidos y el tope de gasto configurado en cada proveedor; aceptado para el prototipo (sec. 7.1.6 y 8.6.1) |
+| Característica de control BLE sin autenticación | Durante (noviembre, revisión de código) | Aceptado | Un central cercano podría enviar comandos al dispositivo; se acepta en el prototipo, con una sola unidad, y la clave por unidad queda como trabajo futuro (sec. 7.2.3 y 11.6) |
+| Función de evidencia sin sesión que guarda fotografías de la vía pública, con personas y matrículas | Durante (octubre) | Vigente | Son datos personales; la función se usa sólo durante el desarrollo, en almacenamiento privado, y debe deshabilitarse antes de la versión final (sec. 8.6.3) |
