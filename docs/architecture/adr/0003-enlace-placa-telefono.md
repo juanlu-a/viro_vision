@@ -1,6 +1,6 @@
 # ADR 0003: Enlace placa ↔ teléfono: BLE como plano de control, la foto se decide midiendo
 
-- **Status:** Proposed (2026-09-04), **actualizado 2026-09-05: la medición cerró el transporte de la
+- **Status:** Accepted (cerrado el 2026-11-24 a pedido del director; propuesto el 2026-09-04), **actualizado 2026-09-05: la medición cerró el transporte de la
   foto: WiFi (plan B)**. Falta validar con el tutor. Hardware real, audio y arranque al día en la
   actualización 2026-10-22
 - **Date:** 2026-09-04

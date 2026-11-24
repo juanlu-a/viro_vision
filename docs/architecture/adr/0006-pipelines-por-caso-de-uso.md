@@ -1,6 +1,6 @@
 # ADR 0006: Pipelines por caso de uso: bondis local, supermercado nube o LLM chico
 
-- **Status:** Proposed, a validar con el tutor (enmendado 2026-09-07: el detector se fine-tunea y corre en el sensor IMX500, sin Coral; 2026-10-19: zoom digital sobre el cartel, medido en la placa el 2026-10-22; 2026-10-22: márgenes del cartel, reentrenamiento en la V100 y catálogo)
+- **Status:** Accepted (cerrado el 2026-11-24 a pedido del director) (enmendado 2026-09-07: el detector se fine-tunea y corre en el sensor IMX500, sin Coral; 2026-10-19: zoom digital sobre el cartel, medido en la placa el 2026-10-22; 2026-10-22: márgenes del cartel, reentrenamiento en la V100 y catálogo)
 - **Date:** 2026-08-22 (reunión de equipo del 2026-08-21)
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, architecture

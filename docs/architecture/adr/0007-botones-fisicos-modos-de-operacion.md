@@ -1,6 +1,6 @@
 # ADR 0007: Botones físicos y modos de operación del dispositivo
 
-- **Status:** Proposed, a validar con el tutor
+- **Status:** Accepted (cerrado el 2026-11-24 a pedido del director)
 - **Date:** 2026-08-22 (reunión de equipo del 2026-08-21)
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** hardware, app, accessibility

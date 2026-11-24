@@ -1,6 +1,6 @@
 # ADR 0004: Runtime de inferencia on-device (Gemma vía LiteRT-LM)
 
-- **Status:** Proposed, a discutir con el tutor (superado en lo central por ADR 0006; actualización 2026-10-22)
+- **Status:** Superseded por el ADR 0006 (cerrado el 2026-11-24 a pedido del director) (superado en lo central por ADR 0006; actualización 2026-10-22)
 - **Date:** 2026-08-11
 - **Deciders:** ViroVision team (Juan Lucas Abreu, Magalí Dellapiazza, Francisco Tauber)
 - **Tags:** ml, app, hardware, requirement
