@@ -5102,8 +5102,6 @@ dependencias a una tarjeta de 512 MB de RAM.
 La placa quedó en la WiFi de casa con el AP apagado hasta el próximo reinicio, que la devuelve al
 modo producto.
 
-- La prueba nueva de `test_link.py` sólo corre en la placa (en la Mac falta `dbus_next`).
-
 ## 2026-11-24: la revisión del director sobre el informe
 
 El director comentó el informe en el Doc (59 comentarios) y por mensaje (cinco generales). Se resolvió
