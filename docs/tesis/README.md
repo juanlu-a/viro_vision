@@ -4,7 +4,7 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 
 | Dónde | Qué manda ahí |
 |---|---|
-| **Este directorio** | **Los capítulos 1 a 12.** Es la fuente de verdad: lo que está acá es el texto correcto |
+| **Este directorio** | **Los capítulos 1 a 13.** Es la fuente de verdad: lo que está acá es el texto correcto |
 | **El Google Doc** | La **carátula** y el **índice**, que no se pueden escribir en Markdown (la carátula lleva el logo como imagen y el índice es un campo vivo de Docs). Y es la superficie donde el equipo lee, comenta y sugiere |
 
 **[ViroVision PFC v2 (completo)](https://docs.google.com/document/d/19Bki4iWc6h48yO6PNMBeEueIF4Gj3ApodsjWADizKWs/edit)** en la carpeta *Documentos* del Drive del proyecto.
@@ -14,16 +14,18 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 | Archivo | Estado |
 |---|---|
 | `01-introduccion.md` | Del documento original |
-| `02-descripcion-del-proyecto.md` | Del documento original: alcance, objetivos, entregables, antecedentes |
+| `02-descripcion-del-proyecto.md` | Contexto y relevamiento, requisitos (traídos del anexo en la revisión del director de noviembre de 2026), objetivos, alcance y entregables, en ese orden |
 | `03-marco-teorico.md` | Reescrito por el equipo en el Doc (noviembre de 2026): IA, métricas, YOLO, OCR, Edge AI, comunicación inalámbrica, audio y WCAG |
 | `04-estado-del-arte.md` | Del original, más los apartados que estaban vacíos |
 | `05-metodologia.md` | Nuevo |
 | `06-planificacion.md` | Nuevo |
-| `07-desarrollo.md` | Nuevo, el capítulo central |
+| `07-desarrollo.md` | Diseño y desarrollo: de la arquitectura a cada componente, con sus decisiones y las mediciones que las justifican, resumidas |
 | `08-despliegue.md` | Nuevo |
-| `09-conclusiones.md`, `10-trabajo-futuro.md` | Marcadores; se escriben al final |
-| `11-bibliografia.md` | Nuevo, pendiente de verificar contra las fuentes |
-| `12-anexo.md` | Del original, más el material nuevo |
+| `09-evaluacion.md` | Nuevo (noviembre de 2026): conjuntos de datos, métricas con su unidad y denominador, resultados por caso de uso, cumplimiento de requisitos y amenazas a la validez |
+| `10-conclusiones.md` | Marcador; se escribe al final |
+| `11-trabajo-futuro.md` | Nuevo |
+| `12-bibliografia.md` | Nuevo, pendiente de verificar contra las fuentes |
+| `13-anexo.md` | Del original, más el material nuevo |
 
 ## Convenciones de redacción
 
@@ -39,10 +41,16 @@ El documento vive en dos lugares y cada uno tiene un rol distinto.
 - **Lo pendiente se declara.** Lo que no está hecho o no está medido se dice, no se omite.
 - **Ninguna credencial se transcribe.** Se nombra la deuda, no el valor.
 - **Comillas “” y cita antes del punto** (convención del equipo en el Doc, 2026-11-17): “así”, y
-  «… del proyecto \[45\].». Las citas son numéricas, \[n\], y remiten a la lista única del capítulo 11.
+  «… del proyecto \[45\].». Las citas son numéricas, \[n\], y remiten a la lista única del capítulo 12.
 - **La bibliografía es una sola lista numerada**, sin subtítulos por tema: si se agrupara, el Doc
   reiniciaría la numeración en cada grupo y las citas dejarían de coincidir. Una fuente nueva se
   agrega al final, para no correr la numeración de las que ya se citan.
+- **Toda tabla lleva número y título, arriba, y se cita desde el texto** (pedido del director, noviembre de
+  2026): «Tabla N: título.» en la línea anterior a la tabla, numeración global y correlativa, y en el
+  texto «la Tabla N muestra…» o «(Tabla N)», nunca «la tabla anterior». La fuente, si la hay, va debajo.
+  `build.py` falla si una tabla no tiene título, si la numeración salta o si una tabla o una figura
+  no se cita en ninguna parte, y genera `build/lists.md` con la lista de tablas y la de figuras, que
+  van en el Doc junto al índice.
 - **Las figuras van en el cuerpo**, junto al párrafo que las cita, con numeración global y
   correlativa: «Figura N: título.» debajo de la imagen y, en el párrafo siguiente, «Fuente: …». Sólo
   las muy grandes o las complementarias van además, o únicamente, en el anexo. En el Markdown la
@@ -150,5 +158,5 @@ haya cambiado, y recién entonces publicar.
 - Las figuras marcadas.
 - Las columnas reales del tablero de Trello (§5.4).
 - El registro completo de reuniones con el director (§5.6).
-- Verificar la bibliografía contra las fuentes (capítulo 11).
+- Verificar la bibliografía contra las fuentes (capítulo 12).
 - Conclusiones y trabajo futuro.

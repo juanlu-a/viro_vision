@@ -5101,3 +5101,45 @@ dependencias a una tarjeta de 512 MB de RAM.
 
 La placa quedó en la WiFi de casa con el AP apagado hasta el próximo reinicio, que la devuelve al
 modo producto.
+
+## 2026-11-24: la revisión del director sobre el informe
+
+El director comentó el informe en el Doc (59 comentarios) y por mensaje (cinco generales). Se resolvió
+todo lo que se arregla redactando, sólo en el repo (el Doc lo arma el equipo con otro agente).
+
+- **Estructura.** El capítulo 2 va de contexto y relevamiento a una síntesis nueva (2.2: por qué
+  ómnibus y supermercado, y por qué no precios, vencimientos ni cruce de calles), los requisitos (2.3,
+  traídos del anexo con su origen en la encuesta y la entrevista), objetivos y alcance. El 7 pasa a
+  «Diseño y desarrollo», de la arquitectura a cada componente con sus decisiones. El 9 es nuevo,
+  «Evaluación»: datos, métricas con unidad y denominador, resultados por caso de uso, estado de cada
+  requisito (9.8) y amenazas a la validez (9.9). Los capítulos siguientes pasan a 10 a 13, con todas
+  las referencias remapeadas; el detalle operativo del 8 pasó al anexo 13.13.
+- **Tablas.** Las 58 llevan número, título y cita; las figuras también quedaron citadas. `build.py`
+  lo exige y genera `build/lists.md` con la lista de tablas y de figuras para el Doc.
+- **Audio.** Esquema del circuito y respuesta del filtro (`figuras/src/audio_circuit.py`), teoría en
+  3.7 y anexo 13.12 con las cuentas. El PAM8403 es de 24 dB (no 34); el filtro es un pasabajos RC
+  pasivo de segundo orden, corte de 2,1 kHz sin carga y 3,5 kHz con la entrada del ampli, más de 50 dB
+  sobre la conmutación; las resistencias bajan la ganancia efectiva a unos 17,5 dB.
+- **Telemetría como medición.** Los tiempos del modo supermercado por etapa
+  (`docs/mediciones/2026-11-23-telemetria-supermercado.md`): con salida por el teléfono unos 2,2 s,
+  con salida por el dispositivo unos 4,6 s, fuera del objetivo de 3 a 4 s por la síntesis en la nube.
+  Son sumas de medianas: el ciclo completo no se mide con un solo cronómetro.
+- **ADRs.** 0003, 0006 y 0007 aceptados y 0004 reemplazado, a pedido del director.
+- **App.** La descripción del modo supermercado dice «alimentos y productos de almacén».
+- Revisión con tackle-review (Opus, Sonnet, Haiku y Codex, cuatro rondas): el filtro se recalculó con
+  la carga del amplificador, la consulta de telemetría pasó a atribuir el modo por sesión y se
+  corrigieron plazos, estados de requisitos y referencias.
+
+### Pendientes
+
+- Datos que sólo tiene el equipo, marcados `[PENDIENTE]`: discapacidad visual en el Censo 2011
+  desagregado o 2023; cuántas de las 26 respuestas son de personas con discapacidad visual;
+  consentimiento de Luciano para publicar con su nombre; peso del dispositivo; autor y licencia del
+  modelo base de la carcasa; precios en Uruguay de la tabla de placas y de OrCam; partición de la v7 en
+  Roboflow; Android; probabilidad e impacto de los riesgos; confirmar el párrafo del asistente (5.3).
+- Leer y, si corresponde, citar los tres trabajos académicos que sugirió el director (4.2).
+- Escribir las conclusiones (cap. 10) con las dos limitaciones que pidió destacar.
+- En el Doc: título más corto, la tabla de costos en página nueva y la lista de tablas junto al índice.
+- `sync_doc.py` no maneja secciones movidas: pegar capítulos enteros.
+- Medir el ciclo completo del modo supermercado (doble clic a audio).
+

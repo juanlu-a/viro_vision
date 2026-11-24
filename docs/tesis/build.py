@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the thesis body from the per-chapter sources.
 
-The repository is the source of truth for chapters 1 to 12. The Google Doc holds
+The repository is the source of truth for chapters 1 to 13. The Google Doc holds
 the cover page and the table of contents, which cannot be expressed in Markdown
 (the cover carries an image and the index is a live field), and is the surface
 the team reads and comments on.
@@ -10,6 +10,9 @@ Usage:
     python3 build.py                # whole body -> build/body.md and build/body.html
     python3 build.py --chapter 7    # one chapter, for a surgical edit
     python3 build.py --list         # what would be included, in order
+
+The whole-body build also writes build/lists.md, the list of tables and the list of
+figures that go in the Doc's front matter next to the table of contents.
 
 The HTML output is what gets pasted into the Doc. See README.md for the
 procedure and for the traps that are easy to fall into.
@@ -43,15 +46,76 @@ def assemble(only=None):
     return "\n\n".join(parts) + "\n"
 
 
-def check(text):
+def check(text, whole_body):
     """Fail on the conventions that are easy to break by hand."""
     problems = []
     if "—" in text:
         problems.append("em dash found: use commas, colons or parentheses")
     for match in re.finditer(r"^#{1,6}\s*$", text, re.M):
         problems.append(f"empty heading at offset {match.start()}")
+    problems += uncaptioned_tables(text)
+    if whole_body:
+        problems += check_captions(text, "Tabla", "Tablas")
+        problems += check_captions(text, "Figura", "Figuras")
     if problems:
         sys.exit("\n".join(problems))
+
+
+def captions(text, word):
+    """(number, title) of every caption line, e.g. 'Tabla 7: Title.'"""
+    return [(int(m.group(1)), m.group(2)) for m in re.finditer(rf"^{word} (\d+): (.*)$", text, re.M)]
+
+
+def check_captions(text, word, plural):
+    """Captions numbered 1..N in order, and each one cited somewhere outside its caption.
+
+    Only for the whole body: a single chapter starts mid-sequence and cites other chapters.
+    """
+    problems = []
+    found = captions(text, word)
+    numbers = [n for n, _ in found]
+    if numbers != list(range(1, len(numbers) + 1)):
+        problems.append(f"{word} captions are not numbered 1..N in order: {numbers}")
+    body = re.sub(rf"^{word} \d+:.*$", "", text, flags=re.M)
+    cited = set()
+    for m in re.finditer(rf"\b(?:{word}|{plural}) (\d+(?:(?:, | y | a )\d+)*)", body):
+        cited |= expand(m.group(1))
+    for n in numbers:
+        if n not in cited:
+            problems.append(f"{word} {n} is never cited in the text")
+    return problems
+
+
+def uncaptioned_tables(text):
+    """Every table needs a 'Tabla N: title.' line right above it (whole body or a single chapter)."""
+    problems = []
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if line.startswith("|") and (i == 0 or not lines[i - 1].startswith("|")):
+            j = i - 1
+            while j >= 0 and not lines[j].strip():
+                j -= 1
+            if j < 0 or not re.match(r"Tabla \d+: \S", lines[j]):
+                problems.append(f"table without a 'Tabla N: title.' caption: {line[:60]}")
+    return problems
+
+
+def expand(citation):
+    """'3, 5 y 7' -> {3, 5, 7}; '3 a 5' -> {3, 4, 5}."""
+    numbers = set()
+    for part in re.split(r", | y ", citation):
+        bounds = [int(n) for n in part.split(" a ")]
+        numbers |= set(range(bounds[0], bounds[-1] + 1))
+    return numbers
+
+
+def lists(text):
+    """The list of tables and the list of figures, for the front matter of the Doc."""
+    out = ["# Lista de tablas", ""]
+    out += [f"Tabla {n}: {title}" for n, title in captions(text, "Tabla")]
+    out += ["", "# Lista de figuras", ""]
+    out += [f"Figura {n}: {title}" for n, title in captions(text, "Figura")]
+    return "\n".join(out) + "\n"
 
 
 def main():
@@ -66,19 +130,23 @@ def main():
         return
 
     text = assemble(args.chapter)
-    check(text)
+    check(text, whole_body=args.chapter is None)
 
     BUILD.mkdir(exist_ok=True)
     stem = f"chapter-{args.chapter}" if args.chapter else "body"
     md = BUILD / f"{stem}.md"
     html = BUILD / f"{stem}.html"
     md.write_text(text)
+    if args.chapter is None:
+        (BUILD / "lists.md").write_text(lists(text))
     subprocess.run(
         ["pandoc", str(md), "-f", "gfm", "-t", "html", "-o", str(html)],
         check=True,
     )
     print(f"{md}   {len(text):>7} chars")
     print(f"{html}  {html.stat().st_size:>7} bytes")
+    if args.chapter is None:
+        print(f"{BUILD / 'lists.md'}   list of tables and list of figures")
     print()
     print("To put the HTML on the clipboard (macOS), so that Docs keeps the")
     print("headings and tables when pasting:")

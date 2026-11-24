@@ -1,4 +1,4 @@
-# 11. Bibliografía
+# 12. Bibliografía
 
 1. Stryker, C. y Kavlakoglu, E. (2026, 2 de octubre). *What is artificial intelligence (AI)?* IBM. [https://www.ibm.com/think/topics/artificial-intelligence](https://www.ibm.com/think/topics/artificial-intelligence)
 1. Dartmouth. (s. f.). *Artificial intelligence (AI) coined at Dartmouth*. [https://home.dartmouth.edu/about/artificial-intelligence-ai-coined-dartmouth](https://home.dartmouth.edu/about/artificial-intelligence-ai-coined-dartmouth)
@@ -107,8 +107,11 @@
 1. Shelby, Z., Hartke, K. y Bormann, C. (2014). *RFC 7252: The Constrained Application Protocol (CoAP)*. IETF. [https://www.rfc-editor.org/rfc/rfc7252](https://www.rfc-editor.org/rfc/rfc7252)
 1. OASIS. (2019). *MQTT Version 5.0*. OASIS Standard. [https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html)
 1. República Oriental del Uruguay. (2008). *Ley N.º 18.331 de Protección de Datos Personales y Acción de Habeas Data*. IMPO. [https://www.impo.com.uy/bases/leyes/18331-2008](https://www.impo.com.uy/bases/leyes/18331-2008)
+1. Adafruit Industries. (s. f.). *Adding Basic Audio Ouput to Raspberry Pi Zero*. Adafruit Learning System. [https://learn.adafruit.com/adding-basic-audio-ouput-to-raspberry-pi-zero](https://learn.adafruit.com/adding-basic-audio-ouput-to-raspberry-pi-zero)
+1. Diodes Incorporated. (s. f.). *PAM8403: Filterless 3W Class-D Stereo Audio Amplifier* \[hoja de datos\]. [https://www.diodes.com/products/analog/audio/part/PAM8403](https://www.diodes.com/products/analog/audio/part/PAM8403)
+1. Be My Eyes. (2023, 7 de agosto). *Introducing: Be My AI*. [https://www.bemyeyes.com/business/blog/introducing-be-my-ai/](https://www.bemyeyes.com/business/blog/introducing-be-my-ai/)
 
-Además de las fuentes anteriores, los siguientes documentos del repositorio del proyecto constituyen las fuentes primarias de los capítulos 5 a 8. Los archivos de las campañas de medición, que contienen los datos crudos, se enumeran también en el anexo (sec. 12.9):
+Además de las fuentes anteriores, los siguientes documentos del repositorio del proyecto constituyen las fuentes primarias de los capítulos 5 a 9. Los archivos de las campañas de medición, que contienen los datos crudos, se enumeran también en el anexo (anexo 13.9):
 
 - Registros de decisión de arquitectura (ADR) 0001 a 0012 (el 0005 no se redactó), docs/architecture/adr/.
 - Campaña de medición de modelos de nube, 2 de septiembre de 2026, docs/mediciones/2026-09-02-modelos-supermercado.md.
@@ -116,6 +119,7 @@ Además de las fuentes anteriores, los siguientes documentos del repositorio del
 - Campaña de medición del modo ómnibus sobre el dispositivo, 15 de septiembre de 2026, docs/mediciones/2026-09-15-omnibus-en-placa.md.
 - Reentrenamiento del detector en la GPU V100, 15 de octubre de 2026, docs/mediciones/2026-10-15-reentreno-v100/.
 - Campaña de medición del zoom digital del modo ómnibus, 22 de octubre de 2026, docs/mediciones/2026-10-22-zoom-omnibus.md.
+- Tiempos del modo supermercado según la telemetría, 23 de noviembre de 2026, docs/mediciones/2026-11-23-telemetria-supermercado.md.
 - Informe del spike de visión local, docs/spike-vision-local.md.
 - Pruebas y decisiones, docs/pruebas-y-decisiones.md.
 - Bitácora de sesiones, docs/SESSION-LOG.md.

@@ -5,7 +5,7 @@ documentación está en español (ADR 0009); el código, en inglés.
 
 ## Contenido
 
-- [`tesis/`](tesis/README.md): el informe de tesis, capítulos 1 a 12. Es la fuente de verdad del
+- [`tesis/`](tesis/README.md): el informe de tesis, capítulos 1 a 13. Es la fuente de verdad del
   texto; el Google Doc tiene la carátula y el índice.
 - [`architecture/`](architecture/README.md): el diagrama de modos de operación y los tres flujos por
   caso de uso. [`architecture/adr/`](architecture/adr/README.md) tiene los ADRs: 0001 offline-first
