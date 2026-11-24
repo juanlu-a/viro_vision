@@ -5062,3 +5062,24 @@ la tesis (sec. 7.8.5) para pasarlo al Doc oficial.
 
 - **Rotar la clave de Gemini** en Google AI Studio: viajó en builds anteriores.
 - La prueba nueva de `test_link.py` sólo corre en la placa (en la Mac falta `dbus_next`).
+
+## 2026-11-24: cierre de los pendientes de la revisión
+
+Se resolvieron los pendientes que habían quedado de las dos entradas anteriores (PR #145 y #146):
+
+- **Funciones de Supabase desplegadas** el 2026-11-23 (`vision`, `telemetry`, `evidence`). Se
+  verificó que ya corre el código nuevo: un cuerpo JSON `null` ahora devuelve 400 en las tres.
+- **Clave de Gemini eliminada** en Google AI Studio (era del plan gratuito, sin tarjeta). El secret
+  `EXPO_PUBLIC_GEMINI_API_KEY` ya se había borrado del repositorio el 2026-11-23, y no quedaba
+  ningún otro secret de proveedor. El proyecto no usa Gemini: el modo supermercado va con OpenAI y
+  Qwen (Groq) a través del proxy, y el modo ómnibus corre entero en la placa.
+- **Release a `main`** (PR #147): las versiones de TestFlight y Google Play publicadas incluyen los
+  arreglos de la revisión.
+
+Los hallazgos que la entrada del 2026-11-23 listaba como "sin tocar" también se cerraron en el PR
+#146 (el archivo `VOLUMEN`, el error de cámara en modo ómnibus, el filtro de ecos de modo, las
+pruebas de `DeviceProvider` y las pruebas con `sleep`).
+
+### Pendientes
+
+- La prueba nueva de `test_link.py` sólo corre en la placa (en la Mac falta `dbus_next`).
