@@ -318,9 +318,10 @@ class Builder:
             ps = {"namedStyleType": "NORMAL_TEXT", "alignment": "JUSTIFIED", "spaceAbove": PT(12), "spaceBelow": PT(12)}
         self.req.append({"updateParagraphStyle": {"range": self.rng(a, b), "paragraphStyle": ps, "fields": PARA_FIELDS}})
 
-    def emit_blocks(self, cursor, blocks_, fill_empty=False):
+    def emit_blocks(self, cursor, blocks_, fill_empty=False, after_list=False):
         """Insert blocks after the paragraph whose newline is at `cursor`. If fill_empty, the paragraph at
-        `cursor` is an empty one to be filled by the first paragraph block."""
+        `cursor` is an empty one to be filled by the first paragraph block. If after_list, that paragraph
+        is a list item, and list items right after it continue its list instead of starting a new one."""
         i = 0
         while i < len(blocks_):
             b = blocks_[i]
@@ -333,10 +334,37 @@ class Builder:
                 i += 1
                 continue
             if b["k"] == "li":
+                inherit = after_list and i == 0 and not fill_empty
                 group = []
                 while i < len(blocks_) and blocks_[i]["k"] == "li":
                     group.append(blocks_[i]); i += 1
-                cursor, fill_empty = self.emit_list(cursor, group, fill_empty), False
+                cursor, fill_empty = self.emit_list(cursor, group, fill_empty, inherit), False
+                continue
+            if b["k"] in ("p", "quote", "code"):
+                # consecutive paragraphs of the same kind go in as one insert with one paragraph style and
+                # one base text style: same result, a fraction of the requests
+                group = []
+                while i < len(blocks_) and blocks_[i]["k"] in (b["k"], "img"):
+                    if blocks_[i]["k"] == b["k"]:
+                        group.append(blocks_[i])
+                    i += 1
+                runs = []
+                for n, g in enumerate(group):
+                    runs += ([("\n", {})] if n else []) + list(g["runs"])
+                text = "\n".join(runs_text(g["runs"]) for g in group)
+                if fill_empty:
+                    start = cursor
+                    if text:
+                        self.req.append({"insertText": {"location": {"index": cursor}, "text": text}})
+                    fill_empty = False
+                else:
+                    start = cursor + 1
+                    self.req.append({"insertText": {"location": {"index": cursor}, "text": "\n" + text}})
+                end = start + u16(text)
+                self.req.append({"deleteParagraphBullets": {"range": self.rng(start, end + 1)}})
+                self.para_style(start, end + 1, b["k"])
+                self.text_style(start, end, runs)
+                cursor = end
                 continue
             text = runs_text(b["runs"])
             if fill_empty:
@@ -364,7 +392,18 @@ class Builder:
             self.para_style(cursor, cursor + 1, "code")
         return cursor
 
-    def emit_list(self, cursor, group, fill_empty):
+    def emit_list(self, cursor, group, fill_empty, inherit=False):
+        if inherit and all(g["level"] == 0 for g in group):
+            # appended after an item of an existing list: the new paragraphs inherit its list, so the
+            # numbering continues (createParagraphBullets would start a new list at 1)
+            joined = "\n".join(runs_text(g["runs"]) for g in group)
+            self.req.append({"insertText": {"location": {"index": cursor}, "text": "\n" + joined}})
+            pos = cursor + 1
+            for g in group:
+                t = runs_text(g["runs"])
+                self.text_style(pos, pos + u16(t), g["runs"])
+                pos += u16(t) + 1
+            return cursor + 1 + u16(joined)
         texts = [("\t" * g["level"]) + runs_text(g["runs"]) for g in group]
         joined = "\n".join(texts)
         if fill_empty:
@@ -498,7 +537,7 @@ def plan(doc):
         if md_plain(m["blocks"]) != doc_plain(d["els"]):
             if d["img"]:
                 # with images only a paragraph-level patch is safe: it never touches the image paragraphs
-                if patch(d, m) is not None or segments(d, m) is not None:
+                if patch(d, m) is not None or diffpatch(d, m) is not None or segments(d, m) is not None:
                     ops.append({"t": "replace", "d": d, "m": m, "img": True})
                 else:
                     ops.append({"t": "skip-img", "d": d, "m": m})
@@ -632,11 +671,129 @@ def segments(d, m):
     return reqs
 
 
+def lcs_pairs(a, b):
+    """Index pairs of the longest common subsequence of two key lists."""
+    n, k = len(a), len(b)
+    best = [[0] * (k + 1) for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        for j in range(k - 1, -1, -1):
+            best[i][j] = best[i + 1][j + 1] + 1 if a[i] == b[j] else max(best[i + 1][j], best[i][j + 1])
+    pairs, i, j = [], 0, 0
+    while i < n and j < k:
+        if a[i] == b[j]:
+            pairs.append((i, j)); i += 1; j += 1
+        elif best[i + 1][j] >= best[i][j + 1]:
+            i += 1
+        else:
+            j += 1
+    return pairs
+
+
+def unit_key(el):
+    if "table" in el:
+        cells = [" ".join(para_text(x["paragraph"]) for x in c["content"] if "paragraph" in x)
+                 for r in el["table"]["tableRows"] for c in r["tableCells"]]
+        return ("table", norm(" ".join(cells)))
+    p = el["paragraph"]
+    if is_image_par(el):
+        return ("img",)
+    text = norm(para_text(p))
+    if not text:
+        return ("empty", el["startIndex"])  # never matches anything
+    return ("li" if p.get("bullet") else "p", text)
+
+
+def block_key(b):
+    if b["k"] == "img":
+        return ("img",)
+    if b["k"] == "table":
+        return ("table", norm(" ".join(runs_text(c) for row in b["rows"] for c in row)))
+    return ("li" if b["k"] == "li" else "p", norm(runs_text(b["runs"])))
+
+
+def diffpatch(d, m):
+    """Paragraph-level diff of a section whose structure changed: paragraphs, tables and images that are
+    identical in the Doc and the Markdown stay untouched (with their comments), and only the stretches
+    between them are rewritten. Returns None when that would delete an image that exists only in the Doc,
+    or the section has a floating image."""
+    els = [el for el in d["els"] if "startIndex" in el and ("paragraph" in el or "table" in el)]
+    if any(el.get("paragraph", {}).get("positionedObjectIds") for el in els):
+        return None
+    if any("inlineObjectElement" in e for el in els if "paragraph" in el and not is_image_par(el)
+           for e in el["paragraph"]["elements"]):
+        return None
+    mb = [b for b in m["blocks"] if b["k"] in ("img", "table") or runs_text(b["runs"]).strip() or b["k"] == "code"]
+    dk, mk = [unit_key(el) for el in els], [block_key(b) for b in mb]
+    pairs = lcs_pairs(dk, mk)
+    matched_doc = {i for i, _ in pairs}
+    for i, el in enumerate(els):
+        if is_image_par(el) and i not in matched_doc and d["img"]:
+            return None  # an image the Markdown does not account for: never delete it
+    reqs = []
+    anchors = [(-1, -1)] + pairs + [(len(els), len(mb))]
+    for g in range(len(anchors) - 2, -1, -1):  # bottom-up
+        (ia, ja), (ib, jb) = anchors[g], anchors[g + 1]
+        gap_doc, gap_md = els[ia + 1:ib], mb[ja + 1:jb]
+        if not gap_md and all(unit_key(el)[0] == "empty" for el in gap_doc):
+            continue  # nothing to change here (blank spacer paragraphs are left alone)
+        right = els[ib]["startIndex"] if ib < len(els) else d["end"]
+        right_is_table = ib < len(els) and "table" in els[ib]
+        left = els[ia] if ia >= 0 else None
+        left_is_table = left is not None and "table" in left
+        after_list = bool(left is not None and not left_is_table and left["paragraph"].get("bullet"))
+        bld = Builder()
+
+        def emit_after_left():
+            start = left["endIndex"] if left is not None else d["he"]
+            bld.emit_blocks(start - 1, gap_md, after_list=after_list)
+            if gap_md and gap_md[0]["k"] == "table":
+                # a table inserted right after the anchor takes its newline: restore the anchor's style
+                if left is None:
+                    ps, f, a0 = {"namedStyleType": f"HEADING_{m['level']}"}, "namedStyleType", d["hs"]
+                else:
+                    st = left["paragraph"]["paragraphStyle"]
+                    ps = {k: st[k] for k in ("namedStyleType", "alignment") if k in st} or \
+                        {"namedStyleType": "NORMAL_TEXT"}
+                    f, a0 = ",".join(ps), left["startIndex"]
+                bld.req.append({"updateParagraphStyle": {"range": bld.rng(a0, start), "paragraphStyle": ps,
+                                                         "fields": f}})
+
+        if gap_doc and "paragraph" in gap_doc[-1] and not right_is_table and not left_is_table:
+            # the usual case: drop the old stretch and insert the new one after the left anchor
+            bld.req.append({"deleteContentRange": {"range": bld.rng(gap_doc[0]["startIndex"],
+                                                                    gap_doc[-1]["endIndex"])}})
+            if gap_md:
+                emit_after_left()
+        elif gap_doc and "paragraph" in gap_doc[-1]:
+            # next to a table: keep the gap's last newline as an empty paragraph and fill it, because the
+            # API refuses to delete the newline right before a table and a table needs a paragraph after it
+            gstart, last = gap_doc[0]["startIndex"], gap_doc[-1]
+            if last["endIndex"] - 1 > gstart:
+                bld.req.append({"deleteContentRange": {"range": bld.rng(gstart, last["endIndex"] - 1)}})
+            bld.emit_blocks(gstart, gap_md, fill_empty=True)
+        else:
+            if gap_doc:  # the gap ends with a table; the paragraph after it is the right anchor
+                bld.req.append({"deleteContentRange": {"range": bld.rng(gap_doc[0]["startIndex"], right)}})
+                right = gap_doc[0]["startIndex"]
+            if not gap_md:
+                pass
+            elif left_is_table:
+                bld.req.append({"insertText": {"location": {"index": right}, "text": "\n"}})
+                bld.emit_blocks(right, gap_md, fill_empty=True)
+            else:
+                emit_after_left()
+        reqs += bld.req
+    return reqs
+
+
 def build(op):
     b = Builder()
     if op["t"] == "replace":
         d, m = op["d"], op["m"]
         small = patch(d, m)
+        if small is not None:
+            return small
+        small = diffpatch(d, m)
         if small is not None:
             return small
         if op.get("img"):

@@ -621,7 +621,7 @@ Las alternativas exploradas para el respaldo fueron los modelos multimodales eje
 
 La aplicación debía funcionar en iOS y Android, comunicarse con el dispositivo físico y ser utilizable por personas ciegas o con baja visión. La elección de la tecnología debía considerar estas necesidades, la experiencia del equipo y el tiempo disponible para desarrollar y mantener la solución.
 
-Se consideraron el desarrollo nativo por plataforma y los frameworks multiplataforma, entre ellos React Native y Flutter. El desarrollo nativo permite trabajar directamente con las herramientas de cada sistema operativo, pero supone mantener dos implementaciones. Los frameworks multiplataforma permiten compartir parte del código, aunque su integración con las funciones de cada plataforma debe verificarse según las necesidades de la aplicación.
+Se consideraron el desarrollo nativo por plataforma y los frameworks multiplataforma descritos en la sec. 3.6, entre ellos React Native y Flutter. El desarrollo nativo permite trabajar directamente con las herramientas de cada sistema operativo, pero supone mantener dos implementaciones. Los frameworks multiplataforma permiten compartir parte del código, aunque su integración con las funciones de cada plataforma debe verificarse según las necesidades de la aplicación.
 
 Se eligió React Native por la experiencia previa del equipo con JavaScript y React, la posibilidad de compartir código entre plataformas y la disponibilidad de bibliotecas para la comunicación Bluetooth con el dispositivo. Estos factores permitían dedicar el esfuerzo al reconocimiento, la interacción y la accesibilidad, en lugar de aprender una tecnología nueva.
 
