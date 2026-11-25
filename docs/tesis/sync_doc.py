@@ -889,6 +889,21 @@ def main():
     for op in todo:
         r = build(op)
         n = len(json.dumps(r, ensure_ascii=False, separators=(",", ":")))
+        if op["t"] == "new" and n > maxc and len(op["secs"]) > 1:
+            # too big for one batch: insert only its last sections now; on the next round the rest come
+            # out as NEW right before them, so the order is kept
+            for j in range(len(op["secs"]) - 1, 0, -1):
+                part = dict(op, secs=op["secs"][j:])
+                r2 = build(part)
+                n2 = len(json.dumps(r2, ensure_ascii=False, separators=(",", ":")))
+                if n2 > maxc and j < len(op["secs"]) - 1:
+                    break
+                r, n = r2, n2
+            if reqs and size + n > maxc:
+                break
+            reqs += r
+            size += n
+            break
         if reqs and size + n > maxc:
             break
         reqs += r

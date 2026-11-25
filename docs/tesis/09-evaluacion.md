@@ -28,7 +28,7 @@ Tabla 36: Composición del conjunto de evaluación del pipeline de ómnibus.
 | Con cartel legible | 68 |
 | Con número esperado | 48 |
 | Con destino esperado | 56 |
-| Procedencia | tres videos (45 / 32 / 26 imágenes) y el conjunto de prueba de Roboflow (14) |
+| Procedencia | tres videos (32 / 45 / 26 imágenes) y el conjunto de prueba de Roboflow (14) |
 
 Cada fila registra la imagen, el número y el destino esperados, la presencia de ómnibus y de cartel, y una nota con el texto literal del cartel cuando difiere de la denominación oficial.
 
@@ -295,7 +295,7 @@ El modo supermercado tiene la misma limitación de forma más marcada: su precis
 
 ### 9.9.2 Validez interna: cómo se construyeron los conjuntos
 
-El conjunto de evaluación del modo ómnibus tiene 117 imágenes, pero 103 provienen de sólo tres videos (45, 32 y 26 imágenes). Los cuadros de un mismo video son muy parecidos entre sí, porque muestran los mismos ómnibus, con la misma luz y desde el mismo lugar, de modo que el tamaño efectivo de la muestra es mucho menor que 117 y los porcentajes tienen una incertidumbre mayor que la que sugiere ese número. Con 48 imágenes con número esperado, además, cada imagen vale 2,1 puntos porcentuales.
+El conjunto de evaluación del modo ómnibus tiene 117 imágenes, pero 103 provienen de sólo tres videos (32, 45 y 26 imágenes). Los cuadros de un mismo video son muy parecidos entre sí, porque muestran los mismos ómnibus, con la misma luz y desde el mismo lugar, de modo que el tamaño efectivo de la muestra es mucho menor que 117 y los porcentajes tienen una incertidumbre mayor que la que sugiere ese número. Con 48 imágenes con número esperado, además, cada imagen vale 2,1 puntos porcentuales.
 
 La partición de la versión 7 del conjunto de entrenamiento no quedó registrada en el repositorio. En consecuencia, las 14 imágenes del conjunto de evaluación tomadas de Roboflow podrían haberse usado para entrenar el detector reentrenado, y las métricas del detector antes y después del reentrenamiento no son comparables en sentido estricto: se calcularon sobre particiones distintas, que incluso podrían solaparse con las imágenes de entrenamiento (sec. 9.4.1). La mejora de 0,391 a 0,739 en el mAP@0,5:0,95 indica una tendencia, no una magnitud exacta. Las métricas del detector reentrenado se calcularon además sobre la partición con la que se eligió la mejor época, aunque la última época, que no se eligió por su resultado, da cifras prácticamente iguales.
 
