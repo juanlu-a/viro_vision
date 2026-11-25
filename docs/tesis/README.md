@@ -101,8 +101,8 @@ de abajo hacia arriba, sin tocar la carátula, el índice, las imágenes que el 
 ni los comentarios de las secciones que no cambian. El ciclo es:
 
 1. Leer el Doc con `read_doc` y quedarse con el objeto `content` (`jq '.content'`).
-2. `python3 sync_doc.py doc.json batch.json --max-chars 25000` arma la tanda siguiente; con
-   `--report` lista qué secciones difieren.
+2. `python3 sync_doc.py doc.json batch.json --reinsert auto --delete-orphans --max-chars 25000` arma
+   la tanda siguiente; con `--report` lista qué secciones difieren.
 3. Mandar `batch.json` con `update_doc`, **siempre con su `writeControl`**: si alguien editó el Doc
    en el medio, Google rechaza la tanda entera y se vuelve al paso 1.
 4. Repetir hasta que el script diga `ops=0`. Al final, actualizar el índice a mano (la API no lo
@@ -110,15 +110,32 @@ ni los comentarios de las secciones que no cambian. El ciclo es:
 
 Desde el 2026-11-18 el script reescribe sólo los párrafos y las celdas de tabla que cambiaron, cuando la
 estructura de la sección coincide (mismos párrafos, ítems y tablas). Si no coincide, reemplaza la sección
-entera. Con `--reinsert 1-14,16-18,20-23` también reescribe las secciones cuyas únicas imágenes son
-figuras con fuente en el repositorio (`figuras/` o `docs/mediciones/`), y después el script
-`imgins.py` del scratchpad las vuelve a poner sobre su epígrafe. Los diagramas que el equipo dibujó en
-el Doc (7.4.1, 7.5.1) y las imágenes del anexo nunca se reescriben. La API de Docs limita las
-escrituras por minuto: ante el error de cuota hay que esperar y reintentar.
+entera. Con `--reinsert auto` también reescribe las secciones cuyas únicas imágenes son figuras con
+fuente en el repositorio: las que el Markdown marca `<!-- imagen del Doc: figuras/x.png -->` (ruta
+relativa a `docs/tesis`, así que `../mediciones/...` también sirve; `ancho=450` fija el ancho en
+puntos). Las reconoce por el texto del epígrafe y no por el número, que cambia cada vez que se agrega
+una figura. Después, `python3 img_insert.py doc.json img.json <sha>` las vuelve a poner sobre su
+epígrafe, bajándolas de GitHub en ese commit (el repo es público, así que el commit tiene que estar
+pusheado). Los diagramas que el equipo dibujó en el Doc (marcados `<!-- imagen del Doc -->`, sin ruta)
+nunca se borran: en esas secciones el script reescribe sólo el texto entre una imagen y la otra, y
+para eso los marcadores del Markdown tienen que coincidir en cantidad con las imágenes del Doc. La API
+de Docs limita las escrituras por minuto: ante el error de cuota hay que esperar y reintentar.
 
-El script salta a propósito las secciones que todavía no hay que pisar (hoy, la 12.2.3, que en el Doc
-tiene una copia de la tabla agregada a mano: ver `SKIP` en el código) y las que tienen imágenes. Antes de publicar sigue valiendo la regla de
-abajo: traer primero al repo lo que se haya editado directo en el Doc.
+Desde el 2026-11-25 el script empareja las secciones del Markdown con las del Doc por alineación
+global (la subsecuencia común de mayor peso), y no buscando hacia adelante el primer título que
+coincide. El método anterior, ante la reestructura de la revisión del director, saltaba de 2.3 a los
+requisitos del anexo y daba el documento entero por movido. Lo que sí se movió aparece como `NEW` (en
+su lugar nuevo) más `ORPHAN` (la copia vieja en el Doc), y `--delete-orphans` borra la copia vieja.
+Una `ORPHAN-IMG` (una copia vieja con imágenes del Doc) nunca se borra sola: hay que mover antes la
+imagen, o confirmar que es una figura del repo, y recién entonces pasarla en `--delete-orphan-img
+"7.4.5 "`. Las secciones nuevas al final del documento y las huérfanas del final también se aplican.
+
+El script salta a propósito las secciones que todavía no hay que pisar (hoy, la 13.2.3, que en el Doc
+tiene una copia de la tabla agregada a mano: ver `SKIP` en el código). Antes de publicar sigue valiendo la
+regla de abajo: traer primero al repo lo que se haya editado directo en el Doc. La skill
+`/doc_update_google` hace todo el recorrido: lee lo que entró a `main`, trae las ediciones del equipo,
+atiende los comentarios del director (registro en `revision-director.md`), revisa la coherencia y
+publica. Su estado queda en `doc-sync.json`.
 
 ### Actualizar el índice
 

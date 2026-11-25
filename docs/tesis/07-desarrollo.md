@@ -409,7 +409,7 @@ El equipo no contó con una GPU durante buena parte del desarrollo. Las dos prim
 
 Para superar las dos limitaciones a la vez, la empresa Arnaldo Castro S.A. facilitó un servidor con una GPU NVIDIA Tesla V100, y el 15 de octubre de 2026 el detector de dos clases se reentrenó allí, partiendo otra vez de los pesos de YOLO11n preentrenados sobre COCO. El conjunto pasó a tener 395 imágenes y el entrenamiento completó las 120 épocas previstas, con lote de 16 imágenes de 640×640 píxeles, en unos cuatro minutos y medio. Esa corrida no aplicó todos los valores de la Tabla 22. Conservó la decisión que más importa para este problema, no reflejar las imágenes, pero dejó el resto de la aumentación en los valores por defecto de la biblioteca (tono 0,015, saturación 0,7, brillo 0,4, sin rotación, corte ni mezcla de imágenes), y el optimizador lo eligió la propia biblioteca: AdamW, con una tasa de aprendizaje inicial de 0,001667. Los registros de la corrida se conservan en el repositorio (docs/mediciones/2026-10-15-reentreno-v100/).
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/results.png ancho=450 -->
 
 Figura 21: Pérdidas de entrenamiento y de validación, y métricas de validación, a lo largo de las 120 épocas del reentrenamiento en la V100.
 

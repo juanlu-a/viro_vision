@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """Sync the thesis chapters (Markdown, source of truth) into the Google Doc, section by section.
 
-usage: sync_doc.py DOC.json OUT.json [--max-chars N] [--report]
+usage: sync_doc.py DOC.json OUT.json [--max-chars N] [--report] [--reinsert auto|1-14,16]
+                   [--delete-orphans] [--only TITLE-PREFIX]
   DOC.json  the `content` object of a read_doc result
   OUT.json  update_doc arguments {requests, writeControl} for the bottom-most changed sections
             whose request JSON fits in N chars (default 25000). Empty requests = nothing to do.
+  --report          list what differs: REPLACE, RETITLE, NEW, SKIP-IMG, ORPHAN (a Doc section no
+                    Markdown section matches, e.g. one the Markdown moved or removed) and ORPHAN-IMG
+  --reinsert auto   sections whose only images are repo figures (`<!-- imagen del Doc: figuras/... -->`
+                    in the Markdown) can be rewritten; img_insert.py puts the images back afterwards
+  --delete-orphans  also delete ORPHAN sections (never ORPHAN-IMG)
+  --delete-orphan-img "7.4.5 ,12.3 "  also delete these ORPHAN-IMG sections (title prefixes), once their
+                    images are safe elsewhere (repo figures, or moved by hand in the Doc)
 """
 import glob, json, re, subprocess, sys, unicodedata
 
@@ -111,7 +119,10 @@ def blocks(bs, quote=False, level=None, ordered=False):
         elif t == "Div":
             out += blocks(c[1], quote, level, ordered)
         elif t == "RawBlock":
-            pass
+            # `<!-- imagen del Doc[: path] -->` marks where an image sits in the Doc
+            mk = re.match(r"\s*<!-- imagen del Doc(?:: (\S+))?", c[1])
+            if mk:
+                out.append({"k": "img", "path": mk.group(1), "runs": []})
         else:
             raise SystemExit(f"block {t}")
     return out
@@ -138,6 +149,8 @@ def runs_text(runs):
 def md_plain(blocks_):
     parts = []
     for b in blocks_:
+        if b["k"] == "img":
+            continue
         if b["k"] == "table":
             parts += [runs_text(c) for row in b["rows"] for c in row]
         else:
@@ -176,8 +189,12 @@ def doc_sections(doc):
             # replace would delete them, so these sections are never rewritten
             if p and (p.get("positionedObjectIds") or any("inlineObjectElement" in e for e in p["elements"])):
                 secs[-1]["img"] = True
+    body_end = body[-1]["endIndex"]
     for i, s in enumerate(secs):
-        s["end"] = secs[i + 1]["hs"] if i + 1 < len(secs) else None
+        # the last section runs to the body's final newline, which can never be deleted
+        s["end"] = secs[i + 1]["hs"] if i + 1 < len(secs) else body_end - 1
+        s["last"] = i + 1 == len(secs)
+        s["body_end"] = body_end
         s["img"] = s["img"] and not reinsertable(s["els"])
     return secs
 
@@ -186,6 +203,32 @@ def doc_sections(doc):
 # whose only images are these, each right above its "Figura N:" caption, can be rewritten, and
 # scratchpad imgins.py puts the images back above their captions afterwards. Set with --reinsert.
 REINSERT = set()
+REINSERT_CAPTIONS = set()  # with --reinsert auto: caption texts, without "Figura N:", of the repo figures
+
+
+def caption_key(text):
+    return norm(re.sub(r"^Figura \d+:\s*", "", text))[:80]
+
+
+def repo_figures():
+    """{figure number: (path relative to docs/tesis, width in pt)} for every figure whose image lives in
+    the repository: a `<!-- imagen del Doc: figuras/x.png [ancho=N] -->` marker followed by its
+    "Figura N:" caption."""
+    out, pending = {}, None
+    for path in sorted(glob.glob(f"{REPO}/[0-9][0-9]-*.md")):
+        for line in open(path):
+            m = re.match(r"\s*<!-- imagen del Doc: (\S+)(?: ancho=(\d+))? -->", line)
+            if m:
+                pending = (m.group(1), int(m.group(2) or 400))
+                continue
+            if not line.strip():
+                continue
+            c = re.match(r"Figura (\d+):", line)
+            if pending and c:
+                out[int(c.group(1))] = pending
+                REINSERT_CAPTIONS.add(caption_key(line))
+            pending = None
+    return out
 
 
 def reinsertable(els):
@@ -200,7 +243,13 @@ def reinsertable(els):
         if any("inlineObjectElement" in e for e in p["elements"]):
             nxt = next((x["paragraph"] for x in els[i + 1:] if "paragraph" in x), None)
             m = nxt and re.match(r"Figura (\d+):", para_text(nxt))
-            if not m or int(m.group(1)) not in REINSERT:
+            if not m:
+                return False
+            # by caption text when known: numbers shift whenever a figure is added or moved
+            if REINSERT_CAPTIONS:
+                if caption_key(para_text(nxt)) not in REINSERT_CAPTIONS:
+                    return False
+            elif int(m.group(1)) not in REINSERT:
                 return False
     return True
 
@@ -275,6 +324,9 @@ class Builder:
         i = 0
         while i < len(blocks_):
             b = blocks_[i]
+            if b["k"] == "img":
+                i += 1  # the Doc's own images stay where they are; repo figures come back via img_insert.py
+                continue
             if b["k"] == "table":
                 cursor = self.emit_table(cursor, b)
                 fill_empty = True
@@ -388,18 +440,52 @@ class Builder:
 
 # ---------------------------------------------------------------- plan
 
+def score(m, d):
+    """How well Markdown section m matches Doc section d: 0 = not the same section. Same title beats
+    same title under another number; equal text breaks ties between repeated titles."""
+    if d["title"] == m["title"]:
+        sc = 4
+    elif strip_num(d["title"]) == strip_num(m["title"]) and d["level"] == m["level"]:
+        sc = 2
+    else:
+        return 0
+    return sc + (1 if md_plain(m["blocks"]) == doc_plain(d["els"]) else 0)
+
+
+def align(md, ds):
+    """Order-preserving alignment of Markdown and Doc sections with the highest total score (weighted
+    longest common subsequence). A greedy forward match jumps to the first title that fits further down
+    and drops everything in between; this keeps the bulk in place, so only the sections that really
+    moved come out as NEW (in the Markdown) plus ORPHAN (in the Doc). Returns [(md index, doc index)]."""
+    n, k = len(md), len(ds)
+    sc = [[score(m, d) for d in ds] for m in md]
+    best = [[0] * (k + 1) for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        row, nxt, si = best[i], best[i + 1], sc[i]
+        for j in range(k - 1, -1, -1):
+            v = max(nxt[j], row[j + 1])
+            if si[j]:
+                v = max(v, si[j] + nxt[j + 1])
+            row[j] = v
+    pairs, i, j = [], 0, 0
+    while i < n and j < k:
+        if sc[i][j] and best[i][j] == sc[i][j] + best[i + 1][j + 1]:
+            pairs.append((i, j)); i += 1; j += 1
+        elif best[i][j] == best[i + 1][j]:
+            i += 1
+        else:
+            j += 1
+    return pairs
+
+
 def plan(doc):
     md, ds = md_sections(), doc_sections(doc)
-    ops, j = [], 0
-    pending_new = []
-    for m in md:
-        # find the matching doc section at or after j
-        k = None
-        for idx in range(j, len(ds)):
-            if ds[idx]["title"] == m["title"] or (strip_num(ds[idx]["title"]) == strip_num(m["title"])
-                                                    and ds[idx]["level"] == m["level"]):
-                k = idx
-                break
+    pairs = align(md, ds)
+    doc_of = dict(pairs)
+    matched = {j for _, j in pairs}
+    ops, pending_new = [], []
+    for i, m in enumerate(md):
+        k = doc_of.get(i)
         if k is None:
             pending_new.append(m)
             continue
@@ -407,18 +493,25 @@ def plan(doc):
             ops.append({"t": "new", "at": ds[k]["hs"], "secs": pending_new})
             pending_new = []
         d = ds[k]
-        j = k + 1
         if d["title"] != m["title"]:
             ops.append({"t": "retitle", "d": d, "m": m})
         if md_plain(m["blocks"]) != doc_plain(d["els"]):
             if d["img"]:
-                ops.append({"t": "skip-img", "d": d, "m": m})
-            elif d["end"] is None:
-                ops.append({"t": "skip-last", "d": d, "m": m})
+                # with images only a paragraph-level patch is safe: it never touches the image paragraphs
+                if patch(d, m) is not None or segments(d, m) is not None:
+                    ops.append({"t": "replace", "d": d, "m": m, "img": True})
+                else:
+                    ops.append({"t": "skip-img", "d": d, "m": m})
             else:
                 ops.append({"t": "replace", "d": d, "m": m})
     if pending_new:
-        ops.append({"t": "new-at-end", "secs": pending_new})
+        if not ds:
+            raise SystemExit("the Doc has no '1. Introducción' heading: nothing to anchor the chapters to")
+        ops.append({"t": "new", "at": ds[-1]["body_end"], "secs": pending_new, "at_end": True})
+    # Doc sections no Markdown section claimed: moved (the Markdown has them elsewhere, as NEW) or removed
+    for k, d in enumerate(ds):
+        if k not in matched:
+            ops.append({"t": "orphan-img" if d["img"] else "orphan", "d": d})
     return ops
 
 
@@ -440,10 +533,14 @@ def patch(d, m):
             text = para_text(p).rstrip("\n")
             if not text.strip():
                 continue
-            if any("inlineObjectElement" in e for e in p["elements"]) or p.get("positionedObjectIds"):
+            if p.get("positionedObjectIds"):
                 return None
+            if any("inlineObjectElement" in e for e in p["elements"]):
+                if text.strip():
+                    return None
+                continue  # an image paragraph is left exactly where it is
             units.append(("li" if p.get("bullet") else "p", el))
-    mb = [x for x in m["blocks"] if x["k"] == "table" or runs_text(x["runs"]).strip()]
+    mb = [x for x in m["blocks"] if x["k"] == "table" or (x["k"] != "img" and runs_text(x["runs"]).strip())]
     if len(units) != len(mb):
         return None
     edits = []  # (start, end, runs)
@@ -486,6 +583,55 @@ def patch(d, m):
     return b.req
 
 
+def is_image_par(el):
+    p = el.get("paragraph")
+    return bool(p) and any("inlineObjectElement" in e for e in p["elements"]) and not para_text(p).strip()
+
+
+def segments(d, m):
+    """Replace plan for a section with images whose structure changed: the Doc's image paragraphs split
+    the section into stretches of text, the Markdown's `<!-- imagen del Doc -->` markers split it the
+    same way, and each stretch that differs is rewritten whole. The images are never touched. Returns
+    None when the counts disagree or an image floats (positioned object)."""
+    els = d["els"]
+    if any(el.get("paragraph", {}).get("positionedObjectIds") for el in els):
+        return None
+    imgs = [el for el in els if is_image_par(el)]
+    if any("inlineObjectElement" in e for el in els if "paragraph" in el and not is_image_par(el)
+           for e in el["paragraph"]["elements"]):
+        return None  # an image sharing its paragraph with text
+    md_parts, cur = [], []
+    for blk in m["blocks"]:
+        if blk["k"] == "img":
+            md_parts.append(cur); cur = []
+        else:
+            cur.append(blk)
+    md_parts.append(cur)
+    if len(md_parts) != len(imgs) + 1:
+        return None
+    bounds = [d["he"]] + [im["endIndex"] for im in imgs]
+    ends = [im["startIndex"] for im in imgs] + [d["end"]]
+    reqs = []
+    for k in range(len(md_parts) - 1, -1, -1):
+        a, b_, part = bounds[k], ends[k], md_parts[k]
+        doc_els = [el for el in els if a <= el.get("startIndex", -1) < b_]
+        if md_plain(part) == doc_plain(doc_els):
+            continue
+        bld = Builder()
+        if b_ > a:
+            bld.req.append({"deleteContentRange": {"range": bld.rng(a, b_)}})
+        bld.emit_blocks(a - 1, part)
+        if part and part[0]["k"] == "table":
+            # a table inserted right after the anchor paragraph takes its newline: restore its style
+            style = ({"namedStyleType": f"HEADING_{m['level']}"}, "namedStyleType") if k == 0 else \
+                ({"namedStyleType": "NORMAL_TEXT", "alignment": "CENTER"}, "namedStyleType,alignment")
+            start = d["hs"] if k == 0 else imgs[k - 1]["startIndex"]
+            bld.req.append({"updateParagraphStyle": {"range": bld.rng(start, a), "paragraphStyle": style[0],
+                                                     "fields": style[1]}})
+        reqs += bld.req
+    return reqs
+
+
 def build(op):
     b = Builder()
     if op["t"] == "replace":
@@ -493,6 +639,8 @@ def build(op):
         small = patch(d, m)
         if small is not None:
             return small
+        if op.get("img"):
+            return segments(d, m) or []  # never rewrite a section with images wholesale
         if d["end"] > d["he"]:
             b.req.append({"deleteContentRange": {"range": b.rng(d["he"], d["end"])}})
         b.emit_blocks(d["he"] - 1, m["blocks"])
@@ -500,13 +648,23 @@ def build(op):
             # a table inserted right after the heading takes the heading's newline: restore its style
             b.req.append({"updateParagraphStyle": {"range": b.rng(d["hs"], d["he"]), "paragraphStyle": {
                 "namedStyleType": f"HEADING_{m['level']}"}, "fields": "namedStyleType"}})
+    elif op["t"] == "orphan":
+        d = op["d"]
+        b.req.append({"deleteContentRange": {"range": b.rng(d["hs"], d["end"])}})
+        if d["last"]:
+            # what is left is the body's final paragraph: make sure it is plain text, not the heading
+            b.req.append({"updateParagraphStyle": {"range": b.rng(d["hs"], d["hs"] + 1), "paragraphStyle": {
+                "namedStyleType": "NORMAL_TEXT"}, "fields": "namedStyleType"}})
     elif op["t"] == "retitle":
         d, m = op["d"], op["m"]
         b.req.append({"deleteContentRange": {"range": b.rng(d["hs"], d["he"] - 1)}})
         b.req.append({"insertText": {"location": {"index": d["hs"]}, "text": m["title"]}})
     elif op["t"] == "new":
-        # insert "TITLE\n" at the start of the next heading, then the blocks after it
+        # insert "TITLE\n" at the start of the next heading, then the blocks after it. At the end of the
+        # body, first open an empty paragraph after the last one and insert there.
         at = op["at"]
+        if op.get("at_end"):
+            b.req.append({"insertText": {"location": {"index": at - 1}, "text": "\n"}})
         cursor = None
         first = True
         for s in op["secs"]:
@@ -532,7 +690,9 @@ def build(op):
 
 def main():
     args = sys.argv[1:]
-    if "--reinsert" in args:
+    if "--reinsert" in args and args[args.index("--reinsert") + 1] == "auto":
+        REINSERT.update(repo_figures())
+    elif "--reinsert" in args:
         for part in args[args.index("--reinsert") + 1].split(","):
             a, _, b = part.partition("-")
             REINSERT.update(range(int(a), int(b or a) + 1))
@@ -544,14 +704,21 @@ def main():
         for op in ops:
             t = op["t"]
             if t == "new":
-                print("NEW before", op["at"], [s["title"] for s in op["secs"]])
-            elif t == "new-at-end":
-                print("NEW AT END", [s["title"] for s in op["secs"]])
+                where = "AT END" if op.get("at_end") else f"before {op['at']}"
+                print("NEW", where, [s["title"] for s in op["secs"]])
             else:
                 print(t.upper(), op["d"]["title"], "->", op["m"]["title"] if t == "retitle" else "")
     SKIP = ("13.2.3 ",)
-    todo = [op for op in ops if op["t"] in ("replace", "retitle", "new")
-            and not (op["t"] == "replace" and op["d"]["title"].startswith(SKIP))]
+    force = tuple(args[args.index("--delete-orphan-img") + 1].split(",")) if "--delete-orphan-img" in args else ()
+    for op in ops:
+        if op["t"] == "orphan-img" and force and op["d"]["title"].startswith(force):
+            op["t"] = "orphan"
+    kinds = ("replace", "retitle", "new") + (("orphan",) if "--delete-orphans" in args else ())
+    todo = [op for op in ops if op["t"] in kinds
+            # matched by the Doc's title or the Markdown's: a renumbered section keeps its old title in
+            # the Doc until its retitle lands
+            and not (op["t"] == "replace" and (op["d"]["title"].startswith(SKIP)
+                                               or op["m"]["title"].startswith(SKIP)))]
     if "--only" in args:
         want = args[args.index("--only") + 1]
         todo = [op for op in todo if op["t"] != "new" and op["d"]["title"].startswith(want)]
@@ -559,7 +726,8 @@ def main():
     # retitle (heading text) goes after the body replace, which is below it.
     # same index: the body replace (below the heading) first, then the retitle, then a new section
     # inserted before that heading, so no op uses an index another op at the same spot already moved
-    todo.sort(key=lambda op: (op_pos(op), {"replace": 2, "retitle": 1, "new": 0}[op["t"]]), reverse=True)
+    todo.sort(key=lambda op: (op_pos(op), {"orphan": 3, "replace": 2, "retitle": 1, "new": 0}[op["t"]]),
+              reverse=True)
     reqs, size = [], 0
     for op in todo:
         r = build(op)

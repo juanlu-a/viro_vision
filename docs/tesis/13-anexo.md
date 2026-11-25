@@ -398,19 +398,19 @@ Fuente: argumentos de entrenamiento guardados en los pesos de la corrida (best.p
 
 Las curvas de precisión, exhaustividad y F1 en función del umbral de confianza (Figuras 27, 28 y 29) complementan las figuras de la sec. 9.4.1.
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/BoxP_curve.png -->
 
 Figura 27: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/BoxR_curve.png -->
 
 Figura 28: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/BoxF1_curve.png -->
 
 Figura 29: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
