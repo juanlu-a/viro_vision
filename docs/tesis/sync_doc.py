@@ -622,6 +622,26 @@ def patch(d, m):
     return b.req
 
 
+def is_page_break(el):
+    p = el.get("paragraph")
+    return bool(p) and any("pageBreak" in e for e in p["elements"])
+
+
+def content_end(d):
+    """Where a section's content ends: before the page-break paragraphs at its tail. Those breaks belong to
+    the layout of the next chapter (the Doc puts one before each chapter heading), so rewriting or deleting
+    this section must leave them in place."""
+    end = d["end"]
+    for el in reversed(d["els"]):
+        if "paragraph" not in el:
+            break
+        if is_page_break(el):
+            end = el["startIndex"]
+        elif para_text(el["paragraph"]).strip():
+            break
+    return end
+
+
 def is_image_par(el):
     p = el.get("paragraph")
     return bool(p) and any("inlineObjectElement" in e for e in p["elements"]) and not para_text(p).strip()
@@ -649,7 +669,7 @@ def segments(d, m):
     if len(md_parts) != len(imgs) + 1:
         return None
     bounds = [d["he"]] + [im["endIndex"] for im in imgs]
-    ends = [im["startIndex"] for im in imgs] + [d["end"]]
+    ends = [im["startIndex"] for im in imgs] + [content_end(d)]
     reqs = []
     for k in range(len(md_parts) - 1, -1, -1):
         a, b_, part = bounds[k], ends[k], md_parts[k]
@@ -716,7 +736,9 @@ def diffpatch(d, m):
     identical in the Doc and the Markdown stay untouched (with their comments), and only the stretches
     between them are rewritten. Returns None when that would delete an image that exists only in the Doc,
     or the section has a floating image."""
-    els = [el for el in d["els"] if "startIndex" in el and ("paragraph" in el or "table" in el)]
+    stop = content_end(d)
+    els = [el for el in d["els"] if "startIndex" in el and ("paragraph" in el or "table" in el)
+           and el["startIndex"] < stop]
     if any(el.get("paragraph", {}).get("positionedObjectIds") for el in els):
         return None
     if any("inlineObjectElement" in e for el in els if "paragraph" in el and not is_image_par(el)
@@ -736,7 +758,7 @@ def diffpatch(d, m):
         gap_doc, gap_md = els[ia + 1:ib], mb[ja + 1:jb]
         if not gap_md and all(unit_key(el)[0] == "empty" for el in gap_doc):
             continue  # nothing to change here (blank spacer paragraphs are left alone)
-        right = els[ib]["startIndex"] if ib < len(els) else d["end"]
+        right = els[ib]["startIndex"] if ib < len(els) else stop
         right_is_table = ib < len(els) and "table" in els[ib]
         left = els[ia] if ia >= 0 else None
         left_is_table = left is not None and "table" in left
@@ -798,8 +820,8 @@ def build(op):
             return small
         if op.get("img"):
             return segments(d, m) or []  # never rewrite a section with images wholesale
-        if d["end"] > d["he"]:
-            b.req.append({"deleteContentRange": {"range": b.rng(d["he"], d["end"])}})
+        if content_end(d) > d["he"]:
+            b.req.append({"deleteContentRange": {"range": b.rng(d["he"], content_end(d))}})
         b.emit_blocks(d["he"] - 1, m["blocks"])
         if m["blocks"] and m["blocks"][0]["k"] == "table":
             # a table inserted right after the heading takes the heading's newline: restore its style
@@ -807,7 +829,7 @@ def build(op):
                 "namedStyleType": f"HEADING_{m['level']}"}, "fields": "namedStyleType"}})
     elif op["t"] == "orphan":
         d = op["d"]
-        b.req.append({"deleteContentRange": {"range": b.rng(d["hs"], d["end"])}})
+        b.req.append({"deleteContentRange": {"range": b.rng(d["hs"], content_end(d))}})
         if d["last"]:
             # what is left is the body's final paragraph: make sure it is plain text, not the heading
             b.req.append({"updateParagraphStyle": {"range": b.rng(d["hs"], d["hs"] + 1), "paragraphStyle": {

@@ -5178,3 +5178,37 @@ atendido. Quedó en `.claude/skills/doc_update_google/SKILL.md`.
 - Primera corrida de `/doc_update_google`. La puesta al día con el PR #149 suma unas 230 operaciones y cerca
   de 1 MB de solicitudes: son muchas tandas. Hay que mover a mano, o confirmar, la imagen de la vieja 7.4.5,
   y revisar las cuatro secciones del anexo que el equipo editó en el Doc (13.2.2, 13.2.3, 13.2.5 y 13.11).
+
+## 2026-11-25 (cont.): primera corrida de `/doc_update_google`
+
+Se publicó en el Doc oficial todo lo que estaba en el repo y no en el Doc: la revisión del director (PR #149) y lo
+mergeado desde el 19 de noviembre. Antes de tocar nada se hizo una copia de respaldo del Doc en el Drive
+(“RESPALDO 2026-11-25 antes de doc_update_google”), que además conserva el historial de versiones.
+
+- **Lo nuevo de `main`.** Sólo faltaba en la tesis la actualización del código del dispositivo desde la tarjeta sin
+  red (PR #136): quedó en 8.7.2 y en el anexo 13.13.3, que todavía decía que había que instalar por acceso remoto.
+- **Ediciones del equipo en el Doc.** Contra lo último publicado (`681f1aa`) el Doc tenía cuatro diferencias en el
+  anexo: los números de pregunta de 13.2 como texto (en el Markdown eran una lista que se reiniciaba en 1) y las
+  imágenes por video de 13.11 corregidas a 32 / 45 / 26, que coinciden con `gt.csv` del repositorio de visión. Se
+  llevaron al repo, y la misma corrección se aplicó a las dos menciones del capítulo 9.
+- **Comentarios del director.** Los 64 comentarios del Doc y los 5 pedidos por mensaje quedaron en
+  `docs/tesis/revision-director.md`: 45 resueltos (ahora 46, con el salto de página antes de la tabla de costos), 17
+  pendientes del equipo y 2 «punto y seguido» anclados en un signo «:» cuya posición la API no da. En la revisión
+  apareció además una referencia equivocada en 5.3 («punto d)» por «punto f)»), corregida.
+- **Publicación.** 24 tandas por la API, de abajo hacia arriba, cada una verificada contra el conteo de imágenes y
+  tablas, y después la reinserción de 18 figuras desde GitHub. Para que entrara se mejoró `sync_doc.py`: diff por
+  párrafo dentro de cada sección (los párrafos iguales no se tocan y conservan sus comentarios), inserción agrupada,
+  continuación de listas (la bibliografía siguió en una sola lista de 110) y huecos junto a tablas sin borrar el
+  párrafo previo, que la API rechaza. El total bajó de 1 MB a unos 530 KB. Se probó antes sobre dos copias del Doc.
+- **Saltos de página.** Una corrida así borró los saltos antes de los capítulos 3, 4, 10 y 11, porque eran el
+  último párrafo de secciones reescritas o movidas. Se repusieron y el script ahora nunca toca esos párrafos.
+- **Resultado.** El Doc coincide con el repo (0 operaciones pendientes, 13.2.3 incluida), con 56 imágenes, las 58
+  tablas con su título, 30 figuras numeradas y el salto de página antes de la tabla de costos.
+
+### Pendientes
+
+- Actualizar el índice desde Chrome (perfil jlabreu24) y uniformarlo con `toc_style.py`: la API no lo refresca.
+- Insertar en el Doc la lista de tablas y la de figuras (`docs/tesis/build/lists.md`), junto al índice.
+- Ubicar en el Doc los dos «punto y seguido» del director y corregirlos.
+- Acortar el título y corregir el año en la carátula (viven sólo en el Doc).
+- Los 17 comentarios pendientes del equipo (ver `revision-director.md`).

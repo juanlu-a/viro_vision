@@ -1,6 +1,6 @@
 {
-  "main_sha": "681f1aa",
-  "published_sha": "681f1aa",
-  "date": "2026-11-19",
-  "note": "Last publication to the Google Doc (the case chapter with figures, SESSION-LOG 2026-11-19). The tutor review (PR #149) and later thesis changes are in the repo but not yet in the Doc. Updated by /doc_update_google."
+  "main_sha": "df0dc04",
+  "published_sha": "4ba3e78",
+  "date": "2026-11-25",
+  "note": "First /doc_update_google run: the tutor review (PR #149) and everything merged up to main df0dc04 is in the Doc. Backup of the Doc before the run: 'RESPALDO 2026-11-25 antes de doc_update_google' in the owner's Drive. Updated by /doc_update_google."
 }

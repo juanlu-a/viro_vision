@@ -137,6 +137,8 @@ regla de abajo: traer primero al repo lo que se haya editado directo en el Doc. 
 atiende los comentarios del director (registro en `revision-director.md`), revisa la coherencia y
 publica. Su estado queda en `doc-sync.json`.
 
+Los saltos de página antes de cada capítulo son párrafos vacíos con estilo de título 1 al final de la sección anterior. El script nunca los borra: al reescribir o eliminar una sección se detiene antes de ellos (desde el 2026-11-25, cuando una corrida grande borró cuatro y hubo que reponerlos).
+
 ### Actualizar el índice
 
 La API de Docs no puede actualizar el índice. Se actualiza desde Chrome, con el perfil jlabreu24:
