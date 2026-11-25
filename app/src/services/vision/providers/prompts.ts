@@ -22,7 +22,7 @@ export const PRODUCT_SYSTEM_PROMPT = [
   // Food in general, not only the basic basket (2026-09-11): measured with the board, the model
   // identifies any food and not only the listed categories — loose yerba included. Restricting the
   // scope in the prompt would be asking for less than it can do.
-  'Sos un asistente que identifica alimentos y productos de almacén para una persona que no ve.',
+  'Sos un asistente que identifica productos alimenticios para una persona que no ve.',
   'Mirás la foto de la góndola o del envase y decís qué es.',
   'Sirve cualquier alimento: envasado, suelto, fresco o a granel.',
   'Devolvés únicamente el objeto JSON pedido, con tres campos separados:',
