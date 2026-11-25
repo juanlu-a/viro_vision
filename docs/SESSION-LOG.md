@@ -5143,3 +5143,38 @@ todo lo que se arregla redactando, sólo en el repo (el Doc lo arma el equipo co
 - `sync_doc.py` no maneja secciones movidas: pegar capítulos enteros.
 - Medir el ciclo completo del modo supermercado (doble clic a audio).
 
+
+## 2026-11-25: la skill `/doc_update_google` y `sync_doc.py` para secciones movidas
+
+El usuario pidió una skill que, cada vez que se invoque, lea lo que entró a `main`, lo pase a la tesis y lo
+publique en el Doc oficial respetando el estilo (tercera persona, sin raya larga, prosa narrativa, sin tono
+de robot), cuidando la coherencia del documento entero y verificando que cada comentario del director quede
+atendido. Quedó en `.claude/skills/doc_update_google/SKILL.md`.
+
+- **Recorrido de la skill.** Rama en un worktree desde `staging` (o desde el PR abierto de la corrida
+  anterior); lectura de PRs, bitácora, mediciones y ADRs desde el último `main` revisado; las ediciones que el
+  equipo hizo directo en el Doc se detectan comparando el Doc con lo último publicado (`published_sha`) y se
+  traen al repo; los comentarios del director (`Sebastian Garcia` en el Doc, 63 abiertos al 2026-11-25) se
+  atienden en el texto y se registran en `docs/tesis/revision-director.md` antes de publicar, porque
+  reemplazar una sección pierde el anclaje de sus comentarios; revisión de estilo y coherencia; PR; publicación
+  con `sync_doc.py` e `img_insert.py`; índice desde Chrome. El estado queda en `docs/tesis/doc-sync.json`
+  (última publicación: `681f1aa`, 2026-11-19).
+- **`sync_doc.py` empareja por alineación global.** La búsqueda hacia adelante del primer título igual, ante
+  la reestructura del PR #149, saltaba de 2.3 a los requisitos del anexo y daba 164 secciones por movidas.
+  Ahora una subsecuencia común de peso máximo deja en su lugar lo que no se movió: lo movido sale como `NEW`
+  más `ORPHAN`, y `--delete-orphans` borra la copia vieja. También se aplican las secciones nuevas y las
+  huérfanas del final del documento, y en las secciones con diagramas del equipo se reescribe sólo el texto
+  entre imagen e imagen. `SKIP` mira el título del Doc y el del Markdown.
+- **Figuras desde el repo.** `--reinsert auto` toma las figuras marcadas con ruta
+  (`<!-- imagen del Doc: figuras/x.png -->`) y las reconoce por el texto del epígrafe, no por el número.
+  `img_insert.py` (antes un script del scratchpad que se perdió) las vuelve a poner desde el raw de GitHub. Las
+  figuras del reentreno de la V100 (21, 23, 24 y 27 a 29) ahora apuntan a `docs/mediciones/`.
+- **Prueba.** Sobre una copia del Doc (ya en la papelera) se aplicó una tanda con los casos nuevos: secciones
+  al final, huérfanas al final, cambio de título y reescritura alrededor de un diagrama. El reporte posterior
+  confirmó que esas operaciones desaparecieron sin tocar las secciones vecinas.
+
+### Pendientes
+
+- Primera corrida de `/doc_update_google`. La puesta al día con el PR #149 suma unas 230 operaciones y cerca
+  de 1 MB de solicitudes: son muchas tandas. Hay que mover a mano, o confirmar, la imagen de la vieja 7.4.5,
+  y revisar las cuatro secciones del anexo que el equipo editó en el Doc (13.2.2, 13.2.3, 13.2.5 y 13.11).

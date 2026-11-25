@@ -72,6 +72,7 @@ documento:
 | [references/decisiones.md](references/decisiones.md) | Antes de tomar una decisión que quizá ya se tomó. Índice de ADRs con su estado y **qué cambió** en cada enmienda. |
 | [references/placa-acceso.md](references/placa-acceso.md) | **Antes de tocar la Raspberry Pi**: cómo entrar (BLE con `tools/ap.py`, microSD, redes WiFi guardadas), qué no hacer nunca (unir la Mac al AP de la placa) y las trampas ya pisadas. |
 | skill **`virovision-marca`** | Ante cualquier cosa visual: colores, tokens de tema, íconos, tipografía, material de la tesis. |
+| skill **`/doc_update_google`** | Para pasar la tesis al Google Doc oficial: lee lo que entró a `main`, lo redacta en `docs/tesis`, atiende los comentarios del director, revisa la coherencia y publica sección por sección. El Doc no se edita por otra vía. |
 
 ## Convenciones y restricciones transversales
 

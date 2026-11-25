@@ -85,13 +85,13 @@ La mejora alcanza a todas las métricas. La exhaustividad pasa de 0,667 a 0,926 
 
 Por clase, el ómnibus se detecta algo mejor que el cartel (Figura 23), con un mAP@0,5 de 0,979 frente a 0,955, lo que es esperable porque el cartel es un objeto más pequeño y su aspecto cambia con el brillo de los LED. La matriz de confusión (Figura 24) confirma que el detector casi no confunde una clase con la otra: detecta con la clase correcta el 99% de los ómnibus y el 91% de los carteles de validación. Sus errores son, sobre todo, detecciones donde no hay nada: de los falsos positivos, el 62% son carteles y el 38% ómnibus. Un cartel falso no llega por sí solo a un anuncio, porque su lectura tiene que coincidir con el catálogo de líneas (sec. 7.3.8).
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/BoxPR_curve.png -->
 
 Figura 23: Curva precisión-exhaustividad del detector reentrenado, por clase y para ambas clases, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/confusion_matrix_normalized.png -->
 
 Figura 24: Matriz de confusión normalizada del detector reentrenado sobre la partición de validación. Cada columna corresponde a la clase real y cada fila a la clase predicha.
 
@@ -189,7 +189,7 @@ Las cifras corresponden al uso del sistema por el equipo durante el desarrollo, 
 
 El enlace entre el dispositivo y el teléfono se evaluó en dos momentos. El primero fue la comparación de protocolos de aplicación sobre la red WiFi, realizada al comienzo del proyecto, cuyo resultado se muestra en la Figura 25. MQTT obtuvo el menor tiempo promedio, del orden de 1,2 segundos, seguido por WebSocket y HTTP, entre 1,5 y 2 segundos, y por BLE, algo por encima de 2 segundos; CoAP superó los 10 segundos, el máximo de la escala, en varias de las mediciones. Las demás gráficas de la medición se presentan en el anexo 13.3.
 
-<!-- imagen del Doc: figuras/rtt-promedio-por-protocolo.png -->
+<!-- imagen del Doc: figuras/rtt-promedio-por-protocolo.png ancho=450 -->
 
 Figura 25: Tiempo de ida y vuelta promedio por protocolo de comunicación.
 
