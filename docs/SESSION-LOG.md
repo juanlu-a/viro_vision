@@ -5212,3 +5212,36 @@ mergeado desde el 19 de noviembre. Antes de tocar nada se hizo una copia de resp
 - Ubicar en el Doc los dos «punto y seguido» del director y corregirlos.
 - Acortar el título y corregir el año en la carátula (viven sólo en el Doc).
 - Los 17 comentarios pendientes del equipo (ver `revision-director.md`).
+
+## 2026-11-27: comentarios del director que se podían cerrar sin el equipo, e índice
+
+Segunda pasada de `/doc_update_google`. De los 17 comentarios pendientes del equipo se resolvieron los que se podían
+cerrar con datos del repo, del repositorio de visión o de fuentes públicas, y se publicaron en el Doc (6 secciones, una
+tanda, 0 operaciones pendientes después).
+
+- **Censo (sec. 2.1.1).** El 15,9% del Censo 2011 era “alguna discapacidad” de cualquier tipo. Se agregó el dato del
+  Censo 2023 del informe de UNICEF, UNFPA y MIDES (Cabrera, 2025): 92.300 personas de 5 años y más con discapacidad
+  visual, el 3,1%, con el umbral del Grupo de Washington (mucha dificultad o no puede).
+- **Encuesta (sec. 2.1.1).** La gráfica de la pregunta 1, que estaba sólo en el Doc, da la composición: de 25
+  respuestas, 7 personas ciegas, 14 con baja visión, 3 que trabajan con el colectivo y 1 familiar.
+- **Relación de aspecto (sec. 7.3.1 y 11.3).** Medida sobre las 201 cajas de cartel del conjunto v6 de Roboflow:
+  mediana 2,56 y el 28% por debajo del umbral de 2,0. Revisadas a mano, no son sólo carteles de número o laterales:
+  también hay frentes en ángulo, destinos en dos renglones y carteles de cartón. El umbral es más estricto de lo que
+  el conjunto justifica; queda como trabajo futuro, sin tocar el código.
+- **Estado del arte (sec. 4.2).** Los tres trabajos que sugirió el director: Guida et al. (2011), Shafique et al.
+  (2025, Génova, YOLOv8 + ESRGAN + EasyOCR + lista de líneas, 95% sobre 120 imágenes) y Vishnu et al. (2026, Raspberry
+  Pi). El de Génova es casi el mismo pipeline, a pedido y no en vigilancia. Los dos de Springer se leyeron sólo por su
+  resumen.
+- **Tabla 6 (sec. 4.1.1).** Precios en Uruguay: la ESP32 entre 514 y 700 pesos en Mercado Libre; la Jetson sin oferta
+  local (la Orin Nano Super, 249 USD de lista).
+- **Carátula.** El “2026” caía en la página del índice: se sacaron dos renglones vacíos y el índice empieza en página
+  nueva (sólo en el Doc).
+- **Índice.** Actualizado desde Chrome y uniformado con `toc_style.py`.
+
+### Pendientes
+
+- Siguen pendientes del equipo: probar en Android, la probabilidad y el impacto de los riesgos, la partición de la v7
+  (necesita la clave de Roboflow), el consentimiento de Luciano, el peso del dispositivo, confirmar el párrafo del
+  asistente, el autor y la licencia del modelo base de la carcasa, el título y las conclusiones (cap. 10).
+- Ubicar los dos «punto y seguido».
+- Insertar en el Doc la lista de tablas y la de figuras (`build/lists.md`).
