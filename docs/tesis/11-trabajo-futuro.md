@@ -42,6 +42,8 @@ La prioridad es evaluar el sistema en condiciones reales. Esto implica construir
 
 La cobertura debe extenderse a las zonas donde el procesamiento local es más necesario. En la periferia de Montevideo esto significa incorporar al entrenamiento y a la evaluación carteles de líneas con letras, que el sistema admite pero cuyo reconocimiento aún no se midió de forma suficiente (sec. 7.3.13). En el interior y en las líneas suburbanas e interdepartamentales significa, además, ampliar el catálogo con los datos de otras empresas y departamentos, y generar los anuncios pregrabados correspondientes; sin esa ampliación, el sistema no anuncia esas líneas aunque lea el cartel.
 
+La relación de aspecto mínima que se exige al cartel frontal (2,0) descarta el 28% de los carteles etiquetados en el conjunto de entrenamiento, entre ellos carteles frontales fotografiados en ángulo o con el destino en dos renglones (sec. 7.3.1). Queda por medir en el conjunto de evaluación cuántas lecturas se ganan al bajarlo y cuántos carteles laterales se cuelan.
+
 Si la prueba en la calle muestra que el límite está en el detector, que desde lejos no encuentra el cartel, el zoom puede extenderse a la zona de entrada del detector, para que el sensor también analice el ómnibus detectado con mayor resolución (sec. 7.3.10).
 
 ## 11.4 Reconocimiento de productos
