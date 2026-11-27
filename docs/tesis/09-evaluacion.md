@@ -265,7 +265,7 @@ Tabla 44: Estado de los requisitos al cierre del informe.
 | RF-05 | Cumplido | Treinta gestos sin errores (sec. 9.6); calibrado con personas videntes |
 | RF-06 | Cumplido | sec. 7.1.2 |
 | RF-07 | Cumplido | sec. 7.2.4 y 7.5.5 |
-| RF-08 | Cumplido con iPhone | sec. 7.5.5 y 7.5.10; no verificado con Android |
+| RF-08 | Cumplido | sec. 7.5.5 y 7.5.10; verificado con iPhone y con Android |
 | RF-09 | Cumplido | sec. 7.5.4 y 7.5.6 |
 | RF-10 | No cumplido en el modo producto | La imagen sólo se muestra en el modo desarrollo, como herramienta del equipo (sec. 7.6.4) |
 | RNF-01 | Cumplido | Detección en el sensor y OCR en la placa, sin conexión (sec. 7.3.2 y 7.2.6) |
