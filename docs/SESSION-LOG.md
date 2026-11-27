@@ -5245,3 +5245,8 @@ tanda, 0 operaciones pendientes después).
   asistente, el autor y la licencia del modelo base de la carcasa, el título y las conclusiones (cap. 10).
 - Ubicar los dos «punto y seguido».
 - Insertar en el Doc la lista de tablas y la de figuras (`build/lists.md`).
+- **Más tarde, el mismo día, con respuestas del equipo:** Android verificado (7.1.4, RF-08 cumplido); Luciano consintió
+  publicar la entrevista con su nombre (5.7); el reparto del trabajo con el asistente quedó confirmado y ampliado con
+  las tres habilidades (contexto, manual de marca, publicación del Doc) y la herramienta tackle-ticket (5.3); la carcasa
+  es diseño propio del equipo, no de terceros, con la colaboración de Fernando y Eduardo (laboratorio) y de Gian (7.2.8).
+  Todo publicado en el Doc. Siguen pendientes el peso del dispositivo, la partición de la v7 (Magalí) y las conclusiones.
