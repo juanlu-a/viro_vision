@@ -5143,3 +5143,110 @@ todo lo que se arregla redactando, sólo en el repo (el Doc lo arma el equipo co
 - `sync_doc.py` no maneja secciones movidas: pegar capítulos enteros.
 - Medir el ciclo completo del modo supermercado (doble clic a audio).
 
+
+## 2026-11-25: la skill `/doc_update_google` y `sync_doc.py` para secciones movidas
+
+El usuario pidió una skill que, cada vez que se invoque, lea lo que entró a `main`, lo pase a la tesis y lo
+publique en el Doc oficial respetando el estilo (tercera persona, sin raya larga, prosa narrativa, sin tono
+de robot), cuidando la coherencia del documento entero y verificando que cada comentario del director quede
+atendido. Quedó en `.claude/skills/doc_update_google/SKILL.md`.
+
+- **Recorrido de la skill.** Rama en un worktree desde `staging` (o desde el PR abierto de la corrida
+  anterior); lectura de PRs, bitácora, mediciones y ADRs desde el último `main` revisado; las ediciones que el
+  equipo hizo directo en el Doc se detectan comparando el Doc con lo último publicado (`published_sha`) y se
+  traen al repo; los comentarios del director (`Sebastian Garcia` en el Doc, 63 abiertos al 2026-11-25) se
+  atienden en el texto y se registran en `docs/tesis/revision-director.md` antes de publicar, porque
+  reemplazar una sección pierde el anclaje de sus comentarios; revisión de estilo y coherencia; PR; publicación
+  con `sync_doc.py` e `img_insert.py`; índice desde Chrome. El estado queda en `docs/tesis/doc-sync.json`
+  (última publicación: `681f1aa`, 2026-11-19).
+- **`sync_doc.py` empareja por alineación global.** La búsqueda hacia adelante del primer título igual, ante
+  la reestructura del PR #149, saltaba de 2.3 a los requisitos del anexo y daba 164 secciones por movidas.
+  Ahora una subsecuencia común de peso máximo deja en su lugar lo que no se movió: lo movido sale como `NEW`
+  más `ORPHAN`, y `--delete-orphans` borra la copia vieja. También se aplican las secciones nuevas y las
+  huérfanas del final del documento, y en las secciones con diagramas del equipo se reescribe sólo el texto
+  entre imagen e imagen. `SKIP` mira el título del Doc y el del Markdown.
+- **Figuras desde el repo.** `--reinsert auto` toma las figuras marcadas con ruta
+  (`<!-- imagen del Doc: figuras/x.png -->`) y las reconoce por el texto del epígrafe, no por el número.
+  `img_insert.py` (antes un script del scratchpad que se perdió) las vuelve a poner desde el raw de GitHub. Las
+  figuras del reentreno de la V100 (21, 23, 24 y 27 a 29) ahora apuntan a `docs/mediciones/`.
+- **Prueba.** Sobre una copia del Doc (ya en la papelera) se aplicó una tanda con los casos nuevos: secciones
+  al final, huérfanas al final, cambio de título y reescritura alrededor de un diagrama. El reporte posterior
+  confirmó que esas operaciones desaparecieron sin tocar las secciones vecinas.
+
+### Pendientes
+
+- Primera corrida de `/doc_update_google`. La puesta al día con el PR #149 suma unas 230 operaciones y cerca
+  de 1 MB de solicitudes: son muchas tandas. Hay que mover a mano, o confirmar, la imagen de la vieja 7.4.5,
+  y revisar las cuatro secciones del anexo que el equipo editó en el Doc (13.2.2, 13.2.3, 13.2.5 y 13.11).
+
+## 2026-11-25 (cont.): primera corrida de `/doc_update_google`
+
+Se publicó en el Doc oficial todo lo que estaba en el repo y no en el Doc: la revisión del director (PR #149) y lo
+mergeado desde el 19 de noviembre. Antes de tocar nada se hizo una copia de respaldo del Doc en el Drive
+(“RESPALDO 2026-11-25 antes de doc_update_google”), que además conserva el historial de versiones.
+
+- **Lo nuevo de `main`.** Sólo faltaba en la tesis la actualización del código del dispositivo desde la tarjeta sin
+  red (PR #136): quedó en 8.7.2 y en el anexo 13.13.3, que todavía decía que había que instalar por acceso remoto.
+- **Ediciones del equipo en el Doc.** Contra lo último publicado (`681f1aa`) el Doc tenía cuatro diferencias en el
+  anexo: los números de pregunta de 13.2 como texto (en el Markdown eran una lista que se reiniciaba en 1) y las
+  imágenes por video de 13.11 corregidas a 32 / 45 / 26, que coinciden con `gt.csv` del repositorio de visión. Se
+  llevaron al repo, y la misma corrección se aplicó a las dos menciones del capítulo 9.
+- **Comentarios del director.** Los 64 comentarios del Doc y los 5 pedidos por mensaje quedaron en
+  `docs/tesis/revision-director.md`: 45 resueltos (ahora 46, con el salto de página antes de la tabla de costos), 17
+  pendientes del equipo y 2 «punto y seguido» anclados en un signo «:» cuya posición la API no da. En la revisión
+  apareció además una referencia equivocada en 5.3 («punto d)» por «punto f)»), corregida.
+- **Publicación.** 24 tandas por la API, de abajo hacia arriba, cada una verificada contra el conteo de imágenes y
+  tablas, y después la reinserción de 18 figuras desde GitHub. Para que entrara se mejoró `sync_doc.py`: diff por
+  párrafo dentro de cada sección (los párrafos iguales no se tocan y conservan sus comentarios), inserción agrupada,
+  continuación de listas (la bibliografía siguió en una sola lista de 110) y huecos junto a tablas sin borrar el
+  párrafo previo, que la API rechaza. El total bajó de 1 MB a unos 530 KB. Se probó antes sobre dos copias del Doc.
+- **Saltos de página.** Una corrida así borró los saltos antes de los capítulos 3, 4, 10 y 11, porque eran el
+  último párrafo de secciones reescritas o movidas. Se repusieron y el script ahora nunca toca esos párrafos.
+- **Resultado.** El Doc coincide con el repo (0 operaciones pendientes, 13.2.3 incluida), con 56 imágenes, las 58
+  tablas con su título, 30 figuras numeradas y el salto de página antes de la tabla de costos.
+
+### Pendientes
+
+- Actualizar el índice desde Chrome (perfil jlabreu24) y uniformarlo con `toc_style.py`: la API no lo refresca.
+- Insertar en el Doc la lista de tablas y la de figuras (`docs/tesis/build/lists.md`), junto al índice.
+- Ubicar en el Doc los dos «punto y seguido» del director y corregirlos.
+- Acortar el título y corregir el año en la carátula (viven sólo en el Doc).
+- Los 17 comentarios pendientes del equipo (ver `revision-director.md`).
+
+## 2026-11-27: comentarios del director que se podían cerrar sin el equipo, e índice
+
+Segunda pasada de `/doc_update_google`. De los 17 comentarios pendientes del equipo se resolvieron los que se podían
+cerrar con datos del repo, del repositorio de visión o de fuentes públicas, y se publicaron en el Doc (6 secciones, una
+tanda, 0 operaciones pendientes después).
+
+- **Censo (sec. 2.1.1).** El 15,9% del Censo 2011 era “alguna discapacidad” de cualquier tipo. Se agregó el dato del
+  Censo 2023 del informe de UNICEF, UNFPA y MIDES (Cabrera, 2025): 92.300 personas de 5 años y más con discapacidad
+  visual, el 3,1%, con el umbral del Grupo de Washington (mucha dificultad o no puede).
+- **Encuesta (sec. 2.1.1).** La gráfica de la pregunta 1, que estaba sólo en el Doc, da la composición: de 25
+  respuestas, 7 personas ciegas, 14 con baja visión, 3 que trabajan con el colectivo y 1 familiar.
+- **Relación de aspecto (sec. 7.3.1 y 11.3).** Medida sobre las 201 cajas de cartel del conjunto v6 de Roboflow:
+  mediana 2,56 y el 28% por debajo del umbral de 2,0. Revisadas a mano, no son sólo carteles de número o laterales:
+  también hay frentes en ángulo, destinos en dos renglones y carteles de cartón. El umbral es más estricto de lo que
+  el conjunto justifica; queda como trabajo futuro, sin tocar el código.
+- **Estado del arte (sec. 4.2).** Los tres trabajos que sugirió el director: Guida et al. (2011), Shafique et al.
+  (2025, Génova, YOLOv8 + ESRGAN + EasyOCR + lista de líneas, 95% sobre 120 imágenes) y Vishnu et al. (2026, Raspberry
+  Pi). El de Génova es casi el mismo pipeline, a pedido y no en vigilancia. Los dos de Springer se leyeron sólo por su
+  resumen.
+- **Tabla 6 (sec. 4.1.1).** Precios en Uruguay: la ESP32 entre 514 y 700 pesos en Mercado Libre; la Jetson sin oferta
+  local (la Orin Nano Super, 249 USD de lista).
+- **Carátula.** El “2026” caía en la página del índice: se sacaron dos renglones vacíos y el índice empieza en página
+  nueva (sólo en el Doc).
+- **Índice.** Actualizado desde Chrome y uniformado con `toc_style.py`.
+
+### Pendientes
+
+- Siguen pendientes del equipo: probar en Android, la probabilidad y el impacto de los riesgos, la partición de la v7
+  (necesita la clave de Roboflow), el consentimiento de Luciano, el peso del dispositivo, confirmar el párrafo del
+  asistente, el autor y la licencia del modelo base de la carcasa, el título y las conclusiones (cap. 10).
+- Ubicar los dos «punto y seguido».
+- Insertar en el Doc la lista de tablas y la de figuras (`build/lists.md`).
+- **Más tarde, el mismo día, con respuestas del equipo:** Android verificado (7.1.4, RF-08 cumplido); Luciano consintió
+  publicar la entrevista con su nombre (5.7); el reparto del trabajo con el asistente quedó confirmado y ampliado con
+  las tres habilidades (contexto, manual de marca, publicación del Doc) y la herramienta tackle-ticket (5.3); la carcasa
+  es diseño propio del equipo, no de terceros, con la colaboración de Fernando y Eduardo (laboratorio) y de Gian (7.2.8).
+  Todo publicado en el Doc. Peso medido: 96,6 g (7.2.8 y 11.1). Siguen pendientes la partición de la v7 (Magalí) y las conclusiones.

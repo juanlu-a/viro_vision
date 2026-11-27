@@ -36,7 +36,7 @@ Versión publicada de la planilla de entregables y del diagrama de Gantt: [https
 
 <!-- imagen del Doc -->
 
-10. ¿En qué situaciones sentís que más se necesita ayuda externa?
+10\. ¿En qué situaciones sentís que más se necesita ayuda externa?
 
 La Tabla 46 transcribe las respuestas abiertas.
 
@@ -74,7 +74,7 @@ Tabla 46: Respuestas abiertas a la pregunta 10 del cuestionario.
 
 <!-- imagen del Doc -->
 
-17. Contanos una situación difícil o incómoda que hayas vivido usando transporte público.
+17\. Contanos una situación difícil o incómoda que hayas vivido usando transporte público.
 
 La Tabla 47 transcribe las respuestas abiertas.
 
@@ -112,7 +112,7 @@ Tabla 47: Respuestas abiertas a la pregunta 17 del cuestionario.
 
 <!-- imagen del Doc -->
 
-23. Si querés que te contactemos para una entrevista breve o para ampliar tu respuesta, podés dejar tu nombre y contacto.
+23\. Si querés que te contactemos para una entrevista breve o para ampliar tu respuesta, podés dejar tu nombre y contacto.
 
 *\>\> Aquí algunos de los encuestados nos dejaron sus nombres junto con sus números de teléfono o forma de contacto. 17 respuestas en total.*
 
@@ -398,19 +398,19 @@ Fuente: argumentos de entrenamiento guardados en los pesos de la corrida (best.p
 
 Las curvas de precisión, exhaustividad y F1 en función del umbral de confianza (Figuras 27, 28 y 29) complementan las figuras de la sec. 9.4.1.
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/BoxP_curve.png -->
 
 Figura 27: Precisión del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/BoxR_curve.png -->
 
 Figura 28: Exhaustividad del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
 Fuente: elaboración propia, a partir de los registros de entrenamiento de Ultralytics.
 
-<!-- imagen del Doc -->
+<!-- imagen del Doc: ../mediciones/2026-10-15-reentreno-v100/BoxF1_curve.png -->
 
 Figura 29: F1 del detector reentrenado en función del umbral de confianza, sobre la partición de validación.
 
@@ -515,7 +515,7 @@ Tabla 56: Estructura del conjunto de evaluación del pipeline de ómnibus.
 | Con cartel legible | 68 |
 | Con número esperado | 48 |
 | Con destino esperado | 56 |
-| Procedencia | Video 1: 45 · Video 2: 32 · Video 3: 26 · Conjunto de prueba de Roboflow: 14 |
+| Procedencia | Video 1: 32 · Video 2: 45 · Video 3: 26 · Conjunto de prueba de Roboflow: 14 |
 
 Columnas del archivo de verdad de terreno: identificador de imagen, número esperado, destino esperado, presencia de ómnibus, presencia de cartel y una nota con el texto literal del cartel cuando difiere de la denominación oficial.
 
@@ -643,7 +643,7 @@ El procedimiento verificado consta de cinco pasos y su orden importa:
 
 Tres restricciones de este procedimiento se identificaron durante las pruebas:
 
-- El instalador automático no se vuelve a ejecutar. Está protegido por un archivo centinela que ya existe, y ese centinela vive en la partición del sistema, no en la de arranque, por lo que no se puede borrar desde otra computadora con la tarjeta puesta. Dejar una versión nueva del paquete en la tarjeta no alcanza: hay que instalarla por acceso remoto.
+- El instalador automático no se vuelve a ejecutar. Está protegido por un archivo centinela que ya existe, y ese centinela vive en la partición del sistema, no en la de arranque, por lo que no se puede borrar desde otra computadora con la tarjeta puesta. Durante la mayor parte del desarrollo, dejar una versión nueva del paquete en la tarjeta no alcanzaba y había que instalarla por acceso remoto. Esa limitación pesó cuando hubo que llevar el control de volumen a un dispositivo que estaba lejos de cualquier red conocida, y el 18 de noviembre de 2026 se agregó una vía sin red: si en la partición de arranque hay un paquete de actualización con el código del servicio, el script que corre en cada arranque, antes del servicio, reemplaza el código instalado, guarda el anterior como respaldo y renombra el paquete para dejar constancia de que se aplicó. Esta vía reemplaza sólo el código Python y no toca el entorno virtual, de modo que no sirve cuando cambian las dependencias; en ese caso sigue siendo necesario el procedimiento por acceso remoto.
 - El paquete debe llevar el árbol completo, y no sólo el módulo de la aplicación. Un paquete incompleto instala un servicio a medias, y el síntoma aparece mucho después, sin nada que lo vincule con el día en que se ensambló de forma incorrecta.
 - Una bandera de configuración puede estar repetida en dos archivos distintos. Al renombrar las banderas por el cambio de idioma (ADR 0009), se corrigió la ocurrencia evidente y la otra volvió a imponerse en el arranque siguiente. Desde entonces, al cambiar una bandera se busca en toda la partición y no sólo en el archivo principal.
 
